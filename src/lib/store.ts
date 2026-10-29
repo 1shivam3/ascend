@@ -2229,13 +2229,18 @@ export const useAppStore = create<AppState>()(
       setMacroGoals: (goals) => set({ macroGoals: goals }),
 
       addBodyMetric: (entry) => set((state) => {
+        // Re-audit DI-R3: normalize the date like every other write path
+        // (updateBodyMetrics, imports) — an invalid date must not be
+        // stored verbatim.
+        const entryDate = isValidEntryDate(entry.date) ? entry.date : getLocalTodayStr();
+        const normalizedEntry = { ...entry, date: entryDate };
         // One entry per date: a same-date entry is replaced, and the
         // replaced row must be tombstoned or sync resurrects it (QA4-001).
         const replacedIds = state.bodyMetrics
-          .filter(m => m.date === entry.date && m.id !== entry.id)
+          .filter(m => m.date === entryDate && m.id !== entry.id)
           .map(m => m.id);
         return {
-          bodyMetrics: [stampNewRow(entry), ...state.bodyMetrics.filter(m => m.date !== entry.date)],
+          bodyMetrics: [stampNewRow(normalizedEntry), ...state.bodyMetrics.filter(m => m.date !== entryDate)],
           deletedBodyMetricIds: [
             ...new Set([
               ...(state.deletedBodyMetricIds || []).filter((d) => d !== entry.id),
@@ -4422,10 +4427,15 @@ export const useAppStore = create<AppState>()(
                 const currentState = useAppStore.getState();
                 const baselineId = 'initial_bw_' + (currentState.profile?.id || 'user');
                 const hasBaseline = (currentState.bodyMetrics || []).some((m) => m.id === baselineId);
-                if (currentState.profile?.bodyweightKg && !hasBaseline) {
+                const baselineDate = currentState.profile?.createdAt ? getLocalTodayStr(new Date(currentState.profile.createdAt)) : getLocalTodayStr();
+                // Re-audit DI-R2: never stack the baseline onto a date the
+                // user already logged — that creates a same-date duplicate
+                // (and a UNIQUE-constraint risk on the next sync push).
+                const hasRowOnBaselineDate = (currentState.bodyMetrics || []).some((m) => m.date === baselineDate);
+                if (currentState.profile?.bodyweightKg && !hasBaseline && !hasRowOnBaselineDate) {
                   const entry: BodyMetricEntry = {
                     id: baselineId,
-                    date: currentState.profile.createdAt ? getLocalTodayStr(new Date(currentState.profile.createdAt)) : getLocalTodayStr(),
+                    date: baselineDate,
                     weightKg: currentState.profile.bodyweightKg,
                     heightCm: currentState.profile.heightCm,
                     notes: 'Baseline calibration',

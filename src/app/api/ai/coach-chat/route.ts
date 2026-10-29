@@ -9,9 +9,13 @@ import {
   COACH_CHAT_MINUTE_CAP,
   COACH_CHAT_PROVIDER_TIMEOUT_MS,
   COACH_CHAT_REFER_OUT,
-  detectSafetyStop,
+  COACH_CHAT_TOPIC_DECLINE,
+  ensureReplyCaution,
+  findSafetyStop,
   formatHistoryForPrompt,
+  isCoachChatInScope,
   sanitizeHistory,
+  stripModelCitations,
   truncateReply,
 } from '@/lib/coach-chat';
 import { AiActorAuthError, aiQuotaExceededResponse, checkAiDailyQuota } from '@/lib/ai-quota';
@@ -76,42 +80,13 @@ export async function POST(req: Request) {
   });
   if (!minute.ok) return minute.response;
 
-  // 2. Per-actor daily AI quota (audit F-02), same as every other AI
-  // route: signed-in users get the per-account cap, guests the guest
-  // cap, keyed by server-verified identity only. Enforced before body
-  // parsing so a denied call consumes nothing downstream.
-  try {
-    const quota = await checkAiDailyQuota(req);
-    if (!quota.allowed) {
-      return aiQuotaExceededResponse(quota.actor, quota.resetMs);
-    }
-  } catch (err) {
-    if (err instanceof AiActorAuthError) {
-      // Gauntlet R7: present-but-unverifiable Bearer token fails closed.
-      return NextResponse.json(
-        { error: 'UNAUTHORIZED', message: 'Invalid or expired session token. Sign in again to continue.' },
-        { status: 401 }
-      );
-    }
-    if (err instanceof RateLimitUnavailableError) {
-      return rateLimitUnavailableResponse();
-    }
-    throw err;
-  }
-
-  // 3. Chat-specific daily cap: 30 messages/24h per IP (the product cap
-  // for this chat; guest mode has no account identity, so the IP is the
-  // user key — same pattern as the other routes).
-  const daily = await enforceLimit(req, {
-    windowMs: 24 * 60 * 60 * 1000,
-    maxRequests: COACH_CHAT_DAILY_CAP,
-    keyPrefix: 'coach-chat-daily',
-    errorCode: 'DAILY_CAP',
-  });
-  if (!daily.ok) return daily.response;
-
   try {
     // Streaming body read with a hard cap (gauntlet SEC-11 pattern).
+    // Re-audit E2E-R3: the body is parsed BEFORE the quota gates so the
+    // safety stop below can be served even when a quota is exhausted or
+    // the limiter is down — the refer-out is static copy and must never
+    // be blocked by quota state. Parsing is local and byte-capped, and
+    // the per-minute burst limit above still gates this path.
     const body: CoachChatRequestBody = await readJsonBodyWithLimit(req, COACH_CHAT_BODY_LIMIT);
 
     const rawMessage = typeof body.message === 'string' ? body.message.trim() : '';
@@ -130,9 +105,65 @@ export async function POST(req: Request) {
       ? rawContext.evidence.filter((e): e is string => typeof e === 'string').slice(0, 30)
       : [];
 
-    // 4. Safety stop BEFORE any provider call: pain/injury or disordered
-    // eating → refer-out copy, no model involved, no diagnosis, no advice.
-    const stop = detectSafetyStop(rawMessage);
+    // Safety stop BEFORE any provider call (re-audit SEC-R1/E2E-R2):
+    // the scan covers the current message, the user's history turns,
+    // and the grounding context (check-in notes included), in English
+    // and Hindi — everything that would otherwise reach the model.
+    // Pain/injury or disordered eating → refer-out copy, no model
+    // involved, no diagnosis, no advice.
+    const stop = findSafetyStop({ message: rawMessage, history, contextText });
+
+    // Per-actor daily AI quota (audit F-02), same as every other AI
+    // route: signed-in users get the per-account cap, guests the guest
+    // cap, keyed by server-verified identity only. The outcome is
+    // captured rather than returned immediately: a safety stop outranks
+    // a quota denial (re-audit E2E-R3). The remaining count is also
+    // captured for the honest counter (re-audit E2E-R8, below).
+    let quotaDeny: Response | null = null;
+    let sharedRemaining: number | null = null;
+    try {
+      const quota = await checkAiDailyQuota(req);
+      sharedRemaining = quota.allowed ? quota.remaining : 0;
+      if (!quota.allowed) {
+        quotaDeny = aiQuotaExceededResponse(quota.actor, quota.resetMs);
+      }
+    } catch (err) {
+      if (err instanceof AiActorAuthError) {
+        // Gauntlet R7: present-but-unverifiable Bearer token fails closed.
+        quotaDeny = NextResponse.json(
+          { error: 'UNAUTHORIZED', message: 'Invalid or expired session token. Sign in again to continue.' },
+          { status: 401 }
+        );
+      } else if (err instanceof RateLimitUnavailableError) {
+        quotaDeny = rateLimitUnavailableResponse();
+      } else {
+        throw err;
+      }
+    }
+
+    // Chat-specific daily cap: 30 messages/24h per IP (the product cap
+    // for this chat; guest mode has no account identity, so the IP is the
+    // user key — same pattern as the other routes). Runs for every
+    // parsed request so safety-stop accounting stays uniform; one
+    // deliberate exception to the old "a denied call consumes nothing"
+    // rule — a shared-quota denial now also counts here. Denial
+    // precedence is unchanged: shared quota first, then this cap.
+    const daily = await enforceLimit(req, {
+      windowMs: 24 * 60 * 60 * 1000,
+      maxRequests: COACH_CHAT_DAILY_CAP,
+      keyPrefix: 'coach-chat-daily',
+      errorCode: 'DAILY_CAP',
+    });
+
+    // Honest counter (re-audit E2E-R8): the number the client shows
+    // must be the BINDING quota — the shared per-actor AI quota
+    // (guests: 10/day across all AI features) usually binds before
+    // this chat's own 30/day cap, so report the minimum of the two.
+    // Null when the shared check errored (its remaining is unknown;
+    // the chat-cap number alone is the honest fallback there).
+    const bindingRemaining = (chatRemaining: number): number =>
+      sharedRemaining == null ? chatRemaining : Math.min(chatRemaining, sharedRemaining);
+
     if (stop) {
       return NextResponse.json({
         reply: COACH_CHAT_REFER_OUT[stop][language],
@@ -140,9 +171,29 @@ export async function POST(req: Request) {
         provider: 'safety',
         model: null,
         safetyStop: stop,
-        dailyRemaining: daily.remaining,
+        dailyRemaining: daily.ok ? bindingRemaining(daily.remaining) : 0,
       });
     }
+
+    // Mechanical topic gate (re-audit E2E-R1): the topic lock used to
+    // live only in the system prompt. A deterministic in-scope scan now
+    // declines zero-signal messages BEFORE the provider is called —
+    // same static-copy treatment as the safety stop (served regardless
+    // of quota state, counted by the chat daily cap above). Safety
+    // outranks the gate: the stop check ran first.
+    if (!isCoachChatInScope(rawMessage, history)) {
+      return NextResponse.json({
+        reply: COACH_CHAT_TOPIC_DECLINE[language],
+        evidence: [],
+        provider: 'topic-lock',
+        model: null,
+        safetyStop: null,
+        topicLock: true,
+        dailyRemaining: daily.ok ? bindingRemaining(daily.remaining) : 0,
+      });
+    }
+    if (quotaDeny) return quotaDeny;
+    if (!daily.ok) return daily.response;
 
     const systemPrompt = buildCoachChatSystemPrompt({ language, hasData });
     const prompt = [
@@ -184,14 +235,33 @@ export async function POST(req: Request) {
       safetyFiltered = true;
     }
 
+    // 6. Mechanical enforcement of the prompt's behavior rules
+    // (re-audit E2E-R1), applied to model text only — the guardrail
+    // fallback above is static copy and skips both steps:
+    //  - citation integrity: model-written attribution lines are
+    //    stripped; citations reach the user only via the evidence
+    //    array attached below.
+    //  - caution enforcement: a reply prescribing a near-max load, a
+    //    large deficit, or a sharp volume jump without a caution line
+    //    gets the localized caution prepended.
+    let cautionRisk: string | null = null;
+    if (!safetyFiltered) {
+      const stripped = stripModelCitations(reply);
+      if (stripped) reply = stripped;
+      const cautioned = ensureReplyCaution(reply, language);
+      reply = cautioned.reply;
+      cautionRisk = cautioned.risk;
+    }
+
     return NextResponse.json({
       reply,
       evidence,
       provider: execResult.provider,
       model: execResult.model,
       safetyStop: null,
-      dailyRemaining: daily.remaining,
+      dailyRemaining: bindingRemaining(daily.remaining),
       ...(safetyFiltered ? { safetyFiltered: true } : {}),
+      ...(cautionRisk ? { cautionAdded: cautionRisk } : {}),
     });
   } catch (error: unknown) {
     if (error instanceof RequestBodyTooLargeError) {

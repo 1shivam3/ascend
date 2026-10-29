@@ -6,6 +6,7 @@ import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, BodyMetricEntry, 
 import {
   mergeRemotePlans,
   mergeRemoteRecords,
+  dedupeBodyMetricsByDate,
   prunableTombstones,
   tombstonedIdsToDelete,
   isLocalProfileNewer,
@@ -1116,7 +1117,18 @@ class SupabaseSyncEngine {
           foods: r.foods || [],
           ...(r.updated_at ? { updatedAt: r.updated_at } : {}),
         }));
-        updates.bodyMetrics = (remoteMetrics.data || []).map((r: any) => bodyMetricFromRemoteRow(r));
+        // Re-audit DI-R1: adopted rows get the same one-per-date dedupe
+        // as the merge path; superseded remote rows are tombstoned so a
+        // later pull does not union them straight back in.
+        const adoptedMetrics = dedupeBodyMetricsByDate(
+          (remoteMetrics.data || []).map((r: any) => bodyMetricFromRemoteRow(r))
+        );
+        updates.bodyMetrics = adoptedMetrics.rows;
+        if (adoptedMetrics.supersededIds.length > 0) {
+          updates.deletedBodyMetricIds = [
+            ...new Set([...(localState.deletedBodyMetricIds || []), ...adoptedMetrics.supersededIds]),
+          ];
+        }
         updates.plannedWorkouts = (remotePlans.data || []).map(planFromRemoteRow);
         // Retain the mapped remote rows for apply-time recompute (R2/R5).
         pullRemote.prs = updates.prs;
@@ -1206,7 +1218,17 @@ class SupabaseSyncEngine {
             remoteMapped,
             localState.deletedBodyMetricIds || []
           );
-          if (changed) {
+          // Re-audit DI-R1: restore the one-entry-per-date invariant the
+          // id-keyed union can break (UNIQUE (user_id, date) in the DB);
+          // superseded rows are tombstoned so they are never re-pushed.
+          const deduped = dedupeBodyMetricsByDate(merged);
+          if (deduped.supersededIds.length > 0) {
+            updates.bodyMetrics = deduped.rows;
+            updates.deletedBodyMetricIds = [
+              ...new Set([...(localState.deletedBodyMetricIds || []), ...deduped.supersededIds]),
+            ];
+            needsLocalUpdate = true;
+          } else if (changed) {
             updates.bodyMetrics = merged;
             needsLocalUpdate = true;
           }

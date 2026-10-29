@@ -395,7 +395,10 @@ describe('POST /api/ai/coach-chat — route behavior (mocked provider)', () => {
     const body = await res.json();
     expect(body.reply).toContain('Squat');
     expect(body.evidence.join(' ')).toContain('Test Block');
-    expect(body.dailyRemaining).toBe(29);
+    // Re-audit E2E-R8 (pin updated with the fix): dailyRemaining now
+    // reports the BINDING quota — min(chat cap 29, shared quota 9) —
+    // not the chat cap alone, which overstated what a guest can use.
+    expect(body.dailyRemaining).toBe(9);
     expect(providerState.calls.length).toBe(1);
     const prompt = (providerState.calls[0] as { prompt: string }).prompt;
     expect(prompt).toContain('Squat');
@@ -413,15 +416,22 @@ describe('POST /api/ai/coach-chat — route behavior (mocked provider)', () => {
     expect(providerState.calls.length).toBe(0);
   });
 
+  // Re-audit E2E-R1 (pin update, behavior intentionally changed): the
+  // benign filler message in this block used to be 'hi'. The mechanical
+  // topic gate now declines zero-signal messages before the quota and
+  // provider stages, so filler posts use an in-scope question — the
+  // quota/auth/limiter/guardrail behavior pinned below is unchanged
+  // for in-scope traffic, and the gate itself is pinned in
+  // tests/reaudit-batch2.test.ts.
   it('429s with DAILY_CAP when the daily limit is hit, RATE_LIMIT for bursts', async () => {
     rateLimitState.dailyOk = false;
-    const daily = await POST(post({ message: 'hi', history: [], language: 'en', context: {} }));
+    const daily = await POST(post({ message: 'how is my squat going?', history: [], language: 'en', context: {} }));
     expect(daily.status).toBe(429);
     expect((await daily.json()).error).toBe('DAILY_CAP');
 
     rateLimitState.dailyOk = true;
     rateLimitState.minuteOk = false;
-    const minute = await POST(post({ message: 'hi', history: [], language: 'en', context: {} }));
+    const minute = await POST(post({ message: 'how is my squat going?', history: [], language: 'en', context: {} }));
     expect(minute.status).toBe(429);
     expect((await minute.json()).error).toBe('RATE_LIMIT');
     expect(providerState.calls.length).toBe(0);
@@ -429,7 +439,7 @@ describe('POST /api/ai/coach-chat — route behavior (mocked provider)', () => {
 
   it('truncates an over-long provider reply server-side', async () => {
     providerState.reply = 'w'.repeat(2000);
-    const res = await POST(post({ message: 'hi', history: [], language: 'en', context: {} }));
+    const res = await POST(post({ message: 'how is my squat going?', history: [], language: 'en', context: {} }));
     const body = await res.json();
     expect(body.reply.length).toBeLessThanOrEqual(COACH_CHAT_MAX_REPLY_CHARS);
   });
@@ -450,7 +460,7 @@ describe('POST /api/ai/coach-chat — master hardening (quota, R7, SEC-02, SEC-2
 
   it('429s with AI_QUOTA_EXCEEDED when the per-actor daily quota denies the call', async () => {
     quotaState.allowed = false;
-    const res = await POST(post({ message: 'hi', history: [], language: 'en', context: {} }));
+    const res = await POST(post({ message: 'how is my squat going?', history: [], language: 'en', context: {} }));
     expect(res.status).toBe(429);
     expect((await res.json()).error).toBe('AI_QUOTA_EXCEEDED');
     expect(providerState.calls.length).toBe(0);
@@ -458,7 +468,7 @@ describe('POST /api/ai/coach-chat — master hardening (quota, R7, SEC-02, SEC-2
 
   it('401s when the quota layer rejects an unverifiable Bearer token (R7)', async () => {
     quotaState.authError = true;
-    const res = await POST(post({ message: 'hi', history: [], language: 'en', context: {} }));
+    const res = await POST(post({ message: 'how is my squat going?', history: [], language: 'en', context: {} }));
     expect(res.status).toBe(401);
     expect((await res.json()).error).toBe('UNAUTHORIZED');
     expect(providerState.calls.length).toBe(0);
@@ -466,21 +476,21 @@ describe('POST /api/ai/coach-chat — master hardening (quota, R7, SEC-02, SEC-2
 
   it('503s when the limiter backend is unavailable — chat limits fail closed (SEC-02)', async () => {
     rateLimitState.unavailable = true;
-    const res = await POST(post({ message: 'hi', history: [], language: 'en', context: {} }));
+    const res = await POST(post({ message: 'how is my squat going?', history: [], language: 'en', context: {} }));
     expect(res.status).toBe(503);
     expect(providerState.calls.length).toBe(0);
   });
 
   it('503s when the quota check hits the limiter outage (SEC-02)', async () => {
     quotaState.unavailable = true;
-    const res = await POST(post({ message: 'hi', history: [], language: 'en', context: {} }));
+    const res = await POST(post({ message: 'how is my squat going?', history: [], language: 'en', context: {} }));
     expect(res.status).toBe(503);
     expect(providerState.calls.length).toBe(0);
   });
 
   it('replaces a guardrail-violating provider reply with the safety fallback (SEC-22)', async () => {
     providerState.reply = 'No pain, no gain — push through the pain and finish your sets.';
-    const res = await POST(post({ message: 'hi', history: [], language: 'en', context: {} }));
+    const res = await POST(post({ message: 'how is my squat going?', history: [], language: 'en', context: {} }));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.reply).toBe(COACH_SAFETY_FALLBACK);

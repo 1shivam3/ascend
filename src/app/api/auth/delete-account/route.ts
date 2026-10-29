@@ -526,6 +526,21 @@ export async function POST(req: Request) {
     );
   } catch (err: any) {
     const safeError = redactSecrets(err?.message || 'Internal deletion failure');
+    // Re-audit SEC-R4: a missing deletion secret is a configuration
+    // problem, not a deletion failure — answer with the same 503
+    // CONFIGURATION_ERROR shape this route uses for its other
+    // configuration refusals instead of a generic 500.
+    if (safeError.includes('SUPABASE_DELETION_SECRET')) {
+      return NextResponse.json(
+        {
+          cloudDeleted: false,
+          error: 'CONFIGURATION_ERROR',
+          message:
+            'Account deletion cannot be processed: server configuration is incomplete. Please contact support.',
+        },
+        { status: 503, headers: SECURITY_HEADERS }
+      );
+    }
     return NextResponse.json(
       {
         cloudDeleted: false,
