@@ -27,6 +27,7 @@ import type { NextRequest } from 'next/server';
 
 const KNOWN_API_ROUTES = new Set([
   '/api/ai/coach',
+  '/api/ai/coach-chat',
   '/api/ai/parse-meal',
   '/api/ai/parse-voice',
   '/api/ai/scan-meal',
