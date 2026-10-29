@@ -21,6 +21,7 @@
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.3",
     "@upstash/qstash": "^2.12.0",
+    "@vercel/analytics": "^2.0.1",
     "@zxing/browser": "^0.2.1",
     "@zxing/library": "^0.23.0",
     "lucide-react": "^0.451.0",

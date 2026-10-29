@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Script from 'next/script';
+import { Analytics } from '@vercel/analytics/next';
 import {
   getTelemetryConsent,
   getGaMeasurementId,
@@ -84,6 +85,14 @@ export default function TelemetryProvider() {
           strategy="afterInteractive"
         />
       )}
+
+      {/* ── Vercel Analytics (Only activated upon verified consent) ──── */}
+      {/* Same consent gate as GA/Sentry: ASCEND's privacy promise is that
+          NO telemetry of any kind loads before the user opts in. Vercel
+          Analytics is cookieless, but it stays behind the banner so the
+          promise has no exceptions. Requires Web Analytics to be enabled
+          in the Vercel project dashboard, otherwise it is a silent no-op. */}
+      {isAccepted && <Analytics />}
 
       {/* Consent Gating UI Banner */}
       <TelemetryConsentBanner />
