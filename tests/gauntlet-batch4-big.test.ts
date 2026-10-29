@@ -1,6 +1,6 @@
 /**
  * Gauntlet batch-4 (big items): SEC-22 coach output validation,
- * SEC-16/SEC-20 proxy (middleware pre-Next-16), SEC-17 short-term (report route + sink
+ * SEC-16/SEC-20 middleware (middleware pre-Next-16), SEC-17 short-term (report route + sink
  * scan), TRIAGE-PA-02.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -12,7 +12,7 @@ import {
   violatesCoachGuardrails,
   COACH_SAFETY_FALLBACK,
 } from '../src/lib/coach-output';
-import { proxy } from '../src/proxy';
+import { middleware } from '../src/middleware';
 import { GET as deleteAccountGet } from '../src/app/api/auth/delete-account/route';
 
 const readSrc = (rel: string) =>
@@ -88,17 +88,17 @@ describe('SEC-22: coach output validation', () => {
   });
 });
 
-describe('SEC-16 + SEC-20: proxy (formerly middleware)', () => {
+describe('SEC-16 + SEC-20: middleware', () => {
   const apiReq = (path: string, ip = '198.51.100.2') =>
     new NextRequest(`https://ascend.app${path}`, { headers: { 'x-forwarded-for': ip } });
 
-  it('SEC-16 status: proxy is API-only; the CSP stays in next.config.js with reporting', () => {
+  it('SEC-16 status: middleware is API-only; the CSP stays in next.config.js with reporting', () => {
     // A nonce CSP was built and live-tested, then removed: pages are
     // statically generated, so prerendered inline scripts never get
     // the nonce and hydration would break (see next.config.js). The
     // matcher therefore covers /api/* only, and the config policy
     // keeps 'unsafe-inline' (no 'unsafe-eval') + SEC-17 reporting.
-    const mw = readSrc('src/proxy.ts');
+    const mw = readSrc('src/middleware.ts');
     expect(mw).toContain("matcher: ['/api/:path*']");
     const cfg = readSrc('next.config.js');
     const scriptSrc = cfg.match(/"script-src[^"]*"/)?.[0] ?? '';
@@ -109,7 +109,7 @@ describe('SEC-16 + SEC-20: proxy (formerly middleware)', () => {
   });
 
   it('unknown API paths are denied 404', async () => {
-    const res = proxy(apiReq('/api/definitely-not-a-route'));
+    const res = middleware(apiReq('/api/definitely-not-a-route'));
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.error).toBe('NOT_FOUND');
@@ -117,20 +117,20 @@ describe('SEC-16 + SEC-20: proxy (formerly middleware)', () => {
 
   it('known API paths pass through', () => {
     for (const p of ['/api/feedback', '/api/ai/coach', '/api/notifications/dispatch', '/api/csp-report']) {
-      const res = proxy(apiReq(p, '198.51.100.9'));
+      const res = middleware(apiReq(p, '198.51.100.9'));
       expect(res.status, p).toBe(200);
     }
   });
 
   it('the default API ceiling trips at 300/min per IP', () => {
     const ip = '198.51.100.77';
-    let last: ReturnType<typeof proxy> | null = null;
+    let last: ReturnType<typeof middleware> | null = null;
     for (let i = 0; i < 301; i += 1) {
-      last = proxy(apiReq('/api/feedback', ip));
+      last = middleware(apiReq('/api/feedback', ip));
     }
     expect(last!.status).toBe(429);
     // A different IP is unaffected.
-    expect(proxy(apiReq('/api/feedback', '198.51.100.78')).status).toBe(200);
+    expect(middleware(apiReq('/api/feedback', '198.51.100.78')).status).toBe(200);
   });
 });
 

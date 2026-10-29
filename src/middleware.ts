@@ -4,9 +4,15 @@ import type { NextRequest } from 'next/server';
 /**
  * Central API floor (gauntlet SEC-20).
  *
- * Next 16 renamed the middleware convention to proxy.ts (this file,
- * formerly src/middleware.ts; the exported handler is `proxy`). The
- * behavior below is unchanged from the middleware version.
+ * This file stays on the middleware convention (src/middleware.ts,
+ * Edge runtime) under Next 16. The proxy.ts rename was tried in the
+ * Next 16 upgrade and REVERTED the same day (2026-10-29): with the
+ * Node-runtime proxy, every POST API route hung on the Vercel
+ * preview (GETs and proxy-generated 404s answered normally; the
+ * identical build served POSTs fine locally and the Next 14
+ * production was unaffected). Next 16 deprecates middleware.ts but
+ * still supports it; revisit the rename once the platform-level
+ * POST deadlock is resolved upstream. Behavior below is unchanged.
  *
  * /api/* used to rely on every route opting into rate limiting
  * individually. This proxy adds the floor for ALL API traffic:
@@ -70,7 +76,7 @@ function clientIp(req: NextRequest): string {
   return req.headers.get('x-real-ip') || 'unknown';
 }
 
-export function proxy(req: NextRequest) {
+export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const normalized =
     pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;

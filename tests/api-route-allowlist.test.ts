@@ -1,10 +1,10 @@
 /**
  * SEC-20 route-allowlist parity (regression for the coach-chat 404).
  *
- * The API proxy (src/proxy.ts, the Next 16 rename of middleware.ts)
+ * The API middleware (src/middleware.ts, the Next 16 rename of middleware.ts)
  * 404s every /api/* path that is not in its hardcoded
  * KNOWN_API_ROUTES set. When /api/ai/coach-chat was added (PR #59)
- * without a matching allowlist entry, the proxy silently 404'd every
+ * without a matching allowlist entry, the middleware silently 404'd every
  * chat request even though the route existed and its own tests
  * passed — the failure was only visible live. This test derives the
  * real route set from the filesystem and pins it to the allowlist,
@@ -26,12 +26,12 @@ function deriveApiRoutes(dir: string, prefix: string): string[] {
   return out;
 }
 
-describe('SEC-20 proxy allowlist matches the real API routes', () => {
+describe('SEC-20 middleware allowlist matches the real API routes', () => {
   const apiDir = join(process.cwd(), 'src/app/api');
   const realRoutes = deriveApiRoutes(apiDir, '/api').sort();
 
-  const proxySource = readFileSync(join(process.cwd(), 'src/proxy.ts'), 'utf8');
-  const setMatch = proxySource.match(/KNOWN_API_ROUTES = new Set\(\[([\s\S]*?)\]\)/);
+  const middlewareSource = readFileSync(join(process.cwd(), 'src/middleware.ts'), 'utf8');
+  const setMatch = middlewareSource.match(/KNOWN_API_ROUTES = new Set\(\[([\s\S]*?)\]\)/);
   const allowlisted = [...(setMatch?.[1].matchAll(/'([^']+)'/g) ?? [])].map((m) => m[1]).sort();
 
   it('finds the routes on disk (sanity)', () => {
@@ -41,7 +41,7 @@ describe('SEC-20 proxy allowlist matches the real API routes', () => {
 
   it('every real route is allowlisted (no route ships unreachable)', () => {
     for (const route of realRoutes) {
-      expect(allowlisted, `proxy allowlist is missing ${route}`).toContain(route);
+      expect(allowlisted, `middleware allowlist is missing ${route}`).toContain(route);
     }
   });
 
