@@ -26,7 +26,7 @@
  * inside Train, next to Plans and History.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useCoachDigest } from '@/lib/use-coach-digest';
@@ -181,6 +181,11 @@ export default function CoachChatTab({
   );
   const [trainAroundPain, setTrainAroundPain] = useState(false);
   const [restedToday, setRestedToday] = useState(false);
+  // UX-18: free-text notes per question, typed alongside the chips.
+  const [notes, setNotes] = useState<Partial<Record<CheckinStep, string>>>(
+    () => ({ ...(seed?.notes ?? {}) })
+  );
+  const [noteDraft, setNoteDraft] = useState('');
   const [swaps, setSwaps] = useState<Record<string, string>>({});
   const [showWhy, setShowWhy] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
@@ -197,9 +202,32 @@ export default function CoachChatTab({
       energy,
       soreAreas,
       painAreas,
+      notes,
       ...patch,
     };
     setDailyCheckin(todayStr, next);
+  };
+
+  /** A fresh draft per question — a note never leaks across steps. */
+  useEffect(() => {
+    setNoteDraft('');
+  }, [stepIndex]);
+
+  /**
+   * UX-18: send the typed note for the CURRENT question. The note is
+   * attached to that question's answer on the check-in record and
+   * shown in the thread; the structured chip flow is untouched (the
+   * note never answers a question by itself, and the session card
+   * still builds from the structured answers only).
+   */
+  const submitNote = () => {
+    if (!currentStep) return;
+    const text = noteDraft.trim().slice(0, 500);
+    if (!text) return;
+    const next = { ...notes, [currentStep]: text };
+    setNotes(next);
+    saveCheckin({ notes: next });
+    setNoteDraft('');
   };
   const toggleArea = (list: MuscleGroup[], area: MuscleGroup): MuscleGroup[] =>
     list.includes(area) ? list.filter((a) => a !== area) : [...list, area];
@@ -296,6 +324,7 @@ export default function CoachChatTab({
     if (typeof next.energy === 'number') setEnergy(next.energy);
     setSoreAreas(next.soreAreas ?? []);
     setPainAreas(next.painAreas ?? []);
+    setNotes({ ...(next.notes ?? {}) });
     setPainYes((next.painAreas ?? []).length > 0);
     setTrainAroundPain(false);
     saveCheckin(next);
@@ -712,6 +741,7 @@ export default function CoachChatTab({
           <React.Fragment key={`${step}-${i}`}>
             <CoachBubble>{t(questionKey(step))}</CoachBubble>
             <UserBubble>{answerText(step)}</UserBubble>
+            {notes[step] && <UserBubble>{notes[step]}</UserBubble>}
           </React.Fragment>
         ))}
 
@@ -719,7 +749,34 @@ export default function CoachChatTab({
         {!done && currentStep && (
           <>
             <CoachBubble>{t(questionKey(currentStep))}</CoachBubble>
+            {notes[currentStep] && <UserBubble>{notes[currentStep]}</UserBubble>}
             <div className="pl-1">{currentReplies()}</div>
+            {/* UX-18: typing box alongside the chips — a note attached
+                to the current question, never a replacement answer. */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                submitNote();
+              }}
+              className="flex gap-2 pl-1"
+            >
+              <input
+                type="text"
+                value={noteDraft}
+                onChange={(e) => setNoteDraft(e.target.value.slice(0, 500))}
+                maxLength={500}
+                placeholder={t('coachChat.notePlaceholder')}
+                aria-label={t('coachChat.notePlaceholder')}
+                className="flex-1 min-w-0 rounded-full border border-border bg-bg-primary px-3 py-2 text-sm text-text-primary placeholder:text-text-muted"
+              />
+              <button
+                type="submit"
+                disabled={!noteDraft.trim()}
+                className="px-4 py-2 rounded-full bg-accent text-accent-on text-sm font-bold cursor-pointer disabled:opacity-50 shrink-0"
+              >
+                {t('coachChat.noteSend')}
+              </button>
+            </form>
           </>
         )}
       </div>

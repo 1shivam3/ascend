@@ -44,6 +44,7 @@ import {
   type CoachBlocksState,
 } from './block-engine';
 import { mainCompoundKey } from './percent-1rm';
+import { calculateWorkoutVolumeKg } from './volume';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shapes
@@ -159,22 +160,12 @@ function weekTonnageKg(
   monday: string,
   bodyweightKg: number | undefined
 ): number {
+  // Gauntlet DI-05: canonical volume from lib/volume — warmups count,
+  // bodyweight work counts at full body weight, same as everywhere.
   let total = 0;
   for (const w of workouts) {
     if (!inWeek(w.date, monday)) continue;
-    for (const ex of w.exercises ?? []) {
-      for (const s of ex.sets ?? []) {
-        if (!isSetCompleted(s) || s.isWarmup) continue;
-        if (!(s.reps > 0)) continue;
-        let kg = 0;
-        if (typeof s.weight === 'number' && s.weight > 0) {
-          kg = s.unit === 'lbs' ? s.weight / 2.20462 : s.weight;
-        } else if (bodyweightKg && bodyweightKg > 0) {
-          kg = bodyweightKg;
-        }
-        total += kg * s.reps;
-      }
-    }
+    total += calculateWorkoutVolumeKg(w, bodyweightKg);
   }
   return Math.round(total);
 }

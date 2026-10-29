@@ -13,59 +13,33 @@ import {
 } from './types';
 import { toLocalDateString, getCreatineStats, calculateHydrationTarget } from './habits';
 import { getWeekDateStrings } from './formatters';
-import { isBodyweightExercise } from './strength-standards';
+import { calculateWorkoutVolumeKg } from './volume';
 import { getExerciseMuscle } from './exercise-library';
 import { buildCompactUserContext } from './ai-context';
 import { getAiAuthHeaders } from './ai-client-auth';
 import { getNextSessionTarget, exerciseHadPain } from './workout-engine';
 
 /**
- * Fraction of bodyweight that acts as the load for a bodyweight
- * movement, or null when the exercise is not a bodyweight movement.
- * Vertical pulls/dips/squats move ~90% of body mass; horizontal/ground
- * movements (push-ups, planks, burpees) move less.
- */
-function bodyweightLoadFraction(name: string): number | null {
-  if (!isBodyweightExercise(name)) return null;
-  if (/push[\s-]?up|plank|burpee|mountain climber|glute bridge|crunch|sit[\s-]?up|leg raise/i.test(name)) {
-    return 0.65;
-  }
-  return 0.9;
-}
-
-/**
  * Calculates total tonnage (volume in kg) for a workout session.
- * Bodyweight exercises count a realistic fraction of the user's mass —
- * previously only four named lifts (pull-up/chin-up/dip/push-up) got
- * any bodyweight credit, so a calisthenics or running athlete's load
- * was invisible to readiness/ACWR while their days still counted
- * toward consecutive-day fatigue.
+ *
+ * Gauntlet DI-05: the set-by-set volume is the single canonical
+ * definition in lib/volume (ALL completed sets including warmups;
+ * bodyweight work at full body weight) — the same number the weekly
+ * review and the monthly report show for the same session. On top of
+ * that, a pure-conditioning session (a run, a ride) logs ~zero set
+ * volume but is genuine training load, so readiness/ACWR additionally
+ * credit a duration-based equivalent (minutes × bodyweight × 0.5).
+ * That credit is a coach-load equivalent only; it is not part of the
+ * displayed volume definition.
  */
 export function calculateWorkoutTonnage(workout: WorkoutEntry, bodyweightKg = 75): number {
   if (!workout?.exercises) return 0;
 
-  let total = 0;
-  let allConditioning = workout.exercises.length > 0;
+  let total = calculateWorkoutVolumeKg(workout, bodyweightKg);
 
-  for (const ex of workout.exercises) {
-    if (getExerciseMuscle(ex.name) !== 'Conditioning') allConditioning = false;
-    const bwFraction = bodyweightLoadFraction(ex.name);
-    for (const set of ex.sets || []) {
-      if (!isSetCompleted(set)) continue;
-      const reps = Math.max(0, Number(set.reps) || 0);
-      let weightKg = Math.max(0, Number(set.weight) || 0);
-
-      if (set.unit === 'lbs') {
-        weightKg = weightKg * 0.453592;
-      }
-
-      if (bwFraction !== null) {
-        weightKg = bodyweightKg * bwFraction + weightKg;
-      }
-
-      total += reps * weightKg;
-    }
-  }
+  const allConditioning =
+    workout.exercises.length > 0 &&
+    workout.exercises.every((ex) => getExerciseMuscle(ex.name) === 'Conditioning');
 
   // Pure-cardio sessions (a run, a ride) log ~zero weighted tonnage but
   // are genuine training load. Credit a duration-based equivalent

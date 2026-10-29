@@ -2998,6 +2998,8 @@ export const en = {
   'coachChat.chatPainQ': 'Any sharp, joint, or one-sided pain?',
   'coachChat.chatPainNo': 'No pain',
   'coachChat.chatPainYes': 'Yes, here:',
+  'coachChat.notePlaceholder': 'Add a note for your coach (optional)',
+  'coachChat.noteSend': 'Send',
   'coachChat.painStopTitle': 'Stop — get this checked',
   'coachChat.painStopBody': 'Sharp, joint, or one-sided pain is not something to train through. A physio or doctor should look at it before you load that area again. Your coach won\'t guess at injuries — ever.',
   'coachChat.restToday': 'Rest today',

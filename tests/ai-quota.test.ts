@@ -22,7 +22,14 @@ import {
  * (sha256 of the server-observed IP only; gauntlet SEC-01 removed the
  * User-Agent from the key because rotating it minted fresh buckets).
  * These tests prove the separation, the caps, and the anti-spoofing
- * rule against the real in-memory limiter.
+ * rule against a fake distributed limiter.
+ *
+ * SEC-02 contract change (2026-10-29): checkAiDailyQuota is
+ * fail-closed, and fail-closed calls no longer degrade to the
+ * in-memory limiter when the distributed backend is missing — they
+ * throw. The enforcement tests therefore inject a fake
+ * ascend_check_rate_limit RPC client (fixed-window counting in a
+ * Map) instead of pinning the null-client in-memory path.
  */
 
 function req(headers: Record<string, string> = {}): Request {
@@ -38,12 +45,40 @@ const fakeVerifier: AiActorVerifier = {
   },
 };
 
+/**
+ * Fake distributed limiter: implements the ascend_check_rate_limit
+ * RPC contract (anchored fixed-window count per key) in a Map, so
+ * quota enforcement is exercised end-to-end without a live backend.
+ */
+function makeFakeDistributedLimiter() {
+  const counts = new Map<string, number>();
+  return {
+    rpc: async (
+      _fn: string,
+      params: { p_key: string; p_window_ms: number; p_max_requests: number }
+    ) => {
+      const next = (counts.get(params.p_key) ?? 0) + 1;
+      counts.set(params.p_key, next);
+      return {
+        data: [
+          {
+            allowed: next <= params.p_max_requests,
+            count: next,
+            reset_ms: params.p_window_ms,
+          },
+        ],
+        error: null,
+      };
+    },
+  };
+}
+
 beforeEach(() => {
-  // In-memory limiter only: reset clears the store, and the null client
-  // with "attempted" set pins the in-memory path even if Supabase env
-  // vars happen to be present in the test runner.
+  // Distributed path only (SEC-02): a fresh fake RPC client per test.
+  // The fail-closed quota check throws when no distributed limiter
+  // exists, so the old null-client in-memory pinning is gone.
   resetRateLimitStoreForTests();
-  setRateLimiterSupabaseForTests(null);
+  setRateLimiterSupabaseForTests(makeFakeDistributedLimiter());
   delete process.env.AI_DAILY_SIGNED_IN_CAP;
   delete process.env.AI_DAILY_GUEST_CAP;
 });
@@ -127,7 +162,7 @@ describe('resolveAiActor anti-spoofing', () => {
   });
 });
 
-describe('checkAiDailyQuota enforcement (real in-memory limiter)', () => {
+describe('checkAiDailyQuota enforcement (fake distributed limiter)', () => {
   it('guest cap: 10 allowed, 11th denied', async () => {
     for (let i = 0; i < 10; i++) {
       const r = await checkAiDailyQuota(req(), fakeVerifier);

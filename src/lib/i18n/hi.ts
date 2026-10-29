@@ -3003,6 +3003,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'coachChat.chatPainQ': 'कोई तेज़, जॉइंट या एक तरफ का दर्द है?',
   'coachChat.chatPainNo': 'कोई दर्द नहीं',
   'coachChat.chatPainYes': 'हां, यहां:',
+  'coachChat.notePlaceholder': 'कोच के लिए नोट लिखें (वैकल्पिक)',
+  'coachChat.noteSend': 'भेजें',
   'coachChat.painStopTitle': 'रुकें — इसे दिखवाएं',
   'coachChat.painStopBody': 'तेज़, जॉइंट या एक तरफ के दर्द के साथ ट्रेनिंग न करें। उस हिस्से पर वज़न डालने से पहले किसी फिज़ियो या डॉक्टर को दिखाएं। आपका कोच चोटों पर अंदाज़ा कभी नहीं लगाता।',
   'coachChat.restToday': 'आज आराम करें',

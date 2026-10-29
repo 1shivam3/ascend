@@ -13,8 +13,8 @@ import {
   CreatineConfig,
   CreatineSupply,
   DailyTimelineEvent,
-  isSetCompleted,
 } from './types';
+import { calculateWorkoutVolumeKg } from './volume';
 
 export type { DayType };
 
@@ -521,6 +521,8 @@ export function getMonthlyAscensionReport(params: {
   waterLogs: Record<string, number>;
   waterTargetMl: number;
   creatineLogs: Record<string, CreatineLog>;
+  /** User body weight for the canonical volume definition (DI-05). */
+  bodyweightKg?: number;
 }): MonthlyAscensionReport {
   const { year, month, workouts, prs, waterLogs, waterTargetMl, creatineLogs } = params;
 
@@ -538,18 +540,12 @@ export function getMonthlyAscensionReport(params: {
   const monthPRs = prs.filter((p) => p.date && p.date.startsWith(monthPrefix));
   const prsBrokenCount = monthPRs.length;
 
-  // Total volume lifted (Tonnes)
+  // Total volume lifted (Tonnes) — gauntlet DI-05: canonical volume
+  // from lib/volume (warmups count; bodyweight work at full body
+  // weight), identical to the weekly review and coach tonnage.
   let totalVolumeKg = 0;
   for (const w of monthWorkouts) {
-    for (const ex of w.exercises || []) {
-      for (const s of ex.sets || []) {
-        if (!isSetCompleted(s) || s.isWarmup) continue;
-        if (typeof s.weight === 'number' && Number.isFinite(s.weight)) {
-          const wtKg = s.unit === 'lbs' ? s.weight * 0.453592 : s.weight;
-          totalVolumeKg += wtKg * (s.reps || 0);
-        }
-      }
-    }
+    totalVolumeKg += calculateWorkoutVolumeKg(w, params.bodyweightKg);
   }
   const totalVolumeTonnes = Number((totalVolumeKg / 1000).toFixed(1));
 

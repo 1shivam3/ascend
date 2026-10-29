@@ -55,6 +55,8 @@ describe('CoachChatTab', () => {
       'coachChat.chatPainQ',
       'coachChat.chatPainNo',
       'coachChat.chatPainYes',
+      'coachChat.notePlaceholder',
+      'coachChat.noteSend',
       'coachChat.painStopTitle',
       'coachChat.painStopBody',
       'coachChat.restToday',

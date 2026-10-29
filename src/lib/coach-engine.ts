@@ -517,6 +517,18 @@ export interface ManualCheckin {
    * unless the user explicitly chooses to train around it.
    */
   painAreas?: MuscleGroup[];
+  /**
+   * Free-text notes the user typed in the Coach tab chat, keyed by
+   * check-in step id ('sleep', 'freshness', 'areas', 'energy',
+   * 'minutes', 'location', 'pain' — CheckinStep in coach-session).
+   * Optional, added for gauntlet UX-18 (2026-10-29): the user asked
+   * for a typing box alongside the answer chips. The readiness score
+   * and the session builder ignore notes entirely — they are the
+   * user's own words attached to a question's structured answer,
+   * stored on the record and shown in the chat thread. Absent on
+   * older entries — treated as {}.
+   */
+  notes?: Record<string, string>;
 }
 
 export interface ReadinessResult {

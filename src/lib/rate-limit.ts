@@ -3,9 +3,13 @@
  *
  * Implements an anchored fixed-window counter with a Supabase-backed
  * distributed store so that limits are enforced consistently across
- * serverless function instances. Falls back to in-process memory when
- * Supabase is unavailable (e.g. offline mode or local development
- * without credentials).
+ * serverless function instances. Calls that do NOT opt into
+ * `failClosed` fall back to in-process memory when Supabase is
+ * unavailable (e.g. offline mode or local development without
+ * credentials). Fail-closed calls never degrade: when the
+ * distributed limiter cannot run — including when the service key
+ * is absent entirely (gauntlet SEC-02) — they throw
+ * RateLimitUnavailableError so the caller can reject with 503.
  *
  * Gauntlet SEC-24: the in-memory fallback used to be sliding-window
  * while the Supabase RPC is fixed-window (reset_at bucket), so the two
@@ -100,7 +104,9 @@ export interface RateLimitOptions {
   windowMs: number;
   maxRequests: number;
   keyPrefix?: string;
-  /** When true, returns 503 if distributed rate limiter is unavailable */
+  /** When true, returns 503 (throws RateLimitUnavailableError) if the
+   * distributed rate limiter is unavailable OR not configured at all
+   * (service key absent — gauntlet SEC-02). */
   failClosed?: boolean;
 }
 
@@ -246,6 +252,19 @@ async function checkRateLimitByKey(
         `Distributed rate limiter unavailable for key prefix: ${options.keyPrefix || 'global'}`
       );
     }
+  } else if (options.failClosed) {
+    // Gauntlet SEC-02 (user decision 2026-10-29: reject-all). The
+    // distributed limiter is not configured at all — the service-role
+    // key is absent. Fail-closed callers must NOT silently degrade to
+    // per-instance in-memory counting here: every serverless instance
+    // would mint its own bucket and multiply the cap by the instance
+    // count. Reject instead; callers map this error to 503. (The
+    // in-memory fallback below remains for callers that never opted
+    // into failClosed — local/guest surfaces and the SEC-20 edge
+    // floor are unaffected.)
+    throw new RateLimitUnavailableError(
+      `Distributed rate limiter not configured (service key absent) for key prefix: ${options.keyPrefix || 'global'}`
+    );
   }
 
   // Fall back to in-process memory when Supabase is not configured
