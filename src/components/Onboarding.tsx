@@ -85,10 +85,22 @@ export default function Onboarding() {
   // confirmation BEFORE any plans are added. Never auto-add without asking.
   const [pendingPlans, setPendingPlans] = useState<any[] | null>(null);
   const [pendingSchedule, setPendingSchedule] = useState<any | null>(null);
+  // Plans the user ACCEPTED on the plan_offer screen. They stay staged —
+  // exactly like the profile — until applyPendingProfile runs on the
+  // summary's Continue/Edit. Writing them into the store at Accept time
+  // (the old behaviour) tripped the page.tsx history fork mid-onboarding:
+  // the fork gate counts plannedWorkouts as retained history while the
+  // profile is still null, so the fork replaced Onboarding, destroyed
+  // the staged profile, and bounced the user back to the welcome screen
+  // (same self-trigger class as TRIAGE-PA-01, via plans not targets;
+  // observed live on the c4efbcbb preview, 2026-10-29).
+  const [acceptedPlans, setAcceptedPlans] = useState<any[] | null>(null);
+  const [acceptedSchedule, setAcceptedSchedule] = useState<any | null>(null);
   // The profile itself is also deferred on the offer path: page.tsx unmounts
   // Onboarding the moment a profile exists, so calling setProfile before the
   // user answers the offer makes the offer screen unreachable. The pending
-  // profile is applied by handleAcceptPlans/handleDeclinePlans instead.
+  // profile (and any accepted plans) are applied by applyPendingProfile,
+  // which runs on the summary screen's Continue/Edit.
   const [pendingProfile, setPendingProfile] = useState<any | null>(null);
   const [savedFirstName, setSavedFirstName] = useState('Athlete');
 
@@ -493,6 +505,17 @@ export default function Onboarding() {
       applyProfileWithAgeGuards(pendingProfile);
       setPendingProfile(null);
     }
+    // Accepted plans land WITH the profile, never before it (see the
+    // acceptedPlans state comment): writing them while the profile was
+    // still staged tripped the history fork mid-onboarding.
+    if (acceptedPlans && acceptedPlans.length > 0) {
+      setPlannedWorkouts(acceptedPlans);
+      if (acceptedSchedule) {
+        setWeeklySchedule(acceptedSchedule);
+      }
+    }
+    setAcceptedPlans(null);
+    setAcceptedSchedule(null);
   };
 
   const handleAcceptPlans = () => {
@@ -500,11 +523,13 @@ export default function Onboarding() {
     // unmounts Onboarding via the page.tsx gate (profile presence), so
     // applying it would skip the summary screen entirely — the summary
     // renders only because the profile stays staged until its Continue.
+    // The accepted plans stay staged too (acceptedPlans): writing them
+    // into the store here tripped the history fork mid-onboarding,
+    // because the fork gate counts plannedWorkouts while the profile
+    // is still null. applyPendingProfile lands them with the profile.
     if (pendingPlans && pendingPlans.length > 0) {
-      setPlannedWorkouts(pendingPlans);
-      if (pendingSchedule) {
-        setWeeklySchedule(pendingSchedule);
-      }
+      setAcceptedPlans(pendingPlans);
+      setAcceptedSchedule(pendingSchedule);
     }
     setPendingPlans(null);
     setPendingSchedule(null);
