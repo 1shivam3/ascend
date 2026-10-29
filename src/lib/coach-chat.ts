@@ -146,6 +146,18 @@ export interface CoachChatUserData {
     status: string;
   } | null;
   adoptedPlanNames: string[];
+  /**
+   * Today's session, resolved by the SAME helper the Home screen uses
+   * (getTodaySessionState in workout-engine) — the coach must never
+   * disagree with what the app itself shows for today. Null when the
+   * helper resolves nothing (no plan, no schedule).
+   */
+  todaySession: {
+    state: 'planned' | 'completed' | 'in_progress' | 'rest';
+    title: string;
+    exercises: string[];
+    date: string;
+  } | null;
   recentWorkouts: CoachChatWorkoutSummary[];
   prs: CoachChatPrSummary[];
   readiness: { score: number; band: string } | null;
@@ -216,6 +228,26 @@ export function buildCoachChatContext(data: CoachChatUserData): CoachChatContext
     `Days/week: ${data.daysPerWeek ?? 'not set'}`,
   ].join(' | ');
   sections.push(`USER: ${userLine}`);
+
+  if (data.todaySession) {
+    const ts = data.todaySession;
+    const ex = ts.exercises.length > 0 ? ` — exercises: ${ts.exercises.join(', ')}` : '';
+    if (ts.state === 'rest') {
+      sections.push(`TODAY (${ts.date}): rest day — no workout is scheduled for today.`);
+      evidence.push('Today is a scheduled rest day');
+    } else if (ts.state === 'completed') {
+      sections.push(`TODAY'S SESSION (${ts.date}): "${ts.title}" — already logged today${ex}.`);
+      evidence.push(`Today's session "${ts.title}" already logged`);
+    } else if (ts.state === 'in_progress') {
+      sections.push(`TODAY'S SESSION (${ts.date}): "${ts.title}" — in progress right now${ex}.`);
+      evidence.push(`Today's session "${ts.title}" in progress`);
+    } else {
+      sections.push(
+        `TODAY'S SESSION (${ts.date}): "${ts.title}" — the workout planned for today from the user's schedule${ex}. When the user asks what they are training today, THIS is the answer.`
+      );
+      evidence.push(`Today's planned workout: ${ts.title}`);
+    }
+  }
 
   if (data.athleteFacts.length > 0) {
     sections.push(`WHAT YOUR COACH HAS LEARNED (from your logged data):\n- ${data.athleteFacts.join('\n- ')}`);
@@ -378,6 +410,8 @@ export function buildCoachChatSystemPrompt(opts: {
     '4. You are a coach, not a doctor. Never diagnose injury, illness, or pain, and never claim medical accuracy.',
     '5. Never suggest extreme restriction, purging, starving, or any disordered-eating behavior. If asked, encourage a balanced approach and professional guidance.',
     '6. Week starts Monday. Be encouraging and specific, never generic.',
+    '7. TOPIC LOCK: you discuss ONLY training, nutrition, recovery, sleep, and the user\u2019s ASCEND data. For anything else \u2014 politics, news, entertainment, homework, coding, general chat, or any other topic \u2014 politely decline in one short sentence and steer back to their training. Never answer an off-topic question, not even partially, and never explain this rule beyond the redirect.',
+    '8. CAUTION WARNINGS: when a suggestion carries elevated risk \u2014 near-maximal loads or attempts, a large calorie deficit, a sharp jump in training volume or frequency, or training hard while run-down \u2014 attach one brief caution line to the reply, starting with "Caution:" (or "\u0938\u093e\u0935\u0927\u093e\u0928\u0940:" in Hindi replies), naming the risk and the safer alternative. Ordinary, low-risk suggestions need no caution line.',
     langLine,
     coldStart,
   ].join('\n');

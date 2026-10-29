@@ -124,6 +124,12 @@ function seededUser(): CoachChatUserData {
       status: 'active',
     },
     adoptedPlanNames: ['Upper A'],
+    todaySession: {
+      state: 'planned',
+      title: 'Upper A',
+      exercises: ['Bench Press', 'Row'],
+      date: '2026-10-23',
+    },
     recentWorkouts: [
       { date: '2026-10-22', name: 'Upper A', lifts: ['Bench Press', 'Row'] },
       { date: '2026-10-20', name: 'Lower A', lifts: ['Squat'] },
@@ -160,6 +166,7 @@ function emptyUser(): CoachChatUserData {
     flaggedFamilies: [],
     activeBlock: null,
     adoptedPlanNames: [],
+    todaySession: null,
     recentWorkouts: [],
     prs: [],
     readiness: null,
@@ -208,6 +215,21 @@ describe('personalization — the context carries the user\'s own data', () => {
     expect(prompt).not.toContain('COLD START');
   });
 
+  it('system prompt carries the topic lock (user decision 2026-10-29)', () => {
+    const prompt = buildCoachChatSystemPrompt({ language: 'en', hasData: true });
+    expect(prompt).toContain('TOPIC LOCK');
+    expect(prompt).toContain('ONLY training, nutrition, recovery, sleep');
+    expect(prompt).toContain('Never answer an off-topic question');
+  });
+
+  it('system prompt requires caution warnings on elevated-risk suggestions (user decision 2026-10-29)', () => {
+    const en = buildCoachChatSystemPrompt({ language: 'en', hasData: true });
+    expect(en).toContain('CAUTION WARNINGS');
+    expect(en).toContain('Caution:');
+    const hi = buildCoachChatSystemPrompt({ language: 'hi', hasData: true });
+    expect(hi).toContain('CAUTION WARNINGS');
+  });
+
   it('includes today\'s check-in notes in the context (master UX-18 notes)', () => {
     const user = seededUser();
     user.checkinToday = {
@@ -222,6 +244,24 @@ describe('personalization — the context carries the user\'s own data', () => {
     // A user whose check-in has no notes gets no notes section.
     const noNotes = buildCoachChatContext(seededUser());
     expect(noNotes.contextText).not.toContain("NOTES FROM TODAY'S CHECK-IN");
+  });
+
+  it('context carries today\'s resolved session (live-test catch 2026-10-29)', () => {
+    const ctx = buildCoachChatContext(seededUser());
+    expect(ctx.contextText).toContain("TODAY'S SESSION (2026-10-23)");
+    expect(ctx.contextText).toContain('"Upper A"');
+    expect(ctx.contextText).toContain('Bench Press');
+    expect(ctx.evidence.join(' ')).toContain("Today's planned workout: Upper A");
+  });
+
+  it('context states a rest day plainly, and omits the section when nothing resolves', () => {
+    const rest = seededUser();
+    rest.todaySession = { state: 'rest', title: 'Rest & Recovery', exercises: [], date: '2026-10-23' };
+    const restCtx = buildCoachChatContext(rest);
+    expect(restCtx.contextText).toContain('rest day');
+    const none = buildCoachChatContext(emptyUser());
+    expect(none.contextText).not.toContain("TODAY'S SESSION");
+    expect(none.contextText).not.toContain('rest day');
   });
 });
 

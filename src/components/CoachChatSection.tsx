@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useStore } from '@/lib/store';
+import { getTodaySessionState } from '@/lib/workout-engine';
 import { getCurrentLanguage, useTranslation } from '@/lib/i18n';
 import {
   buildCoachChatContext,
@@ -49,6 +50,8 @@ export default function CoachChatSection() {
   const bodyMetrics = useStore((s) => s.bodyMetrics);
   const dailyCheckins = useStore((s) => s.dailyCheckins);
   const plannedWorkouts = useStore((s) => s.plannedWorkouts);
+  const weeklySchedule = useStore((s) => s.weeklySchedule);
+  const activeWorkoutDraft = useStore((s) => s.activeWorkoutDraft);
   const readinessHistory = useStore((s) => s.coach?.readinessHistory ?? []);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -91,6 +94,32 @@ export default function CoachChatSection() {
         : null;
     const latestMetric = sortedMetrics[0];
     const checkin = dailyCheckins?.[todayStr];
+    // Today's session from the SAME resolver the Home screen uses, so
+    // the coach can never disagree with the app about today's workout
+    // (live-test catch 2026-10-29: the context had plans and reviews
+    // but no today resolution, so the coach said it had no workout
+    // for today while Home showed one).
+    const sessionInfo = getTodaySessionState(
+      todayStr,
+      workouts ?? [],
+      plannedWorkouts ?? [],
+      activeWorkoutDraft ?? null,
+      profile?.unit ?? 'kg',
+      weeklySchedule ?? undefined
+    );
+    const todaySession: CoachChatUserData['todaySession'] =
+      sessionInfo.status === 'in_progress'
+        ? { state: 'in_progress', title: sessionInfo.title, exercises: sessionInfo.exercises ?? [], date: todayStr }
+        : sessionInfo.status === 'completed'
+          ? { state: 'completed', title: sessionInfo.title, exercises: sessionInfo.exercises ?? [], date: todayStr }
+          : sessionInfo.status === 'planned'
+            ? {
+                state: sessionInfo.isRestDay ? 'rest' : 'planned',
+                title: sessionInfo.title,
+                exercises: sessionInfo.exercises ?? [],
+                date: todayStr,
+              }
+            : null;
     const active = coachBlocks?.activeBlock ?? null;
     // Master has no per-muscle readiness-band source (the athlete model
     // carries recovery curves, not bands), so no bands are passed: the
@@ -133,6 +162,7 @@ export default function CoachChatSection() {
       adoptedPlanNames: Object.keys(coachBlocks?.adoptedPlans ?? {}).map(
         (planId) => plannedWorkouts?.find((p) => p.id === planId)?.name ?? planId
       ),
+      todaySession,
       recentWorkouts: sortedWorkouts.slice(0, 5).map((w) => ({
         date: w.date,
         name: w.name ?? 'Workout',
@@ -188,6 +218,8 @@ export default function CoachChatSection() {
     bodyMetrics,
     dailyCheckins,
     plannedWorkouts,
+    weeklySchedule,
+    activeWorkoutDraft,
     readinessHistory,
   ]);
 
