@@ -102,7 +102,7 @@ export default function Onboarding() {
   // profile (and any accepted plans) are applied by applyPendingProfile,
   // which runs on the summary screen's Continue/Edit.
   const [pendingProfile, setPendingProfile] = useState<any | null>(null);
-  const [savedFirstName, setSavedFirstName] = useState('Athlete');
+  const [savedFirstName, setSavedFirstName] = useState('');
 
   // Local device snapshot detection
   const [backupSnapshot, setBackupSnapshot] = useState<any>(null);
@@ -300,7 +300,9 @@ export default function Onboarding() {
     // 13–120); weight, height, unit, and diet keep the state defaults and
     // are asked later — weight/height/diet on the first Fuel visit.
     const age = calculateAgeFromDob(details.dateOfBirth) ?? 25;
-    const nameToSave = sanitizeAthleteName(details.name.trim() || athleteName.trim() || 'Athlete', MAX_ATHLETE_NAME_LENGTH);
+    // Audit-3 FE-21: no placeholder name — the details form requires a
+    // real name, and quick/guest paths must not invent 'Athlete' either.
+    const nameToSave = sanitizeAthleteName(details.name.trim() || athleteName.trim(), MAX_ATHLETE_NAME_LENGTH);
     const bodyweightKg =
       unit === 'lbs' ? weight * 0.453592 : weight;
     const bodyweightLbs =
@@ -443,7 +445,7 @@ export default function Onboarding() {
     }
 
     setIsFinishing(false);
-    setSavedFirstName(nameToSave.split(' ')[0] || 'Athlete');
+    setSavedFirstName(nameToSave.split(' ')[0] || '');
 
     // If we generated plans, ask the user BEFORE adding them.
     // If they already had plans, skip the offer and go to the summary —
@@ -470,7 +472,7 @@ export default function Onboarding() {
     // pendingPlans was nulled at Accept/Decline, so judge the toast by
     // what actually landed in the store: plans added → Training Ready.
     const plansAdded = (useStore.getState().plannedWorkouts?.length ?? 0) > 0;
-    toast.success(t('toast.welcome', { name: savedFirstName }), plansAdded ? t('toast.titleTrainingReady') : t('toast.titleAllSet'));
+    toast.success(savedFirstName ? t('toast.welcome', { name: savedFirstName }) : t('toast.welcomeNoName'), plansAdded ? t('toast.titleTrainingReady') : t('toast.titleAllSet'));
     try {
       navigate('home', { clearHistory: true });
     } catch {}
@@ -481,7 +483,7 @@ export default function Onboarding() {
   // Preferences section. The button label names that real destination.
   const handleSummaryEdit = () => {
     applyPendingProfile();
-    toast.success(t('toast.welcome', { name: savedFirstName }), t('toast.titleAllSet'));
+    toast.success(savedFirstName ? t('toast.welcome', { name: savedFirstName }) : t('toast.welcomeNoName'), t('toast.titleAllSet'));
     try {
       sessionStorage.setItem('ascend_settings_section', 'training');
     } catch {}
@@ -628,7 +630,8 @@ export default function Onboarding() {
             setCurrentScreen('login');
           }}
           onContinueAsGuest={() => {
-            setAthleteName('Athlete');
+            // Audit-3 FE-21: guests are no longer pre-named 'Athlete' —
+            // the details form asks for their real name like everyone else.
             setAuthOrigin('welcome');
             setCurrentScreen('goals');
           }}
@@ -744,7 +747,10 @@ export default function Onboarding() {
               {t('onboarding.planOfferTitle')}
             </h1>
             <p className="text-sm text-text-primary/70">
-              Based on your goals, I put together {planCount} workouts{planNames ? ` (${planNames}${planCount > 4 ? ', …' : ''})` : ''}. Add {planCount === 1 ? 'it' : 'them'} to your training, or skip and build your own.
+              {t(planCount === 1 ? 'onboarding.planOfferBodyOne' : 'onboarding.planOfferBodyMany', {
+                count: planCount,
+                namesPart: planNames ? ` (${planNames}${planCount > 4 ? ', …' : ''})` : '',
+              })}
             </p>
           </div>
           {/* Preview what's inside — never ask for blind acceptance. */}
@@ -771,17 +777,18 @@ export default function Onboarding() {
               idea why; a diabetic got no safety framing at all. */}
           {currentMacroGoals && currentMacroGoals.maintenanceCalories ? (
             <div className="bg-bg-card border border-border rounded-2xl px-4 py-3 shadow-2xs space-y-1">
-              <p className="text-sm font-bold">Your daily food target: {currentMacroGoals.calories.toLocaleString()} kcal</p>
+              <p className="text-sm font-bold">{t('onboarding.foodTargetTitle', { calories: currentMacroGoals.calories.toLocaleString() })}</p>
               <p className="text-xs text-text-primary/70 leading-relaxed">
-                Your body burns about {currentMacroGoals.maintenanceCalories.toLocaleString()} kcal a day.
+                {t('onboarding.foodTargetBurn', { maintenance: currentMacroGoals.maintenanceCalories.toLocaleString() })}
                 {typeof currentMacroGoals.calorieDelta === 'number' && currentMacroGoals.calorieDelta < 0
-                  ? ` To lose fat steadily and safely, your target is ${Math.abs(currentMacroGoals.calorieDelta)} kcal less — never below the safe minimum for your body.`
+                  ? ` ${t('onboarding.foodTargetDeficit', { delta: Math.abs(currentMacroGoals.calorieDelta) })}`
                   : typeof currentMacroGoals.calorieDelta === 'number' && currentMacroGoals.calorieDelta > 0
-                    ? ` To build muscle, your target adds ${currentMacroGoals.calorieDelta} kcal on top.`
-                    : ' Your target matches what you burn, to maintain your weight.'}{' '}
-                Protein {currentMacroGoals.proteinG}g · Carbs {currentMacroGoals.carbsG}g · Fat {currentMacroGoals.fatG}g.
-                These targets are estimated from default weight and height — add yours in Fuel for exact numbers.
-                You can change this any time in Meals. If you have a medical condition like diabetes, check with your doctor before following a calorie target.
+                    ? ` ${t('onboarding.foodTargetSurplus', { delta: currentMacroGoals.calorieDelta })}`
+                    : ` ${t('onboarding.foodTargetMaintain')}`}{' '}
+                {t('onboarding.foodTargetMacros', { protein: currentMacroGoals.proteinG, carbs: currentMacroGoals.carbsG ?? 0, fat: currentMacroGoals.fatG ?? 0 })}{' '}
+                {t('onboarding.foodTargetEstimateNote')}{' '}
+                {t('onboarding.foodTargetChangeNote')}{' '}
+                {t('onboarding.foodTargetDiabetesCaution')}
               </p>
             </div>
           ) : null}

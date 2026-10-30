@@ -3674,8 +3674,8 @@ export const useAppStore = create<AppState>()(
         // same default profile untouched onboarding produces and land
         // on Today: ONBOARDING_DEFAULTS in Onboarding.tsx (beginner /
         // male / kg / 70 kg / 175 cm / 4 days / full gym / light
-        // activity / non-vegetarian), name 'Athlete' (the details
-        // form's fallback), no injuries, no DOB (age stays unset —
+        // activity / non-vegetarian), NO name (audit-3 FE-21: never
+        // invent one — the details form asks for a real name), no injuries, no DOB (age stays unset —
         // never fabricated), no plans (the plan offer is an onboarding
         // choice). Goals have no untouched value — onboarding requires
         // a choice — so use the repo's own fallback DEFAULT_GOALS
@@ -3691,7 +3691,7 @@ export const useAppStore = create<AppState>()(
         const store = get();
         store.setProfile({
           id: getOrCreateGuestId(),
-          name: sanitizeAthleteName('Athlete', MAX_ATHLETE_NAME_LENGTH),
+          name: sanitizeAthleteName('', MAX_ATHLETE_NAME_LENGTH),
           gender: 'male',
           bodyweightKg: 70,
           bodyweightLbs: Math.round(70 * 2.20462 * 10) / 10,

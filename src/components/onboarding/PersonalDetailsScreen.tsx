@@ -75,11 +75,11 @@ export default function PersonalDetailsScreen({
 
     const athleteName = name.trim();
     if (!athleteName) {
-      setError('Please enter your name or athlete nickname.');
+      setError(t('onboarding.errNameRequired'));
       return;
     }
     if (athleteName.length > MAX_ATHLETE_NAME_LENGTH) {
-      setError(`Please keep your name under ${MAX_ATHLETE_NAME_LENGTH} characters.`);
+      setError(t('onboarding.errNameTooLong', { max: MAX_ATHLETE_NAME_LENGTH }));
       return;
     }
 
@@ -128,12 +128,12 @@ export default function PersonalDetailsScreen({
             {t('onboarding.detailsTitle')}
           </h1>
           <p className="text-sm text-text-muted">
-            This helps us calculate your strength standards, nutrition targets, and workout progression.
+            {t('onboarding.detailsSubtitle')}
           </p>
         </div>
 
         {error && (
-          <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2.5 animate-shake">
+          <div className="p-3.5 rounded-xl bg-danger/10 border border-danger/30 text-danger text-xs flex items-start gap-2.5 animate-shake">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span className="leading-snug">{error}</span>
           </div>
@@ -143,14 +143,14 @@ export default function PersonalDetailsScreen({
           {/* Athlete Name */}
           <div className="p-4 rounded-2xl bg-bg-card border border-border shadow-2xs space-y-1.5">
             <label htmlFor="details-name" className="block text-xs font-semibold text-text-primary">
-              Athlete Name
+              {t('onboarding.athleteNameLabel')}
             </label>
             <input
               id="details-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Alex"
+              placeholder={t('onboarding.namePlaceholder')}
               required
               maxLength={MAX_ATHLETE_NAME_LENGTH}
               className="w-full px-3 py-2 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary outline-none transition"
@@ -160,12 +160,12 @@ export default function PersonalDetailsScreen({
           {/* Gender Segmented Control: Male, Female, Other */}
           <div className="p-4 rounded-2xl bg-bg-card border border-border shadow-2xs space-y-2">
             <span className="block text-xs font-semibold text-text-primary">
-              Gender
+              {t('onboarding.gender')}
             </span>
             <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-bg-primary border border-border">
               {(['male', 'female', 'other'] as const).map((g) => {
                 const isActive = genderSelection === g;
-                const label = g.charAt(0).toUpperCase() + g.slice(1);
+                const label = t(g === 'male' ? 'editProfile.genderMale' : g === 'female' ? 'editProfile.genderFemale' : 'editProfile.genderOther');
 
                 return (
                   <button
@@ -265,7 +265,7 @@ export default function PersonalDetailsScreen({
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin text-white" />
-              <span>Calibrating Program...</span>
+              <span>{t('onboarding.calibrating')}</span>
             </>
           ) : (
             t('common.continue')
