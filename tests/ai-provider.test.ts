@@ -3,6 +3,7 @@ import {
   cleanAndParseJson,
   executeMultiProviderVision,
   executeMultiProviderText,
+  OPENROUTER_TEXT_MODELS,
   OPENROUTER_VISION_MODELS,
 } from '@/lib/ai-provider';
 
@@ -328,11 +329,20 @@ describe('AI Multi-Provider Engine', () => {
       fetchSpy.mockRestore();
     });
 
-    it('falls over from failed Groq to OpenRouter text model', async () => {
+    // SEC2-1 (audit-3) pin rewrite: this test used to fall over to one
+    // of the built-in :free text models — the exact behaviour SEC2-1
+    // prohibits, because the text path carries personal coach context
+    // and :free endpoints log prompts for host training. OpenRouter
+    // text is now exercised only with an explicitly configured
+    // non-free model (same pattern as the vision suite), and the
+    // request must carry X-Data-Collection: deny like the vision one.
+    it('falls over from failed Groq to OpenRouter text when a non-free model is configured (SEC2-1)', async () => {
       process.env.GROQ_API_KEY = 'gsk_mock_groq_key_12345';
       process.env.OPENROUTER_API_KEY = 'sk-or-mock_openrouter_key_12345';
+      OPENROUTER_TEXT_MODELS.push('custom/enterprise-text');
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
+      let openRouterHeaders: Record<string, string> | null = null;
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any, init: any) => {
         if (String(url).includes('groq.com')) {
           return new Response(JSON.stringify({ error: { message: 'Groq unavailable' } }), {
             status: 503,
@@ -340,6 +350,7 @@ describe('AI Multi-Provider Engine', () => {
           });
         }
         if (String(url).includes('openrouter.ai')) {
+          openRouterHeaders = init?.headers ?? null;
           return new Response(
             JSON.stringify({
               choices: [
@@ -358,14 +369,66 @@ describe('AI Multi-Provider Engine', () => {
         return new Response('Not found', { status: 404 });
       });
 
-      const result = await executeMultiProviderText<any>({
-        prompt: 'Generate plan',
-        timeoutMs: 1000,
+      try {
+        const result = await executeMultiProviderText<any>({
+          prompt: 'Generate plan',
+          timeoutMs: 1000,
+        });
+
+        expect(result.provider).toBe('openrouter');
+        expect(result.model).toBe('custom/enterprise-text');
+        expect(result.data.plan).toBe('OpenRouter Workout Plan');
+        expect(openRouterHeaders).not.toBeNull();
+        expect(openRouterHeaders!['X-Data-Collection']).toBe('deny');
+      } finally {
+        fetchSpy.mockRestore();
+        OPENROUTER_TEXT_MODELS.splice(OPENROUTER_TEXT_MODELS.indexOf('custom/enterprise-text'), 1);
+      }
+    });
+
+    it('never sends user text to :free OpenRouter models: falls from failed Groq to Gemini (SEC2-1)', async () => {
+      process.env.GROQ_API_KEY = 'gsk_mock_groq_key_12345';
+      process.env.OPENROUTER_API_KEY = 'sk-or-mock_openrouter_key_12345';
+      process.env.GEMINI_API_KEY = 'mock_gemini_key_12345';
+      // The shipped OPENROUTER_TEXT_MODELS are all :free at this point
+      // (the non-free entry above was spliced back out).
+      expect(OPENROUTER_TEXT_MODELS.every((m) => m.endsWith(':free'))).toBe(true);
+
+      const fetchedUrls: string[] = [];
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
+        fetchedUrls.push(String(url));
+        if (String(url).includes('groq.com')) {
+          return new Response(JSON.stringify({ error: { message: 'Groq unavailable' } }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        // An OpenRouter fetch would succeed if it ever happened — the
+        // assertion below proves it never does.
+        return new Response(
+          JSON.stringify({
+            choices: [{ message: { content: JSON.stringify({ plan: 'Should never be served' }) } }],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
       });
 
-      expect(result.provider).toBe('openrouter');
-      expect(result.data.plan).toBe('OpenRouter Workout Plan');
-      fetchSpy.mockRestore();
+      mockGenerateContent.mockResolvedValueOnce({
+        text: JSON.stringify({ plan: 'Gemini Workout Plan' }),
+      });
+
+      try {
+        const result = await executeMultiProviderText<any>({
+          prompt: 'Generate plan with my personal coach context',
+          timeoutMs: 1000,
+        });
+
+        expect(result.provider).toBe('gemini');
+        expect(result.data.plan).toBe('Gemini Workout Plan');
+        expect(fetchedUrls.some((u) => u.includes('openrouter.ai'))).toBe(false);
+      } finally {
+        fetchSpy.mockRestore();
+      }
     });
 
     it('falls over to Gemini when OpenRouter text model fails', async () => {
