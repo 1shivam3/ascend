@@ -407,9 +407,17 @@ export default function LogPastWorkoutModal({
 
     const workoutId = safeRandomId('wk');
 
+    const parsedDuration = parseInt(durationMinutes, 10);
     const entry: WorkoutEntry = {
       id: workoutId,
       date: new Date(`${date}T12:00:00`).toISOString(),
+      // FE-04 (audit-3): the form collects a name and a duration, but
+      // this entry used to drop both — the saved workout lost the
+      // name the user typed, and the Coach's Take downstream had
+      // nothing real to show. Blank duration stays blank, exactly
+      // like the quick-log path — never invent 45 minutes.
+      name: workoutName,
+      durationMinutes: Number.isFinite(parsedDuration) && parsedDuration > 0 ? parsedDuration : undefined,
       exercises: validExercises,
     };
 
