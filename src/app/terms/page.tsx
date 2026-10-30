@@ -134,6 +134,9 @@ export default function TermsPage() {
             Users agree NOT to use AI features to generate abusive, offensive, defamatory, or harmful content, or to attempt prompt injection attacks against the service.
           </p>
           <p className="text-2xs">
+            <strong>Free-Tier Models &amp; Your Data:</strong> Some models in the AI fallback chain are free-tier services (served via OpenRouter). When a free-tier model handles your request, its provider may retain the text you submitted and use it to operate, improve, or train its models, under that provider&apos;s own terms and privacy policy. Commercial-tier providers in the chain do not train on API data, and meal photos are never sent to free-tier models. Do not enter sensitive personal information into AI features. See our <Link href="/privacy" className="text-accent underline">Privacy Policy</Link> for exactly what is sent.
+          </p>
+          <p className="text-2xs">
             <strong>In-App Reporting:</strong> If you receive any objectionable, unsafe, or inappropriate AI output, you must report it using the integrated in-app flag button. Flagged content is immediately suppressed and logged for safety review in compliance with Google Play Store AI Policies.
           </p>
         </section>
