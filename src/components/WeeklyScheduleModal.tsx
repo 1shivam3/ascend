@@ -323,7 +323,7 @@ export default function WeeklyScheduleModal({
                         >
                           {plannedWorkouts.map((plan) => (
                             <option key={plan.id} value={plan.id}>
-                              {t('sched.planOption', { name: plan.name, count: plan.exercises.length })}
+                              {t(plan.exercises.length === 1 ? 'sched.planOptionOne' : 'sched.planOption', { name: plan.name, count: plan.exercises.length })}
                             </option>
                           ))}
                           {plannedWorkouts.length === 0 && (
