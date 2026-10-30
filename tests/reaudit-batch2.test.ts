@@ -211,7 +211,14 @@ describe('E2E-R8 binding quota — route counter honesty', () => {
     expect((await res.json()).dailyRemaining).toBe(4);
   });
 
-  it('reports the binding number on the safety and topic-lock paths too', async () => {
+  // Audit-3 PERF-1 pin change: static replies (safety stop, topic
+  // lock) are now served after the per-minute burst limit ONLY — the
+  // route no longer burns the shared-quota and chat-cap RPCs to answer
+  // a constant string (they measured ~2–4 s). The binding counter is
+  // therefore unknowable on these paths and reports null; the client
+  // keeps its last numeric value. The provider path above still
+  // reports the binding minimum (E2E-R8 unchanged there).
+  it('reports a null counter on the safety and topic-lock paths (PERF-1: no quota RPCs burned)', async () => {
     routeState.quotaRemaining = 4;
     const safety = await POST(
       post({
@@ -221,12 +228,12 @@ describe('E2E-R8 binding quota — route counter honesty', () => {
         context: {},
       }),
     );
-    expect((await safety.json()).dailyRemaining).toBe(4);
+    expect((await safety.json()).dailyRemaining).toBeNull();
 
     const topic = await POST(
       post({ message: 'who won the election?', history: [], language: 'en', context: {} }),
     );
-    expect((await topic.json()).dailyRemaining).toBe(4);
+    expect((await topic.json()).dailyRemaining).toBeNull();
   });
 });
 

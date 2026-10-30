@@ -31,7 +31,7 @@ import { Sparkles } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useCoachDigest } from '@/lib/use-coach-digest';
 import { getScheduledPlanEntries } from '@/lib/scheduled-days';
-import { getLocalTodayStr, getWeekRange, parseLocalDate } from '@/lib/formatters';
+import { getLocalTodayStr, getWeekDateStrings, getWeekRange, parseLocalDate } from '@/lib/formatters';
 import {
   adjustSession,
   checkinSteps,
@@ -290,6 +290,7 @@ export default function CoachChatTab({
 
   const weekAdherence = useMemo(() => {
     const week = getWeekRange(new Date());
+    const weekDates = getWeekDateStrings(new Date());
     const planned = scheduled.length;
     const doneDates = new Set(
       (workouts || [])
@@ -297,7 +298,17 @@ export default function CoachChatTab({
         .filter((d) => d >= week.start && d <= todayStr)
     );
     const doneCount = doneDates.size;
-    return { planned, done: doneCount, suggestion: weeklySuggestion(planned, doneCount) };
+    // FE-02 (audit-3): the verdict judges only the elapsed part of
+    // the week — scheduled days strictly before today (a session is
+    // not "missed" until its day is over) — and the displayed count
+    // is capped at the plan, so extra unscheduled sessions can no
+    // longer render as "7 of 4 sessions done".
+    const dueCount = scheduled.filter((e) => weekDates[e.weekday] < todayStr).length;
+    return {
+      planned,
+      done: Math.min(doneCount, planned),
+      suggestion: weeklySuggestion(planned, doneCount, dueCount),
+    };
   }, [scheduled, workouts, todayStr]);
 
   const reasonKey: StringKey =

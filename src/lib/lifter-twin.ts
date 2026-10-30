@@ -77,12 +77,31 @@ export function calculateSetEffortDrift(sets: WorkoutSet[]): {
 export const calculateSetFatigueSlope = calculateSetEffortDrift;
 
 /**
+ * Normalized exercise-name equality (FE-03, audit-3): trim, case-fold,
+ * collapse internal whitespace — and nothing looser. Variant lifts
+ * ('Incline Bench Press' vs 'Bench Press') are different exercises
+ * with different numbers; substring matching silently merged their
+ * histories and inflated the base lift's chart and PR timeline.
+ */
+export function exerciseNamesEqual(a: string, b: string): boolean {
+  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+  return norm(a) === norm(b);
+}
+
+/**
  * Extracts and chronologically sorts past sessions for a specific exercise.
+ *
+ * Matching defaults to the historical fuzzy rule (exact, or substring
+ * in either direction — coach-engine's stall/previous-session lookups
+ * rely on it for plan-vs-log name drift). Progress surfaces pass
+ * { exact: true } so a variant lift never pollutes the selected
+ * exercise's chart (FE-03).
  */
 export function getExerciseHistorySessions(
   exerciseName: string,
   workouts: WorkoutEntry[],
-  userUnit: 'kg' | 'lbs' = 'kg'
+  userUnit: 'kg' | 'lbs' = 'kg',
+  opts?: { exact?: boolean }
 ): {
   date: string;
   sets: WorkoutSet[];
@@ -112,6 +131,7 @@ export function getExerciseHistorySessions(
 
   for (const w of sorted) {
     const match = w.exercises.find((e) => {
+      if (opts?.exact) return exerciseNamesEqual(e.name, exerciseName);
       const nameLower = e.name.trim().toLowerCase();
       return nameLower === targetLower || nameLower.includes(targetLower) || targetLower.includes(nameLower);
     });

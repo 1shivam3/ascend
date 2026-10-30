@@ -912,7 +912,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const [isExerciseLibraryOpen, setIsExerciseLibraryOpen] = useState(false);
   const [postWorkoutSummary, setPostWorkoutSummary] = useState<{
     name: string;
-    durationMinutes: number;
+    // Optional (FE-04): a past-workout log may genuinely have no
+    // duration — the take modal renders '--' rather than a fake 45.
+    durationMinutes?: number;
     durationSeconds?: number;
     exercises: WorkoutExercise[];
   } | null>(null);
@@ -2998,8 +3000,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         onClose={() => setIsLogPastModalOpen(false)}
         onSaved={(entry) => {
           setPostWorkoutSummary({
-            name: 'Completed Workout',
-            durationMinutes: 45,
+            // FE-04 (audit-3): show the workout the user actually
+            // logged — its real name and duration. This handler used
+            // to substitute the literal 'Completed Workout' and a
+            // fabricated 45 minutes regardless of the entry.
+            name: entry.name || entry.exercises[0]?.name || 'Completed Workout',
+            durationMinutes: entry.durationMinutes,
             exercises: entry.exercises,
           });
         }}

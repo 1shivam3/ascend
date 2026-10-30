@@ -20,6 +20,55 @@ import {
 } from './reconcile';
 import { isCrossAccountSwitch as isCrossAccountSwitchFn, decideStartFreshGate } from '../start-fresh-guard';
 
+/** Page size for sync reads — equal to the PostgREST row cap. */
+export const SYNC_READ_PAGE_SIZE = 1000;
+
+/**
+ * DI2-1 (audit-3): fetch ALL of one user's rows from a sync table,
+ * paging past the 1,000-row PostgREST cap (supabase/config.toml
+ * max_rows = 1000) with a stable id order + .range(), mirroring the
+ * SEC-09 subscriptions helper (notification-dispatch.ts). The bare
+ * .select().eq() reads this replaces silently truncated at 1,000
+ * rows, which (a) lost rows on new-device restore, (b) made the push
+ * stamp-gate treat past-cap rows as absent (stale local copies could
+ * overwrite newer remote edits), and (c) let tombstone pruning clear
+ * tombstones whose server rows sat past the cap — resurrecting
+ * deleted records on the next pull. There is deliberately NO total
+ * cap here: the merge, stamp-gate and tombstone logic are only
+ * correct over the complete set.
+ *
+ * Returns the PostgREST shape ({ data, error }) so call sites keep
+ * their existing handling. Client doubles without order/range keep
+ * the legacy single-query behaviour (feature-detected, same as
+ * fetchAllSubscriptions) — the real client always paginates.
+ */
+export async function fetchAllUserRowsPaged(
+  supabase: any,
+  table: string,
+  columns: string,
+  filterColumn: string,
+  filterValue: string,
+): Promise<{ data: any[] | null; error: any }> {
+  const build = () => supabase.from(table).select(columns).eq(filterColumn, filterValue);
+  const probe = build();
+  const ordered =
+    probe && typeof probe.order === 'function' ? probe.order('id', { ascending: true }) : null;
+  if (!ordered || typeof ordered.range !== 'function') {
+    const { data, error } = await probe;
+    return { data: (data as any[] | null) ?? null, error: error ?? null };
+  }
+  const rows: any[] = [];
+  for (let from = 0; ; from += SYNC_READ_PAGE_SIZE) {
+    const { data, error } = await build()
+      .order('id', { ascending: true })
+      .range(from, from + SYNC_READ_PAGE_SIZE - 1);
+    if (error) return { data: null, error };
+    const page = (data as any[] | null) || [];
+    rows.push(...page);
+    if (page.length < SYNC_READ_PAGE_SIZE) return { data: rows, error: null };
+  }
+}
+
 /**
  * Gauntlet DI-03: the unsynced-slice reset applied on a cross-account
  * switch, as a pure, testable builder. The switch branch's comment
@@ -936,14 +985,16 @@ class SupabaseSyncEngine {
         isAnonymous: Boolean(user.is_anonymous),
       };
 
-      // 2. Pull remote records
+      // 2. Pull remote records (DI2-1: the five collection reads page
+      // past the 1,000-row PostgREST cap via fetchAllUserRowsPaged;
+      // the profile is a single-row maybeSingle and is not capped.)
       const [remoteProfile, remotePRs, remoteWorkouts, remoteMeals, remoteMetrics, remotePlans] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
-        supabase.from('personal_records').select('*').eq('user_id', user.id),
-        supabase.from('workouts').select('*').eq('user_id', user.id),
-        supabase.from('meals').select('*').eq('user_id', user.id),
-        supabase.from('body_metrics').select('*').eq('user_id', user.id),
-        supabase.from('planned_workouts').select('*').eq('user_id', user.id),
+        fetchAllUserRowsPaged(supabase, 'personal_records', '*', 'user_id', user.id),
+        fetchAllUserRowsPaged(supabase, 'workouts', '*', 'user_id', user.id),
+        fetchAllUserRowsPaged(supabase, 'meals', '*', 'user_id', user.id),
+        fetchAllUserRowsPaged(supabase, 'body_metrics', '*', 'user_id', user.id),
+        fetchAllUserRowsPaged(supabase, 'planned_workouts', '*', 'user_id', user.id),
       ]);
 
       const localState = useStore.getState();
@@ -1370,10 +1421,9 @@ class SupabaseSyncEngine {
     try {
       const supabase = getSupabase();
       if (!supabase) return null;
-      const { data, error } = await supabase
-        .from(table)
-        .select('id,updated_at')
-        .eq(column, value);
+      // DI2-1: paged — a truncated stamp map reads past-cap rows as
+      // absent and disarms the newest-wins gate for them.
+      const { data, error } = await fetchAllUserRowsPaged(supabase, table, 'id,updated_at', column, value);
       if (error) return null;
       const stamps = new Map<string, string | null>();
       for (const row of data || []) {
@@ -1701,10 +1751,10 @@ class SupabaseSyncEngine {
       if (tombstones.length === 0) return;
       const supabase = getSupabase();
       if (!supabase) return;
-      const { data, error } = await supabase
-        .from(table)
-        .select('id')
-        .eq('user_id', userId);
+      // DI2-1: paged — with a truncated id list, a tombstoned row past
+      // the cap looks deleted and its tombstone gets pruned, so the
+      // next pull resurrects the record.
+      const { data, error } = await fetchAllUserRowsPaged(supabase, table, 'id', 'user_id', userId);
       if (error) return;
       const remoteIds = (data || []).map((r: any) => r.id as string);
       const toDelete = tombstonedIdsToDelete(localIds, remoteIds, tombstones);

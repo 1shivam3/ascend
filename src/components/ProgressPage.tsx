@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { getBigThreeStats, calculateDOTS, getDOTSClassification } from '@/lib/dots';
 import { calculateOneRepMax } from '@/lib/strength-standards';
-import { getExerciseHistorySessions } from '@/lib/lifter-twin';
+import { exerciseNamesEqual, getExerciseHistorySessions } from '@/lib/lifter-twin';
 import WorkoutHeatmap from '@/components/WorkoutHeatmap';
 import MuscleVolumeSection from '@/components/MuscleVolumeSection';
 import EmptyState from '@/components/ui/EmptyState';
@@ -477,9 +477,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
   // Hero lift session history & real delta for Screen 14
   const heroLiftAnalytics = useMemo(() => {
-    const sessions = getExerciseHistorySessions(heroLift.name, workouts, userUnit);
+    const sessions = getExerciseHistorySessions(heroLift.name, workouts, userUnit, { exact: true });
     const prMatches = prs
-      .filter((p) => p.exercise.toLowerCase().includes(heroLift.name.toLowerCase()))
+      .filter((p) => exerciseNamesEqual(p.exercise, heroLift.name))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     // Combine into chronological progress points
@@ -519,10 +519,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     // Unified data source: workout sessions AND manually logged PRs, merged
     // by date. PRs that duplicate a session (auto-detected from that session)
     // are skipped so nothing appears twice.
-    const sessions = getExerciseHistorySessions(selectedExercise, workouts, userUnit) || [];
-    const prMatches = prs.filter((p) =>
-      p.exercise.toLowerCase().includes(selectedExercise.toLowerCase())
-    );
+    const sessions = getExerciseHistorySessions(selectedExercise, workouts, userUnit, { exact: true }) || [];
+    const prMatches = prs.filter((p) => exerciseNamesEqual(p.exercise, selectedExercise));
 
     type Row = { date: string; bestWeight: number; bestReps: number; bestE1RM: number; source: 'session' | 'pr' };
     const rows: Row[] = sessions.map((s) => ({
@@ -570,9 +568,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
   // Selected exercise 1RM and filtered progress chart for Screen 15
   const selectedExerciseAnalytics = useMemo(() => {
-    const rawSessions = getExerciseHistorySessions(selectedExercise, workouts, userUnit);
+    const rawSessions = getExerciseHistorySessions(selectedExercise, workouts, userUnit, { exact: true });
     const prMatches = prs
-      .filter((p) => p.exercise.toLowerCase().includes(selectedExercise.toLowerCase()))
+      .filter((p) => exerciseNamesEqual(p.exercise, selectedExercise))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     const pointsMap = new Map<string, number>();
@@ -816,9 +814,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   });
   // Big-three trend mirrors the hero computation (sessions + PRs).
   const big3Analytics = useMemo(() => {
-    const sessions = getExerciseHistorySessions(big3Lift, workouts, userUnit);
+    const sessions = getExerciseHistorySessions(big3Lift, workouts, userUnit, { exact: true });
     const prMatches = prs
-      .filter((pr) => pr.exercise.toLowerCase().includes(big3Lift.toLowerCase()))
+      .filter((pr) => exerciseNamesEqual(pr.exercise, big3Lift))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     const pointsMap = new Map<string, number>();
     prMatches.forEach((pr) => {

@@ -283,7 +283,14 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     });
   };
   const handleMoveSection = (id: string, dir: -1 | 1) => {
-    const order = [...rawTodayLayoutForSheet.order];
+    // FE-01 (audit-3): move in RESOLVED order (what this sheet
+    // displays), not raw stored order — the same fix HomePage's
+    // handler already carries. For a never-reordered layout the
+    // resolved order is the density default, which differs from the
+    // stored canonical order; swapping neighbours in the raw order
+    // first "un-pristined" the layout, jumping the whole Today list
+    // to canonical order on the user's first ▲ tap.
+    const order: string[] = resolvedTodayForSheet.map((s) => s.id);
     const idx = order.indexOf(id);
     const next = idx + dir;
     if (idx < 0 || next < 0 || next >= order.length) return;

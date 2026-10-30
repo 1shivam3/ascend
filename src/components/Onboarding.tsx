@@ -581,11 +581,14 @@ export default function Onboarding() {
           <Loader2 className="w-7 h-7 text-accent animate-spin" />
         </div>
         <div className="space-y-1">
-          <h2 className="text-xl font-bold text-white tracking-tight">
-            Restoring Account
+          {/* FE-07 (audit-3): theme token, not text-white — on the
+              light background the hardcoded white heading was
+              invisible; copy is localized like the rest of onboarding. */}
+          <h2 className="text-xl font-bold text-text-primary tracking-tight">
+            {t('onboarding.restoringTitle')}
           </h2>
           <p className="text-xs text-text-muted max-w-xs">
-            Connecting to cloud sync and loading your training records...
+            {t('onboarding.restoringBody')}
           </p>
         </div>
       </div>

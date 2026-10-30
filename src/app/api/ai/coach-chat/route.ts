@@ -106,54 +106,100 @@ export async function POST(req: Request) {
       : [];
 
     // Safety stop BEFORE any provider call (re-audit SEC-R1/E2E-R2):
-    // the scan covers the current message, the user's history turns,
-    // and the grounding context (check-in notes included), in English
-    // and Hindi — everything that would otherwise reach the model.
+    // the scan covers the user's own words — the current message, the
+    // user's history turns, and the check-in notes inside the grounding
+    // context (audit-3 SEC2-2: never the generated context scaffolding).
     // Pain/injury or disordered eating → refer-out copy, no model
     // involved, no diagnosis, no advice.
     const stop = findSafetyStop({ message: rawMessage, history, contextText });
 
-    // Per-actor daily AI quota (audit F-02), same as every other AI
-    // route: signed-in users get the per-account cap, guests the guest
-    // cap, keyed by server-verified identity only. The outcome is
-    // captured rather than returned immediately: a safety stop outranks
-    // a quota denial (re-audit E2E-R3). The remaining count is also
-    // captured for the honest counter (re-audit E2E-R8, below).
-    let quotaDeny: Response | null = null;
-    let sharedRemaining: number | null = null;
-    try {
-      const quota = await checkAiDailyQuota(req);
-      sharedRemaining = quota.allowed ? quota.remaining : 0;
-      if (!quota.allowed) {
-        quotaDeny = aiQuotaExceededResponse(quota.actor, quota.resetMs);
-      }
-    } catch (err) {
-      if (err instanceof AiActorAuthError) {
-        // Gauntlet R7: present-but-unverifiable Bearer token fails closed.
-        quotaDeny = NextResponse.json(
-          { error: 'UNAUTHORIZED', message: 'Invalid or expired session token. Sign in again to continue.' },
-          { status: 401 }
-        );
-      } else if (err instanceof RateLimitUnavailableError) {
-        quotaDeny = rateLimitUnavailableResponse();
-      } else {
-        throw err;
-      }
+    // PERF-1 (audit-3): static replies are served HERE — after the
+    // per-minute burst limit (step 1) and the local scans only. The old
+    // flow made even a constant-string reply wait on the shared-quota
+    // and chat-cap RPCs (3 sequential Supabase round-trips, ~2–4 s
+    // measured). Consequences, all deliberate:
+    //  - Safety still outranks quota (re-audit E2E-R3): the refer-out
+    //    is served without quota state being consulted at all, so an
+    //    exhausted quota or a limiter outage can never block it.
+    //  - Static replies no longer claim shared-quota or chat-cap
+    //    slots; the burst limit remains their anti-abuse gate, exactly
+    //    as it gates the parse itself.
+    //  - dailyRemaining is null on these paths: the binding counter is
+    //    unknowable without the RPCs this fix removes, and the client
+    //    only overwrites its counter on a numeric value, so it keeps
+    //    the last honest number it was given.
+    if (stop) {
+      return NextResponse.json({
+        reply: COACH_CHAT_REFER_OUT[stop][language],
+        evidence: [],
+        provider: 'safety',
+        model: null,
+        safetyStop: stop,
+        dailyRemaining: null,
+      });
     }
 
-    // Chat-specific daily cap: 30 messages/24h per IP (the product cap
-    // for this chat; guest mode has no account identity, so the IP is the
-    // user key — same pattern as the other routes). Runs for every
-    // parsed request so safety-stop accounting stays uniform; one
-    // deliberate exception to the old "a denied call consumes nothing"
-    // rule — a shared-quota denial now also counts here. Denial
-    // precedence is unchanged: shared quota first, then this cap.
-    const daily = await enforceLimit(req, {
-      windowMs: 24 * 60 * 60 * 1000,
-      maxRequests: COACH_CHAT_DAILY_CAP,
-      keyPrefix: 'coach-chat-daily',
-      errorCode: 'DAILY_CAP',
-    });
+    // Mechanical topic gate (re-audit E2E-R1): the topic lock used to
+    // live only in the system prompt. A deterministic in-scope scan now
+    // declines zero-signal messages BEFORE the provider is called —
+    // same static-copy treatment as the safety stop. Safety outranks
+    // the gate: the stop check ran first.
+    if (!isCoachChatInScope(rawMessage, history)) {
+      return NextResponse.json({
+        reply: COACH_CHAT_TOPIC_DECLINE[language],
+        evidence: [],
+        provider: 'topic-lock',
+        model: null,
+        safetyStop: null,
+        topicLock: true,
+        dailyRemaining: null,
+      });
+    }
+
+    // Provider path only: per-actor daily AI quota (audit F-02), same
+    // as every other AI route — signed-in users get the per-account
+    // cap, guests the guest cap, keyed by server-verified identity
+    // only — and the chat-specific daily cap: 30 messages/24h per IP
+    // (the product cap for this chat; guest mode has no account
+    // identity, so the IP is the user key — same pattern as the other
+    // routes). PERF-1: the two checks are independent counters, so
+    // they run in PARALLEL (Promise.all) instead of sequentially.
+    // Denial precedence is unchanged: shared quota first, then the cap.
+    const captureQuota = async (): Promise<{ deny: Response | null; remaining: number | null }> => {
+      try {
+        const quota = await checkAiDailyQuota(req);
+        return {
+          deny: quota.allowed ? null : aiQuotaExceededResponse(quota.actor, quota.resetMs),
+          remaining: quota.allowed ? quota.remaining : 0,
+        };
+      } catch (err) {
+        if (err instanceof AiActorAuthError) {
+          // Gauntlet R7: present-but-unverifiable Bearer token fails closed.
+          return {
+            deny: NextResponse.json(
+              { error: 'UNAUTHORIZED', message: 'Invalid or expired session token. Sign in again to continue.' },
+              { status: 401 }
+            ),
+            remaining: null,
+          };
+        }
+        if (err instanceof RateLimitUnavailableError) {
+          return { deny: rateLimitUnavailableResponse(), remaining: null };
+        }
+        throw err;
+      }
+    };
+    const [quotaOutcome, daily] = await Promise.all([
+      captureQuota(),
+      enforceLimit(req, {
+        windowMs: 24 * 60 * 60 * 1000,
+        maxRequests: COACH_CHAT_DAILY_CAP,
+        keyPrefix: 'coach-chat-daily',
+        errorCode: 'DAILY_CAP',
+      }),
+    ]);
+    const quotaDeny = quotaOutcome.deny;
+    const sharedRemaining = quotaOutcome.remaining;
 
     // Honest counter (re-audit E2E-R8): the number the client shows
     // must be the BINDING quota — the shared per-actor AI quota
@@ -164,34 +210,6 @@ export async function POST(req: Request) {
     const bindingRemaining = (chatRemaining: number): number =>
       sharedRemaining == null ? chatRemaining : Math.min(chatRemaining, sharedRemaining);
 
-    if (stop) {
-      return NextResponse.json({
-        reply: COACH_CHAT_REFER_OUT[stop][language],
-        evidence: [],
-        provider: 'safety',
-        model: null,
-        safetyStop: stop,
-        dailyRemaining: daily.ok ? bindingRemaining(daily.remaining) : 0,
-      });
-    }
-
-    // Mechanical topic gate (re-audit E2E-R1): the topic lock used to
-    // live only in the system prompt. A deterministic in-scope scan now
-    // declines zero-signal messages BEFORE the provider is called —
-    // same static-copy treatment as the safety stop (served regardless
-    // of quota state, counted by the chat daily cap above). Safety
-    // outranks the gate: the stop check ran first.
-    if (!isCoachChatInScope(rawMessage, history)) {
-      return NextResponse.json({
-        reply: COACH_CHAT_TOPIC_DECLINE[language],
-        evidence: [],
-        provider: 'topic-lock',
-        model: null,
-        safetyStop: null,
-        topicLock: true,
-        dailyRemaining: daily.ok ? bindingRemaining(daily.remaining) : 0,
-      });
-    }
     if (quotaDeny) return quotaDeny;
     if (!daily.ok) return daily.response;
 

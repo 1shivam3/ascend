@@ -236,6 +236,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'onboarding.dietEggitarian': 'एगिटेरियन (अंडा खाते हैं)',
   'onboarding.dietNonVegetarian': 'मांसाहारी',
   'onboarding.dietVegan': 'वीगन',
+  'onboarding.restoringTitle': 'खाता पुनर्स्थापित हो रहा है',
+  'onboarding.restoringBody': 'क्लाउड सिंक से कनेक्ट हो रहा है और आपके प्रशिक्षण रिकॉर्ड लोड हो रहे हैं...',
 
   // ── Settings ────────────────────────────────────────────────────────
   'settings.title': 'सेटिंग्स',

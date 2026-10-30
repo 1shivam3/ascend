@@ -8,12 +8,11 @@ import {
 } from '@/lib/coach-chat';
 import { getAiAuthHeaders } from '@/lib/ai-client-auth';
 import { toLocalDateString } from '@/lib/habits';
-
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  evidence?: string[];
-}
+import {
+  useCoachChatStore,
+  currentDailyLeft,
+  type CoachChatMessage,
+} from '@/lib/coach-chat-store';
 
 function weekIndexOf(startMonday: string, todayStr: string, weekCount: number): number {
   const parse = (s: string) => {
@@ -54,11 +53,24 @@ export default function CoachChatSection() {
   const activeWorkoutDraft = useStore((s) => s.activeWorkoutDraft);
   const readinessHistory = useStore((s) => s.coach?.readinessHistory ?? []);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // FE-06 (audit-3): the conversation and the daily-left counter live
+  // in a persisted store, not useState — this section unmounts on
+  // every tab switch, which used to wipe the thread and made users
+  // re-ask (burning another of the day's messages) for an answer
+  // they already had. Input/sending/error stay local: they are
+  // ephemeral typing state and SHOULD reset on remount.
+  const messages = useCoachChatStore((s) => s.messages);
+  const setMessages = useCoachChatStore((s) => s.setMessages);
+  const storedDailyLeft = useCoachChatStore((s) => s.dailyLeft);
+  const storedDailyLeftDate = useCoachChatStore((s) => s.dailyLeftDate);
+  const setDailyLeftRaw = useCoachChatStore((s) => s.setDailyLeft);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<'generic' | 'cap' | 'rate' | null>(null);
-  const [dailyLeft, setDailyLeft] = useState<number | null>(null);
+  const dailyLeft = currentDailyLeft(
+    { dailyLeft: storedDailyLeft, dailyLeftDate: storedDailyLeftDate },
+    toLocalDateString(new Date())
+  );
   const listRef = useRef<HTMLDivElement | null>(null);
 
   const userData: CoachChatUserData = useMemo(() => {
@@ -231,7 +243,7 @@ export default function CoachChatSection() {
     setError(null);
     setInput('');
     const history = messages.map((m) => ({ role: m.role, content: m.content }));
-    const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: text }];
+    const nextMessages: CoachChatMessage[] = [...messages, { role: 'user', content: text }];
     setMessages(nextMessages);
     setSending(true);
     try {
@@ -258,7 +270,9 @@ export default function CoachChatSection() {
         }
         return;
       }
-      if (typeof data?.dailyRemaining === 'number') setDailyLeft(data.dailyRemaining);
+      if (typeof data?.dailyRemaining === 'number') {
+        setDailyLeftRaw(data.dailyRemaining, toLocalDateString(new Date()));
+      }
       setMessages([
         ...nextMessages,
         {
