@@ -39,6 +39,8 @@ import BodyMetricsModal from '@/components/BodyMetricsModal';
 import MeetAttemptPlannerModal from '@/components/MeetAttemptPlannerModal';
 import WeeklyRecapModal from '@/components/WeeklyRecapModal';
 import { plural, safeRandomId, getLocalTodayStr, getWeekDateStrings } from '@/lib/formatters';
+import { buildActiveDays, calculateStreak } from '@/lib/streak-freeze';
+import { useToday } from '@/lib/use-today';
 import { useAppNavigation } from '@/lib/navigation';
 import { useToast } from '@/components/ui/Toast';
 import { useTranslation, type StringKey } from '@/lib/i18n';
@@ -263,10 +265,15 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   const addProgressPhoto = useStore((state) => state.addProgressPhoto);
   const removeProgressPhoto = useStore((state) => state.removeProgressPhoto);
   const trainingProfile = useStore((state) => state.trainingProfile);
+  const meals = useStore((state) => state.meals || []);
+  const streak = useStore((state) => state.streak);
   const uiPreferences = useStore((state) => state.uiPreferences);
   const setUiPreferences = useStore((state) => state.setUiPreferences);
   const toast = useToast();
   const { t } = useTranslation();
+  // Audit-3 FE-19: rollover-aware "today" (was: new Date() at render —
+  // an app left open overnight kept showing yesterday as today).
+  const todayStr = useToday();
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [photoPose, setPhotoPose] = useState<'Front' | 'Side' | 'Back'>('Front');
@@ -318,7 +325,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     }
   };
 
-  const userUnit = profile?.unit || 'lbs';
+  const userUnit = profile?.unit || 'kg'; // audit-3 FE-11: kg is the single unit-less default (matches onboarding)
 
   const displayWeight = (kg: number | null | undefined): string => {
     if (kg === null || kg === undefined || isNaN(kg) || kg <= 0) {
@@ -496,7 +503,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     const sortedDates = Array.from(pointsMap.keys()).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
     const dataPoints = sortedDates.map((d) => ({ date: d, value: pointsMap.get(d)! }));
 
-    let deltaText = 'No data';
+    let deltaText = t('progress.noData');
     if (dataPoints.length >= 2) {
       const latest = dataPoints[dataPoints.length - 1].value;
       const first = dataPoints[0].value;
@@ -504,7 +511,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       const pct = first > 0 ? (delta / first) * 100 : 0;
       deltaText = `${delta >= 0 ? '+' : ''}${Math.round(delta)} ${userUnit} (${delta >= 0 ? '+' : ''}${Math.round(pct)}%)`;
     } else if (dataPoints.length === 1) {
-      deltaText = 'Baseline';
+      deltaText = t('progress.baseline');
     }
 
     return {
@@ -512,7 +519,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       deltaText,
       latest1RM: dataPoints.length > 0 ? dataPoints[dataPoints.length - 1].value : heroLift.best1RMKg ? (userUnit === 'lbs' ? Math.round(heroLift.best1RMKg * 2.20462) : Math.round(heroLift.best1RMKg * 10) / 10) : null,
     };
-  }, [heroLift, workouts, prs, userUnit]);
+  }, [heroLift, workouts, prs, userUnit, t]);
 
   // Selected exercise sessions for Screen 15
   const selectedExerciseSessions = useMemo(() => {
@@ -549,7 +556,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     rows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return rows.slice(0, 5).map((s, idx, arr) => {
-      let deltaStr = s.source === 'pr' ? 'PR Log' : 'Completed';
+      let deltaStr = s.source === 'pr' ? t('progress.prLog') : t('progress.completed');
       if (idx < arr.length - 1) {
         const prevE1RM = arr[idx + 1].bestE1RM;
         if (prevE1RM > 0) {
@@ -566,7 +573,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
         hasData: true,
       };
     });
-  }, [selectedExercise, workouts, prs, userUnit]);
+  }, [selectedExercise, workouts, prs, userUnit, t]);
 
   // Selected exercise 1RM and filtered progress chart for Screen 15
   const selectedExerciseAnalytics = useMemo(() => {
@@ -595,7 +602,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
     const dataPoints = sortedFilteredDates.map((d) => ({ date: d, value: pointsMap.get(d)! }));
 
-    let deltaText = 'No data';
+    let deltaText = t('progress.noData');
     if (dataPoints.length >= 2) {
       const latest = dataPoints[dataPoints.length - 1].value;
       const first = dataPoints[0].value;
@@ -603,7 +610,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       const pct = first > 0 ? (delta / first) * 100 : 0;
       deltaText = `${delta >= 0 ? '+' : ''}${Math.round(delta)} ${userUnit} (${delta >= 0 ? '+' : ''}${Math.round(pct)}%)`;
     } else if (dataPoints.length === 1) {
-      deltaText = 'Baseline';
+      deltaText = t('progress.baseline');
     }
 
     const latestVal = dataPoints.length > 0 ? dataPoints[dataPoints.length - 1].value : null;
@@ -613,7 +620,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       deltaText,
       latest1RM: latestVal,
     };
-  }, [selectedExercise, workouts, prs, userUnit, strengthTimeRange]);
+  }, [selectedExercise, workouts, prs, userUnit, strengthTimeRange, t]);
 
   // ── 2. REAL BODY COMPOSITION & MEASUREMENTS DATA ──────────────────────────
   const sortedMetrics = useMemo(() => {
@@ -633,7 +640,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   // Bodyweight trend chart & real delta
   const bodyweightAnalytics = useMemo(() => {
     if (sortedMetrics.length === 0 && !profile?.bodyweightKg) {
-      return { dataPoints: [], deltaText: 'No logs yet', latestWeight: null };
+      return { dataPoints: [], deltaText: t('progress.noLogsYet'), latestWeight: null };
     }
 
     const now = Date.now();
@@ -649,7 +656,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       return { date: m.date, value: Math.round(val * 10) / 10 };
     });
 
-    let deltaText = 'No logs yet';
+    let deltaText = t('progress.noLogsYet');
     if (dataPoints.length >= 2) {
       // SIM-P2-03: the headline delta was endpoint-based (latest minus
       // first), so one bad weigh-in swung the number the user sees —
@@ -672,9 +679,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       const pct = fittedFirst > 0 ? (delta / fittedFirst) * 100 : 0;
       deltaText = `${delta >= 0 ? '+' : ''}${delta.toFixed(1)} ${userUnit} (${delta >= 0 ? '+' : ''}${Math.round(pct)}%)`;
     } else if (dataPoints.length === 1) {
-      deltaText = 'Baseline';
+      deltaText = t('progress.baseline');
     } else if (currentWeightKg) {
-      deltaText = 'Current';
+      deltaText = t('progress.current');
     }
 
     return {
@@ -682,12 +689,12 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       deltaText,
       latestWeight: currentWeightKg ? (userUnit === 'lbs' ? Math.round(currentWeightKg * 2.20462) : Math.round(currentWeightKg * 10) / 10) : null,
     };
-  }, [sortedMetrics, profile, userUnit, bodyTimeRange, currentWeightKg]);
+  }, [sortedMetrics, profile, userUnit, bodyTimeRange, currentWeightKg, t]);
 
   // ── 3. REAL CONSISTENCY & STREAK DATA ─────────────────────────────────────
   const consistencyStats = useMemo(() => {
-    const today = new Date();
-    const todayStr = getLocalDateStr(today);
+    const [ty, tm, td] = todayStr.split('-').map(Number);
+    const today = new Date(ty, tm - 1, td);
 
     // Group workouts by unique calendar date (deduplicating multiple sessions per day)
     const workoutDays = new Set<string>();
@@ -701,33 +708,34 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       }
     });
 
-    // Calculate real consecutive daily streak
-    let streakDays = 0;
-    const checkDate = new Date(today);
-    if (!workoutDays.has(todayStr)) {
-      checkDate.setDate(checkDate.getDate() - 1);
-    }
-    while (streakDays < 365) {
-      const dStr = getLocalDateStr(checkDate);
-      if (workoutDays.has(dStr)) {
-        streakDays++;
-        checkDate.setDate(checkDate.getDate() - 1);
-      } else {
-        break;
-      }
-    }
+    // Audit-3 FE-09: ONE streak definition everywhere — Home's forgiving
+    // streak (workouts OR 3+ logged meals count as an active day, one
+    // missed day inside a run is freeze-covered), computed by the same
+    // streak-freeze machinery Home uses. This block previously ran a
+    // workout-only consecutive-days loop, so Progress and Home routinely
+    // showed different streaks for the same user.
+    const normalizedWorkouts = workouts.map((w) => ({ ...w, date: w.date.split('T')[0] }));
+    const activeDays = buildActiveDays(normalizedWorkouts, meals);
+    const streakDays = calculateStreak({
+      dailyActivity: activeDays,
+      freezesAvailable: streak?.freezesAvailable ?? 0,
+      todayStr,
+    }).currentStreak;
 
-    // Current calendar week (Monday–Sunday) — the week always starts on Monday.
-    const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-    const weekDates = getWeekDateStrings(today);
+    // Audit-3 FE-18: "Last 7 Days" is a true trailing window — today plus
+    // the previous 6 days (was: the current Mon–Sun calendar week, which
+    // included future days early in the week).
+    const weekdayLetters = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     let thisWeekCompleted = 0;
-    const dayBars = weekDates.map((dStr, i) => {
-      const label = dayLabels[i];
+    const dayBars = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - (6 - i));
+      const dStr = getLocalDateStr(d);
       const isCompleted = workoutDays.has(dStr);
       if (isCompleted) thisWeekCompleted++;
 
       return {
-        label,
+        label: weekdayLetters[d.getDay()],
         dateStr: dStr,
         isCompleted,
         heightPct: isCompleted ? 85 : 15,
@@ -754,7 +762,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       fourWeeksCompleted += count;
       const pct = Math.min(100, Math.round((count / weeklyTarget) * 100));
       fourWeeksBreakdown.push({
-        label: w === 0 ? 'Week 4 (Current)' : w === 1 ? 'Week 3' : w === 2 ? 'Week 2' : 'Week 1',
+        label: w === 0 ? t('progress.weekNCurrent', { n: 4 - w }) : t('progress.weekN', { n: 4 - w }),
         count,
         target: weeklyTarget,
         pct,
@@ -774,7 +782,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       dayBars,
       fourWeeksBreakdown,
     };
-  }, [workouts, trainingProfile?.daysPerWeek]);
+  }, [workouts, meals, streak?.freezesAvailable, trainingProfile?.daysPerWeek, todayStr, t]);
 
   // DOTS calculation for powerlifting modal
   const bigThreeStats = useMemo(() => getBigThreeStats(prs), [prs]);
@@ -828,7 +836,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     sessions.forEach((sess) => pointsMap.set(sess.date, Math.round(sess.bestE1RM * 10) / 10));
     const sortedDates = Array.from(pointsMap.keys()).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
     const dataPoints = sortedDates.map((d) => ({ date: d, value: pointsMap.get(d)! }));
-    let deltaText = 'No data';
+    let deltaText = t('progress.noData');
     if (dataPoints.length >= 2) {
       const latest = dataPoints[dataPoints.length - 1].value;
       const first = dataPoints[0].value;
@@ -836,7 +844,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       const pct = first > 0 ? (delta / first) * 100 : 0;
       deltaText = `${delta >= 0 ? '+' : ''}${Math.round(delta)} ${userUnit} (${delta >= 0 ? '+' : ''}${Math.round(pct)}%)`;
     } else if (dataPoints.length === 1) {
-      deltaText = 'Baseline';
+      deltaText = t('progress.baseline');
     }
     return { dataPoints, deltaText, latest1RM: dataPoints.length > 0 ? dataPoints[dataPoints.length - 1].value : null };
   }, [big3Lift, workouts, prs, userUnit]);
@@ -1799,7 +1807,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 <div className="flex items-center justify-between">
                   <h3 className="text-base font-bold text-text-primary font-sans">{t('progress.last7Days')}</h3>
                   <span className="text-xs font-mono font-bold text-text-secondary">
-                    {consistencyStats.thisWeekCompleted}/{consistencyStats.thisWeekTarget} workouts
+                    {Math.min(consistencyStats.thisWeekCompleted, consistencyStats.thisWeekTarget)}/{consistencyStats.thisWeekTarget} {t('progress.workoutsLabel')}
                   </span>
                 </div>
 
@@ -1829,7 +1837,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 <div className="flex items-center justify-between">
                   <h3 className="text-base font-bold text-text-primary font-sans">{t('progress.last4Weeks')}</h3>
                   <span className="text-xs font-mono font-bold text-[#5E615A] dark:text-[#A5A096]">
-                    {consistencyStats.fourWeeksCompleted}/{consistencyStats.fourWeeksTarget} workouts ({consistencyStats.consistencyPct}%)
+                    {/* Audit-3 FE-10: display-only caps — never show done > total or >100% (was: "28/20 workouts (140%)"). Underlying counts untouched. */}
+                    {Math.min(consistencyStats.fourWeeksCompleted, consistencyStats.fourWeeksTarget)}/{consistencyStats.fourWeeksTarget} {t('progress.workoutsLabel')} ({Math.min(consistencyStats.consistencyPct, 100)}%)
                   </span>
                 </div>
 
