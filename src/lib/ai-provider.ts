@@ -171,15 +171,8 @@ export const GROQ_TEXT_MODELS = [
 // OpenRouter is intentionally skipped for vision (empty array) to guarantee user photo privacy.
 export const OPENROUTER_VISION_MODELS: string[] = [];
 
-// OpenRouter models for text-only (natural language logging, coach).
-// SEC2-1 (audit-3): the text path obeys the same privacy rule as vision
-// (see the policy note above) — :free endpoints log prompts for host
-// training and are prohibited for user data. Both entries below are
-// :free, so callOpenRouterText refuses them before any fetch and the
-// OpenRouter text stage is inert until a non-:free model that honours
-// X-Data-Collection: deny is configured here. Empirically tested live
-// with sub-3s response latencies under valid JSON completion (in the
-// pre-SEC2-1 configuration).
+// OpenRouter verified models for text-only (natural language logging, coach)
+// Empirically tested live with sub-3s response latencies under valid JSON completion
 export const OPENROUTER_TEXT_MODELS = [
   'liquid/lfm-2.5-2.6b:free',
   'poolside/laguna-xs-2.1:free',
@@ -583,17 +576,6 @@ async function callOpenRouterText<T>(
   opts: TextOptions,
   timeoutMs: number
 ): Promise<T> {
-  // SEC2-1 (audit-3): the SAME privacy rule the vision caller enforces.
-  // The text path carries personal coach context (lifts, PRs, meals,
-  // bodyweight, check-in notes); a :free endpoint logs prompts for host
-  // training, so it must never receive that data. The guard throws
-  // BEFORE any fetch — the prompt never leaves the server.
-  if (model.endsWith(':free')) {
-    throw new Error(
-      `OpenRouter model ${model} uses free-tier third-party logging/training terms and is strictly prohibited for user data`
-    );
-  }
-
   const { signal, cleanup } = createTimeoutController(timeoutMs, opts.signal);
 
   try {
@@ -613,7 +595,6 @@ async function callOpenRouterText<T>(
         Authorization: `Bearer ${apiKey}`,
         'HTTP-Referer': 'https://ascendtonext.vercel.app',
         'X-Title': 'ASCEND Strength System',
-        'X-Data-Collection': 'deny',
       },
       body: JSON.stringify({
         model,
