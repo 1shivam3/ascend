@@ -79,8 +79,11 @@ function clientIp(req: NextRequest): string {
   const forwarded = req.headers.get('x-forwarded-for');
   const first = forwarded?.split(',')[0].trim();
   if (first && isValidIpFormat(first)) return first;
-  const real = req.headers.get('x-real-ip')?.trim();
-  if (real && isValidIpFormat(real)) return real;
+  // Audit-3 SEC2-5: NO x-real-ip fallback. That header is not set by
+  // Vercel's edge, so any client can send it and rotate its apparent IP
+  // at will — minting a fresh floor bucket per request and defeating
+  // this ceiling. This mirrors getClientIp's documented decision in
+  // lib/rate-limit.ts: no trustworthy header → one shared bucket.
   return 'unknown';
 }
 
