@@ -109,7 +109,9 @@ describe('startFreshFromRetainedHistory / restoreArchivedHistory', () => {
     expect(after.hasCompletedOnboarding).toBe(true);
     expect(after.profile).toBeTruthy();
     expect(after.profile!.id.startsWith('guest_')).toBe(true);
-    expect(after.profile!.name).toBe('Athlete');
+    // FE-21 (audit 3): no placeholder name is seeded — the profile name
+    // stays empty until the user provides one.
+    expect(after.profile!.name).toBe('');
     expect(after.profile!.gender).toBe('male');
     expect(after.profile!.bodyweightKg).toBe(70);
     expect(after.profile!.bodyweightLbs).toBe(154.3);
