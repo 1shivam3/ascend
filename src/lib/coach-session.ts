@@ -229,14 +229,30 @@ export type WeeklySuggestionKind = 'shrink' | 'progress' | 'hold';
 
 export function weeklySuggestion(
   sessionsPlanned: number,
-  sessionsDone: number
+  sessionsDone: number,
+  sessionsDue: number = sessionsPlanned
 ): { kind: WeeklySuggestionKind; missed: number } {
-  const missed = Math.max(0, sessionsPlanned - sessionsDone);
-  if (sessionsPlanned > 0 && sessionsDone / sessionsPlanned < 0.5) {
+  // FE-02 (audit-3): sessionsDue = scheduled sessions whose day is
+  // already over. The thresholds below are end-of-week judgements, so
+  // a partial week must be judged only on the part that has elapsed:
+  //  - 'shrink' needs evidence — at least half the week's sessions
+  //    already due — and fewer than half of those done. (Monday
+  //    morning, with nothing due yet, can no longer read "more than
+  //    half the week was missed".)
+  //  - 'progress' is an end-of-week verdict: every planned session
+  //    done AND every planned day already due.
+  // With sessionsDue omitted the caller asserts a completed week and
+  // gets the original end-of-week semantics.
+  const due = Math.max(0, Math.min(sessionsDue, sessionsPlanned));
+  const missed = Math.max(0, due - sessionsDone);
+  if (sessionsPlanned <= 0 || due <= 0) {
+    return { kind: 'hold', missed: 0 };
+  }
+  if (due >= Math.ceil(sessionsPlanned / 2) && sessionsDone / due < 0.5) {
     return { kind: 'shrink', missed };
   }
-  if (sessionsPlanned > 0 && sessionsDone >= sessionsPlanned) {
-    return { kind: 'progress', missed };
+  if (sessionsDone >= sessionsPlanned && due >= sessionsPlanned) {
+    return { kind: 'progress', missed: 0 };
   }
   return { kind: 'hold', missed };
 }
