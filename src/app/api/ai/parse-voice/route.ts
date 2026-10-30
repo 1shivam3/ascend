@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { RateLimitUnavailableError, checkRateLimit } from '@/lib/rate-limit';
 import { checkAiDailyQuota, aiQuotaExceededResponse, AiActorAuthError } from '@/lib/ai-quota';
 import { executeMultiProviderText } from '@/lib/ai-provider';
+import { MAX_PR_WEIGHT_KG } from '@/lib/strength-standards';
 import { rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
 
 export const runtime = 'nodejs';
@@ -111,14 +112,35 @@ Respond with ONLY raw JSON matching this schema:
       }, { status: 422 });
     }
 
+    // Audit-3 DI2-3: clamp the model output to the same sane ranges the
+    // store applies elsewhere (update-sanitize: weight 0..MAX_PR_WEIGHT_KG,
+    // reps 1..1000, RPE on its 1..10 scale). The client auto-applies this
+    // result on a 4-second hands-free timer, so an unclamped hallucination
+    // (99999 kg, RPE 999) would land in the log — and in PR/e1RM math —
+    // unless the user cancels in time.
+    const maxWeight = userUnit === 'lbs' ? Math.ceil(MAX_PR_WEIGHT_KG * 2.20462) : MAX_PR_WEIGHT_KG;
+    const clampNum = (v: unknown, min: number, max: number): number | undefined => {
+      if (typeof v !== 'number' || !Number.isFinite(v)) return undefined;
+      return Math.min(max, Math.max(min, v));
+    };
+    const weight = clampNum(parsed.weight, 0, maxWeight) ?? 0;
+    const reps = Math.round(clampNum(parsed.reps, 1, 1000) ?? 0);
+    const rpe = clampNum(parsed.rpe, 1, 10);
+    // setIndex is a 1-based ordinal: 0/negative is meaningless input, so
+    // it is dropped (undefined) rather than clamped up to an invented 1.
+    const setIndex =
+      typeof parsed.setIndex === 'number' && Number.isFinite(parsed.setIndex) && parsed.setIndex >= 1
+        ? Math.round(Math.min(100, parsed.setIndex))
+        : undefined;
+
     return NextResponse.json({
       success: true,
       result: {
         exerciseName: parsed.exerciseName || fallbackExercise,
-        weight: typeof parsed.weight === 'number' ? parsed.weight : 0,
-        reps: typeof parsed.reps === 'number' ? parsed.reps : 0,
-        rpe: typeof parsed.rpe === 'number' ? parsed.rpe : undefined,
-        setIndex: typeof parsed.setIndex === 'number' ? parsed.setIndex : undefined,
+        weight,
+        reps,
+        rpe,
+        setIndex,
       },
     });
   } catch (err: any) {
