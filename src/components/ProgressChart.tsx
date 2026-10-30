@@ -111,7 +111,7 @@ export default function ProgressChart() {
 
   // Volume load & RPE fatigue data derived from workouts
   const volumeData = useMemo(() => {
-    const rawSessions = getExerciseHistorySessions(selectedExercise, workouts || []);
+    const rawSessions = getExerciseHistorySessions(selectedExercise, workouts || [], 'kg', { exact: true });
     let filtered = rawSessions;
 
     if (timeframe !== 'all') {

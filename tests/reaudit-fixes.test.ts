@@ -37,10 +37,16 @@ describe('re-audit: safety scan coverage (SEC-R1/E2E-R2)', () => {
   });
 
   it('finds a stop in the grounding context (check-in notes channel)', () => {
+    // Audit-3 SEC2-2 pin update: the context channel is the delimited
+    // notes section the builder actually emits (COACH_CHAT_NOTES_SECTION_HEADER).
+    // The old pin used a synthetic 'CHECK-IN NOTE: …' string scanned as
+    // raw context; that whole-context scan is precisely what SEC2-2
+    // removed, because generated context scaffolding false-positives it.
     const stop = findSafetyStop({
       message: 'how is my progress?',
       history: [],
-      contextText: 'CHECK-IN NOTE: sharp pain in left shoulder since Tuesday',
+      contextText:
+        "NOTES FROM TODAY'S CHECK-IN (the user's own words):\n- sharp pain in left shoulder since Tuesday",
     });
     expect(stop).toBe('pain');
   });

@@ -102,12 +102,50 @@ export function detectSafetyStop(message: string): CoachChatSafetyStop {
 }
 
 /**
+ * Header of the ONLY section of the grounding context that carries the
+ * user's own free text. Everything else in the context is app-generated
+ * scaffolding and summaries — including the literal header "PAIN
+ * EPISODES ON RECORD" and athlete-model facts that quote the user's
+ * pain history ("Pain has come up on N days…").
+ */
+export const COACH_CHAT_NOTES_SECTION_HEADER =
+  "NOTES FROM TODAY'S CHECK-IN (the user's own words):";
+
+/**
+ * Extract the user's check-in notes (their own words) from a built
+ * context text; '' when the context carries no notes section.
+ */
+export function extractCheckinNotes(contextText: string): string {
+  if (!contextText) return '';
+  const section = contextText
+    .split('\n\n')
+    .find((s) => s.startsWith(COACH_CHAT_NOTES_SECTION_HEADER));
+  if (!section) return '';
+  return section
+    .slice(COACH_CHAT_NOTES_SECTION_HEADER.length)
+    .split('\n')
+    .map((line) => line.replace(/^-\s*/, '').trim())
+    .filter((line) => line.length > 0)
+    .join('\n');
+}
+
+/**
  * Whole-request safety scan (re-audit SEC-R1/E2E-R2): the pre-provider
- * stop must cover everything that will be forwarded to the model — not
- * just the current message, but also the user's history turns and the
- * grounding context (which carries check-in notes). A stop found in any
- * channel returns the same refer-out; the current message wins ties so
- * the copy matches what the user just said.
+ * stop must cover the user's own words wherever they will be forwarded
+ * to the model — the current message, the user's history turns, and the
+ * check-in notes inside the grounding context. A stop found in any of
+ * those channels returns the same refer-out; the current message wins
+ * ties so the copy matches what the user just said.
+ *
+ * Audit-3 SEC2-2: the context channel is the check-in NOTES section
+ * only — never the whole context text. The generated scaffolding
+ * itself contains the scan's own trigger words (the section header
+ * "PAIN EPISODES ON RECORD", athlete-model facts quoting pain
+ * history), so scanning it permanently safety-stopped every message
+ * from any user with a pain episode on record: exactly the users the
+ * scan exists to protect could not use the chat at all. The user's
+ * notes remain fully scanned (EN + HI), so a pain disclosure typed
+ * into the check-in still stops the request before any provider call.
  */
 export function findSafetyStop(input: {
   message: string;
@@ -124,7 +162,10 @@ export function findSafetyStop(input: {
     const fromHistory = detectSafetyStop(userTurns);
     if (fromHistory) return fromHistory;
   }
-  if (input.contextText) return detectSafetyStop(input.contextText);
+  if (input.contextText) {
+    const notes = extractCheckinNotes(input.contextText);
+    if (notes) return detectSafetyStop(notes);
+  }
   return null;
 }
 
@@ -600,7 +641,7 @@ export function buildCoachChatContext(data: CoachChatUserData): CoachChatContext
     .filter((n) => n.length > 0)
     .slice(0, 6);
   if (checkinNotes.length > 0) {
-    sections.push(`NOTES FROM TODAY'S CHECK-IN (the user's own words):\n- ${checkinNotes.join('\n- ')}`);
+    sections.push(`${COACH_CHAT_NOTES_SECTION_HEADER}\n- ${checkinNotes.join('\n- ')}`);
   }
 
   if (data.painEpisodes.length > 0) {

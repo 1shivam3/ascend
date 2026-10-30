@@ -58,6 +58,7 @@ import { dropTombstonedRows } from './tombstone-heal';
 import type { Language } from './i18n/en';
 import { generateLifterTwinProfile, generateTrainingDecision } from './lifter-twin';
 import { buildAthleteModel, type AthleteModel } from './athlete-model';
+import { useCoachChatStore, COACH_CHAT_STORAGE_KEY } from './coach-chat-store';
 import {
   applyPlateauProposalToPlan,
   buildPlateauProposals,
@@ -3508,6 +3509,16 @@ export const useAppStore = create<AppState>()(
       },
 
       logout: (options) => {
+        // FE-06 (audit-3): the coach-chat thread lives in its own
+        // persisted store — clear it on ANY logout, so one user's
+        // conversation (their own words, grounded in their data)
+        // never greets the next person on a shared device. The
+        // persist middleware writes the cleared state; the explicit
+        // removeItem covers a storage write racing the unload.
+        try {
+          useCoachChatStore.getState().clearCoachChat();
+          if (typeof window !== 'undefined') localStorage.removeItem(COACH_CHAT_STORAGE_KEY);
+        } catch {}
         if (typeof window !== 'undefined') {
           try {
             localStorage.setItem('ascend_logged_out', 'true');

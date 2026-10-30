@@ -672,7 +672,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </h2>
 
         <p className="text-xs sm:text-sm text-text-muted mt-1 font-normal">
-          {/^rest day/i.test(routineDisplayName)
+          {/* FE-05 (audit-3): rest detection uses the engine's
+              isRestDay flag, never a title regex — the engine's own
+              rest title is 'Rest & Recovery' (or the user's custom
+              title), which /^rest day/i never matched, so genuine
+              rest days rendered a fake '0 min · N exercises' line. */}
+          {sessionInfo.isRestDay
             ? t('home.restDayLine')
             : exerciseCount !== null && durationMinutes !== null
               ? t(exerciseCount === 1 ? 'home.durationExercisesOne' : 'home.durationExercises', { min: durationMinutes, count: exerciseCount })

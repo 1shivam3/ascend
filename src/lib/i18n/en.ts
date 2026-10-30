@@ -259,6 +259,8 @@ export const en = {
   'onboarding.dietEggitarian': 'Eggetarian',
   'onboarding.dietNonVegetarian': 'Non-Vegetarian',
   'onboarding.dietVegan': 'Vegan',
+  'onboarding.restoringTitle': 'Restoring Account',
+  'onboarding.restoringBody': 'Connecting to cloud sync and loading your training records...',
 
   // ── Settings ────────────────────────────────────────────────────────
   'settings.title': 'Settings',

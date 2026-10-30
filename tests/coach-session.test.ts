@@ -211,4 +211,24 @@ describe('proteinTargetG and weeklySuggestion', () => {
     expect(weeklySuggestion(4, 3)).toEqual({ kind: 'hold', missed: 1 });
     expect(weeklySuggestion(0, 0)).toEqual({ kind: 'hold', missed: 0 });
   });
+
+  it('weekly (FE-02): a partial week is judged only on elapsed days', () => {
+    // Monday morning: nothing due yet — no verdict at all.
+    expect(weeklySuggestion(4, 0, 0)).toEqual({ kind: 'hold', missed: 0 });
+    // One session due and missed is not enough evidence to condemn
+    // the week ("more than half the week was missed" needs half the
+    // week's sessions due first).
+    expect(weeklySuggestion(4, 0, 1)).toEqual({ kind: 'hold', missed: 1 });
+    // Half the week due, none done → shrink is earned.
+    expect(weeklySuggestion(4, 0, 2)).toEqual({ kind: 'shrink', missed: 2 });
+    // Half due, half of those done → hold.
+    expect(weeklySuggestion(4, 1, 2)).toEqual({ kind: 'hold', missed: 1 });
+    // All sessions done early but a scheduled day remains → not yet
+    // an end-of-week "progress" verdict.
+    expect(weeklySuggestion(4, 4, 3)).toEqual({ kind: 'hold', missed: 0 });
+    // Week complete: all due, all done → progress; extra unscheduled
+    // sessions change nothing.
+    expect(weeklySuggestion(4, 4, 4)).toEqual({ kind: 'progress', missed: 0 });
+    expect(weeklySuggestion(4, 7, 4)).toEqual({ kind: 'progress', missed: 0 });
+  });
 });
