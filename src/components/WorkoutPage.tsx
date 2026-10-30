@@ -518,7 +518,7 @@ function PlanModal({
 
         {/* Footer */}
         <div className="p-4 border-t border-border flex gap-3">
-          <button type="button" onClick={onClose} className="btn-ghost flex-1">Cancel</button>
+          <button type="button" onClick={onClose} className="btn-ghost flex-1">{t('common.cancel')}</button>
           <button
             type="button"
             onClick={handleSave}
@@ -620,8 +620,8 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
           <button
             type="button"
             onClick={onDuplicate}
-            title="Duplicate plan"
-            aria-label="Duplicate plan"
+            title={t('workout.duplicatePlan')}
+            aria-label={t('workout.duplicatePlan')}
             className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
           >
             <Copy className="w-3.5 h-3.5" />
@@ -629,8 +629,8 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
           <button
             type="button"
             onClick={onShare}
-            title="Share plan via WhatsApp or QR"
-            aria-label="Share plan via WhatsApp or QR"
+            title={t('workout.sharePlan')}
+            aria-label={t('workout.sharePlan')}
             className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
           >
             <Share2 className="w-3.5 h-3.5" />
@@ -638,8 +638,8 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
           <button
             type="button"
             onClick={onEdit}
-            title="Edit plan"
-            aria-label="Edit plan"
+            title={t('workout.editPlan')}
+            aria-label={t('workout.editPlan')}
             className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
           >
             <Edit2 className="w-3.5 h-3.5" />
@@ -647,8 +647,8 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
           <button
             type="button"
             onClick={onDelete}
-            title="Delete plan"
-            aria-label="Delete plan"
+            title={t('workout.deletePlan')}
+            aria-label={t('workout.deletePlan')}
             className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -2046,19 +2046,19 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             isOpen={!!planToDelete}
             onClose={() => setPlanToDelete(null)}
             onConfirm={confirmDeletePlan}
-            title="Delete this plan?"
+            title={t('workout.deletePlanTitle')}
             message={
               planToDelete &&
               activeWorkoutDraft &&
               (activeWorkoutDraft.startedFromPlanId === planToDelete.id ||
                 activeWorkoutDraft.planId === planToDelete.id)
-                ? `"${planToDelete.name}" has a paused session. Deleting it will unlink the in-progress draft (your logged sets are kept). You can undo the deletion right after.`
+                ? t('workout.deletePlanMsgPaused', { name: planToDelete.name })
                 : planToDelete
-                  ? `"${planToDelete.name}" will be deleted. You can undo right after deleting.`
+                  ? t('workout.deletePlanMsg', { name: planToDelete.name })
                   : ''
             }
-            confirmText="Delete Plan"
-            cancelText="Keep"
+            confirmText={t('workout.deletePlanConfirm')}
+            cancelText={t('workout.keepPlan')}
             variant="danger"
           />
         </div>
@@ -2849,7 +2849,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                             className="text-danger hover:text-danger/80 text-xs flex items-center gap-1.5 px-2 py-1 rounded hover:bg-danger/10 transition-colors"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
-                            Delete Workout
+                            {t('workout.deleteWorkout')}
                           </button>
                         )}
                       </div>
@@ -2865,7 +2865,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                 onClick={() => setShowAllHistory(true)}
                 className="btn-secondary w-full py-2.5 px-4 text-xs font-bold flex items-center justify-center gap-1.5 border border-border/80 hover:border-accent/40 text-text-secondary hover:text-accent-text transition-colors shadow-xs cursor-pointer"
               >
-                <span>View All ({filteredWorkouts.length}) Workouts</span>
+                <span>{t('workout.viewAllWorkouts', { count: filteredWorkouts.length })}</span>
                 <ChevronDown className="w-3.5 h-3.5 text-accent" />
               </button>
             )}
@@ -2876,7 +2876,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                 onClick={() => setShowAllHistory(false)}
                 className="text-2xs text-text-muted hover:text-accent-text mx-auto py-1.5 flex items-center gap-1 transition-colors cursor-pointer"
               >
-                <span>Show Recent 3 Only</span>
+                <span>{t('workout.showRecentOnly')}</span>
                 <ChevronUp className="w-3 h-3" />
               </button>
             )}
@@ -2964,19 +2964,19 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         isOpen={!!planToDelete}
         onClose={() => setPlanToDelete(null)}
         onConfirm={confirmDeletePlan}
-        title="Delete this plan?"
+        title={t('workout.deletePlanTitle')}
         message={
           planToDelete &&
           activeWorkoutDraft &&
           (activeWorkoutDraft.startedFromPlanId === planToDelete.id ||
             activeWorkoutDraft.planId === planToDelete.id)
-            ? `"${planToDelete.name}" has a paused session. Deleting it will unlink the in-progress draft (your logged sets are kept). You can undo the deletion right after.`
+            ? t('workout.deletePlanMsgPaused', { name: planToDelete.name })
             : planToDelete
-              ? `"${planToDelete.name}" will be deleted. You can undo right after deleting.`
+              ? t('workout.deletePlanMsg', { name: planToDelete.name })
               : ''
         }
-        confirmText="Delete Plan"
-        cancelText="Keep"
+        confirmText={t('workout.deletePlanConfirm')}
+        cancelText={t('workout.keepPlan')}
         variant="danger"
       />
 

@@ -59,7 +59,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
       setGender(profile.gender || 'male');
       setAge(profile.age ? String(profile.age) : '');
       setDob(profile.dateOfBirth || '');
-      setUnit(profile.unit || 'lbs');
+      setUnit(profile.unit || 'kg'); // audit-3 FE-11: was 'lbs' — opening this editor on a unit-less profile and saving silently flipped the unit
 
       if (profile.unit === 'lbs') {
         const lbsVal = profile.bodyweightLbs || Math.round(profile.bodyweightKg * 2.20462);

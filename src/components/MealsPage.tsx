@@ -89,6 +89,7 @@ import { useToast } from '@/components/ui/Toast';
 
 import { useAppNavigation } from '@/lib/navigation';
 import { safeRandomId, getLocalTodayStr, formatLocalDate, round1, formatWaterMl } from '@/lib/formatters';
+import { useToday } from '@/lib/use-today';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -1330,7 +1331,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
   // ── Derived data ──────────────────────────────────────────────────────────
 
-  const todayDate   = getLocalTodayStr();
+  // Audit-3 FE-19: rollover-aware "today" (was: getLocalTodayStr() at
+  // render — an app left open overnight kept pacing against yesterday).
+  const todayDate   = useToday();
   const todayMeals  = meals.filter((m) => m.date === todayDate);
   const todayMacros = calculateMealMacros(todayMeals.flatMap((m) => m.foods));
   // N2/N3 (audit): one canonical derivation — stored goals, else the
@@ -1400,6 +1403,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     const calDelta = Math.round(todayMacros.calories - displayGoals.calories);
     const protDelta = Math.round(todayMacros.proteinG - (displayGoals.proteinG || proteinTargetG));
 
+    // Audit-3 FE-13: every pacing string below is localized (was:
+    // hardcoded English, including the below-safe-minimum warning —
+    // Hindi users got an English verdict on an otherwise-Hindi tab).
     switch (primaryGoal) {
       case 'lose_fat': {
         const isDeficitKept = calDelta <= 0;
@@ -1408,20 +1414,20 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         if (effectiveGoals.calories < getSafeMinCalories(profile?.gender || 'male')) {
           return {
             isPositive: false,
-            badgeText: 'Target Below Safe Minimum',
-            subtext: `Your daily target is under the ${getSafeMinCalories(profile?.gender || 'male').toLocaleString()} kcal safety floor. Raise it via Edit Targets — eating this low risks muscle, hormones and health.`,
-            protStatus: protDelta >= 0 ? 'Protein target met (anti-catabolic)' : `${Math.abs(protDelta)}g protein needed to spare lean mass`,
+            badgeText: t('meals.pacingBelowSafeBadge'),
+            subtext: t('meals.pacingBelowSafeSub', { floor: getSafeMinCalories(profile?.gender || 'male').toLocaleString() }),
+            protStatus: protDelta >= 0 ? t('meals.pacingProtMetAntiCatabolic') : t('meals.pacingProtSpareMass', { n: Math.abs(protDelta) }),
           };
         }
         return {
           isPositive: isDeficitKept,
           badgeText: isDeficitKept
-            ? `Deficit Preserved (${Math.abs(calDelta)} kcal under ceiling)`
-            : `Over Deficit Limit (+${calDelta} kcal)`,
+            ? t('meals.pacingDeficitKept', { n: Math.abs(calDelta) })
+            : t('meals.pacingOverDeficit', { n: calDelta }),
           subtext: isDeficitKept
-            ? 'Maintaining caloric deficit to oxidize fat stores while preserving lean tissue.'
-            : 'Exceeded caloric limit for today. Prioritize lean protein and low-density foods.',
-          protStatus: protDelta >= 0 ? 'Protein target met (anti-catabolic)' : `${Math.abs(protDelta)}g protein needed to spare lean mass`,
+            ? t('meals.pacingDeficitKeptSub')
+            : t('meals.pacingOverDeficitSub'),
+          protStatus: protDelta >= 0 ? t('meals.pacingProtMetAntiCatabolic') : t('meals.pacingProtSpareMass', { n: Math.abs(protDelta) }),
         };
       }
       case 'build_muscle': {
@@ -1429,12 +1435,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         return {
           isPositive: isSurplusMet,
           badgeText: isSurplusMet
-            ? `Growth Surplus Reached (+${calDelta} kcal)`
-            : `${Math.abs(calDelta)} kcal to reach lean surplus target`,
+            ? t('meals.pacingSurplusReached', { n: calDelta })
+            : t('meals.pacingToSurplus', { n: Math.abs(calDelta) }),
           subtext: isSurplusMet
-            ? 'Lean surplus secured. Muscle protein synthesis and recovery are fully fueled.'
-            : 'Consume remaining calories to ensure positive energy balance for muscle hypertrophy.',
-          protStatus: protDelta >= 0 ? 'Protein synthesis optimized' : `${Math.abs(protDelta)}g protein needed to hit target`,
+            ? t('meals.pacingSurplusMetSub')
+            : t('meals.pacingSurplusUnmetSub'),
+          protStatus: protDelta >= 0 ? t('meals.pacingProtSynthesis') : t('meals.pacingProtHitTarget', { n: Math.abs(protDelta) }),
         };
       }
       case 'get_stronger': {
@@ -1442,20 +1448,20 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         return {
           isPositive: isFueled,
           badgeText: isFueled
-            ? 'Strength Energy Fueled'
-            : `${Math.abs(calDelta)} kcal to fuel target`,
-          subtext: 'Glycogen and ATP replenishment on target for heavy compound progression.',
-          protStatus: protDelta >= 0 ? 'Structural repair protein met' : `${Math.abs(protDelta)}g protein remaining`,
+            ? t('meals.pacingStrengthFueled')
+            : t('meals.pacingToFuel', { n: Math.abs(calDelta) }),
+          subtext: t('meals.pacingStrengthSub'),
+          protStatus: protDelta >= 0 ? t('meals.pacingProtStructural') : t('meals.pacingProtRemaining', { n: Math.abs(protDelta) }),
         };
       }
       case 'stamina': {
         return {
           isPositive: Math.abs(calDelta) <= 200,
           badgeText: Math.abs(calDelta) <= 200
-            ? 'Endurance Energy Balance'
-            : `${calDelta > 0 ? `+${calDelta}` : calDelta} kcal vs maintenance`,
-          subtext: 'Carbohydrate and hydration balance prioritized for sustained work capacity.',
-          protStatus: protDelta >= 0 ? 'Recovery protein met' : `${Math.abs(protDelta)}g protein remaining`,
+            ? t('meals.pacingEnduranceBalance')
+            : t('meals.pacingVsMaintenance', { delta: calDelta > 0 ? `+${calDelta}` : calDelta }),
+          subtext: t('meals.pacingStaminaSub'),
+          protStatus: protDelta >= 0 ? t('meals.pacingProtRecovery') : t('meals.pacingProtRemaining', { n: Math.abs(protDelta) }),
         };
       }
       case 'general_fitness':
@@ -1463,14 +1469,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         return {
           isPositive: Math.abs(calDelta) <= 250,
           badgeText: Math.abs(calDelta) <= 250
-            ? 'Balanced Energy Adherence'
-            : `${calDelta > 0 ? `+${calDelta}` : calDelta} kcal vs target`,
-          subtext: 'Healthy macro balance supporting overall wellness and joint longevity.',
-          protStatus: protDelta >= 0 ? 'Daily protein met' : `${Math.abs(protDelta)}g protein remaining`,
+            ? t('meals.pacingBalancedAdherence')
+            : t('meals.pacingVsTarget', { delta: calDelta > 0 ? `+${calDelta}` : calDelta }),
+          subtext: t('meals.pacingGeneralSub'),
+          protStatus: protDelta >= 0 ? t('meals.pacingProtDailyMet') : t('meals.pacingProtRemaining', { n: Math.abs(protDelta) }),
         };
       }
     }
-  }, [displayGoals, effectiveGoals, todayMacros, primaryGoal, proteinTargetG]);
+  }, [displayGoals, effectiveGoals, todayMacros, primaryGoal, proteinTargetG, t]);
 
 
   const waterToday = waterLogs[todayDate] || 0;

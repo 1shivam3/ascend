@@ -87,6 +87,7 @@ interface CoachRequestBody {
 
 import { RateLimitUnavailableError, checkRateLimit } from '@/lib/rate-limit';
 import { validateCoachOutput } from '@/lib/coach-output';
+import { detectSafetyStop, COACH_CHAT_REFER_OUT } from '@/lib/coach-chat';
 import { checkAiDailyQuota, aiQuotaExceededResponse, AiActorAuthError } from '@/lib/ai-quota';
 import { getServerGeminiApiKey, rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
 
@@ -153,6 +154,37 @@ export async function POST(req: Request) {
       body.substitution.exerciseToReplace = body.substitution.exerciseToReplace.slice(0, 150);
     }
 
+    // Audit-3 SEC2-4: deterministic pre-provider safety stop — the same
+    // standard the coach-chat route got in PR #62. The only free-text
+    // user channel on this route is the WORKOUT_COMMAND instruction;
+    // a pain/injury/disordered-eating disclosure there gets the static
+    // refer-out WITHOUT any provider call (previously safety rested on
+    // the system prompt plus the post-hoc English phrase scan).
+    // Deliberately NOT scanned: userContext (app-built context — the
+    // SEC2-2 false-positive class) and the substitution reason option
+    // (a fixed-option feature input; substituting AWAY from a painful
+    // movement is this route's designed safe path).
+    if (task === 'WORKOUT_COMMAND' && body.command?.instruction) {
+      const stop = detectSafetyStop(body.command.instruction);
+      if (stop) {
+        return NextResponse.json({
+          success: true,
+          task,
+          source: 'safety-stop',
+          safetyStop: stop,
+          safetyFiltered: true,
+          data: {
+            actionType: 'CUSTOM',
+            summary:
+              stop === 'pain'
+                ? 'Stop and rest — possible injury reported'
+                : 'Take the safe, balanced path',
+            coachAdvice: COACH_CHAT_REFER_OUT[stop].en,
+            modifiedExercises: [],
+          },
+        });
+      }
+    }
 
     let systemInstruction = '';
     let promptText = '';

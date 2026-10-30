@@ -97,6 +97,23 @@ const GUARDRAIL_PATTERNS: RegExp[] = [
   /don'?t need (to see )?a doctor/i,
   /skip the doctor/i,
   /\b(take|start|use|try)\s+(ibuprofen|paracetamol|acetaminophen|aspirin|painkillers?|steroids?|testosterone|hgh)\b/i,
+  // Audit-3 SEC2-3: Hindi (Devanagari) equivalents — coach replies are
+  // generated in Hindi when language==='hi', so an English-only output
+  // scan left Hindi users without this layer. Machine-written Hindi,
+  // flagged for native-speaker review like the input-scan starter set.
+  // दर्द के बावजूद ट्रेनिंग = train through the pain.
+  /दर्द\s*(के\s*)?(बावजूद|में\s*भी|होते\s*हुए)\s*.{0,30}(ट्रेनिंग|वर्कआउट|व्यायाम|जारी)/,
+  // दर्द को अनदेखा करो = ignore the pain.
+  /दर्द\s*को\s*(अनदेखा|नज़रअंदाज़|नजरअंदाज)/,
+  // दर्द नहीं तो गेन नहीं = no pain, no gain.
+  /दर्द\s*नहीं\s*(तो|,)?\s*(गेन|फायदा|मज़बूती|मजबूती)\s*नहीं/,
+  // डॉक्टर की ज़रूरत नहीं = no need for a doctor.
+  /डॉक्टर\s*(के\s*पास\s*(जाने\s*)?|को\s*(दिखाने\s*)?)?की?\s*(कोई\s*)?(ज़रूरत|जरूरत)\s*नहीं/,
+  // डॉक्टर को दिखाना छोड़ दो = skip the doctor.
+  /डॉक्टर\s*को\s*दिखाना\s*(छोड़|बंद)/,
+  // Drug names transliterated, with a take/start verb nearby.
+  /(आइबुप्रोफेन|पैरासिटामोल|एस्पिरिन|दर्दनिवारक|स्टेरॉयड|टेस्टोस्टेरोन)\s*(ले\s*लो|लो|लेना|शुरू\s*करो|खाओ)/,
+  /(ले\s*लो|लो|शुरू\s*करो)\s*.{0,15}(आइबुप्रोफेन|पैरासिटामोल|एस्पिरिन|दर्दनिवारक|स्टेरॉयड|टेस्टोस्टेरोन)/,
 ];
 
 /** Sub-1200-kcal dietary directives contradict the route guardrails. */
@@ -104,7 +121,13 @@ function hasUnsafeCalorieAdvice(text: string): boolean {
   const m = text.match(/(?:below|under|only|max(?:imum)? of|just)\s+(\d{3,4})\s*(?:kcal|calories|cal)\b/i);
   if (m && Number(m[1]) < 1200) return true;
   const direct = text.match(/\b(\d{3})\s*(?:kcal|calorie|cal)\s*(?:diet|per day|a day)/i);
-  return !!direct && Number(direct[1]) < 1200;
+  if (direct && Number(direct[1]) < 1200) return true;
+  // Hindi equivalents (audit-3 SEC2-3, machine-written): "केवल 800
+  // कैलोरी" (only 800 calories) and "800 कैलोरी प्रतिदिन/डाइट".
+  const hiOnly = text.match(/(?:केवल|सिर्फ़|सिर्फ|मात्र)\s*(\d{3,4})\s*(?:kcal|कैलोरी|कैलरी)/);
+  if (hiOnly && Number(hiOnly[1]) < 1200) return true;
+  const hiDirect = text.match(/(\d{3})\s*(?:kcal|कैलोरी|कैलरी)\s*(?:प्रतिदिन|रोज़ाना|रोज़|प्रति\s*दिन|डाइट)/);
+  return !!hiDirect && Number(hiDirect[1]) < 1200;
 }
 
 export function violatesCoachGuardrails(text: string): boolean {

@@ -262,7 +262,11 @@ export function findReplyRisk(reply: string): CoachChatReplyRisk | null {
     /\b(9\d|100)\s?%\s?(of\s+)?(your\s+)?(1\s?rm|one[- ]rep max|max)\b/i.test(reply) ||
     /\brpe\s*(9\.5|10)\b/i.test(reply) ||
     /\b(test|attempt|go for|try)\s+(a\s+|your\s+)?(new\s+)?(1\s?rm|one[- ]rep max|max single)\b/i.test(reply) ||
-    /\bmax(imum)?\s+(effort|single|attempt)\b/i.test(reply)
+    /\bmax(imum)?\s+(effort|single|attempt)\b/i.test(reply) ||
+    // Hindi (audit-3 SEC2-3, machine-written): अधिकतम प्रयास = maximum
+    // effort; एक रेप मैक्स / वन रेप मैक्स = one-rep max.
+    /अधिकतम\s+(प्रयास|कोशिश)/.test(reply) ||
+    /(एक|वन)\s*रेप\s*मैक्स/.test(reply)
   ) {
     return 'near-max';
   }
@@ -275,8 +279,27 @@ export function findReplyRisk(reply: string): CoachChatReplyRisk | null {
   ) {
     return 'large-deficit';
   }
+  // Hindi: घाटा / कमी = deficit (audit-3 SEC2-3, machine-written).
+  const deficitAfterHi = reply.match(/(\d{3,4})\s?(?:kcal|कैलोरी|कैलरी)[^.]{0,25}?(घाटा|कमी)/);
+  const deficitBeforeHi = reply.match(/(घाटा|कमी)[^.]{0,25}?(\d{3,4})\s?(?:kcal|कैलोरी|कैलरी)/);
+  if (
+    (deficitAfterHi && Number(deficitAfterHi[1]) >= 600) ||
+    (deficitBeforeHi && Number(deficitBeforeHi[2]) >= 600)
+  ) {
+    return 'large-deficit';
+  }
   const dailyTotal = reply.match(/(\d{4})\s?(kcal|calories?|cal)\b[^.]{0,15}?\b(a day|per day|daily|each day)\b/i);
   if (dailyTotal && Number(dailyTotal[1]) >= 1200 && Number(dailyTotal[1]) < 1500) {
+    return 'large-deficit';
+  }
+  // Hindi daily total: "1400 कैलोरी प्रतिदिन / रोज़" (machine-written).
+  const dailyTotalHi = reply.match(/(\d{4})\s?(?:kcal|कैलोरी|कैलरी)[^.]{0,15}?(प्रतिदिन|रोज़ाना|रोज़|प्रति\s*दिन|हर\s*दिन)/);
+  if (dailyTotalHi && Number(dailyTotalHi[1]) >= 1200 && Number(dailyTotalHi[1]) < 1500) {
+    return 'large-deficit';
+  }
+  // Hindi also puts the per-day phrase first: "प्रतिदिन 1400 कैलोरी".
+  const dailyTotalHiRev = reply.match(/(प्रतिदिन|रोज़ाना|रोज़|प्रति\s*दिन|हर\s*दिन)[^.]{0,15}?(\d{4})\s?(?:kcal|कैलोरी|कैलरी)/);
+  if (dailyTotalHiRev && Number(dailyTotalHiRev[2]) >= 1200 && Number(dailyTotalHiRev[2]) < 1500) {
     return 'large-deficit';
   }
   const lossRate = reply.match(
@@ -287,15 +310,27 @@ export function findReplyRisk(reply: string): CoachChatReplyRisk | null {
     const isKg = /^kg$/i.test(lossRate[2]);
     if ((isKg && amount >= 1) || (!isKg && amount >= 2)) return 'large-deficit';
   }
+  // Hindi loss rate: "1 किलो प्रति सप्ताह" (machine-written).
+  const lossRateHi = reply.match(/(\d+(?:\.\d+)?)\s?(?:किलो|kg)[^.]{0,15}?(प्रति|हर)\s*(सप्ताह|हफ़्ता|हफ्ता)/i);
+  if (lossRateHi && Number(lossRateHi[1]) >= 1) return 'large-deficit';
+  // …and the week-first order: "हर सप्ताह 1 किलो".
+  const lossRateHiRev = reply.match(/(प्रति|हर)\s*(सप्ताह|हफ़्ता|हफ्ता)[^.]{0,15}?(\d+(?:\.\d+)?)\s?(?:किलो|kg)/i);
+  if (lossRateHiRev && Number(lossRateHiRev[3]) >= 1) return 'large-deficit';
   // Sharp volume jumps.
   if (
     /\bdouble\b[^.]{0,20}\b(volume|sets?|training|workouts?|frequency)\b/i.test(reply) ||
-    /\btwice\b[^.]{0,15}\b(as (much|many)|the)\b[^.]{0,15}\b(volume|sets?|training)\b/i.test(reply)
+    /\btwice\b[^.]{0,15}\b(as (much|many)|the)\b[^.]{0,15}\b(volume|sets?|training)\b/i.test(reply) ||
+    // Hindi: वॉल्यूम/सेट दोगुना = double the volume/sets (machine-written).
+    /(वॉल्यूम|सेट|ट्रेनिंग)[^.]{0,20}दोगुना/.test(reply) ||
+    /दोगुना[^.]{0,20}(वॉल्यूम|सेट|ट्रेनिंग)/.test(reply)
   ) {
     return 'volume-jump';
   }
   const pctJump = reply.match(/\b(\d+)\s?%\s?(more|increase)\b[^.]{0,20}\b(volume|sets?|training)\b/i);
   if (pctJump && Number(pctJump[1]) >= 50) return 'volume-jump';
+  // Hindi % jump: "60% अधिक वॉल्यूम" (machine-written).
+  const pctJumpHi = reply.match(/(\d+)\s?%\s?(अधिक|ज़्यादा|ज्यादा)[^.]{0,20}(वॉल्यूम|सेट|ट्रेनिंग)/);
+  if (pctJumpHi && Number(pctJumpHi[1]) >= 50) return 'volume-jump';
   const freqJump = reply.match(/\bfrom\s+(\d+)\s*(?:to|→)\s*(\d+)\s*(days?|sessions?|workouts?)\b[^.]{0,10}?\b(a|per)\s?week\b/i);
   if (freqJump && Number(freqJump[2]) >= 2 * Number(freqJump[1])) return 'volume-jump';
   return null;

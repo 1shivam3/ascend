@@ -791,7 +791,7 @@ export default function PolicyDecisionCard({
                   >
                     {candidatePlans.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {t('pdc.planOption', { name: p.name, count: p.exercises.length })}
+                        {t(p.exercises.length === 1 ? 'pdc.planOptionOne' : 'pdc.planOption', { name: p.name, count: p.exercises.length })}
                       </option>
                     ))}
                   </select>

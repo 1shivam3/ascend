@@ -265,6 +265,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     steps: t('health.stepsToday'),
     challenge: t('home.monthlyChallenge'),
     'weekly-review-detail': t('weeklyReview.cardTitle'),
+    quote: t('home.quote'),
   };
   const resolvedTodayForSheet = useMemo(
     () => resolveTodayLayout(uiPreferences.todayLayout, uiPreferences.density),
@@ -916,7 +917,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
           <div className="space-y-2 pt-2 border-t border-border/60">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.units')}</span>
-              <span className="text-2xs font-mono text-text-muted uppercase">{profile?.unit === 'kg' ? t('settings.unitKg') : profile?.unit === 'lbs' ? t('settings.unitLbs') : (profile?.unit || 'lbs')}</span>
+              <span className="text-2xs font-mono text-text-muted uppercase">{profile?.unit === 'kg' ? t('settings.unitKg') : profile?.unit === 'lbs' ? t('settings.unitLbs') : (profile?.unit || 'kg')}</span>
             </div>
             <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-bg-secondary border border-border">
               <button

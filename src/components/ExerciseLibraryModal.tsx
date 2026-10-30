@@ -390,7 +390,7 @@ export default function ExerciseLibraryModal({
 
         {/* Footer */}
         <div className="p-3 border-t border-border bg-bg-card flex items-center justify-between text-2xs text-text-muted">
-          <span>{t('lib.found', { count: filteredExercises.length })}</span>
+          <span>{t(filteredExercises.length === 1 ? 'lib.foundOne' : 'lib.found', { count: filteredExercises.length })}</span>
           <button
             type="button"
             onClick={onClose}

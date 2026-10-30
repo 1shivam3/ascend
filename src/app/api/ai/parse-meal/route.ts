@@ -4,6 +4,7 @@ import { checkAiDailyQuota, aiQuotaExceededResponse, AiActorAuthError } from '@/
 import { executeMultiProviderText } from '@/lib/ai-provider';
 import { rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
 import { parseNaturalMealOffline, calculateMealMacros } from '@/lib/macros';
+import { MAX_ITEM_CALORIES, MAX_ITEM_MACRO_G } from '@/lib/scan-meal-sanitize';
 import { FoodItem } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -118,14 +119,25 @@ RULES FOR PRECISION:
 
       const parsed = execResult.data;
       if (parsed && Array.isArray(parsed.foods) && parsed.foods.length > 0) {
-        const validatedFoods: FoodItem[] = parsed.foods.map((f: any) => {
-          const calories = Math.round(Number(f.calories) || 0);
-          const proteinG = Math.round((Number(f.proteinG) || 0) * 10) / 10;
-          const carbsG = Math.round((Number(f.carbsG) || 0) * 10) / 10;
-          const fatG = Math.round((Number(f.fatG) || 0) * 10) / 10;
+        // Audit-3 DI2-2: clamp every model item to the same sane ranges
+        // SEC-14 set for scan-meal (was: Number(...)||0 only — negatives
+        // and 10^9-kcal items passed straight into the review UI and,
+        // if accepted, the meal log), and cap the item count.
+        const MAX_MEAL_ITEMS = 50;
+        const MAX_ITEM_QUANTITY = 10000;
+        const clampItem = (v: unknown, max: number) => {
+          const n = Number(v) || 0;
+          if (!Number.isFinite(n) || n < 0) return 0;
+          return Math.min(max, n);
+        };
+        const validatedFoods: FoodItem[] = parsed.foods.slice(0, MAX_MEAL_ITEMS).map((f: any) => {
+          const calories = Math.round(clampItem(f.calories, MAX_ITEM_CALORIES));
+          const proteinG = Math.round(clampItem(f.proteinG, MAX_ITEM_MACRO_G) * 10) / 10;
+          const carbsG = Math.round(clampItem(f.carbsG, MAX_ITEM_MACRO_G) * 10) / 10;
+          const fatG = Math.round(clampItem(f.fatG, MAX_ITEM_MACRO_G) * 10) / 10;
           return {
             name: String(f.name || 'Food'),
-            quantity: typeof f.quantity === 'number' ? f.quantity : 1,
+            quantity: typeof f.quantity === 'number' ? clampItem(f.quantity, MAX_ITEM_QUANTITY) : 1,
             unit: String(f.unit || 'g'),
             calories,
             proteinG,

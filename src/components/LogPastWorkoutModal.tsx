@@ -540,7 +540,7 @@ export default function LogPastWorkoutModal({
                         <option value="">{t('lp.choose')}</option>
                         {plannedWorkouts.map((p) => (
                           <option key={p.id} value={p.id}>
-                            {t('lp.planOption', { name: p.name, count: p.exercises.length })}
+                            {t(p.exercises.length === 1 ? 'lp.planOptionOne' : 'lp.planOption', { name: p.name, count: p.exercises.length })}
                           </option>
                         ))}
                       </select>

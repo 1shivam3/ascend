@@ -1091,7 +1091,7 @@ class SupabaseSyncEngine {
         // Cloud account has records, but profiles row was missing/empty. Synthesize athlete profile so returning user is not locked out.
         updates.profile = {
           id: user.id,
-          name: extractedName || 'Athlete',
+          name: extractedName || '',
           gender: 'male',
           bodyweightKg: 75,
           bodyweightLbs: 165,
