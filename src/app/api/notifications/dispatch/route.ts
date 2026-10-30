@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import webpush from 'web-push';
 import { Receiver } from '@upstash/qstash';
 import { createClient } from '@supabase/supabase-js';
-import { redactSecrets } from '@/lib/server-security';
+import { redactSecrets, readTextBodyWithLimit } from '@/lib/server-security';
 import { NotificationPreferences } from '@/lib/types';
 import {
   getZonedTime,
@@ -69,8 +69,14 @@ export async function POST(req: Request) {
         currentSigningKey: qstashCurrentKey,
         nextSigningKey: qstashNextKey,
       });
-      const clonedReq = req.clone();
-      const rawBody = await clonedReq.text();
+      // Audit-3 SEC2-6: cap the body read BEFORE signature verification.
+      // Legitimate QStash payloads here are empty/tiny; an unbounded
+      // text() let an unauthenticated caller stream an arbitrarily large
+      // (or slow) body into memory behind a bogus signature header.
+      // Over-cap reads throw and are treated as a failed verification.
+      // (Nothing downstream reads the request body — the handler works
+      // from headers + the database — so no clone is needed.)
+      const rawBody = await readTextBodyWithLimit(req, 64 * 1024);
       const isValid = await receiver.verify({
         signature: upstashSignature,
         body: rawBody,
