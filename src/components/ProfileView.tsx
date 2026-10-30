@@ -91,7 +91,9 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
   // already handled by the navigation stack; registering handleBack here would
   // recurse (handleBack -> goBack -> runBackHandlers -> handleBack ...).
 
-  const athleteName = profile?.name ? profile.name.trim() : 'Alex';
+  // Audit-3 FE-21: no invented name — a profile without a name shows the
+  // existing guest label, not a stranger's name (was: fallback 'Alex').
+  const athleteName = profile?.name ? profile.name.trim() : t('common.guestAthlete');
   const athleteInitial = athleteName.charAt(0).toUpperCase();
 
   // Real athlete tier from the strength-level system (best 1RM per exercise →
@@ -118,7 +120,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
   // that is not theirs and could be mistaken for one. Guests see the
   // guest label; signed-in users see their real account email.
   const athleteEmail = user?.email || t('common.guestAthlete');
-  const userUnit = profile?.unit || 'lbs';
+  const userUnit = profile?.unit || 'kg'; // audit-3 FE-11: kg is the single unit-less default (matches onboarding)
 
   // Format height display
   const displayHeight = () => {
@@ -506,7 +508,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
                 >
                   <span className="block text-sm font-bold text-text-primary">{p.name}</span>
                   <span className="block text-2xs text-text-muted mt-0.5">
-                    {t('profile.exercisesCount', { count: p.exercises.length })}
+                    {t(p.exercises.length === 1 ? 'profile.exercisesCountOne' : 'profile.exercisesCount', { count: p.exercises.length })}
                   </span>
                 </button>
               ))}

@@ -160,9 +160,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   }, [today, language, t]);
 
   const athleteDisplayName = useMemo(() => {
-    if (!profile?.name || !profile.name.trim()) return 'Alex';
-    const first = profile.name.trim().split(' ')[0];
-    return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+    // Audit-3 FE-21: never invent a name — no stored name means no name
+    // in the greeting (was: fallback 'Alex'), and a stored name renders
+    // with its original casing (the old forced title-case mangled
+    // names like "McDonald" into "Mcdonald").
+    if (!profile?.name || !profile.name.trim()) return '';
+    return profile.name.trim().split(' ')[0];
   }, [profile?.name]);
 
   const userUnit = profile?.unit || 'kg';
@@ -179,10 +182,13 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     );
   }, [todayStr, workouts, plannedWorkouts, activeWorkoutDraft, userUnit, weeklySchedule]);
 
-  // Latest completed workout for today (if any)
+  // The session this card titles: getTodaySessionState describes the
+  // FIRST of today's workouts, so the completed-workout modal must open
+  // that same session (audit-3 FE-22 — was: the LAST, so on multi-session
+  // days the card and its Coach's Take modal described different workouts).
   const completedWorkoutForToday = useMemo(() => {
     const todayWks = workouts.filter((w) => w.date.split('T')[0] === todayStr);
-    return todayWks[todayWks.length - 1] || null;
+    return todayWks[0] || null;
   }, [workouts, todayStr]);
 
   // Forgiving streak (streak-freeze system): active days = real workouts or
@@ -482,6 +488,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     return plannedWorkouts.find((p) => p.name.toLowerCase() === routineRawName.toLowerCase()) || plannedWorkouts[0];
   }, [sessionInfo.plannedWorkoutId, plannedWorkouts, routineRawName]);
 
+  // Audit-3 FE-08: null when NO real source exists — the card must not
+  // invent stats for a session that does not exist (was: hardcoded 6).
   const exerciseCount = useMemo(() => {
     if (activeWorkoutDraft?.exercises && activeWorkoutDraft.exercises.length > 0) {
       return activeWorkoutDraft.exercises.length;
@@ -492,16 +500,18 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     if (sessionInfo.exercises && sessionInfo.exercises.length > 0) {
       return sessionInfo.exercises.length;
     }
-    return 6;
+    return null;
   }, [activeWorkoutDraft, scheduledPlan, sessionInfo.exercises]);
 
+  // Null alongside exerciseCount (was: a duration derived from the
+  // invented count — "48 min • 6 exercises" over "No Session Scheduled").
   const durationMinutes = useMemo(() => {
     if (sessionInfo.durationMin && sessionInfo.durationMin > 0) {
       return sessionInfo.durationMin;
     }
     if (scheduledPlan) return estimateSessionMinutes(scheduledPlan);
-    return Math.max(35, Math.min(65, exerciseCount * 8 || 45));
-  }, [sessionInfo.durationMin, exerciseCount, scheduledPlan]);
+    return null;
+  }, [sessionInfo.durationMin, scheduledPlan]);
 
   // Weekly consistency: accurately calculated from logged sessions in current week
   // Today's Fuel summary: real calories and protein vs target
@@ -617,9 +627,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <p className="text-sm font-medium text-text-muted">
             {greeting}
           </p>
-          <h1 className="text-3xl font-bold text-text-primary tracking-tight mt-0.5">
-            {athleteDisplayName}
-          </h1>
+          {athleteDisplayName && (
+            <h1 className="text-3xl font-bold text-text-primary tracking-tight mt-0.5">
+              {athleteDisplayName}
+            </h1>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -662,7 +674,13 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         <p className="text-xs sm:text-sm text-text-muted mt-1 font-normal">
           {/^rest day/i.test(routineDisplayName)
             ? t('home.restDayLine')
-            : t('home.durationExercises', { min: durationMinutes, count: exerciseCount })}
+            : exerciseCount !== null && durationMinutes !== null
+              ? t(exerciseCount === 1 ? 'home.durationExercisesOne' : 'home.durationExercises', { min: durationMinutes, count: exerciseCount })
+              : durationMinutes !== null
+                ? t('home.durationOnly', { min: durationMinutes })
+                : exerciseCount !== null
+                  ? t(exerciseCount === 1 ? 'home.exercisesOnlyOne' : 'home.exercisesOnly', { count: exerciseCount })
+                  : null}
         </p>
 
         <button
