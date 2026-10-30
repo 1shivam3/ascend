@@ -32,6 +32,7 @@ import { useStore } from '@/lib/store';
 import { useCoachDigest } from '@/lib/use-coach-digest';
 import { getScheduledPlanEntries } from '@/lib/scheduled-days';
 import { getLocalTodayStr, getWeekRange, parseLocalDate } from '@/lib/formatters';
+import { useToday } from '@/lib/use-today';
 import {
   adjustSession,
   checkinSteps,
@@ -144,7 +145,9 @@ export default function CoachChatTab({
   const toast = useToast();
   const digest = useCoachDigest();
 
-  const todayStr = getLocalTodayStr();
+  // Audit-3 FE-19: rollover-aware "today" (was: getLocalTodayStr() at
+  // render — an app left open overnight kept treating yesterday as today).
+  const todayStr = useToday();
   const scheduled = useMemo(
     () => getScheduledPlanEntries(weeklySchedule, plannedWorkouts),
     [weeklySchedule, plannedWorkouts]
