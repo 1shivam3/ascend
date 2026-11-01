@@ -2242,6 +2242,55 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         </div>
       )}
 
+      {/* ── Contextual Rest Timer (Visible when timer is active) ── */}
+      {/* Open-items J2.5: hoisted above Your Plans — while a session
+          is active (the only time this renders), the live-session
+          UI comes before the plans list. It renders nothing when no
+          timer runs, so the no-session layout is unchanged. */}
+      {isRestRunning && (
+        <section className="px-3.5 py-2.5 rounded-xl bg-bg-card border border-border flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Timer className="w-4 h-4 text-accent shrink-0" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-sm font-bold text-text-primary font-mono">
+                {isTimerFinished ? (
+                  <span className="text-emerald-500">READY</span>
+                ) : (
+                  formatTimer(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)
+                )}
+              </span>
+              <span className="text-2xs text-text-muted hidden sm:inline">Rest Timer</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {[60, 90, 120, 180, 300].map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => startTimer(s)}
+                className={`px-2 py-1 rounded-lg text-2xs font-semibold border transition-all ${
+                  restTotalSeconds === s && restSecondsLeft > 0
+                    ? 'bg-accent text-accent-on border-accent'
+                    : 'bg-bg-secondary border-border text-text-muted hover:text-text-primary'
+                }`}
+              >
+                {s >= 60 ? `${s / 60}m` : `${s}s`}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={togglePauseTimer}
+              className="p-1.5 rounded-lg bg-accent text-accent-on hover:brightness-105 active:scale-95 transition-all"
+              title={isRestRunning ? 'Pause' : 'Start'}
+              aria-label={isRestRunning ? 'Pause' : 'Start'}
+            >
+              {isRestRunning ? <Pause className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white" />}
+            </button>
+          </div>
+        </section>
+      )}
+
       {/* Weekly review row (PR-C) — block management now lives in the Coach tab */}
         {weeklyReviews.length > 0 && (
           <button
@@ -2452,51 +2501,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           )}
         </div>
       </section>
-
-      {/* ── Contextual Rest Timer (Visible when timer is active) ── */}
-      {isRestRunning && (
-        <section className="px-3.5 py-2.5 rounded-xl bg-bg-card border border-border flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <Timer className="w-4 h-4 text-accent shrink-0" />
-            <div className="flex items-baseline gap-2">
-              <span className="text-sm font-bold text-text-primary font-mono">
-                {isTimerFinished ? (
-                  <span className="text-emerald-500">READY</span>
-                ) : (
-                  formatTimer(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)
-                )}
-              </span>
-              <span className="text-2xs text-text-muted hidden sm:inline">Rest Timer</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {[60, 90, 120, 180, 300].map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => startTimer(s)}
-                className={`px-2 py-1 rounded-lg text-2xs font-semibold border transition-all ${
-                  restTotalSeconds === s && restSecondsLeft > 0
-                    ? 'bg-accent text-accent-on border-accent'
-                    : 'bg-bg-secondary border-border text-text-muted hover:text-text-primary'
-                }`}
-              >
-                {s >= 60 ? `${s / 60}m` : `${s}s`}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={togglePauseTimer}
-              className="p-1.5 rounded-lg bg-accent text-accent-on hover:brightness-105 active:scale-95 transition-all"
-              title={isRestRunning ? 'Pause' : 'Start'}
-              aria-label={isRestRunning ? 'Pause' : 'Start'}
-            >
-              {isRestRunning ? <Pause className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white" />}
-            </button>
-          </div>
-        </section>
-      )}
 
       {/* ── Schedule Status Footer (Reference: Screen 10 Schedule Context) ── */}
       <section className="card p-4 bg-bg-card border border-border/80 space-y-3">

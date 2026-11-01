@@ -449,6 +449,9 @@ export default function ActiveWorkoutScreen({
     reps: number;
     unit: string;
     isPR?: boolean;
+    /** Open-items J2.2: the RPE chosen for the set, echoed on the
+        Set Complete screen when one was selected. */
+    rpe?: number;
   } | null>(null);
   const [isCompletingSet, setIsCompletingSet] = useState(false);
 
@@ -1516,6 +1519,7 @@ export default function ActiveWorkoutScreen({
         reps: targetSet.reps,
         unit: userUnit,
         isPR: !!targetSet.isPR,
+        rpe: targetSet.rpe,
       });
 
       // Check if there is another set to perform in this exercise
@@ -3182,6 +3186,11 @@ export default function ActiveWorkoutScreen({
       </main>
 
       {/* ── Single Small Floating Rest Timer Button ───────────────────────── */}
+      {/* Open-items J2.1: render only while a rest timer is genuinely
+          active (running, paused with time left, or just finished) —
+          before the first completed set this pill showed a "1:30"
+          countdown the user never started. */}
+      {(isRestRunning || isRestFinished || restSecondsLeft > 0) && (
       <div className="fixed bottom-5 right-4 z-40 flex flex-col items-end gap-1.5 select-none pointer-events-auto">
         {isRestPopoverOpen && (
           <div className="bg-bg-card/95 backdrop-blur-md border border-border shadow-2xl rounded-2xl p-2 flex items-center gap-1.5 animate-scale-in">
@@ -3282,6 +3291,7 @@ export default function ActiveWorkoutScreen({
         </button>
         )}
       </div>
+      )}
 
       {/* ── Quick Exercise Jump Drawer ─────────────────────────────────── */}
       {isExerciseJumpOpen && (
@@ -4151,6 +4161,12 @@ export default function ActiveWorkoutScreen({
               {completedSetSummary.isPR && (
                 <span className="px-2 py-0.5 rounded-full bg-accent text-accent-on text-xs font-black uppercase tracking-wider">
                   {t('workout.newPr')}
+                </span>
+              )}
+              {/* Open-items J2.2: echo the RPE chosen for this set. */}
+              {completedSetSummary.rpe != null && completedSetSummary.rpe > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-white/10 text-[#F3F0E7] text-xs font-bold font-mono">
+                  RPE {completedSetSummary.rpe}
                 </span>
               )}
             </div>

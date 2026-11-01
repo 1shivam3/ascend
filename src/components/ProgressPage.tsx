@@ -493,13 +493,16 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     const sessions = getExerciseHistorySessions(selectedExercise, workouts, userUnit, { exact: true }) || [];
     const prMatches = prs.filter((p) => exerciseNamesEqual(p.exercise, selectedExercise));
 
-    type Row = { date: string; bestWeight: number; bestReps: number; bestE1RM: number; source: 'session' | 'pr' };
+    type Row = { date: string; bestWeight: number; bestReps: number; bestE1RM: number; source: 'session' | 'pr'; sets: { weight: number; reps: number }[] };
     const rows: Row[] = sessions.map((s) => ({
       date: s.date,
       bestWeight: s.bestWeight,
       bestReps: s.bestReps,
       bestE1RM: s.bestE1RM,
       source: 'session' as const,
+      // Open-items J4.2: carry every set so the row can show the whole
+      // session compactly instead of implying the best set was it.
+      sets: s.sets.map((st) => ({ weight: typeof st.weight === 'number' ? st.weight : 0, reps: st.reps })),
     }));
     for (const p of prMatches) {
       const val = userUnit === 'lbs' ? p.weightLbs : p.weightKg;
@@ -512,6 +515,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
           bestReps: p.reps,
           bestE1RM: e1rm,
           source: 'pr' as const,
+          sets: [],
         });
       }
     }
@@ -531,6 +535,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
         bestWeight: s.bestWeight,
         bestReps: s.bestReps,
         bestE1RM: s.bestE1RM,
+        sets: s.sets,
         deltaStr,
         hasData: true,
       };
@@ -1424,6 +1429,13 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                           <span className="font-bold text-text-primary font-mono block">
                             {userUnit === 'lbs' ? `${s.bestWeight} lbs` : `${s.bestWeight} kg`} × {s.bestReps} reps
                           </span>
+                          {/* Open-items J4.2: the best set is not the whole
+                              session — every set, compactly, underneath. */}
+                          {s.sets.length > 1 && (
+                            <span className="text-2xs text-text-muted font-mono block">
+                              {s.sets.map((set) => `${set.weight}×${set.reps}`).join(' · ')}
+                            </span>
+                          )}
                           <span className="text-2xs text-text-muted font-mono">
                             Est. 1RM: {userUnit === 'lbs' ? `${s.bestE1RM} lbs` : `${s.bestE1RM} kg`}
                           </span>
