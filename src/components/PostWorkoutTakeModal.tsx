@@ -29,6 +29,13 @@ import {
 interface PostWorkoutTakeModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /**
+   * Final-cert UX F-02: the finish SUMMARY (duration / volume / lifts /
+   * sets / PRs) always renders; only the AI Coach's Take content is
+   * conditional on the Coach toggle. Defaults to true so existing
+   * coach-surface callers are unchanged.
+   */
+  coachEnabled?: boolean;
   completedWorkout: {
     name: string;
     durationMinutes?: number;
@@ -43,6 +50,7 @@ interface PostWorkoutTakeModalProps {
 export default function PostWorkoutTakeModal({
   isOpen,
   onClose,
+  coachEnabled = true,
   completedWorkout,
 }: PostWorkoutTakeModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
@@ -74,6 +82,14 @@ export default function PostWorkoutTakeModal({
   const [targetRationale, setTargetRationale] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isOpen && !coachEnabled) {
+      // UX F-02: Coach off — the summary renders without any take
+      // fetch (no AI call, no loading state to resolve).
+      setLoading(false);
+      setTake(null);
+      setTargetRationale(null);
+      return;
+    }
     if (isOpen) {
       let isMounted = true;
       let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -148,7 +164,7 @@ export default function PostWorkoutTakeModal({
       };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, coachEnabled]);
 
   const userUnit = store.profile?.unit || 'kg';
   const totalSets = useMemo(() => {
@@ -292,8 +308,9 @@ export default function PostWorkoutTakeModal({
           </div>
         )}
 
-        {/* Coach's Take Card */}
-        {loading ? (
+        {/* Coach's Take Card — the ONLY coach-conditional section
+            (UX F-02): the summary above always renders. */}
+        {coachEnabled && (loading ? (
           <div className="py-6 text-center space-y-2">
             <Sparkles className="w-5 h-5 text-accent animate-spin mx-auto" />
             <p className="text-xs text-text-muted font-medium">
@@ -353,7 +370,7 @@ export default function PostWorkoutTakeModal({
               )}
             </div>
           </div>
-        ) : null}
+        ) : null)}
 
         {/* Vs your block (PR-C) — coach-managed workouts only */}
         {blockDebrief && (

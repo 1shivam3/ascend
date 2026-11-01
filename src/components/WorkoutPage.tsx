@@ -3042,12 +3042,16 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         initialWeight={userUnit === 'kg' ? 100 : 225}
       />
 
-      {/* Post-Workout Coach's Take Modal — a coach surface: with Coach
-          off in Settings it must not auto-appear after every workout. */}
-      {postWorkoutSummary && coachEnabled && (
+      {/* Post-Workout Summary Modal (final-cert UX F-02): the finish
+          summary must appear regardless of the Coach toggle — a user
+          who turned Coach off previously got NO summary at all, only
+          toasts. Only the AI Coach's Take inside the modal is
+          conditional on coachEnabled. */}
+      {postWorkoutSummary && (
         <PostWorkoutTakeModal
           isOpen={!!postWorkoutSummary}
           onClose={() => setPostWorkoutSummary(null)}
+          coachEnabled={coachEnabled}
           completedWorkout={postWorkoutSummary}
         />
       )}
