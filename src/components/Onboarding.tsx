@@ -826,6 +826,15 @@ export default function Onboarding() {
     // or default values. Level/days/injuries come from trainingProfile,
     // which handleFinishCalibration already wrote.
     const summaryGoal = resolvePrimaryGoal(pendingProfile?.goals ?? profile?.goals);
+    // Final-cert J1.3: the GOAL line must list ALL selected goals —
+    // Profile lists every one, but the summary showed only the primary
+    // (resolvePrimaryGoal), silently dropping the second goal the user
+    // picked. Fall back to the primary label only when no list exists.
+    const summaryGoals = pendingProfile?.goals ?? profile?.goals ?? [];
+    const summaryGoalLabel =
+      summaryGoals.length > 0
+        ? summaryGoals.map((g) => ATHLETE_GOAL_CONFIGS[g].label).join(', ')
+        : ATHLETE_GOAL_CONFIGS[summaryGoal].label;
     const summaryLevelKey =
       trainingProfile?.experience === 'advanced'
         ? 'settings.modeAdvanced'
@@ -843,7 +852,7 @@ export default function Onboarding() {
             : 'settings.dietNonVegetarian';
     return (
       <SummaryScreen
-        goal={ATHLETE_GOAL_CONFIGS[summaryGoal].label}
+        goal={summaryGoalLabel}
         level={t(summaryLevelKey)}
         daysPerWeek={trainingProfile?.daysPerWeek ?? 4}
         diet={t(summaryDietKey)}
