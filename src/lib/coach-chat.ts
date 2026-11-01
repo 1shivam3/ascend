@@ -286,6 +286,47 @@ export function isCoachChatInScope(
   return false;
 }
 
+// ── Context directive screen (final-cert SEC F-02) ───────────────────────
+/**
+ * Instruction-override screen for the client-supplied contextText.
+ * contextText is never topic-scanned (workout data is off-'topic' by
+ * nature), but it sits in the prompt's highest-trust slot, so
+ * instruction-LIKE directives inside it — override attempts,
+ * system-prompt extraction, role reassignment — are screened
+ * mechanically and declined like the topic gate. Patterns target the
+ * directive shape, not content words: a normal buildCoachChatContext
+ * output (training data, the PAIN EPISODES scaffolding, check-in notes
+ * with ordinary training language) must never match. Hindi patterns are
+ * machine-written starter equivalents, flagged for native review like
+ * the rest of the Hindi safety set.
+ */
+const CONTEXT_DIRECTIVE_PATTERNS: RegExp[] = [
+  /\b(ignore|disregard|forget|override|bypass)\b[^.\n]{0,40}\b(previous|prior|above|earlier|system)\b[^.\n]{0,20}\b(instructions?|prompts?|rules?|directions?)\b/i,
+  /\bdo not (follow|obey|listen to)\b[^.\n]{0,30}\b(instructions?|rules?|prompt)\b/i,
+  /\b(reveal|show|print|repeat|leak|tell me|output)\b[^.\n]{0,30}\b(system prompt|initial instructions?|hidden instructions?|your prompt)\b/i,
+  /\bsystem prompt\b[^.\n]{0,20}\b(is|was|:)/i,
+  /\byou are now\b[^.\n]{0,40}\b(act as|a |an |the )/i,
+  /\bact as (a |an |the )?(?!coach\b)[a-z]/i,
+  /\bpretend (to be|you are)\b/i,
+  /\bfrom now on,? you (are|will|must|should)\b/i,
+  /\byour new (instructions?|role|persona|task|identity) (is|are)\b/i,
+  /\bnew persona\b/i,
+  /\bdeveloper mode\b/i,
+  /\bjailbreak\b/i,
+  // Hindi starter equivalents (machine-written): "ignore/forget the
+  // previous instructions", "show/tell the system prompt", "your new role".
+  /पिछले\s*(सभी\s*)?निर्देशों?\s*को\s*(अनदेखा|भूल)/,
+  /निर्देशों?\s*को\s*अनदेखा\s*करो/,
+  /सिस्टम\s*प्रॉम्प्ट\s*(बताओ|दिखाओ|बताइए|बता\s*दो)/,
+  /तुम्हारी\s*नई\s*भूमिका/,
+];
+
+/** True when contextText carries an instruction-like directive (SEC F-02). */
+export function findContextDirective(contextText: string): boolean {
+  if (!contextText) return false;
+  return CONTEXT_DIRECTIVE_PATTERNS.some((re) => re.test(contextText));
+}
+
 // ── Reply caution enforcement (re-audit E2E-R1, prompt rule 8 by code) ────
 export type CoachChatReplyRisk = 'near-max' | 'large-deficit' | 'volume-jump';
 
