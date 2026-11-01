@@ -91,7 +91,7 @@ export default function PrivacyPage() {
             <li><strong>Progress Photos (Device-Only):</strong> Photos you add in Progress are stored only in this device&apos;s local storage (key <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">ascend_progress_photos_v1</code>, up to 24 photos). They are never uploaded, never synced to the cloud, and are deleted when you delete the photo or wipe app data.</li>
             <li><strong>Feedback Messages:</strong> If you send feedback from inside the app, your message (and the name/email you optionally type into the form) is stored in our Supabase database so we can respond. When email forwarding is configured on the server, a copy is also emailed to our support inbox via Resend (transactional email provider).</li>
           </ul>
-          <p className="text-amber-300/80 pt-1">
+          <p className="text-amber-800 dark:text-amber-300/80 pt-1">
             <strong>Important Notice for Guest Mode:</strong> If you remain in Guest Mode without a cloud account or exported backup file, clearing your browser history, site data, or cache will permanently erase your data. Regular exports via the <em>Data Vault</em> are strongly advised.
           </p>
         </section>
@@ -192,11 +192,11 @@ export default function PrivacyPage() {
 
         {/* Section 7: Medical & Safety Notice */}
         <section className="space-y-2">
-          <h2 className="text-sm font-bold text-amber-400 flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-400" />
+          <h2 className="text-sm font-bold text-amber-800 dark:text-amber-400 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-800 dark:text-amber-400" />
             7. Health, Fitness &amp; Safety Notice
           </h2>
-          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200/90 text-sm space-y-1.5">
+          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/40 text-amber-900 dark:border-amber-500/20 dark:text-amber-200/90 text-sm space-y-1.5">
             <p>
               ASCEND is an analytical workout journal and mathematical strength calculator. It is NOT a medical device and does NOT provide medical advice, clinical diagnosis, or rehabilitation prescriptions. Resistance training carries inherent risks of injury. Always consult a licensed healthcare professional before beginning any physical exercise regimen.
             </p>

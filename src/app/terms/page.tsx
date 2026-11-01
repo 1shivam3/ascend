@@ -90,11 +90,11 @@ export default function TermsPage() {
 
         {/* Section 2 */}
         <section className="space-y-2">
-          <h2 className="text-sm font-bold text-amber-400 flex items-center gap-1.5">
-            <AlertTriangle className="w-4 h-4 text-amber-400" />
+          <h2 className="text-sm font-bold text-amber-800 dark:text-amber-400 flex items-center gap-1.5">
+            <AlertTriangle className="w-4 h-4 text-amber-800 dark:text-amber-400" />
             2. Medical &amp; Physical Activity Assumption of Risk
           </h2>
-          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200/90 text-sm space-y-2">
+          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/40 text-amber-900 dark:border-amber-500/20 dark:text-amber-200/90 text-sm space-y-2">
             <p>
               <strong>WARNING:</strong> Weightlifting, powerlifting, and maximal strength attempts (such as 1-Rep Max squats, bench presses, and deadlifts) involve intrinsic physical hazards, including musculoskeletal strains, tears, joint injuries, drops, and acute cardiovascular strain.
             </p>
