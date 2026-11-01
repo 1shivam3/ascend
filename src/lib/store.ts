@@ -224,8 +224,13 @@ export interface UiPreferences {
   /** UX redesign — Today section visibility/order. Local-only. */
   todayLayout: { visible: Record<string, boolean | 'unset'>; order: string[] };
   /**
-   * UX redesign — explicit workout-mode override. null = follow
-   * density (Beginner in Simple, Advanced in Detailed). Local-only.
+   * UX redesign — the workout-view preference (Beginner/Advanced
+   * workout screens). Open-items J5.1: DECOUPLED from Today density —
+   * this field IS the preference now. Legacy blobs carrying null
+   * (the old "follow density" Auto) are materialized by
+   * sanitizeUiPreferences to the mode density resolved at upgrade
+   * time, so nobody's view changes on upgrade; null survives only in
+   * unsanitized/legacy data. Local-only.
    */
   workoutModeOverride: 'beginner' | 'advanced' | null;
   /** UX redesign — pinned Progress spotlight chart id, or null. Local-only. */
@@ -253,7 +258,7 @@ export const DEFAULT_UI_PREFERENCES: UiPreferences = {
   customAccentHex: null,
   density: 'simple',
   todayLayout: { ...DEFAULT_TODAY_LAYOUT, order: [...DEFAULT_TODAY_LAYOUT.order] },
-  workoutModeOverride: null,
+  workoutModeOverride: 'beginner',
   pinnedProgressChart: null,
   defaultMatrixView: 'weekly',
 };
@@ -840,13 +845,21 @@ export function sanitizeUiPreferences(
     out.density = hasUserData ? 'detailed' : 'simple';
   }
   out.todayLayout = sanitizeTodayLayout(out.todayLayout);
-  if (
-    out.workoutModeOverride !== 'beginner' &&
-    out.workoutModeOverride !== 'advanced' &&
-    out.workoutModeOverride !== null
-  ) {
-    out.workoutModeOverride = null;
-  }
+  // Open-items J5.1: decoupled workout view. Anything that is not an
+  // explicit Beginner/Advanced choice (legacy null "Auto", missing,
+  // invalid) materializes ONCE to the mode the density rule resolves
+  // right now — the upgrade changes nobody's current view — and is
+  // stored explicitly from then on; later density changes no longer
+  // move the workout view. The check reads the RAW input, not `out`:
+  // `out` is pre-spread with the defaults, whose concrete 'beginner'
+  // would masquerade as an explicit choice for key-less legacy blobs.
+  const rawOverride = (prefs as Record<string, unknown>).workoutModeOverride;
+  out.workoutModeOverride =
+    rawOverride === 'beginner' || rawOverride === 'advanced'
+      ? rawOverride
+      : out.density === 'detailed'
+        ? 'advanced'
+        : 'beginner';
   if (typeof out.pinnedProgressChart !== 'string') out.pinnedProgressChart = null;
   if (out.defaultMatrixView !== 'weekly' && out.defaultMatrixView !== 'monthly') {
     out.defaultMatrixView = 'weekly';

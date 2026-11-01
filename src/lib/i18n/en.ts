@@ -927,6 +927,7 @@ export const en = {
   'workout.previousSessions': 'Previous sessions',
   'workout.viewMode': 'Workout view',
   'workout.viewAuto': 'Auto',
+  'workout.viewIndependentHint': 'Workout screens only — changing Today density no longer changes this.',
   'workout.viewSimple': 'Simple',
   'workout.viewAdvanced': 'Advanced',
   'workout.lastPerformance': '{weight} {unit} × {reps} reps',

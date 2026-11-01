@@ -973,46 +973,42 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             <DietPreferencePicker />
           </div>
 
-          {/* Workout view mode — density-following, NOT the athlete's
-              experience level (live-fix L3: this row used to be labeled
-              "Athlete Experience", so a Simple→Detailed switch that moved
-              the view to Advanced read as the user's level flipping).
-              Micro-fix L3 (round 2): the flip itself is DESIGNED (Auto =
-              follows density), but nothing said so — the hint below
-              states the current Auto mapping from existing keys only,
-              so a density switch that moves the value is legible. */}
+          {/* Workout view mode — NOT the athlete's experience level
+              (live-fix L3: this row used to be labeled "Athlete
+              Experience"). Open-items J5.1: the view is its own
+              persisted preference, DECOUPLED from Today density —
+              the old Auto option is gone; a legacy Auto materialized
+              to the then-current mode at upgrade (sanitize), so the
+              control now always shows a concrete value. */}
           <div className="space-y-2 pt-2 border-t border-border/60">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-text-secondary font-sans">{t('workout.viewMode')}</span>
-              <span className="text-2xs font-mono text-text-muted capitalize">{modeLabel(workoutMode)}{uiPreferences.workoutModeOverride ? '' : ` · ${t('workout.viewAuto')}`}</span>
+              <span className="text-2xs font-mono text-text-muted capitalize">{modeLabel(workoutMode)}</span>
             </div>
-            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-bg-secondary border border-border">
-              {(['auto', 'beginner', 'advanced'] as const).map((m) => (
+            <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-bg-secondary border border-border">
+              {(['beginner', 'advanced'] as const).map((m) => (
                 <button
                   key={m}
                   type="button"
                   onClick={() => {
-                    setUiPreferences({ workoutModeOverride: m === 'auto' ? null : m });
+                    setUiPreferences({ workoutModeOverride: m });
                     // Toast names the control it came from (workout view),
                     // not "experience mode" — same L3 mislabel, same fix.
-                    // Built from existing keys only, no new strings.
-                    toast.info(`${t('workout.viewMode')}: ${m === 'auto' ? t('workout.viewAuto') : modeLabel(m)}`, t('settings.modeUpdatedTitle'));
+                    toast.info(`${t('workout.viewMode')}: ${modeLabel(m)}`, t('settings.modeUpdatedTitle'));
                   }}
                   className={`py-1.5 min-h-[44px] rounded-lg text-xs font-bold capitalize transition-all cursor-pointer ${
-                    (uiPreferences.workoutModeOverride ?? 'auto') === m
+                    workoutMode === m
                       ? 'bg-bg-card text-text-primary shadow-xs border border-border'
                       : 'text-text-muted hover:text-text-primary'
                   }`}
                 >
-                  {m === 'auto' ? t('workout.viewAuto') : modeLabel(m)}
+                  {modeLabel(m)}
                 </button>
               ))}
             </div>
-            {!uiPreferences.workoutModeOverride && (
-              <p className="text-2xs text-text-muted">
-                {t('workout.viewAuto')}: {uiPreferences.density === 'detailed' ? t('settings.densityDetailed') : t('settings.densitySimple')} → {modeLabel(workoutMode)}
-              </p>
-            )}
+            <p className="text-2xs text-text-muted">
+              {t('workout.viewIndependentHint')}
+            </p>
           </div>
 
           {/* Notifications — the single home for reminder settings.

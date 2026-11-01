@@ -21,7 +21,7 @@ import { en } from '../src/lib/i18n/en';
 import { hi } from '../src/lib/i18n/hi';
 
 const TODAY = '2026-11-01';
-const checkin = { readiness: 4 } as ManualCheckin;
+const checkin: ManualCheckin = { sleep: 4, soreness: 4 };
 
 describe('open-items UX F-03: coach segment default', () => {
   it('no record for today (or no check-ins at all) → check-in segment', () => {

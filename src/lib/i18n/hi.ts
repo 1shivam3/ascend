@@ -934,6 +934,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'workout.previousSessions': 'पिछले सत्र',
   'workout.viewMode': 'वर्कआउट व्यू',
   'workout.viewAuto': 'ऑटो',
+  'workout.viewIndependentHint': 'सिर्फ़ वर्कआउट स्क्रीन के लिए — Today की डेंसिटी बदलने से यह अब नहीं बदलता।',
   'workout.viewSimple': 'सिंपल',
   'workout.viewAdvanced': 'एडवांस्ड',
   'workout.lastPerformance': '{weight} {unit} × {reps} रेप्स',

@@ -3425,24 +3425,24 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               </button>
             </div>
 
-            {/* Workout view — follows app density unless overridden (Stage 4) */}
+            {/* Workout view — its own persisted preference since
+                open-items J5.1 (was: follows app density unless
+                overridden; the Auto option is gone) */}
             <div className="pt-3 border-t border-border/80 space-y-2">
               <div>
                 <span className="text-xs font-bold text-text-primary block">{t('workout.viewMode')}</span>
                 <span className="text-2xs text-text-muted">
                   {workoutMode === 'advanced' ? t('tools.viewAdvanced') : t('tools.viewSimple')}
-                  {workoutModeOverride ? '' : ` · ${t('workout.viewAuto')}`}
                 </span>
               </div>
               <SegmentedControl
                 ariaLabel={t('workout.viewMode')}
-                value={workoutModeOverride ?? 'auto'}
+                value={workoutMode}
                 options={[
-                  { value: 'auto', label: t('workout.viewAuto') },
                   { value: 'beginner', label: t('workout.viewSimple') },
                   { value: 'advanced', label: t('workout.viewAdvanced') },
                 ]}
-                onChange={(v) => setUiPreferences({ workoutModeOverride: v === 'auto' ? null : v })}
+                onChange={(v) => setUiPreferences({ workoutModeOverride: v })}
               />
             </div>
           </div>

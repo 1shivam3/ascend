@@ -108,17 +108,21 @@ describe('L2 habit matrix heading', () => {
   });
 });
 
-describe('L3 Auto clarification', () => {
-  it('an Auto hint states the current density → mode mapping', () => {
+describe('L3 Auto clarification — SUPERSEDED by open-items J5.1 (workout view decoupled from density)', () => {
+  // The L3 micro-fix clarified that Auto followed density. The owner
+  // then ordered the decoupling itself (certification J5.1): the
+  // workout view is its own persisted preference, Auto no longer
+  // exists, and the Settings hint now states the INDEPENDENCE.
+  it('the hint now states the view is independent of density', () => {
     const settings = src('src/components/SettingsView.tsx');
-    expect(settings).toContain('{!uiPreferences.workoutModeOverride && (');
-    expect(settings).toContain('settings.densityDetailed');
-    expect(settings).toContain('settings.densitySimple');
-    expect(settings).toContain('modeLabel(workoutMode)');
+    expect(settings).toContain("t('workout.viewIndependentHint')");
+    expect(settings).not.toContain('{!uiPreferences.workoutModeOverride && (');
   });
 
-  it('the follow-density behavior itself is unchanged (null = follow)', () => {
+  it('no Auto option remains: the picker writes a concrete mode', () => {
     const settings = src('src/components/SettingsView.tsx');
-    expect(settings).toContain('workoutModeOverride: m === ' + "'auto' ? null : m");
+    expect(settings).toContain('setUiPreferences({ workoutModeOverride: m })');
+    expect(settings).not.toContain("'auto' ? null");
+    expect(settings).not.toContain("(['auto', 'beginner', 'advanced']");
   });
 });
