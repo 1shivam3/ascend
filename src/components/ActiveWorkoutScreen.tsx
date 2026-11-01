@@ -57,6 +57,7 @@ import {
 } from '@/lib/workout-engine';
 import { calculatePlates, PlateInfo, BARBELL_PRESETS } from '@/lib/plate-calculator';
 import { calculateExerciseVolumeKg } from '@/lib/volume';
+import { getElapsedSeconds, getSessionDuration } from '@/lib/workout-elapsed';
 import { compareSetAdherence } from '@/lib/workout-adherence';
 import { useToast } from '@/components/ui/Toast';
 import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
@@ -313,7 +314,12 @@ export default function ActiveWorkoutScreen({
   const [activeExerciseIdx, setActiveExerciseIdx] = useState<number>(0);
   // Restored from the draft on resume so the timer keeps counting instead of resetting to 0:00.
   const [sessionStartTime] = useState<number>(() => initialSessionStartTime || Date.now());
-  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
+  // Final-cert J2.3: elapsed is DERIVED from the persisted start
+  // timestamp (lib/workout-elapsed), initialized at mount — never a
+  // local 0 that a remount restarts from.
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(() =>
+    getElapsedSeconds(sessionStartTime, Date.now()),
+  );
 
   // Modals & Panels
   const [isPlateModalOpen, setIsPlateModalOpen] = useState(false);
@@ -919,10 +925,13 @@ export default function ActiveWorkoutScreen({
   // Timestamp-based drift-free rest timer reference
   const restTargetEndTimeRef = useRef<number | null>(null);
 
-  // Elapsed workout timer
+  // Elapsed workout timer — re-derived from the persisted start
+  // timestamp on every tick (J2.3), so a throttled interval or a
+  // remount can never leave a stale/reset value behind.
   useEffect(() => {
+    setElapsedSeconds(getElapsedSeconds(sessionStartTime, Date.now()));
     const timer = setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - sessionStartTime) / 1000));
+      setElapsedSeconds(getElapsedSeconds(sessionStartTime, Date.now()));
     }, 1000);
     return () => clearInterval(timer);
   }, [sessionStartTime]);
@@ -1953,14 +1962,19 @@ export default function ActiveWorkoutScreen({
         if (prescribed > 0) plannedTotalSets = prescribed;
       }
 
+      // J2.3: the saved duration is recomputed from the persisted
+      // start timestamp at the finish instant — the same source the
+      // finish summary and the completion screen read — never the
+      // last interval tick of local elapsed state.
+      const finishDuration = getSessionDuration(sessionStartTime, Date.now());
       const workoutEntry: WorkoutEntry = {
         id: safeRandomId('wk'),
         date: today,
         name: workoutName,
         planId,
         plannedTotalSets,
-        durationMinutes: Math.round(elapsedSeconds / 60),
-        durationSeconds: elapsedSeconds,
+        durationMinutes: finishDuration.durationMinutes,
+        durationSeconds: finishDuration.durationSeconds,
         exercises: exercisesToSave,
       };
 
