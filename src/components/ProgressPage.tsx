@@ -599,6 +599,13 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     return profile?.bodyweightKg || null;
   }, [sortedMetrics, profile]);
 
+  // Open-items UX F-01b: every BodyMetricEntry is a real user log
+  // (weightKg is required on the type), so an empty metrics list means
+  // the displayed bodyweight is the seeded profile default — it must
+  // not be labelled "measured". Once a real body log exists, measured
+  // labelling returns automatically.
+  const weightIsMeasured = sortedMetrics.length > 0;
+
   // Bodyweight trend chart & real delta
   const bodyweightAnalytics = useMemo(() => {
     if (sortedMetrics.length === 0 && !profile?.bodyweightKg) {
@@ -973,6 +980,10 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   <div>
                     <div className="text-3xl font-black text-text-primary font-sans tabular-nums">
                       {bodyweightAnalytics.latestWeight ? `${bodyweightAnalytics.latestWeight} ${userUnit}` : '—'}
+                      {/* Open-items UX F-01b: an unmeasured (profile-default) weight carries the est. marker. */}
+                      {!weightIsMeasured && bodyweightAnalytics.latestWeight != null && (
+                        <span className="ml-2 align-middle rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent-text">{t('common.estimatedShort')}</span>
+                      )}
                     </div>
                   </div>
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#5E615A] dark:text-[#A5A096]">
@@ -1013,7 +1024,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     ))}
                   </div>
                   <div className="flex justify-between text-2xs text-text-muted font-mono pt-1">
-                    <span>{t('progress.legendMeasured')}</span>
+                    <span>{weightIsMeasured ? t('progress.legendMeasured') : t('progress.legendProfileDefault')}</span>
                     <span>{dataWindow(bodyweightAnalytics.dataPoints)}{dataWindow(bodyweightAnalytics.dataPoints) ? ` · ${bodyTimeRange}` : ''}</span>
                   </div>
                 </div>
@@ -1477,6 +1488,10 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     </span>
                     <div className="text-3xl sm:text-4xl font-black text-text-primary font-sans tabular-nums mt-0.5">
                       {bodyweightAnalytics.latestWeight ? `${bodyweightAnalytics.latestWeight} ${userUnit}` : '—'}
+                      {/* Open-items UX F-01b: an unmeasured (profile-default) weight carries the est. marker. */}
+                      {!weightIsMeasured && bodyweightAnalytics.latestWeight != null && (
+                        <span className="ml-2 align-middle rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent-text">{t('common.estimatedShort')}</span>
+                      )}
                     </div>
                   </div>
                   <div className="text-right">
@@ -1555,7 +1570,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     ))}
                   </div>
                   <div className="flex justify-between text-2xs text-text-muted font-mono pt-1">
-                    <span>{t('progress.legendMeasured')}</span>
+                    <span>{weightIsMeasured ? t('progress.legendMeasured') : t('progress.legendProfileDefault')}</span>
                     <span>{minMaxLabel(bodyweightAnalytics.dataPoints, userUnit) ?? ''}</span>
                   </div>
                 </div>

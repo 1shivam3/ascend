@@ -3128,6 +3128,16 @@ export const en = {
   'sw.updateAvailable': 'New version available',
   'sw.refresh': 'Refresh',
   'sw.dismissUpdate': 'Dismiss update notice',
+  'onboarding.foodTargetDefaultsNote': 'Estimated from default body stats ({weight} {unit} · {height} cm) — add your real weight and height in Profile for exact targets.',
+  'onboarding.summaryDefaultBadge': 'default',
+  'onboarding.summaryDefaultsNote': 'Level, training days and diet are starting defaults — change them any time in Settings.',
+  'progress.legendProfileDefault': 'Profile value — not measured yet',
+  'coach.segmentCheckin': 'Check-in',
+  'coach.segmentAsk': 'Ask the coach',
+  'coach.segmentAria': 'Coach sections',
+  'home.durationDoneExercises': 'Done in {min} min • {count} exercises',
+  'home.durationDoneExercisesOne': 'Done in {min} min • {count} exercise',
+  'home.durationDoneOnly': 'Done in {min} min',
 } as const;
 
 export type StringKey = keyof typeof en;
