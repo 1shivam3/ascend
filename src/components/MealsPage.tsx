@@ -3098,7 +3098,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                       {isExactFoodItem(food) ? '' : '~'}{Math.round(food.calories)} kcal
                                     </span>
                                     <span>
-                                      P:{isExactFoodItem(food) ? '' : '~'}{food.proteinG}g • C:{isExactFoodItem(food) ? '' : '~'}{food.carbsG}g • F:{isExactFoodItem(food) ? '' : '~'}{food.fatG}g
+                                      {/* Final-cert J3.1: grams render via round1 like the
+                                          editable fields below — the raw stored float
+                                          leaked artifacts such as 5.400000095367432. */}
+                                      P:{isExactFoodItem(food) ? '' : '~'}{round1(food.proteinG)}g • C:{isExactFoodItem(food) ? '' : '~'}{round1(food.carbsG)}g • F:{isExactFoodItem(food) ? '' : '~'}{round1(food.fatG)}g
                                     </span>
                                   </div>
                                 </div>

@@ -10,7 +10,7 @@ import { OIL_LEVELS, defaultOilForFood, applyOilDelta, tspForOilLevel, servingsF
 import { validateImageFile, resizeAndCompressImage, captureVideoFrame, MAX_IMAGE_DIMENSION } from '@/lib/image-processing';
 import { estimateMacros } from '@/lib/macros';
 import { tildeForFoods } from '@/lib/meal-display';
-import { getLocalTodayStr } from '@/lib/formatters';
+import { getLocalTodayStr, round1 } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
 import ReportAIModal from '@/components/ReportAIModal';
 import { toUserMessage } from '@/lib/user-error';
@@ -1389,7 +1389,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                     ~{adjItem.calories} kcal
                                   </span>
                                   <span className="text-2xs text-text-muted block">
-                                    P: {item.proteinG}g • C: {item.carbsG}g • F: {adjItem.fatG}g
+                                    P: {round1(item.proteinG)}g • C: {round1(item.carbsG)}g • F: {round1(adjItem.fatG)}g
                                   </span>
                                 </div>
 
@@ -1504,7 +1504,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                     <input
                                       id={`scan-edit-protein-${idx}`}
                                       type="number"
-                                      value={editProtein}
+                                      value={round1(editProtein)}
                                       onChange={(e) => setEditProtein(Math.max(0, Number(e.target.value)))}
                                       className="w-full py-1 px-1.5 rounded bg-bg-card border border-border text-xs font-mono text-emerald-400 outline-none text-center font-bold"
                                     />
@@ -1514,7 +1514,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                     <input
                                       id={`scan-edit-carbs-${idx}`}
                                       type="number"
-                                      value={editCarbs}
+                                      value={round1(editCarbs)}
                                       onChange={(e) => setEditCarbs(Math.max(0, Number(e.target.value)))}
                                       className="w-full py-1 px-1.5 rounded bg-bg-card border border-border text-xs font-mono text-sky-400 outline-none text-center font-bold"
                                     />
@@ -1524,7 +1524,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                     <input
                                       id={`scan-edit-fat-${idx}`}
                                       type="number"
-                                      value={editFat}
+                                      value={round1(editFat)}
                                       onChange={(e) => setEditFat(Math.max(0, Number(e.target.value)))}
                                       className="w-full py-1 px-1.5 rounded bg-bg-card border border-border text-xs font-mono text-amber-400 outline-none text-center font-bold"
                                     />
