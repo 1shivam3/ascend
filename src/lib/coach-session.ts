@@ -35,7 +35,7 @@ import {
 import type { MuscleGroup } from './exercise-library';
 import { estimatePlanDurationMin } from './workout-engine';
 import type { PlannedExercise, PlannedWorkout } from './types';
-import type { ReadinessResult } from './coach-engine';
+import type { ReadinessResult, ManualCheckin } from './coach-engine';
 
 /** Gym-only equipment — everything else is doable at home. */
 export const GYM_ONLY_EQUIPMENT = ['Barbell', 'Machine', 'Smith Machine', 'Cable'] as const;
@@ -255,4 +255,19 @@ export function weeklySuggestion(
     return { kind: 'progress', missed: 0 };
   }
   return { kind: 'hold', missed };
+}
+
+/**
+ * Open-items UX F-03: which Coach-tab segment to open on. The
+ * check-in's answers persist immediately as today's ManualCheckin
+ * (CoachChatTab writes on every tap) and the data model carries no
+ * separate "completed" flag — so "check-in due" is exactly "no
+ * record for today yet". Once today's record exists, the free-form
+ * coach is the more useful default.
+ */
+export function resolveDefaultCoachSegment(
+  dailyCheckins: Record<string, ManualCheckin> | null | undefined,
+  todayStr: string,
+): 'checkin' | 'ask' {
+  return dailyCheckins?.[todayStr] ? 'ask' : 'checkin';
 }

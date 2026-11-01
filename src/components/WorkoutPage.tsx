@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { tabListKeyDown } from '@/lib/tab-keyboard';
 import { useStore } from '@/lib/store';
+import { resolveDefaultCoachSegment } from '@/lib/coach-session';
 import { useTranslation } from '@/lib/i18n';
 import { validatePlanExercises } from '@/lib/plan-validation';
 import { useToday } from '@/lib/use-today';
@@ -952,6 +953,20 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   useEffect(() => {
     setLastTrainSubTab(trainSubTab);
   }, [trainSubTab, setLastTrainSubTab]);
+
+  // Open-items UX F-03: the Coach tab shows ONE segment at a time —
+  // the guided check-in OR the free-form coach chat (they previously
+  // stacked into one long scroll of two chat surfaces). The default
+  // is re-resolved each time the Coach tab is entered: check-in
+  // while today's check-in is unanswered, otherwise Ask. Switching
+  // segments loses nothing — the check-in re-seeds from today's
+  // persisted record and the chat lives in its own persisted store.
+  const [coachSegment, setCoachSegment] = useState<'checkin' | 'ask'>('checkin');
+  useEffect(() => {
+    if (trainSubTab === 'coach') {
+      setCoachSegment(resolveDefaultCoachSegment(useStore.getState().dailyCheckins, getLocalTodayStr()));
+    }
+  }, [trainSubTab]);
 
   // ── Progressive Disclosure UI States ──────────────────────────────────────
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
@@ -2896,21 +2911,35 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         </div>
       )}
 
-      {/* ── TAB: COACH (simple coach chat — designs today's session from
-          the check-in; readiness comes from the existing coach engine) ── */}
+      {/* ── TAB: COACH (segmented since open-items UX F-03: guided
+          check-in / free-form coach chat, one segment at a time;
+          readiness comes from the existing coach engine) ── */}
       {trainSubTab === 'coach' && (
         <div className="space-y-4">
-          <CoachChatTab
-            onStartPlan={handleStartPlan}
-            onBuildBlock={() => { setCoachBlockAtReview(false); setIsCoachBlockOpen(true); }}
-            onReviewBlock={() => { setCoachBlockAtReview(true); setIsCoachBlockOpen(true); }}
-            onOpenWeeklyReview={() => setIsReviewOpen(true)}
-            onOpenDebrief={() => setIsDebriefOpen(true)}
+          <SegmentedControl
+            ariaLabel={t('coach.segmentAria')}
+            value={coachSegment}
+            onChange={(value) => setCoachSegment(value as 'checkin' | 'ask')}
+            options={[
+              { value: 'checkin', label: t('coach.segmentCheckin') },
+              { value: 'ask', label: t('coach.segmentAsk') },
+            ]}
           />
-          {/* Conversational coach chat — an inline section below the
-              guided check-in (not a drawer; the removed drawer stays
-              removed). Answers are grounded in the user's own data. */}
-          <CoachChatSection />
+          {coachSegment === 'checkin' ? (
+            <CoachChatTab
+              onStartPlan={handleStartPlan}
+              onBuildBlock={() => { setCoachBlockAtReview(false); setIsCoachBlockOpen(true); }}
+              onReviewBlock={() => { setCoachBlockAtReview(true); setIsCoachBlockOpen(true); }}
+              onOpenWeeklyReview={() => setIsReviewOpen(true)}
+              onOpenDebrief={() => setIsDebriefOpen(true)}
+            />
+          ) : (
+            /* Conversational coach chat (not a drawer; the removed
+               drawer stays removed). Answers are grounded in the
+               user's own data; history persists in coachChatStore,
+               so segment switches never lose the thread. */
+            <CoachChatSection />
+          )}
         </div>
       )}
 
