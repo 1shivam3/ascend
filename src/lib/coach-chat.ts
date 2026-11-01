@@ -112,17 +112,60 @@ export const COACH_CHAT_NOTES_SECTION_HEADER =
   "NOTES FROM TODAY'S CHECK-IN (the user's own words):";
 
 /**
+ * Every section header buildCoachChatContext can emit (final-cert
+ * SEC F-01). extractCheckinNotes bounds the notes span by the NEXT of
+ * these — the notes section is delimited by structure, not by blank
+ * lines inside the user's own text.
+ */
+export const COACH_CHAT_KNOWN_SECTION_HEADERS: readonly string[] = [
+  'USER: ',
+  'TODAY (',
+  "TODAY'S SESSION (",
+  'WHAT YOUR COACH HAS LEARNED (from your logged data):',
+  'LIFTS (your logged numbers, not estimates of potential):',
+  'CURRENT COACH BLOCK: ',
+  'ADOPTED PLANS: ',
+  'RECENT WORKOUTS (most recent first):',
+  'PERSONAL RECORDS:',
+  'READINESS TODAY: ',
+  'MUSCLES NEEDING CAUTION TODAY: ',
+  'WEEKLY REVIEWS:',
+  'NUTRITION TODAY: ',
+  'LATEST BODY MEASUREMENT: ',
+  "TODAY'S CHECK-IN: ",
+  COACH_CHAT_NOTES_SECTION_HEADER,
+  'PAIN EPISODES ON RECORD (respect these — do not program the flagged lifts):',
+  'FLAGGED MOVEMENT FAMILIES (excluded from new plans): ',
+  'NO USER HISTORY YET: ',
+];
+
+/**
  * Extract the user's check-in notes (their own words) from a built
  * context text; '' when the context carries no notes section.
+ *
+ * Final-cert SEC F-01: the old extraction split the context on '\n\n'
+ * and scanned only the chunk STARTING with the notes header, so a
+ * disclosure after a blank line inside the notes — or a header not at
+ * a chunk start — escaped the safety scan while still reaching the
+ * provider verbatim. The notes span now runs from the header's first
+ * occurrence to the next KNOWN section header (or end of string),
+ * regardless of internal blank lines. Generated scaffolding outside
+ * that span (e.g. the PAIN EPISODES section) is still never scanned
+ * (the SEC2-2 property).
  */
 export function extractCheckinNotes(contextText: string): string {
   if (!contextText) return '';
-  const section = contextText
-    .split('\n\n')
-    .find((s) => s.startsWith(COACH_CHAT_NOTES_SECTION_HEADER));
-  if (!section) return '';
-  return section
-    .slice(COACH_CHAT_NOTES_SECTION_HEADER.length)
+  const start = contextText.indexOf(COACH_CHAT_NOTES_SECTION_HEADER);
+  if (start < 0) return '';
+  const bodyStart = start + COACH_CHAT_NOTES_SECTION_HEADER.length;
+  let end = contextText.length;
+  for (const header of COACH_CHAT_KNOWN_SECTION_HEADERS) {
+    if (header === COACH_CHAT_NOTES_SECTION_HEADER) continue;
+    const idx = contextText.indexOf(`\n${header}`, bodyStart);
+    if (idx >= 0 && idx < end) end = idx;
+  }
+  return contextText
+    .slice(bodyStart, end)
     .split('\n')
     .map((line) => line.replace(/^-\s*/, '').trim())
     .filter((line) => line.length > 0)
