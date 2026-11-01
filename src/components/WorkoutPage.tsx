@@ -957,16 +957,21 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   // Open-items UX F-03: the Coach tab shows ONE segment at a time —
   // the guided check-in OR the free-form coach chat (they previously
   // stacked into one long scroll of two chat surfaces). The default
-  // is re-resolved each time the Coach tab is entered: check-in
-  // while today's check-in is unanswered, otherwise Ask. Switching
-  // segments loses nothing — the check-in re-seeds from today's
-  // persisted record and the chat lives in its own persisted store.
-  const [coachSegment, setCoachSegment] = useState<'checkin' | 'ask'>('checkin');
-  useEffect(() => {
-    if (trainSubTab === 'coach') {
+  // resolves when the Coach tab is entered: check-in while today's
+  // check-in is unanswered, otherwise Ask (initializer covers a
+  // restored Coach tab; enterTrainSubTab re-resolves on each entry).
+  // Switching segments loses nothing — the check-in re-seeds from
+  // today's persisted record and the chat lives in its own persisted
+  // store.
+  const [coachSegment, setCoachSegment] = useState<'checkin' | 'ask'>(() =>
+    resolveDefaultCoachSegment(useStore.getState().dailyCheckins, getLocalTodayStr()),
+  );
+  const enterTrainSubTab = (tab: 'plans' | 'coach' | 'history') => {
+    setTrainSubTab(tab);
+    if (tab === 'coach') {
       setCoachSegment(resolveDefaultCoachSegment(useStore.getState().dailyCheckins, getLocalTodayStr()));
     }
-  }, [trainSubTab]);
+  };
 
   // ── Progressive Disclosure UI States ──────────────────────────────────────
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
@@ -2172,12 +2177,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       </header>
 
       {/* ── Segmented Control: Plans + Coach + History ── */}
-      <div role="tablist" aria-label="Train navigation" className="segmented-control" onKeyDown={tabListKeyDown((i) => setTrainSubTab((['plans', 'coach', 'history'] as const)[i]))}>
+      <div role="tablist" aria-label="Train navigation" className="segmented-control" onKeyDown={tabListKeyDown((i) => enterTrainSubTab((['plans', 'coach', 'history'] as const)[i]))}>
         <button
           type="button"
           role="tab"
           aria-selected={trainSubTab === 'plans'}
-          onClick={() => setTrainSubTab('plans')}
+          onClick={() => enterTrainSubTab('plans')}
           className={`segmented-item ${trainSubTab === 'plans' ? 'active' : ''}`}
         >
           {t('train.plans')} {plannedWorkouts.length > 0 && `(${plannedWorkouts.length})`}
@@ -2186,7 +2191,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           type="button"
           role="tab"
           aria-selected={trainSubTab === 'coach'}
-          onClick={() => setTrainSubTab('coach')}
+          onClick={() => enterTrainSubTab('coach')}
           className={`segmented-item ${trainSubTab === 'coach' ? 'active' : ''}`}
         >
           {t('train.coach')}
@@ -2195,7 +2200,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           type="button"
           role="tab"
           aria-selected={trainSubTab === 'history'}
-          onClick={() => setTrainSubTab('history')}
+          onClick={() => enterTrainSubTab('history')}
           className={`segmented-item ${trainSubTab === 'history' ? 'active' : ''}`}
         >
           {t('train.history')}
