@@ -80,7 +80,7 @@ function SettingsToggle({ on, onToggle, label }: { on: boolean; onToggle: () => 
       aria-checked={on}
       aria-label={label}
       onClick={onToggle}
-      className={`w-11 h-6 rounded-full transition-colors shrink-0 cursor-pointer relative ${on ? 'bg-accent' : 'bg-border'}`}
+      className={`tap-44 w-11 h-6 rounded-full transition-colors shrink-0 cursor-pointer relative ${on ? 'bg-accent' : 'bg-border'}`}
     >
       <span
         className={`block w-5 h-5 rounded-full bg-white shadow absolute top-0.5 transition-all ${on ? 'left-[22px]' : 'left-0.5'}`}
@@ -613,7 +613,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             key={chip.labelKey}
             type="button"
             onClick={() => scrollToSection(chip.ref)}
-            className="shrink-0 px-3 py-1.5 rounded-full bg-bg-secondary border border-border text-2xs font-bold text-text-secondary hover:text-accent-text hover:border-accent/40 transition-colors cursor-pointer"
+            className="shrink-0 px-3 py-1.5 min-h-[44px] inline-flex items-center rounded-full bg-bg-secondary border border-border text-2xs font-bold text-text-secondary hover:text-accent-text hover:border-accent/40 transition-colors cursor-pointer"
           >
             {t(chip.labelKey)}
           </button>
@@ -932,7 +932,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                   if (profile) setProfile({ ...profile, unit: 'lbs' });
                   toast.info(t('settings.unitsImperialMsg'), t('settings.unitsUpdatedTitle'));
                 }}
-                className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`py-1.5 min-h-[44px] rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   profile?.unit === 'lbs'
                     ? 'bg-bg-card text-text-primary shadow-xs border border-border'
                     : 'text-text-muted hover:text-text-primary'
@@ -946,7 +946,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                   if (profile) setProfile({ ...profile, unit: 'kg' });
                   toast.info(t('settings.unitsMetricMsg'), t('settings.unitsUpdatedTitle'));
                 }}
-                className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`py-1.5 min-h-[44px] rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   profile?.unit === 'kg'
                     ? 'bg-bg-card text-text-primary shadow-xs border border-border'
                     : 'text-text-muted hover:text-text-primary'
@@ -998,7 +998,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                     // Built from existing keys only, no new strings.
                     toast.info(`${t('workout.viewMode')}: ${m === 'auto' ? t('workout.viewAuto') : modeLabel(m)}`, t('settings.modeUpdatedTitle'));
                   }}
-                  className={`py-1.5 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer ${
+                  className={`py-1.5 min-h-[44px] rounded-lg text-xs font-bold capitalize transition-all cursor-pointer ${
                     (uiPreferences.workoutModeOverride ?? 'auto') === m
                       ? 'bg-bg-card text-text-primary shadow-xs border border-border'
                       : 'text-text-muted hover:text-text-primary'

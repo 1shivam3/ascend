@@ -2970,7 +2970,7 @@ export default function ActiveWorkoutScreen({
                   <div className="flex items-center gap-1 sm:gap-2">
                     {/* Weight Input */}
                     <div className="flex flex-col items-center">
-                      <div className="flex items-center bg-bg-secondary rounded-xl px-1.5 sm:px-2 py-1.5 min-h-[40px] border border-border/60 focus-within:border-accent w-[78px] sm:w-[92px] shrink-0">
+                      <div className="flex items-center bg-bg-secondary rounded-xl px-1.5 sm:px-2 py-1.5 min-h-[44px] border border-border/60 focus-within:border-accent w-[78px] sm:w-[92px] shrink-0">
                         <input
                           type="text"
                           inputMode="decimal"
@@ -3016,7 +3016,7 @@ export default function ActiveWorkoutScreen({
                     <span className="text-text-muted font-medium text-xs shrink-0">×</span>
 
                     {/* Reps Input */}
-                    <div className="flex items-center bg-bg-secondary rounded-xl px-1.5 sm:px-2 py-1.5 min-h-[40px] border border-border/60 focus-within:border-accent w-[60px] sm:w-[74px] shrink-0">
+                    <div className="flex items-center bg-bg-secondary rounded-xl px-1.5 sm:px-2 py-1.5 min-h-[44px] border border-border/60 focus-within:border-accent w-[78px] sm:w-[92px] shrink-0">
                       <input
                         type="text"
                         inputMode="numeric"

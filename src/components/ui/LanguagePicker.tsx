@@ -50,7 +50,7 @@ export default function LanguagePicker({
           type="button"
           aria-pressed={language === opt.id}
           onClick={() => setLanguage(opt.id)}
-          className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+          className={`py-1.5 min-h-[44px] rounded-lg text-xs font-bold transition-all cursor-pointer ${
             language === opt.id ? activeCls : idleCls
           }`}
         >

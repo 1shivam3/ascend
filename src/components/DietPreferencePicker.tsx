@@ -48,7 +48,7 @@ export default function DietPreferencePicker() {
                 setProfile({ ...profile, dietPreference: opt.id });
                 toast.success(t('settings.dietSetMsg', { label: t(opt.labelKey) }), t('settings.preferencesTitle'));
               }}
-              className={`p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-left ${
+              className={`p-2.5 min-h-[44px] flex items-center rounded-xl border text-xs font-semibold transition-all cursor-pointer text-left ${
                 active
                   ? 'border-accent bg-accent/10 text-accent-text'
                   : 'border-border bg-bg-secondary text-text-primary hover:border-text-muted'
