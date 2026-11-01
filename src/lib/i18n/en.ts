@@ -3111,6 +3111,8 @@ export const en = {
   'coachChat.subtitle':
     'Ask your coach — every answer is based on your own logged training, not generic advice.',
   'coachChat.placeholder': 'Ask about your training…',
+  'coachChat.emptyState':
+    'No messages yet — ask your coach anything about your training, and the answer will be based on your own logged data.',
   'coachChat.send': 'Send',
   'coachChat.sending': 'Thinking…',
   'coachChat.basedOn': 'Based on your data:',

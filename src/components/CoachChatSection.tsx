@@ -302,30 +302,36 @@ export default function CoachChatSection() {
         <p className="card p-3 text-xs text-text-secondary">{t('coachChat.coldStart')}</p>
       )}
 
-      <div ref={listRef} aria-live="polite" className="card p-3 space-y-3 max-h-80 overflow-y-auto">
-        {messages.length === 0 && (
-          <p className="text-xs text-text-muted">{t('coachChat.placeholder')}</p>
-        )}
-        {messages.map((m, i) => (
-          <div key={i} className="space-y-1">
-            <p className="text-2xs font-bold text-text-secondary">
-              {m.role === 'user' ? t('coachChat.you') : t('coachChat.coach')}
-            </p>
-            <p className="text-sm text-text-primary whitespace-pre-wrap">{m.content}</p>
-            {m.role === 'assistant' && m.evidence && m.evidence.length > 0 && (
-              <div className="text-2xs text-text-muted">
-                <p className="font-bold">{t('coachChat.basedOn')}</p>
-                <ul className="list-disc list-inside">
-                  {m.evidence.slice(0, 4).map((e, j) => (
-                    <li key={j}>{e}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        ))}
-        {sending && <p className="text-xs text-text-muted">{t('coachChat.sending')}</p>}
-      </div>
+      {messages.length === 0 ? (
+        /* Empty state: plain hint text with its OWN copy — not the
+           input's placeholder string inside the transcript card,
+           which read as a second, duplicate input box above the real
+           one (preview spot-check, 2026-11-01). The transcript card
+           renders only once a conversation exists. */
+        <p className="text-xs text-text-muted px-1">{t('coachChat.emptyState')}</p>
+      ) : (
+        <div ref={listRef} aria-live="polite" className="card p-3 space-y-3 max-h-80 overflow-y-auto">
+          {messages.map((m, i) => (
+            <div key={i} className="space-y-1">
+              <p className="text-2xs font-bold text-text-secondary">
+                {m.role === 'user' ? t('coachChat.you') : t('coachChat.coach')}
+              </p>
+              <p className="text-sm text-text-primary whitespace-pre-wrap">{m.content}</p>
+              {m.role === 'assistant' && m.evidence && m.evidence.length > 0 && (
+                <div className="text-2xs text-text-muted">
+                  <p className="font-bold">{t('coachChat.basedOn')}</p>
+                  <ul className="list-disc list-inside">
+                    {m.evidence.slice(0, 4).map((e, j) => (
+                      <li key={j}>{e}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ))}
+          {sending && <p className="text-xs text-text-muted">{t('coachChat.sending')}</p>}
+        </div>
+      )}
 
       {error === 'generic' && <p role="alert" className="text-xs text-red-500">{t('coachChat.errorGeneric')}</p>}
       {error === 'cap' && <p role="alert" className="text-xs text-red-500">{t('coachChat.errorCap')}</p>}

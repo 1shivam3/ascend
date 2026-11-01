@@ -3116,6 +3116,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'coachChat.subtitle':
     'अपने कोच से पूछें — हर जवाब सामान्य सलाह पर नहीं, बल्कि आपके अपने लॉग किए गए प्रशिक्षण पर आधारित होता है।',
   'coachChat.placeholder': 'अपनी ट्रेनिंग के बारे में पूछें…',
+  'coachChat.emptyState':
+    'अभी कोई संदेश नहीं है — अपने प्रशिक्षण के बारे में अपने कोच से कुछ भी पूछें, जवाब आपके अपने लॉग किए गए डेटा पर आधारित होगा।',
   'coachChat.send': 'भेजें',
   'coachChat.sending': 'सोच रहे हैं…',
   'coachChat.basedOn': 'आपके डेटा पर आधारित:',
