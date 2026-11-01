@@ -35,7 +35,38 @@ export function getPurgeableLocalKeys(allKeys: readonly string[]): string[] {
  * ascend_workouts, ascend_meals, emergency snapshots) are re-read on boot
  * and resurrect supposedly deleted data.
  */
+/**
+ * Cache names that belong to this app (final-cert SEC F-05): the
+ * service worker's caches are all named `ascend-…-cache`
+ * (scripts/generate-sw.js). Pure — unit-testable without a DOM.
+ */
+export function getAppCacheNames(allNames: readonly string[]): string[] {
+  return allNames.filter((n) => n.startsWith('ascend-'));
+}
+
+/**
+ * Delete the app's Cache Storage caches (page-side Cache Storage API).
+ * The localStorage purge alone left SW-cached content — including
+ * responses cached by the old default fetch branch — behind on
+ * logout / "Delete WebApp Data & Reset", so the purge's promise was
+ * incomplete on a shared device. Guarded for environments without the
+ * caches API; best-effort, never throws. Returns the deleted names.
+ */
+export async function purgeAppCaches(): Promise<string[]> {
+  try {
+    if (typeof window === 'undefined' || typeof caches === 'undefined') return [];
+    const names = getAppCacheNames(await caches.keys());
+    await Promise.all(names.map((n) => caches.delete(n)));
+    return names;
+  } catch {
+    return [];
+  }
+}
+
 export function purgeLocalAppData(): string[] {
+  // SEC F-05: the data purge must also drop Cache Storage (async,
+  // fire-and-forget — the localStorage sweep stays synchronous).
+  void purgeAppCaches();
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') return [];
   const keys: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
