@@ -11,6 +11,16 @@
  * immediately as today's ManualCheckin — so "due" = no record for
  * today. That rule lives in resolveDefaultCoachSegment and is
  * behaviour-tested here.
+ *
+ * FOLLOW-UP (2026-11-01, preview spot-check regression): the first
+ * F-03 shape switched segments with a ternary, UNMOUNTING the
+ * inactive panel. Chip answers survived (they persist immediately),
+ * but the check-in's in-progress state — the unsent note draft and
+ * the current question step, both CoachChatTab useState — was lost
+ * on every switch. Fix: both panels stay mounted; the inactive one
+ * is hidden (display:none + aria-hidden). The pins below lock that
+ * shape, and lock that CoachChatSection can never auto-send from a
+ * hidden mount (it sends only from Enter/Send handlers).
  */
 import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
@@ -42,14 +52,55 @@ describe('open-items UX F-03: coach segment default', () => {
     }
   });
 
-  it('WorkoutPage renders the segments mutually exclusively', () => {
+  it('WorkoutPage renders one segment at a time, both panels kept mounted', () => {
     const page = fs.readFileSync(path.join(process.cwd(), 'src/components/WorkoutPage.tsx'), 'utf8');
     expect(page).toContain("t('coach.segmentCheckin')");
     expect(page).toContain("t('coach.segmentAsk')");
-    expect(page).toContain("coachSegment === 'checkin' ? (");
     expect(page).toContain('<CoachChatTab');
     expect(page).toContain('<CoachChatSection />');
     // Default re-resolved on entering the Coach tab.
     expect(page).toContain('resolveDefaultCoachSegment(useStore.getState().dailyCheckins, getLocalTodayStr())');
+    // Keep-mounted: visibility toggles by segment, never a ternary
+    // that unmounts the inactive panel.
+    expect(page).not.toContain("coachSegment === 'checkin' ? (");
+    expect(page).toContain("coachSegment === 'checkin' ? undefined : 'hidden'");
+    expect(page).toContain("coachSegment === 'ask' ? undefined : 'hidden'");
+    expect(page).toContain("aria-hidden={coachSegment !== 'checkin'}");
+    expect(page).toContain("aria-hidden={coachSegment !== 'ask'}");
+  });
+});
+
+describe('open-items UX F-03 follow-up: segment switch loses nothing in progress', () => {
+  const readSrc = (p: string) => fs.readFileSync(path.join(process.cwd(), p), 'utf8');
+
+  it('the in-progress state at risk lives in CoachChatTab local state (root cause)', () => {
+    const tab = readSrc('src/components/CoachChatTab.tsx');
+    // Current question step and the unsent per-question note draft
+    // are component-local — they survive ONLY if the component is
+    // never unmounted by a segment switch.
+    expect(tab).toContain('const [stepIndex, setStepIndex] = useState(0)');
+    expect(tab).toContain("const [noteDraft, setNoteDraft] = useState('')");
+  });
+
+  it('WorkoutPage never conditionally unmounts either coach panel', () => {
+    const page = readSrc('src/components/WorkoutPage.tsx');
+    // Both panels render unconditionally inside visibility wrappers;
+    // the only coachSegment ternary left is the className toggle.
+    expect(page).not.toMatch(/coachSegment === 'checkin' \? \(\s*<CoachChatTab/);
+    expect(page).not.toMatch(/: \(\s*<CoachChatSection/);
+    const classToggles = page.match(/coachSegment === '(checkin|ask)' \? undefined : 'hidden'/g) ?? [];
+    expect(classToggles).toHaveLength(2);
+  });
+
+  it('the hidden chat panel cannot auto-send: send fires only from Enter/Send', () => {
+    const section = readSrc('src/components/CoachChatSection.tsx');
+    // No effects at all — nothing runs on mount (hidden or visible),
+    // so keeping the panel mounted issues no coach-chat requests.
+    expect(section).not.toContain('useEffect');
+    // send() is invoked exactly twice: the input Enter handler and
+    // the Send button onClick.
+    expect(section.match(/void send\(\)/g)).toHaveLength(2);
+    expect(section).toContain("if (e.key === 'Enter') void send();");
+    expect(section).toContain('onClick={() => void send()}');
   });
 });

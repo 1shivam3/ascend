@@ -2934,7 +2934,22 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               { value: 'ask', label: t('coach.segmentAsk') },
             ]}
           />
-          {coachSegment === 'checkin' ? (
+          {/* Both segments stay MOUNTED; the inactive one is hidden.
+              The original F-03 ternary UNMOUNTED the inactive panel,
+              which discarded the check-in's in-progress state: the
+              unsent note draft and the current question step live in
+              CoachChatTab useState, while chip answers survived only
+              because they persist immediately (spot-check regression,
+              2026-11-01). Tailwind `hidden` (display:none) also drops
+              the panel from the tab order and accessibility tree;
+              aria-hidden states it explicitly. Safe for the chat:
+              CoachChatSection sends ONLY from its Enter/Send handlers
+              (no mount effect), so a hidden mounted panel issues no
+              coach-chat requests. */}
+          <div
+            className={coachSegment === 'checkin' ? undefined : 'hidden'}
+            aria-hidden={coachSegment !== 'checkin'}
+          >
             <CoachChatTab
               onStartPlan={handleStartPlan}
               onBuildBlock={() => { setCoachBlockAtReview(false); setIsCoachBlockOpen(true); }}
@@ -2942,13 +2957,16 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               onOpenWeeklyReview={() => setIsReviewOpen(true)}
               onOpenDebrief={() => setIsDebriefOpen(true)}
             />
-          ) : (
-            /* Conversational coach chat (not a drawer; the removed
-               drawer stays removed). Answers are grounded in the
-               user's own data; history persists in coachChatStore,
-               so segment switches never lose the thread. */
+          </div>
+          {/* Conversational coach chat (not a drawer; the removed
+              drawer stays removed). Answers are grounded in the
+              user's own data; history persists in coachChatStore. */}
+          <div
+            className={coachSegment === 'ask' ? undefined : 'hidden'}
+            aria-hidden={coachSegment !== 'ask'}
+          >
             <CoachChatSection />
-          )}
+          </div>
         </div>
       )}
 
