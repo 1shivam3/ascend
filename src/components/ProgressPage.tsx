@@ -29,6 +29,7 @@ import {
 import { getBigThreeStats, calculateDOTS, getDOTSClassification } from '@/lib/dots';
 import { calculateOneRepMax } from '@/lib/strength-standards';
 import { exerciseNamesEqual, getExerciseHistorySessions } from '@/lib/lifter-twin';
+import { computeCoreLifts } from '@/lib/core-lifts';
 import WorkoutHeatmap from '@/components/WorkoutHeatmap';
 import MuscleVolumeSection from '@/components/MuscleVolumeSection';
 import EmptyState from '@/components/ui/EmptyState';
@@ -415,49 +416,11 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   // it also persists — a deps array may not reference a later const.)
 
   // ── 1. REAL STRENGTH ANALYTICS & PRs DATA ─────────────────────────────────
-  // Core compound lifts computed strictly from real records
-  const coreLifts = useMemo(() => {
-    const list = [
-      { name: 'Squat', search: ['squat'] },
-      { name: 'Bench Press', search: ['bench press', 'bench'] },
-      { name: 'Deadlift', search: ['deadlift'] },
-      { name: 'Overhead Press', search: ['overhead press', 'ohp', 'military press'] },
-    ];
-
-    return list.map((item) => {
-      // Check PRs
-      const matchPRs = prs
-        .filter((p) => item.search.some((s) => p.exercise.toLowerCase().includes(s)))
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-      let best1RMKg: number | null = matchPRs.length > 0 ? Math.max(...matchPRs.map((p) => p.oneRepMax)) : null;
-
-      // Check workouts if no PR found
-      if (best1RMKg === null) {
-        let maxWorkout1RM = 0;
-        workouts.forEach((w) => {
-          w.exercises.forEach((ex) => {
-            if (item.search.some((s) => ex.name.toLowerCase().includes(s))) {
-              ex.sets.filter(isSetCompleted).forEach((s) => {
-                if (s.weight && s.reps) {
-                  const wKg = s.unit === 'lbs' ? s.weight * 0.453592 : s.weight;
-                  const e1rm = calculateOneRepMax(wKg, s.reps);
-                  if (e1rm > maxWorkout1RM) maxWorkout1RM = e1rm;
-                }
-              });
-            }
-          });
-        });
-        if (maxWorkout1RM > 0) best1RMKg = maxWorkout1RM;
-      }
-
-      return {
-        name: item.name,
-        best1RMKg,
-        hasRealRecord: best1RMKg !== null,
-      };
-    });
-  }, [prs, workouts]);
+  // Core compound lifts computed strictly from real records. Final-cert
+  // D-1: matching is exact normalized (computeCoreLifts / core-lifts.ts)
+  // — the old substring `.includes('bench')` listed an Incline Bench
+  // Press PR as Bench Press's 1RM.
+  const coreLifts = useMemo(() => computeCoreLifts(prs, workouts), [prs, workouts]);
 
   // Distinct exercises available in user's history or defaults
   const availableExercises = useMemo(() => {
