@@ -30,6 +30,7 @@ import { getBigThreeStats, calculateDOTS, getDOTSClassification } from '@/lib/do
 import { calculateOneRepMax } from '@/lib/strength-standards';
 import { exerciseNamesEqual, getExerciseHistorySessions } from '@/lib/lifter-twin';
 import { computeCoreLifts } from '@/lib/core-lifts';
+import { summarizeSeries } from '@/lib/chart-a11y';
 import WorkoutHeatmap from '@/components/WorkoutHeatmap';
 import MuscleVolumeSection from '@/components/MuscleVolumeSection';
 import EmptyState from '@/components/ui/EmptyState';
@@ -979,7 +980,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   </span>
                 </div>
                 <div className="pt-2">
-                  <svg viewBox="0 0 320 110" className="w-full h-28 overflow-visible" preserveAspectRatio="none">
+                  <svg viewBox="0 0 320 110" className="w-full h-28 overflow-visible" preserveAspectRatio="none" role="img" aria-label={summarizeSeries(t('progress.chartWeight'), bodyweightAnalytics.dataPoints, userUnit)}>
                     <defs>
                       <linearGradient id="spotWeightGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#858076" stopOpacity="0.2" />
@@ -1059,7 +1060,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     </span>
                   </div>
                   <div className="pt-2">
-                    <svg viewBox="0 0 320 120" className="w-full h-28 overflow-visible" preserveAspectRatio="none">
+                    <svg viewBox="0 0 320 120" className="w-full h-28 overflow-visible" preserveAspectRatio="none" role="img" aria-label={summarizeSeries(`${big3Lift} estimated 1RM`, big3Analytics.dataPoints, userUnit)}>
                       <defs>
                         <linearGradient id="spotBig3Gradient" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#E44427" stopOpacity="0.22" />
@@ -1125,7 +1126,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 </span>
               </div>
               <div className="pt-2">
-                <svg viewBox="0 0 320 120" className="w-full h-28 overflow-visible" preserveAspectRatio="none">
+                <svg viewBox="0 0 320 120" className="w-full h-28 overflow-visible" preserveAspectRatio="none" role="img" aria-label={summarizeSeries(`${heroLift.name} estimated 1RM`, heroLiftAnalytics.dataPoints, userUnit)}>
                   <defs>
                     <linearGradient id="strengthGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#E44427" stopOpacity="0.22" />
@@ -1335,7 +1336,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
                 {/* Dynamic Progression Chart */}
                 <div className="pt-2">
-                  <svg viewBox="0 0 320 130" className="w-full h-32 overflow-visible" preserveAspectRatio="none">
+                  <svg viewBox="0 0 320 130" className="w-full h-32 overflow-visible" preserveAspectRatio="none" role="img" aria-label={summarizeSeries(`${selectedExercise} estimated 1RM`, selectedExerciseAnalytics.dataPoints, userUnit)}>
                     <defs>
                       <linearGradient id="analyticsGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#E44427" stopOpacity="0.25" />
@@ -1501,7 +1502,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
                 {/* SVG Trend Chart */}
                 <div className="pt-1">
-                  <svg viewBox="0 0 320 110" className="w-full h-28 overflow-visible" preserveAspectRatio="none">
+                  <svg viewBox="0 0 320 110" className="w-full h-28 overflow-visible" preserveAspectRatio="none" role="img" aria-label={summarizeSeries(t('progress.chartWeight'), bodyweightAnalytics.dataPoints, userUnit)}>
                     <defs>
                       <linearGradient id="bodyWeightGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#858076" stopOpacity="0.2" />
