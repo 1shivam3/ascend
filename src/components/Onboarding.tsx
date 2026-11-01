@@ -830,7 +830,7 @@ export default function Onboarding() {
     // Profile lists every one, but the summary showed only the primary
     // (resolvePrimaryGoal), silently dropping the second goal the user
     // picked. Fall back to the primary label only when no list exists.
-    const summaryGoals = pendingProfile?.goals ?? profile?.goals ?? [];
+    const summaryGoals: AthleteGoal[] = pendingProfile?.goals ?? profile?.goals ?? [];
     const summaryGoalLabel =
       summaryGoals.length > 0
         ? summaryGoals.map((g) => ATHLETE_GOAL_CONFIGS[g].label).join(', ')
