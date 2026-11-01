@@ -56,6 +56,7 @@ import {
   MAX_WORKOUT_WEIGHT_KG,
 } from '@/lib/workout-engine';
 import { calculatePlates, PlateInfo, BARBELL_PRESETS } from '@/lib/plate-calculator';
+import { calculateExerciseVolumeKg } from '@/lib/volume';
 import { compareSetAdherence } from '@/lib/workout-adherence';
 import { useToast } from '@/components/ui/Toast';
 import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
@@ -1759,25 +1760,26 @@ export default function ActiveWorkoutScreen({
 
   // Total volume and completed metrics
   const sessionStats = useMemo(() => {
-    let totalVolumeKg = 0;
+    // Final-cert D-3: volume is the canonical DI-05 definition
+    // (lib/volume) — the old loop converted lbs but omitted bodyweight
+    // load, so bodyweight sets contributed 0 to the live counter.
+    // Set COUNTS keep the live counter's own semantics (a completed
+    // 0-rep set still counts as a completed set here).
     let completedSetsCount = 0;
     let totalSetsCount = 0;
 
     for (const ex of exercises) {
       for (const s of ex.sets) {
         totalSetsCount++;
-        const sWeight = parseFloat(String(s.weight)) || 0;
-        const sReps = parseInt(String(s.reps), 10) || 0;
-        const isDone = isActiveSetCompleted(s);
-        if (isDone && sReps > 0) {
-          completedSetsCount++;
-          const wKg = s.unit === 'lbs' ? sWeight * 0.453592 : sWeight;
-          totalVolumeKg += wKg * sReps;
-        } else if (isDone) {
+        if (isActiveSetCompleted(s)) {
           completedSetsCount++;
         }
       }
     }
+    const totalVolumeKg = exercises.reduce(
+      (acc, ex) => acc + calculateExerciseVolumeKg(ex, profile?.bodyweightKg),
+      0,
+    );
 
     return {
       totalVolumeKg: Math.round(totalVolumeKg),
@@ -1787,7 +1789,7 @@ export default function ActiveWorkoutScreen({
       durationSeconds: elapsedSeconds,
       durationFormatted: formatDuration(elapsedSeconds),
     };
-  }, [exercises, elapsedSeconds]);
+  }, [exercises, elapsedSeconds, profile?.bodyweightKg]);
 
   // Pause Workout & Save Draft to resume later
   const handlePauseWorkout = () => {

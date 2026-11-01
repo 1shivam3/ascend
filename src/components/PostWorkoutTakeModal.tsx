@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
-import { AIPostWorkoutTake, isSetCompleted } from '@/lib/types';
+import { AIPostWorkoutTake, isSetCompleted, type WorkoutEntry } from '@/lib/types';
+import { calculateWorkoutVolumeKg } from '@/lib/volume';
 import { fetchPostWorkoutTake, generateDeterministicPostWorkoutTake } from '@/lib/ai-coach';
 import { buildSessionDebrief } from '@/lib/weekly-review';
 import { getNextSessionTarget, exerciseHadPain } from '@/lib/workout-engine';
@@ -155,21 +156,16 @@ export default function PostWorkoutTakeModal({
   }, [completedWorkout.exercises]);
 
   const totalVolume = useMemo(() => {
-    let volKg = 0;
-    for (const ex of completedWorkout.exercises) {
-      for (const s of ex.sets) {
-        if (!isSetCompleted(s as any)) continue;
-        const w = parseFloat(String(s.weight)) || 0;
-        const r = parseInt(String(s.reps), 10) || 0;
-        if (r > 0 && w > 0) {
-          const wKg = s.unit === 'lbs' ? w * 0.453592 : w;
-          volKg += wKg * r;
-        }
-      }
-    }
+    // Final-cert D-3: canonical DI-05 volume (lib/volume) — the old
+    // loop required w > 0 and never added bodyweight load, so a
+    // pull-ups-only session displayed 0 kg instead of 2400 kg.
+    const volKg = calculateWorkoutVolumeKg(
+      completedWorkout as unknown as WorkoutEntry,
+      store.profile?.bodyweightKg,
+    );
     const displayVal = userUnit === 'lbs' ? Math.round(volKg * 2.20462) : Math.round(volKg);
     return `${displayVal.toLocaleString()} ${userUnit}`;
-  }, [completedWorkout.exercises, userUnit]);
+  }, [completedWorkout, store.profile?.bodyweightKg, userUnit]);
 
   // QA4-024: PR dates are local-day keys — a UTC key hides PRs set
   // earlier the same local day (and can show yesterday's as today's).
