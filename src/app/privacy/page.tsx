@@ -57,41 +57,41 @@ export default function PrivacyPage() {
             PRIVACY POLICY
           </h1>
         </div>
-        <p className="text-xs text-text-muted font-mono">
+        <p className="text-xs text-text-muted">
           Last Updated: {LEGAL_LAST_UPDATED} • Version {LEGAL_VERSION} • Global &amp; Google Play Store Compliant
         </p>
       </div>
 
       {/* Guarantee Card */}
-      <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono space-y-1.5">
+      <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm space-y-1.5">
         <div className="flex items-center gap-2 font-bold text-sm">
           <Lock className="w-4 h-4" />
           <span>Local-First Default &amp; Transparent Cloud Privacy</span>
         </div>
-        <p className="text-2xs opacity-90 leading-relaxed">
+        <p className="opacity-90 leading-relaxed">
           ASCEND is engineered with privacy as a foundational principle. By default, ASCEND operates in <strong>Guest Mode (100% local-first)</strong> with zero cloud tracking. For trainees who choose to link a cloud account or enable push reminders, your data is protected with strict Row Level Security (RLS), zero advertising monetization, and instantaneous 0-day cascade account deletion.
         </p>
       </div>
 
       {/* Sections */}
-      <div className="space-y-6 text-xs font-mono text-text-secondary leading-relaxed">
+      <div className="space-y-6 text-sm text-text-secondary leading-relaxed">
         {/* Section 1 */}
         <section className="space-y-2">
           <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
             <HardDrive className="w-4 h-4 text-accent" />
             1. Information Storage: Guest Mode vs. Optional Cloud Account
           </h2>
-          <p className="text-2xs">
+          <p>
             ASCEND gives athletes full control over how and where their training data is stored:
           </p>
-          <ul className="list-disc list-inside text-2xs space-y-1.5 pl-2">
+          <ul className="list-disc list-inside space-y-1.5 pl-2">
             <li><strong>Guest Mode (Default &amp; On-Device):</strong> All application data is stored locally in client-side Web Storage (<code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">localStorage</code> under the <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">ascend_store</code> key). In Guest Mode, zero workout records, PRs, or nutritional entries ever touch any remote server.</li>
             <li><strong>Optional Cloud Sync (Google OAuth &amp; Supabase):</strong> If you choose to sign in to protect your data across device changes, your profile, PRs, workouts, meals, body metrics, and custom routines are backed up to a private, encrypted Supabase PostgreSQL database. Every table is guarded by strict Row Level Security (RLS) policies enforcing that only your authenticated user ID can read or modify your records.</li>
             <li><strong>Optional Push Notifications (Reminder Center):</strong> If you explicitly opt in to reminders (hydration, meal timing, workout notifications), your device web push subscription token (<code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">endpoint</code>, <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">p256dh</code>, <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">auth</code>) and reminder schedules are stored strictly to deliver your chosen alerts. Reminder dispatch is scheduled through Upstash QStash, which processes the delivery timing and your push endpoint — nothing else. You can modify preferences or unsubscribe at any time.</li>
             <li><strong>Progress Photos (Device-Only):</strong> Photos you add in Progress are stored only in this device&apos;s local storage (key <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">ascend_progress_photos_v1</code>, up to 24 photos). They are never uploaded, never synced to the cloud, and are deleted when you delete the photo or wipe app data.</li>
             <li><strong>Feedback Messages:</strong> If you send feedback from inside the app, your message (and the name/email you optionally type into the form) is stored in our Supabase database so we can respond. When email forwarding is configured on the server, a copy is also emailed to our support inbox via Resend (transactional email provider).</li>
           </ul>
-          <p className="text-2xs text-amber-300/80 pt-1">
+          <p className="text-amber-300/80 pt-1">
             <strong>Important Notice for Guest Mode:</strong> If you remain in Guest Mode without a cloud account or exported backup file, clearing your browser history, site data, or cache will permanently erase your data. Regular exports via the <em>Data Vault</em> are strongly advised.
           </p>
         </section>
@@ -102,10 +102,10 @@ export default function PrivacyPage() {
             <Sparkles className="w-4 h-4 text-accent" />
             2. Generative Athletic Intelligence &amp; Data Handling (Groq, OpenRouter, Google Gemini)
           </h2>
-          <p className="text-2xs">
+          <p>
             ASCEND includes optional athletic utilities powered by privacy-hardened machine learning providers (such as the Autoregulated Coach, Macro Lens Photo Estimator, Natural Language Voice Logger, and Exercise Substitutions):
           </p>
-          <ul className="list-disc list-inside text-2xs space-y-1.5 pl-2">
+          <ul className="list-disc list-inside space-y-1.5 pl-2">
             <li><strong>Multi-Provider Fallback Chain:</strong> AI requests are attempted in order — Groq Cloud (LPU inference), then OpenRouter, then Google Gemini — and stop at the first successful response. Meal photos are processed by Groq or Gemini only; they are never sent to OpenRouter (photos are skipped at that stage by design).</li>
             <li><strong>Free-Tier Text Models &amp; Data Use:</strong> Some text models in the fallback chain (served via OpenRouter) are free-tier services. When one of them handles your request, the text you submit — for example a coach-chat message together with the training context it needs (recent workouts, personal records, meals, bodyweight, and your check-in notes) — may be retained by that provider and used to operate, improve, or train its models, under the provider&apos;s own terms and privacy policy. Commercial-tier providers in the chain (Groq, Google Gemini) do not train on API data. Meal photos are never sent to free-tier models. Do not type sensitive personal information into AI chat features.</li>
             <li><strong>Meal Photo Handling &amp; Provider Data Retention:</strong> When using the optional Macro Lens photo scanner, meal images are transmitted in-memory over encrypted TLS to commercial AI developer APIs (Groq Cloud LPU and Google Gemini API). ASCEND does not permanently store meal photos on its servers. Upstream API providers retain operational logs for temporary security and abuse detection windows (typically up to 30 days pursuant to standard commercial API terms), and do not train models on API customer data on commercial developer tiers. Meal photos are strictly <em>never</em> sent to public crowd-sourced or free-tier third-party training pools.</li>
@@ -124,7 +124,7 @@ export default function PrivacyPage() {
             <Barcode className="w-4 h-4 text-accent" />
             3. Device Hardware Permissions &amp; Third-Party Lookups
           </h2>
-          <div className="space-y-2 text-2xs">
+          <div className="space-y-2">
             <p>
               <strong>Camera Permission:</strong> Camera access is requested strictly when you activate the live barcode scanner or capture a meal photo. Camera video frames are processed in-memory in real time for barcode recognition or meal estimation; video feeds and photos are never recorded, surveilled, or permanently stored on any remote server.
             </p>
@@ -146,9 +146,9 @@ export default function PrivacyPage() {
             <ShieldCheck className="w-4 h-4 text-accent" />
             4. Google Play Store &amp; App Store Data Safety Declarations
           </h2>
-          <div className="p-3 rounded-lg bg-bg-secondary border border-border/80 text-2xs space-y-2">
+          <div className="p-3 rounded-lg bg-bg-secondary border border-border/80 space-y-2">
             <p className="font-semibold text-text-primary">Summary of Data Practices for App Store Reviewers &amp; Trainees:</p>
-            <div className="space-y-1.5 text-2xs">
+            <div className="space-y-1.5">
               <p>• <strong>Personal Info (Optional):</strong> Name and email are collected only when you explicitly sign in with Google OAuth for cloud backup. Not collected in Guest Mode.</p>
               <p>• <strong>Health &amp; Fitness:</strong> Workout logs, personal records, bodyweight, and nutrition. Stored 100% locally on-device in Guest Mode; synced with TLS 1.3 encryption to a private Supabase PostgreSQL database with Row Level Security in Cloud Mode.</p>
               <p>• <strong>Health Connect (Android, optional):</strong> If you turn on Health Connect sync in Settings, ASCEND reads only your step counts, sleep duration, and body weight from Health Connect, on this device, to power your readiness score and body-metrics log. Sync is off by default, happens only while the app is open, and can be turned off at any time in Settings or revoked in Health Connect. Imported weights are marked &ldquo;Health Connect&rdquo; and you can edit or delete them like any other entry. You can also remove ASCEND&rsquo;s access entirely in the Health Connect app.</p>
@@ -166,15 +166,15 @@ export default function PrivacyPage() {
             <Trash2 className="w-4 h-4 text-danger" />
             5. User Data Deletion &amp; Account Eradication
           </h2>
-          <div className="p-3 rounded-xl bg-danger/10 border border-danger/30 text-xs text-text-secondary space-y-2">
-            <p className="text-2xs">
+          <div className="p-3 rounded-xl bg-danger/10 border border-danger/30 text-sm text-text-secondary space-y-2">
+            <p>
               Google Play requires clear disclosure of how users can request or execute complete deletion of their account and data. In ASCEND:
             </p>
-            <ul className="list-disc list-inside text-2xs space-y-1.5 pl-1">
+            <ul className="list-disc list-inside space-y-1.5 pl-1">
               <li><strong>Instant In-App Deletion:</strong> Open <em>Settings &rarr; Account &amp; Privacy &rarr; Delete My Account</em>. This immediately and permanently deletes your Supabase cloud account, all synchronized workout, PR, meal, and biometric records, and wipes all device storage.</li>
               <li><strong>External Web Deletion Portal:</strong> In compliance with Google Play Data Safety requirements, you can also initiate deletion without having the app installed via our dedicated <Link href="/delete-account" className="text-accent underline font-semibold">Account &amp; Data Deletion Request Page</Link>.</li>
               <li><strong>Zero Retention Policy:</strong> Wiping or requesting deletion results in immediate 0-day erasure across cloud databases and authentication directories.</li>
-              <li><strong>Manual Support Inquiries:</strong> Contact our privacy team at <a href={`mailto:${SUPPORT_EMAIL}`} className="text-accent underline font-mono">{SUPPORT_EMAIL}</a>.</li>
+              <li><strong>Manual Support Inquiries:</strong> Contact our privacy team at <a href={`mailto:${SUPPORT_EMAIL}`} className="text-accent underline">{SUPPORT_EMAIL}</a>.</li>
             </ul>
           </div>
         </section>
@@ -185,7 +185,7 @@ export default function PrivacyPage() {
             <Users className="w-4 h-4 text-accent" />
             6. Children&apos;s Privacy (COPPA &amp; GDPR-K)
           </h2>
-          <p className="text-2xs">
+          <p>
             ASCEND is designed for athletes and gym trainees aged 13 and older (or 16 and older in the European Economic Area). We do not knowingly collect, solicit, or maintain personal information from children under the age of 13. If you believe a child under 13 has provided data through the app, please wipe the device local storage or contact us to assist.
           </p>
         </section>
@@ -196,7 +196,7 @@ export default function PrivacyPage() {
             <AlertTriangle className="w-4 h-4 text-amber-400" />
             7. Health, Fitness &amp; Safety Notice
           </h2>
-          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200/90 text-2xs space-y-1.5">
+          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200/90 text-sm space-y-1.5">
             <p>
               ASCEND is an analytical workout journal and mathematical strength calculator. It is NOT a medical device and does NOT provide medical advice, clinical diagnosis, or rehabilitation prescriptions. Resistance training carries inherent risks of injury. Always consult a licensed healthcare professional before beginning any physical exercise regimen.
             </p>
@@ -212,12 +212,12 @@ export default function PrivacyPage() {
             <FileText className="w-4 h-4 text-accent" />
             8. Data Retention &amp; Your Rights
           </h2>
-          <div className="space-y-2 text-2xs">
+          <div className="space-y-2">
             <p>
               <strong>Retention:</strong> Cloud data is kept only while your account exists — account deletion triggers immediate, zero-day erasure across all databases and authentication records. Guest Mode data lives in your device&apos;s local storage until you clear site data, reset the app, or delete it yourself. AI provider request logs are retained by the providers only for their standard short abuse-detection windows (typically up to 30 days); ASCEND keeps no copy.
             </p>
             <p>
-              <strong>Your rights:</strong> You can access and export all of your local data at any time via Settings &rarr; Data Vault (JSON backup), correct anything in the app itself, and delete everything via Settings &rarr; Delete Account or the <Link href="/delete-account" className="text-accent underline font-semibold">Account &amp; Data Deletion Request Page</Link>. For access, rectification, portability, or erasure requests you cannot complete yourself, email <a href={`mailto:${SUPPORT_EMAIL}`} className="text-accent underline font-mono">{SUPPORT_EMAIL}</a> and we will act within 30 days.
+              <strong>Your rights:</strong> You can access and export all of your local data at any time via Settings &rarr; Data Vault (JSON backup), correct anything in the app itself, and delete everything via Settings &rarr; Delete Account or the <Link href="/delete-account" className="text-accent underline font-semibold">Account &amp; Data Deletion Request Page</Link>. For access, rectification, portability, or erasure requests you cannot complete yourself, email <a href={`mailto:${SUPPORT_EMAIL}`} className="text-accent underline">{SUPPORT_EMAIL}</a> and we will act within 30 days.
             </p>
           </div>
         </section>
@@ -226,13 +226,13 @@ export default function PrivacyPage() {
       <div className="pt-4 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
         <Link
           href="/terms"
-          className="text-2xs font-mono text-accent-text hover:underline"
+          className="text-sm text-accent-text hover:underline"
         >
           View Terms of Service &rarr;
         </Link>
         <Link
           href="/"
-          className="btn-primary inline-flex items-center justify-center gap-2 py-2 px-5 text-xs font-bold font-mono"
+          className="btn-primary inline-flex items-center justify-center gap-2 py-2 px-5 text-xs font-bold"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Back to Dashboard</span>
