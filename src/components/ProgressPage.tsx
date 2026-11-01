@@ -1237,6 +1237,12 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     {lift.name}
                   </span>
                   <div className="flex items-center gap-2">
+                    {/* Final-cert J4.1: an estimated 1RM in this list gets
+                        the same "est." label the charts carry — the tile
+                        previously showed an estimate as a bare number. */}
+                    {lift.isEstimate && (
+                      <span className="rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent-text">{t('common.estimatedShort')}</span>
+                    )}
                     <span className="font-bold text-text-primary tabular-nums font-mono text-sm">
                       {displayWeight(lift.best1RMKg)}
                     </span>
