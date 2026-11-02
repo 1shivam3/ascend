@@ -392,6 +392,62 @@ export async function sendTestLocalNotification(): Promise<boolean> {
   }
 }
 
+// ─── Rest-timer alert (one-shot, native only) ────────────────────────────────
+
+/** Deterministic id of the one-shot "rest over" notification. */
+export const REST_TIMER_NOTIFICATION_ID = notificationIdFor('ascend|rest-timer-done');
+
+/**
+ * Schedules the one-shot rest-timer alert for the exact countdown end,
+ * covering the locked/background case the Web Audio chime cannot reach.
+ *
+ * No-ops cleanly (returns false) on web, when `at` is not in the future,
+ * or when notification permission has not been granted — the rest timer
+ * never prompts for permission mid-workout. Re-scheduling replaces the
+ * previous alert (the countdown was restarted or adjusted), because the
+ * id is fixed.
+ */
+export async function scheduleRestDoneNotification(
+  at: Date,
+  title: string,
+  body: string
+): Promise<boolean> {
+  if (!isNativeApp()) return false;
+  if (!(at instanceof Date) || at.getTime() <= Date.now()) return false;
+  try {
+    if ((await checkLocalNotificationPermission()) !== 'granted') return false;
+    const plugin = await loadPlugin();
+    await plugin
+      .cancel({ notifications: [{ id: REST_TIMER_NOTIFICATION_ID }] })
+      .catch(() => {});
+    await plugin.schedule({
+      notifications: [
+        {
+          id: REST_TIMER_NOTIFICATION_ID,
+          title,
+          body,
+          schedule: { at, allowWhileIdle: true },
+        },
+      ],
+    });
+    return true;
+  } catch (err) {
+    console.warn('Rest-timer notification scheduling failed:', err);
+    return false;
+  }
+}
+
+/** Cancels the pending rest-timer alert, if any (pause/stop/finish/unmount). */
+export async function cancelRestDoneNotification(): Promise<void> {
+  if (!isNativeApp()) return;
+  try {
+    const plugin = await loadPlugin();
+    await plugin.cancel({ notifications: [{ id: REST_TIMER_NOTIFICATION_ID }] });
+  } catch {
+    // Best effort — a stale alert still names the finished rest break.
+  }
+}
+
 let initialized = false;
 
 /**
