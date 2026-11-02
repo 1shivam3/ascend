@@ -1,6 +1,7 @@
 import { LiftLevel, OverallLevel, Gender, ExerciseRank, OverallTitle, EquipmentType } from './types';
 import { getAllExerciseNames, EXERCISE_LIBRARY, getExerciseMuscle } from './exercise-library';
 import type { StringKey } from './i18n/en';
+import { DEFAULT_BODYWEIGHT_KG } from './defaults';
 
 /**
  * Sanity cap for manually logged PR weights. 500 kg exceeds every raw
@@ -335,7 +336,7 @@ export function getEffectiveExerciseLoad(
   externalWeightKg: number,
   bodyweightKg: number
 ): number {
-  const safeBW = Math.max(20, bodyweightKg || 75);
+  const safeBW = Math.max(20, bodyweightKg || DEFAULT_BODYWEIGHT_KG);
   const safeExt = Math.max(0, externalWeightKg || 0);
   if (isBodyweightExercise(exercise)) {
     return safeBW + safeExt;
@@ -491,7 +492,7 @@ export function getLiftLevel(
   // No usable standard: keep a decorative level from the bench table but
   // flag it unavailable so it is excluded from the overall level.
   const standards = resolved.standards || MALE_STANDARDS['Bench Press'];
-  const safeBW = Math.max(20, bodyweightKg || 75);
+  const safeBW = Math.max(20, bodyweightKg || DEFAULT_BODYWEIGHT_KG);
   
   // For bodyweight exercises (Pull-ups, Dips, etc.), the standard ratios are based on added weight / bodyweight.
   // Callers may pass either total effective mass (bodyweight + added load) or added load directly.
@@ -651,7 +652,7 @@ export function getNextLevelInfo(
   // Press table for an unrelated lift.
   const resolved = resolveStandardFor(exercise, normExercise);
   const standards = resolved.standards || MALE_STANDARDS['Bench Press'];
-  const safeBW = Math.max(20, bodyweightKg || 75);
+  const safeBW = Math.max(20, bodyweightKg || DEFAULT_BODYWEIGHT_KG);
   const isOther = gender === 'other';
   const genderMultiplier = gender === 'female' ? getFemaleMultiplier(normExercise) : 1.0;
   const nextLevel = Math.min(100, currentLevel + 1);

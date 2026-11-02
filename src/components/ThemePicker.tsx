@@ -98,7 +98,7 @@ export default function ThemePicker({
             type="text"
             value={customHex}
             onChange={(e) => onCustomHexChange(e.target.value)}
-            placeholder="#2563EB"
+            placeholder="#E44427"
             aria-label={t('settings.customAccent')}
             className="flex-1 min-w-0 rounded-xl border border-border bg-bg-secondary px-3 py-2.5 text-sm font-mono text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent"
           />

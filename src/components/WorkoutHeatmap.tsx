@@ -26,6 +26,7 @@ import {
   calculateHydrationTarget,
   formatWaterLiters,
 } from '@/lib/habits';
+import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
 
 interface WorkoutHeatmapProps {
   onNavigate?: (tab: 'home' | 'prs' | 'meals' | 'workout') => void;
@@ -67,7 +68,7 @@ export default function WorkoutHeatmap({
   });
 
   const waterTargetMl = calculateHydrationTarget({
-    bodyweightKg: profile?.bodyweightKg || 75,
+    bodyweightKg: profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG,
     customTargetMl: hydrationConfig?.dailyTargetMl,
     isCustomTarget: hydrationConfig?.isCustomTarget,
   });

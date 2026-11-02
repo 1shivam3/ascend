@@ -15,6 +15,7 @@ import {
   DailyTimelineEvent,
 } from './types';
 import { calculateWorkoutVolumeKg } from './volume';
+import { DEFAULT_BODYWEIGHT_KG } from './defaults';
 
 export type { DayType };
 
@@ -38,7 +39,7 @@ export function calculateHydrationTarget(params: {
     return params.customTargetMl;
   }
 
-  const bw = params.bodyweightKg && params.bodyweightKg > 0 ? params.bodyweightKg : 75;
+  const bw = params.bodyweightKg && params.bodyweightKg > 0 ? params.bodyweightKg : DEFAULT_BODYWEIGHT_KG;
   // Standard guideline: ~35 ml / kg bodyweight
   // Fixed baseline so all screens (Home, Nutrition, Essentials, AI) show the exact same target
   let target = Math.round(bw * 35);

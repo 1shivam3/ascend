@@ -4,7 +4,6 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { useAppStore } from '@/lib/store';
 import { TrainingDecisionRecord, TrainingDecision, Unit } from '@/lib/types';
 import PolicyDecisionCard from '@/components/PolicyDecisionCard';
-import PolicyDecisionLedger from '@/components/PolicyDecisionLedger';
 import TrainingDecisionCard from '@/components/TrainingDecisionCard';
 
 describe('Decision Ledger UI & Athlete Actions (Task 3C-6)', () => {
@@ -353,44 +352,8 @@ describe('Decision Ledger UI & Athlete Actions (Task 3C-6)', () => {
     expect(html).toContain('Solid working sets with target RPE in reserve.');
   });
 
-  // ── 8. Mobile layout and accessibility ─────────────────────────────────────
-  it('Requirement 8: verifies accessible attributes, status tabs, and mobile layout classes in PolicyDecisionLedger', () => {
-    const decision1 = createSamplePolicyRecord({ id: 'dec-1', status: 'pending' });
-    const decision2 = createSamplePolicyRecord({
-      id: 'dec-2',
-      status: 'accepted',
-      exerciseName: 'Barbell Back Squat',
-    });
-
-    useAppStore.setState({
-      policyDecisionRecords: { [decision1.id]: decision1, [decision2.id]: decision2 },
-      policyDecisionsLedgerHistory: [decision1, decision2],
-    });
-
-    const html = renderToStaticMarkup(
-      React.createElement(PolicyDecisionLedger, {
-        decisions: [decision1, decision2],
-        userUnit: 'kg',
-      })
-    );
-
-    // Tablist & filter roles
-    expect(html).toContain('role="region"');
-    expect(html).toContain('aria-label="Training Decision Ledger"');
-    expect(html).toContain('role="tablist"');
-    expect(html).toContain('role="tab"');
-
-    // Status filter chips with exact counts
-    expect(html).toContain('All');
-    expect(html).toContain('Pending');
-    expect(html).toContain('Accepted');
-
-    // Both exercises rendered in "All" view
-    expect(html).toContain('BARBELL BENCH PRESS');
-    expect(html).toContain('BARBELL BACK SQUAT');
-
-    // Mobile layout classes present
-    expect(html).toContain('grid-cols-1 sm:grid-cols-2');
-    expect(html).toContain('flex flex-col sm:flex-row');
-  });
+  // Requirement 8 (PolicyDecisionLedger layout/a11y) was retired in the
+  // slop-tail pass: PolicyDecisionLedger was never mounted by any screen
+  // (only this test imported it) and the component has been deleted.
+  // The live PolicyDecisionCard keeps its coverage in Requirements 1–7.
 });

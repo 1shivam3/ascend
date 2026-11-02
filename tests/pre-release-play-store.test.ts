@@ -123,11 +123,14 @@ describe('Google Play Store Launch Readiness Verification', () => {
       const scanMealModalPath = path.join(rootDir, 'src', 'components', 'ScanMealModal.tsx');
       const scanContent = fs.readFileSync(scanMealModalPath, 'utf8');
       expect(scanContent).not.toContain('AI Vision');
-      // QA4-004: the 'Macro Lens' brand title moved into the i18n dictionary
+      // QA4-004: the scan brand title moved into the i18n dictionary
       // and the modal renders it via t('scan.title').
+      // Slop-tail (2026-11-02): the coined name 'Macro Lens' was itself
+      // retired by the slop audit as a buzzword product-name; the title
+      // is now the plain 'Meal Scan'.
       const enDict = fs.readFileSync(
         path.join(rootDir, 'src', 'lib', 'i18n', 'en.ts'), 'utf8');
-      expect(enDict).toContain("'scan.title': 'Macro Lens'");
+      expect(enDict).toContain("'scan.title': 'Meal Scan'");
       expect(scanContent).toContain("t('scan.title')");
     });
   });

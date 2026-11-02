@@ -19,6 +19,7 @@ import {
   type PullSliceKey,
 } from './reconcile';
 import { isCrossAccountSwitch as isCrossAccountSwitchFn, decideStartFreshGate } from '../start-fresh-guard';
+import { DEFAULT_BODYWEIGHT_KG } from '../defaults';
 
 /** Page size for sync reads — equal to the PostgREST row cap. */
 export const SYNC_READ_PAGE_SIZE = 1000;
@@ -1051,7 +1052,7 @@ class SupabaseSyncEngine {
             id: rp.id,
             name: rp.name,
             gender: rp.gender,
-            bodyweightKg: Number(rp.bodyweight_kg) || 75,
+            bodyweightKg: Number(rp.bodyweight_kg) || DEFAULT_BODYWEIGHT_KG,
             bodyweightLbs: Number(rp.bodyweight_lbs) || 165,
             heightCm: rp.height_cm ? Number(rp.height_cm) : undefined,
             unit: rp.unit || 'kg',
@@ -1093,7 +1094,7 @@ class SupabaseSyncEngine {
           id: user.id,
           name: extractedName || '',
           gender: 'male',
-          bodyweightKg: 75,
+          bodyweightKg: DEFAULT_BODYWEIGHT_KG,
           bodyweightLbs: 165,
           unit: 'kg',
           goals: ['build_muscle'],

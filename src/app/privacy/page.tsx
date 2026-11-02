@@ -20,7 +20,7 @@ import { SUPPORT_EMAIL, LEGAL_LAST_UPDATED, LEGAL_VERSION } from '@/lib/legal';
 
 export const metadata: Metadata = {
   title: 'Privacy Policy | ASCEND',
-  description: 'ASCEND Powerlifting & Fitness WebApp Privacy Policy. 100% offline, on-device local storage, transparent AI disclosures, Google Play Data Safety compliance, and user data deletion.',
+  description: 'ASCEND Powerlifting & Fitness WebApp Privacy Policy. Local-first storage on your device with optional account sync, transparent AI disclosures, Google Play Data Safety compliance, and user data deletion.',
 };
 
 export default function PrivacyPage() {
@@ -69,7 +69,7 @@ export default function PrivacyPage() {
           <span>Local-First Default &amp; Transparent Cloud Privacy</span>
         </div>
         <p className="opacity-90 leading-relaxed">
-          ASCEND is engineered with privacy as a foundational principle. By default, ASCEND operates in <strong>Guest Mode (100% local-first)</strong> with zero cloud tracking. For trainees who choose to link a cloud account or enable push reminders, your data is protected with strict Row Level Security (RLS), zero advertising monetization, and account deletion that erases your cloud data from our systems right away (third-party AI provider logs may be kept for up to 30 days, as Section 2 explains).
+          ASCEND is engineered with privacy as a foundational principle. By default, ASCEND operates in <strong>Guest Mode (100% local-first)</strong>: your logs stay on this device and nothing is synced to a cloud account. For trainees who choose to link a cloud account or enable push reminders, your data is protected with strict Row Level Security (RLS), zero advertising monetization, and account deletion that erases your cloud data from our systems right away (third-party AI provider logs may be kept for up to 30 days, as Section 2 explains).
         </p>
       </div>
 

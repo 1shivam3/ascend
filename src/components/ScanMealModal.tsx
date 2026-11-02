@@ -39,6 +39,7 @@ import {
   Check,
   Flag,
 } from 'lucide-react';
+import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
 
 interface ScanMealModalProps {
   isOpen: boolean;
@@ -687,7 +688,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     const todayMeals = store.meals.filter((m) => m.date === today);
     const existingProtein = todayMeals.flatMap((m) => m.foods).reduce((sum, f) => sum + (f.proteinG || 0), 0);
     const currentProteinTotal = Math.round(existingProtein + savedProtein);
-    const targetProtein = store.macroGoals?.proteinG || Math.round((store.profile?.bodyweightKg || 75) * 2);
+    const targetProtein = store.macroGoals?.proteinG || Math.round((store.profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG) * 2);
     const remainingProtein = Math.max(0, targetProtein - currentProteinTotal);
 
     toast.success(

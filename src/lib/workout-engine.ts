@@ -1224,8 +1224,8 @@ export function getProgressionRecommendation(
         isPlateau: true,
         plateauSessionsCount: sessions.length,
         plateauSuggestion: isStrength
-          ? `Deload 10% to ${deloadWeight}${userUnit} for 1 week, or switch to a paused/deficit variation to stimulate new neural drive.`
-          : `Deload 10% to ${deloadWeight}${userUnit} for higher reps, or switch variation for 2 weeks to trigger new hypertrophy.`,
+          ? `Deload 10% to ${deloadWeight}${userUnit} for 1 week, or switch to a paused/deficit variation.`
+          : `Deload 10% to ${deloadWeight}${userUnit} for higher reps, or switch variation for 2 weeks.`,
       };
     }
   }
@@ -2397,7 +2397,7 @@ function buildGoalAdaptiveSplitTemplates(
         id: 'builtin_upper_a',
         name: 'Upper A',
         createdAt: '2026-01-01',
-        description: 'Heavy compound strength focus with strict mechanical tension (4–5 reps)',
+        description: 'Heavy compound strength focus (4–5 reps)',
         goalTag: 'Strength (4–5 reps)',
         exercises: [
           { name: 'Bench Press', targetSets: 4, targetReps: 5, targetWeight: isLbs ? 165 : 75, targetUnit: unit },
@@ -2411,7 +2411,7 @@ function buildGoalAdaptiveSplitTemplates(
         id: 'builtin_lower_a',
         name: 'Lower A',
         createdAt: '2026-01-01',
-        description: 'Primary squat strength day with posterior chain compound loading',
+        description: 'Main squat strength day plus posterior-chain work',
         goalTag: 'Strength (4–5 reps)',
         exercises: [
           { name: 'Squat', targetSets: 4, targetReps: 5, targetWeight: isLbs ? 245 : 110, targetUnit: unit },
@@ -2441,7 +2441,7 @@ function buildGoalAdaptiveSplitTemplates(
         id: 'builtin_lower_b',
         name: 'Lower B',
         createdAt: '2026-01-01',
-        description: 'Maximal deadlift neural drive and quad anterior chain reinforcement',
+        description: 'Heavy deadlift day with quad work',
         goalTag: 'Strength (3–5 reps)',
         exercises: [
           { name: 'Deadlift', targetSets: 4, targetReps: 4, targetWeight: isLbs ? 285 : 130, targetUnit: unit },
@@ -2459,7 +2459,7 @@ function buildGoalAdaptiveSplitTemplates(
         id: 'builtin_upper_a',
         name: 'Upper A',
         createdAt: '2026-01-01',
-        description: 'Muscle-sparing compound mechanical tension with higher training density',
+        description: 'Compound lifts at higher density, to keep muscle in a deficit',
         goalTag: 'Fat Loss (6–8 reps)',
         exercises: [
           { name: 'Bench Press', targetSets: 4, targetReps: 6, targetWeight: isLbs ? 160 : 72.5, targetUnit: unit },
@@ -2473,7 +2473,7 @@ function buildGoalAdaptiveSplitTemplates(
         id: 'builtin_lower_a',
         name: 'Lower A',
         createdAt: '2026-01-01',
-        description: 'Calorie-burning quad and hip hinge loading with controlled rest intervals',
+        description: 'Quad and hip-hinge work with controlled rest intervals',
         goalTag: 'Fat Loss (6–8 reps)',
         exercises: [
           { name: 'Squat', targetSets: 4, targetReps: 6, targetWeight: isLbs ? 225 : 100, targetUnit: unit },
@@ -2486,7 +2486,7 @@ function buildGoalAdaptiveSplitTemplates(
         id: 'builtin_upper_b',
         name: 'Upper B',
         createdAt: '2026-01-01',
-        description: 'Upper torso muscle retention with steady metabolic work rate',
+        description: 'Upper-body work to keep muscle, at a steady pace',
         goalTag: 'Fat Loss (6–8 reps)',
         exercises: [
           { name: 'Incline Bench', targetSets: 4, targetReps: 6, targetWeight: isLbs ? 140 : 62.5, targetUnit: unit },
@@ -2500,7 +2500,7 @@ function buildGoalAdaptiveSplitTemplates(
         id: 'builtin_lower_b',
         name: 'Lower B',
         createdAt: '2026-01-01',
-        description: 'Heavy deadlift tension signal paired with active knee flexion density',
+        description: 'Heavy deadlifts plus hamstring work',
         goalTag: 'Fat Loss (5–8 reps)',
         exercises: [
           { name: 'Deadlift', targetSets: 4, targetReps: 5, targetWeight: isLbs ? 265 : 120, targetUnit: unit },
@@ -2521,7 +2521,7 @@ function buildGoalAdaptiveSplitTemplates(
         id: 'builtin_upper_a',
         name: 'Conditioning & Upper Stamina',
         createdAt: '2026-01-01',
-        description: 'Aerobic base conditioning paired with high-density upper muscular endurance',
+        description: 'Aerobic base work plus upper-body endurance sets',
         goalTag: 'Conditioning (Aerobic Base + 12–15 reps)',
         exercises: [
           { name: 'Bench Press', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 95 : 40, targetUnit: unit, notes: 'Continuous muscular endurance, 12–15 reps' },
@@ -2536,7 +2536,7 @@ function buildGoalAdaptiveSplitTemplates(
         id: 'builtin_lower_a',
         name: 'Conditioning & Lower Stamina',
         createdAt: '2026-01-01',
-        description: 'Incline aerobic work paired with posterior chain endurance and knee flexion density',
+        description: 'Incline aerobic work plus posterior-chain and hamstring endurance',
         goalTag: 'Conditioning (Incline Walk + 12–15 reps)',
         exercises: [
           { name: 'Incline Treadmill Walk', targetSets: 1, targetReps: 15, targetWeight: 0, targetUnit: unit, notes: '15 min @ 10–12% incline, 4.5–5.0 km/h walking speed' },
@@ -2550,7 +2550,7 @@ function buildGoalAdaptiveSplitTemplates(
         id: 'builtin_upper_b',
         name: 'Work Capacity & Intervals',
         createdAt: '2026-01-01',
-        description: 'High-intensity interval conditioning engine for cardiovascular peak power',
+        description: 'High-intensity interval conditioning',
         goalTag: 'Intervals & Circuits',
         exercises: [
           { name: 'Rowing Machine Intervals', targetSets: 8, targetReps: 1, targetWeight: 0, targetUnit: unit, notes: '8 rounds: 1 min hard sprint / 1 min easy paddle' },
@@ -2563,7 +2563,7 @@ function buildGoalAdaptiveSplitTemplates(
         id: 'builtin_lower_b',
         name: 'Total Body Flush & Carries',
         createdAt: '2026-01-01',
-        description: 'Low-impact aerobic flush paired with grip and full-body loaded carries',
+        description: 'Low-impact aerobic work plus grip and loaded carries',
         goalTag: 'Aerobic Flush & Carries',
         exercises: [
           { name: 'Zone 2 Stationary Cycling', targetSets: 1, targetReps: 15, targetWeight: 0, targetUnit: unit, notes: '15 min warm-up flush cadence' },

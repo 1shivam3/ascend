@@ -88,6 +88,7 @@ import { calculateMealMacros, scaleMacroGoalsToCalories } from '@/lib/macros';
 import { effectiveMacroGoals, dayScaledGoals, fallbackMacroGoals, fallbackProteinTargetG } from '@/lib/effective-goals';
 import { toLocalDateString, calculateHydrationTarget } from '@/lib/habits';
 import { getTimeGreeting, getWeekRange } from '@/lib/formatters';
+import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
 import { useToast } from '@/components/ui/Toast';
 import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
 import { PlannedWorkout, PlannedExercise, DayOfWeek, FoodItem, MealEntry } from '@/lib/types';
@@ -322,7 +323,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   // stale `dailyTargetMl || 2700` snapshot, which disagreed with Fuel
   // for every bodyweight except ~77 kg.
   const hydrationTargetMl = calculateHydrationTarget({
-    bodyweightKg: profile?.bodyweightKg || 75,
+    bodyweightKg: profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG,
     customTargetMl: hydrationConfig?.dailyTargetMl,
     isCustomTarget: hydrationConfig?.isCustomTarget,
   });
@@ -851,7 +852,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           aria-label={t('home.viewLevelDetails')}
           className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors pressable`}
         >
-          <span className="text-xs font-medium text-text-muted">{t('home.level')} {levelInfo.level} · {t(levelInfo.nameKey)}</span>
+          <span className="text-xs font-medium text-text-muted">{t('home.level')} {levelInfo.level}</span>
           <span className="mt-1.5 block">
             <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums leading-tight">
               {`${levelInfo.total.toLocaleString()} XP`}
@@ -1190,7 +1191,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           }
           meals={meals}
           waterTargetMl={calculateHydrationTarget({
-            bodyweightKg: profile?.bodyweightKg || 75,
+            bodyweightKg: profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG,
             customTargetMl: hydrationConfig?.dailyTargetMl,
             isCustomTarget: hydrationConfig?.isCustomTarget,
           })}

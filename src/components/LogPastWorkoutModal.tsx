@@ -31,6 +31,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useTranslation } from '@/lib/i18n';
 import type { StringKey } from '@/lib/i18n/en';
 import { safeRandomId, getLocalTodayStr } from '@/lib/formatters';
+import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
 
 interface LogPastWorkoutModalProps {
   isOpen: boolean;
@@ -423,7 +424,7 @@ export default function LogPastWorkoutModal({
 
     // Auto-detect PRs
     let newPRsCount = 0;
-    const userBW = profile?.bodyweightKg || 75;
+    const userBW = profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG;
     validExercises.forEach((ex) => {
       const isBW = isBodyweightExercise(ex.name);
       ex.sets.forEach((s) => {

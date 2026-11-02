@@ -88,6 +88,7 @@ import { calculateHydrationTarget } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
 
 import { useAppNavigation } from '@/lib/navigation';
+import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
 import { safeRandomId, getLocalTodayStr, formatLocalDate, round1, formatWaterMl } from '@/lib/formatters';
 import { useToday } from '@/lib/use-today';
 
@@ -1065,7 +1066,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       setGoalCarbs(macroGoals.carbsG ? String(macroGoals.carbsG) : '');
       setGoalFat(macroGoals.fatG ? String(macroGoals.fatG) : '');
     } else {
-      const bw = profile?.bodyweightKg || 75;
+      const bw = profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG;
       const rec = calculateRecommendedMacroGoals(
         bw,
         primaryGoal,
@@ -1081,7 +1082,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   };
 
   const handleAutoCalculateGoals = () => {
-    const bw = profile?.bodyweightKg || 75;
+    const bw = profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG;
     const rec = calculateRecommendedMacroGoals(
       bw,
       primaryGoal,
@@ -1159,7 +1160,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       // Recompute maintenance from the athlete's stats so the
       // deficit/surplus explanation line survives manual edits.
       maintenanceCalories: calculateMaintenanceCalories(
-        profile?.bodyweightKg || 75,
+        profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG,
         profile?.gender || 'male',
         profile?.heightCm,
         profile?.age,
@@ -1494,7 +1495,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
   const waterToday = waterLogs[todayDate] || 0;
   const waterTargetMl = calculateHydrationTarget({
-    bodyweightKg: profile?.bodyweightKg || 75,
+    bodyweightKg: profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG,
     customTargetMl: hydrationConfig?.dailyTargetMl,
     isCustomTarget: hydrationConfig?.isCustomTarget,
   });
@@ -3016,7 +3017,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                         e.preventDefault();
                                         handleSelectSuggestion(i, sugg);
                                       }}
-                                      className="flex-1 text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-elevated hover:text-accent-text flex items-center justify-between font-medium"
+                                      className="flex-1 text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-elevated flex items-center justify-between font-medium"
                                     >
                                       <span className="flex items-center gap-2">
                                         {sugg.name}
@@ -3032,7 +3033,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                           </span>
                                         )}
                                       </span>
-                                      <ChevronRight className="w-3 h-3 text-text-muted" />
+                                      <span className="flex items-center gap-1.5 shrink-0">
+                                        <span className="text-2xs text-text-secondary font-medium">
+                                          {sugg.kind === 'custom' && sugg.customFood
+                                            ? t('meals.suggKcalCustom', { kcal: Math.round(sugg.customFood.calories) })
+                                            : t('meals.suggKcalDb', { kcal: Math.round(estimateMacros(sugg.name, 100, 'g').calories) })}
+                                        </span>
+                                        <ChevronRight className="w-3 h-3 text-text-muted" />
+                                      </span>
                                     </button>
                                     {sugg.kind === 'custom' && (
                                       <button
@@ -3336,7 +3344,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     {t('meals.macroEngine')}
                   </p>
                   <p className="text-[0.6875rem] text-text-muted font-mono">
-                    {t('meals.basedOnBw', { kg: profile?.bodyweightKg || 75 })}
+                    {t('meals.basedOnBw', { kg: profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG })}
                   </p>
                 </div>
                 <button

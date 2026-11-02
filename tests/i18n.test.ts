@@ -122,7 +122,6 @@ describe('i18n wiring coverage (pinned)', () => {
     // UX redesign Stage 1: purely presentational — all copy arrives
     // as props, no user-visible strings of their own.
     'src/components/ui/EmptyState.tsx',
-    'src/components/ui/FilterBar.tsx',
     'src/components/ui/Section.tsx',
     'src/components/ui/SegmentedControl.tsx',
     // TabGuardBanner wired in Round 5 (tabGuard.* keys).

@@ -33,6 +33,7 @@ import DataVaultModal from '@/components/DataVaultModal';
 import FeedbackModal from '@/components/FeedbackModal';
 import WeeklyRecapModal from '@/components/WeeklyRecapModal';
 import ShareProgramModal from '@/components/ShareProgramModal';
+import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
 
 export interface ProfileViewProps {
   onBack?: () => void;
@@ -107,7 +108,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
       if (pr.weightKg > prev) bestByExercise.set(key, pr.weightKg);
     }
     const levels = Array.from(bestByExercise.entries()).map(([exercise, best1RMKg]) =>
-      getLiftLevel(exercise, best1RMKg, profile?.bodyweightKg || 70, profile?.gender || 'male')
+      getLiftLevel(exercise, best1RMKg, profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG, profile?.gender || 'male')
     );
     // Lifts with no published standard are estimates and are excluded
     // from the overall level — the profile must SAY so (the PR page
