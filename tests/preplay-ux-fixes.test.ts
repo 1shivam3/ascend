@@ -45,8 +45,49 @@ describe('pre-play Progress text joins + empty states (D-UX-3/6)', () => {
     expect(progress).not.toContain('fill="#E44427"');
     expect(progress).not.toContain('stopColor="#E44427"');
     expect(progress).not.toContain('stroke="#858076"');
-    expect(progress).toContain('stroke="var(--accent)"');
-    expect(progress).toContain('stroke="var(--text-secondary)"');
+    expect(progress).toContain('stroke="rgb(var(--accent))"');
+    expect(progress).toContain('stroke="rgb(var(--text-secondary))"');
+  });
+});
+
+describe('pre-play chart paints wrap RGB-triplet tokens in rgb() (D-UX-4 follow-up)', () => {
+  // Root cause of the Graphite "invisible detail chart": --accent,
+  // --text-secondary and --bg-card are space-separated RGB triplets, so a
+  // bare var(--accent) as an SVG paint is invalid — the declaration drops
+  // and the series falls back to stroke:none (no line) + fill black
+  // (black points) + stop-color black (faint dark area). Round 1's pin
+  // above originally asserted the bare form; this block pins the fix.
+  const progress = read('src/components/ProgressPage.tsx');
+  const chart = read('src/components/ProgressChart.tsx');
+  const css = read('src/app/globals.css');
+
+  it('theme tokens stay RGB triplets (app-wide Tailwind rgb(var()/alpha) wiring depends on it)', () => {
+    expect(css).toContain('--accent: 228 68 39;');
+    expect(css).toContain('--accent: 235 78 48;');
+  });
+
+  it('no bare triplet token is used as an SVG paint in either chart file', () => {
+    for (const src of [progress, chart]) {
+      expect(src).not.toContain('stroke="var(--');
+      expect(src).not.toContain('fill="var(--');
+      expect(src).not.toContain('stopColor="var(--');
+      expect(src).not.toContain("'var(--accent)'");
+      expect(src).not.toContain("'var(--bg-card)'");
+    }
+  });
+
+  it('every Progress chart resolves its paints through rgb(var())', () => {
+    expect(progress).toContain('stopColor="rgb(var(--accent))"');
+    expect(progress).toContain('fill="rgb(var(--accent))"');
+    expect(progress).toContain('stopColor="rgb(var(--text-secondary))"');
+    expect(progress).toContain('fill="rgb(var(--text-secondary))"');
+    expect(chart).toContain('stroke="rgb(var(--accent))"');
+    expect(chart).toContain('stopColor="rgb(var(--accent))"');
+  });
+
+  it('detail-chart points are accent-filled with a card-colour ring on every point', () => {
+    // The analytics (per-lift detail) chart: static ring, not last-point-only.
+    expect(progress).toContain('stroke="rgb(var(--bg-card))"');
   });
 });
 
