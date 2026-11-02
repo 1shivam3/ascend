@@ -64,7 +64,7 @@ export default function TermsPage() {
           </li>
           <li className="flex items-start gap-1.5">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
-            <span>Your data is stored 100% locally on your device; you are responsible for maintaining your own backup files via the Data Vault.</span>
+            <span>Your data is stored locally on your device by default. If you sign in, it also syncs to your private cloud account (see Section 3). In Guest Mode, you are responsible for maintaining your own backup files via the Data Vault.</span>
           </li>
           <li className="flex items-start gap-1.5">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />

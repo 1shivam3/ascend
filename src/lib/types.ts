@@ -379,8 +379,9 @@ export interface ActiveWorkoutDraft {
  *  Levels in tsp: none=0, tsp=1, tbsp=3, tbsp2=6. */
 export type OilLevelId = 'none' | 'tsp' | 'tbsp' | 'tbsp2';
 
-/** Explicit per-food diet classification (food schema v2, see food-meta.ts).
- *  One value per DB entry: 'vegan' ⊂ 'veg', 'egg' = eggetarian, 'non-veg'. */
+/** Explicit per-food diet classification (food schema v2).
+ *  One value per DB entry: 'vegan' ⊂ 'veg', 'egg' = eggetarian, 'non-veg'.
+ *  Values live on the DB entries themselves (macros.ts / indian-foods.ts). */
 export type DietTag = 'vegan' | 'veg' | 'egg' | 'non-veg';
 
 /** Controlled allergen vocabulary (food schema v2). Entries list only
@@ -411,14 +412,14 @@ export interface FoodItem {
    *  most DB entries don't carry it — absence means "unknown", not zero. */
   sugarG?: number;
   /** Dietary fiber in grams (food schema v2). For FOOD_DB entries the
-   *  canonical value lives in FOOD_META (food-meta.ts); this field carries
-   *  it on materialized items. Per the quantity's own basis. */
+   *  canonical value lives on the entry itself (macros.ts); this field
+   *  carries it on materialized items. Per the quantity's own basis. */
   fiberG?: number;
-  /** Diet classification (food schema v2, canonical copy in FOOD_META). */
+  /** Diet classification (food schema v2; canonical value on the DB entry). */
   dietTag?: DietTag;
-  /** Allergens present as ingredients (food schema v2, FOOD_META). */
+  /** Allergens present as ingredients (food schema v2). */
   allergenTags?: AllergenTag[];
-  /** Provenance of the entry's values (food schema v2, FOOD_META). */
+  /** Provenance of the entry's values (food schema v2). */
   sourceRef?: FoodSourceRef;
   quantity?: number;
   unit?: string;

@@ -295,8 +295,8 @@ Job: Provide real-time tactical volume overload and recovery guidance for today.
 Schema:
 {
   "volumeTrend": "1-2 punchy sentences describing volume overload/fatigue trend with numbers",
-  "recoveryStatus": "1-2 sharp sentences assessing CNS and muscular recovery based on workout frequency, rest days, and hydration/protein status",
-  "tacticalAdvice": "2-3 specific, high-leverage tactical instructions for today's workout or recovery strategy (e.g. lift selection, RPE target, deload advice, hydration/creatine timing)",
+  "recoveryStatus": "1-2 sharp sentences assessing recovery in plain language, using only the measured signals present in the data — workout frequency, rest days, sleep, soreness, and recent session load. Never claim a state the data does not show",
+  "tacticalAdvice": "2-3 specific tactical instructions for today's workout or recovery strategy (e.g. lift selection, RPE target, deload advice, hydration/creatine timing)",
   "fatigueWarning": "Optional 1 sentence warning if overtraining risk, high consecutive training days, or severe dehydration/protein deficit is detected. Otherwise null or empty string."
 }`;
       promptText = `Athlete Data & Context:\n<athlete_context>\n${body.userContext || ''}\n</athlete_context>\n\nGenerate tactical coaching feedback in JSON.`;

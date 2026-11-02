@@ -200,11 +200,11 @@ export function generateOfflineHeuristic(
   } else if (volume.lastWeekKg === 0) {
     volumeTrend = `Initial cycle established: ${volume.thisWeekKg.toLocaleString()} kg total tonnage logged this week.`;
   } else if (volume.diffPercent >= 10) {
-    volumeTrend = `Volume increased by +${volume.diffPercent}% (${volume.thisWeekKg.toLocaleString()} kg vs ${volume.lastWeekKg.toLocaleString()} kg prior). Progressive overload active.`;
+    volumeTrend = `Volume increased by +${volume.diffPercent}% (${volume.thisWeekKg.toLocaleString()} kg vs ${volume.lastWeekKg.toLocaleString()} kg prior).`;
   } else if (volume.diffPercent <= -10) {
     volumeTrend = `Volume dropped ${Math.abs(volume.diffPercent)}% vs last week (${volume.thisWeekKg.toLocaleString()} kg). Optimal window to push peak intensity or utilize as planned deload.`;
   } else {
-    volumeTrend = `Training volume is stable (${volume.thisWeekKg.toLocaleString()} kg, ${volume.diffPercent >= 0 ? '+' : ''}${volume.diffPercent}% vs prior week). Excellent consistency maintaining work capacity.`;
+    volumeTrend = `Training volume is stable (${volume.thisWeekKg.toLocaleString()} kg, ${volume.diffPercent >= 0 ? '+' : ''}${volume.diffPercent}% vs prior week).`;
   }
 
   let recoveryStatus = '';
@@ -213,7 +213,7 @@ export function generateOfflineHeuristic(
   } else if (consecutiveDays >= 2) {
     recoveryStatus = `Consistent training (${consecutiveDays} days in a row). Keep form crisp and listen to your body.`;
   } else if (daysSince === 1) {
-    recoveryStatus = 'Prior rest day completed. Ready to hit today’s training session with good energy.';
+    recoveryStatus = 'Last session was yesterday. No workout logged yet today.';
   } else if (daysSince > 14) {
     recoveryStatus = "No recent workout logged. Today's session can start fresh.";
   } else if (daysSince >= 3) {
@@ -254,7 +254,7 @@ export function generateOfflineHeuristic(
   if (consecutiveDays >= 4) {
     fatigueWarning = `Consecutive training warning: ${consecutiveDays} continuous workout days detected without a scheduled rest day. Watch for joint soreness and technical breakdown.`;
   } else if (waterMl < 800 && new Date().getHours() >= 16) {
-    fatigueWarning = 'Hydration deficit: Less than 800 ml logged late in the day. Intracellular hydration is low, increasing cramp risk.';
+    fatigueWarning = 'Low water logged: less than 800 ml recorded today. Consider drinking water before training.';
   }
 
   return {
@@ -576,13 +576,50 @@ export function generateDeterministicPostWorkoutTake(
     ? `NEXT SESSION TARGET: ${canonicalTarget.summaryText}`
     : `Repeat ${primary} next session and aim for +1 rep on your final working set before increasing load.`;
 
+  // Measured facts only. This generator receives just the completed
+  // workout — no prior-week data — so it reports this session's own
+  // numbers. It never invents a comparison it cannot compute, and
+  // never states a duration it was not given (the house rule the
+  // quick-log path already follows: blank stays blank).
+  let completedSetCount = 0;
+  let totalVolumeKg = 0;
+  for (const ex of exercises) {
+    for (const s of (ex?.sets || []) as any[]) {
+      if (!isSetCompleted(s)) continue;
+      completedSetCount += 1;
+      const w = parseFloat(String(s.weight)) || 0;
+      const r = parseInt(String(s.reps), 10) || 0;
+      totalVolumeKg += (s.unit === 'lbs' ? w * 0.453592 : w) * r;
+    }
+  }
+  const roundedVolumeKg = Math.round(totalVolumeKg);
+
+  const keyAchievements: string[] = [];
+  if (exercises.length > 0) {
+    keyAchievements.push(
+      `Completed ${exercises.length} movements, ${completedSetCount} sets.`
+    );
+  }
+  if (
+    typeof completedWorkout?.durationMinutes === 'number' &&
+    completedWorkout.durationMinutes > 0
+  ) {
+    keyAchievements.push(`Session duration: ${completedWorkout.durationMinutes} minutes.`);
+  }
+  if (keyAchievements.length === 0) {
+    keyAchievements.push('No completed sets were recorded for this session.');
+  }
+
   return {
-    headline: `Session Complete • ${primary} locked in`,
-    volumeVsLastWeek: 'Volume stimulus successfully delivered to target muscle groups.',
-    keyAchievements: [
-      `Completed ${exercises.length} movements with consistent execution.`,
-      `Session duration: ${completedWorkout?.durationMinutes || 45} minutes.`,
-    ],
+    headline:
+      exercises.length > 0 ? `Session Complete • ${primary} locked in` : 'Session Complete',
+    // Legacy field name — the content is this session's measured total,
+    // because no last-week figure reaches this generator.
+    volumeVsLastWeek:
+      roundedVolumeKg > 0
+        ? `Total volume this session: ${roundedVolumeKg.toLocaleString()} kg across ${completedSetCount} completed sets.`
+        : 'No weighted sets were recorded, so there is no volume total for this session.',
+    keyAchievements,
     nextSessionTarget,
     source: 'offline_heuristic',
   };
@@ -595,20 +632,91 @@ export function generateDeterministicWeeklyReview(state: AppState): AIWeeklyRevi
   const todayStr = toLocalDateString(new Date());
   const trainingProfile = state.trainingProfile;
   const recentWorkouts = state.workouts || [];
-  const count = recentWorkouts.filter((w) => {
-    const diff = Math.floor((new Date().getTime() - new Date(w.date).getTime()) / (1000 * 60 * 60 * 24));
+  const nowMs = new Date().getTime();
+  const weekWorkouts = recentWorkouts.filter((w) => {
+    const diff = Math.floor((nowMs - new Date(w.date).getTime()) / (1000 * 60 * 60 * 24));
     return diff <= 7;
-  }).length;
+  });
+  const count = weekWorkouts.length;
+  const planned = trainingProfile?.daysPerWeek;
+
+  // Measured facts only. This generator reads workouts and nothing
+  // else — no hydration, habits, or sleep — so its highlights report
+  // workouts only, in plain language, and say so when there is
+  // nothing logged to report.
+  let totalVolumeKg = 0;
+  const dayKeys = new Set<string>();
+  const dayNames: string[] = [];
+  const exerciseCounts = new Map<string, number>();
+  for (const w of weekWorkouts) {
+    const key = (w.date || '').slice(0, 10);
+    if (key && !dayKeys.has(key)) {
+      dayKeys.add(key);
+      // Local-date parse (same convention as getDaysSinceLastWorkout)
+      // so the weekday name matches the day the user trained.
+      const parts = key.split('-');
+      const d =
+        parts.length === 3
+          ? new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10))
+          : new Date(w.date);
+      if (!Number.isNaN(d.getTime())) {
+        dayNames.push(d.toLocaleDateString('en-US', { weekday: 'short' }));
+      }
+    }
+    for (const ex of w.exercises || []) {
+      if (ex?.name) exerciseCounts.set(ex.name, (exerciseCounts.get(ex.name) || 0) + 1);
+      for (const s of (ex?.sets || []) as any[]) {
+        if (!isSetCompleted(s)) continue;
+        const wt = parseFloat(String(s.weight)) || 0;
+        const rp = parseInt(String(s.reps), 10) || 0;
+        totalVolumeKg += (s.unit === 'lbs' ? wt * 0.453592 : wt) * rp;
+      }
+    }
+  }
+  let topExercise: string | undefined;
+  let topCount = 0;
+  for (const [name, c] of exerciseCounts) {
+    if (c > topCount) {
+      topCount = c;
+      topExercise = name;
+    }
+  }
+  const roundedVolumeKg = Math.round(totalVolumeKg);
+
+  const weekSummary = planned
+    ? `Completed ${count} of ${planned} target training sessions over the past 7 days.`
+    : `Completed ${count} training sessions over the past 7 days.`;
+
+  const strengthHighlight =
+    count === 0
+      ? 'No workouts were logged in the last 7 days, so there is no training to review yet.'
+      : roundedVolumeKg > 0
+        ? `You logged ${roundedVolumeKg.toLocaleString()} kg of total volume this week${topExercise ? `, most of it on ${topExercise}` : ''}.`
+        : `You trained ${count} ${count === 1 ? 'time' : 'times'} this week across ${dayKeys.size} ${dayKeys.size === 1 ? 'day' : 'days'}.`;
+
+  const habitInsight =
+    count === 0
+      ? 'Nothing was logged this week, so there is no training pattern to report yet.'
+      : `Your training fell on ${dayNames.length} ${dayNames.length === 1 ? 'day' : 'days'} this week${dayNames.length > 0 ? ` (${dayNames.join(', ')})` : ''}.`;
+
+  const focusNextWeek =
+    count === 0
+      ? 'Log your first session this week to get the week started.'
+      : planned && count < planned
+        ? `You have ${planned - count} planned ${planned - count === 1 ? 'session' : 'sessions'} still to aim for — schedule ${planned - count === 1 ? 'it' : 'them'} on days you can protect.`
+        : planned
+          ? `You completed all ${planned} planned sessions. Next week, aim to repeat that consistency before adding more.`
+          : `Keep the same rhythm next week — ${count} ${count === 1 ? 'session' : 'sessions'} is a repeatable week.`;
 
   return {
     id: `review_${todayStr}`,
     date: todayStr,
-    weekSummary: `Completed ${count} of ${trainingProfile?.daysPerWeek || 4} target training sessions over the past 7 days.`,
+    weekSummary,
     workoutsCompleted: count,
-    plannedDaysPerWeek: trainingProfile?.daysPerWeek || 4,
-    strengthHighlight: 'Primary compound movements maintained load progression with disciplined set execution.',
-    habitInsight: 'Consistent hydration on active workout days supported intra-muscular pump and session recovery.',
-    focusNextWeek: 'Focus on advancing top sets by one rep across your primary barbell movements before micro-loading.',
+    plannedDaysPerWeek: planned ?? 0,
+    strengthHighlight,
+    habitInsight,
+    focusNextWeek,
     source: 'offline_heuristic',
     createdAt: new Date().toISOString(),
   };

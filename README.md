@@ -5,18 +5,18 @@
 </p>
 
 <p align="center">
-  A high-performance, evidence-based training, autoregulation, and nutrition platform built with Next.js 14, Tailwind CSS, TypeScript, and Google Gemini AI.<br/>
+  A high-performance, evidence-based training, autoregulation, and nutrition platform built with Next.js 16, Tailwind CSS, and TypeScript. AI coaching is served by a Groq → OpenRouter → Gemini provider cascade.<br/>
   <strong>Engineered for every gym-goer — Bodybuilding & Hypertrophy, Maximum Strength, Fat Loss & Shredding, Stamina & Conditioning, and General Fitness.</strong><br/>
-  <em>100% local-first — zero cloud tracking, zero forced accounts, on-device data vault, offline-first resilience, and Google Play Store / App Store compliance.</em>
+  <em>Local-first by default — your data lives on your device, with zero forced accounts, optional cloud sync, consent-based analytics, and Google Play Store compliance.</em>
 </p>
 
 <p align="center">
-  <a href="https://nextjs.org/"><img alt="Next.js" src="https://img.shields.io/badge/Next.js-14-black?logo=next.js" /></a>
+  <a href="https://nextjs.org/"><img alt="Next.js" src="https://img.shields.io/badge/Next.js-16-black?logo=next.js" /></a>
   <a href="https://www.typescriptlang.org/"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-blue?logo=typescript" /></a>
   <a href="https://tailwindcss.com/"><img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind_CSS-3-38bdf8?logo=tailwindcss" /></a>
-  <a href="https://ai.google.dev/"><img alt="Google Gemini" src="https://img.shields.io/badge/Google_Gemini-AI-orange?logo=google" /></a>
+  <a href="https://ascendtonext.vercel.app/privacy"><img alt="AI Cascade" src="https://img.shields.io/badge/AI_Cascade-Groq_OpenRouter_Gemini-orange" /></a>
   <a href="https://web.dev/progressive-web-apps/"><img alt="PWA" src="https://img.shields.io/badge/PWA-Installable-purple" /></a>
-  <a href="#automated-qa-testing"><img alt="Tests" src="https://img.shields.io/badge/Tests-686%20Passed-emerald" /></a>
+  <a href="#automated-qa-testing"><img alt="Tests" src="https://img.shields.io/badge/Tests-2,622%20Passed-emerald" /></a>
   <a href="#license"><img alt="License" src="https://img.shields.io/badge/License-MIT-green" /></a>
 </p>
 
@@ -89,7 +89,7 @@ $$\text{OPEN ASCEND} \longrightarrow \text{KNOW WHAT TO DO TODAY} \longrightarro
   * **Get Stronger:** Performance surplus (+150 kcal, high complex carbohydrates).
   * **Stamina:** High-glycogen energy balance.
 * **Real-Time Goal Pacing Bar:** Live monitoring on the Nutrition dashboard showing remaining deficit preservation or surplus progress.
-* **Offline Staples & Scanners:** 500+ offline food database with instant 1-tap logging, live barcode scanning (Open Food Facts), and optional Google Gemini Vision meal photo scanning.
+* **Offline Staples & Scanners:** 500+ offline food database with instant 1-tap logging, live barcode scanning (Open Food Facts), and optional AI meal photo scanning via the vision provider cascade.
 * **India-First Food Logging:** Curated Indian dishes with IFCT-consistent values are logged the way India eats — katori, roti and plate units with gram equivalents, a visible recipe assumption on every dish ("assumes 1 tsp ghee tadka"), a one-tap ghee/oil correction (None / 1 tsp / 1 tbsp / 2 tbsp) applied with real fat math in both the meal builder and photo-scan review, household recipe learning ("Save as my version" — your family's dal tops search results), a vegetarian protein coach, whole-day lighter-dinner adaptation, and per-day fasting/festival target patterns.
 
 ### 📱 7. Offline Gym Resilience & PWA Architecture
@@ -99,14 +99,14 @@ $$\text{OPEN ASCEND} \longrightarrow \text{KNOW WHAT TO DO TODAY} \longrightarro
 
 ---
 
-## 🏛️ Google Play Store & Apple App Store Compliance
+## 🏛️ Google Play Store Compliance
 
 ASCEND is engineered to meet all guidelines for mobile app store publication:
 
 ### 1. Google Play Generative AI Policy
 * **In-App Reporting Mechanism:** All AI coaching responses, workout adjustments, and insights include a conspicuous **Flag/Report** button (`ReportAIModal.tsx`) allowing users to report objectionable, unsafe, or inaccurate content without leaving the app.
-* **Medical Advice Prohibition:** Embedded system guardrails in Gemini API routes strictly forbid clinical diagnosis, injury treatment, prescription drugs, or extreme starvation diets.
-* **Explicit Disclosures:** Every AI-generated card carries a clear label: `✨ AI Generated • Not medical advice`.
+* **Medical Advice Prohibition:** Embedded system guardrails in the AI provider routes strictly forbid clinical diagnosis, injury treatment, prescription drugs, or extreme starvation diets.
+* **Explicit Disclosures:** AI and offline content is labelled by its actual source. Deterministic on-device results carry offline provenance (an `offline_heuristic` source tag and "Local Coach" badging), so a user can always tell whether a local rule or a cloud AI model produced what they are reading. AI features are optional assistants — not medical advice (see the in-app Disclaimer).
 
 ### 2. Google Play Health Apps Policy
 * **Conspicuous Non-Medical Disclosures:** Clear medical disclaimers (`/disclaimer`) and in-app banners state that ASCEND is for informational/tracking purposes only.
@@ -119,7 +119,7 @@ ASCEND is engineered to meet all guidelines for mobile app store publication:
 | **Personal Info** | Name, Email | Optional (Cloud Sync only) | Private Supabase PostgreSQL (RLS) | No |
 | **Health & Fitness** | Fitness, workouts, PRs, bodyweight, height | Yes (user-entered) | 100% on-device (`localStorage`) in Guest Mode; private encrypted Supabase in Cloud Mode | No |
 | **Device Identifiers** | Web Push Subscription Token & Keys | Optional (Reminder Center) | Supabase `push_subscriptions` table (for push delivery only) | No |
-| **Photos & Videos** | Food / meal photos | Optional (on-demand) | Ephemeral in-memory | Only to Google Gemini API if user scans meal |
+| **Photos & Videos** | Food / meal photos | Optional (on-demand) | Ephemeral in-memory | Only to the AI vision provider cascade if user scans meal |
 | **Audio Files** | Voice dictation | Optional (on-demand) | Processed in-memory (Web Speech API) | No |
 | **App Performance** | Crash logs, analytics | Optional (opt-in Sentry/GA) | Zero tracking cookies | No third-party sales |
 
@@ -145,7 +145,6 @@ ASCEND is engineered to meet all guidelines for mobile app store publication:
 * **Local-First Default:** All workouts, PRs, nutrition history, and settings are stored locally in browser `localStorage` by default (Guest Mode).
 * **Encrypted Cloud Sync (Optional):** Trainees can securely sign in with Google OAuth to back up their data to a private Supabase database protected by Row Level Security (RLS).
 * **Zero Advertising Monetization:** No ad networks, no tracking pixels, no selling of user training or health data.
-* **Bring-Your-Own-Key (BYOK):** Optional Google Gemini AI features can use your personal free Gemini API key, stored exclusively on your device.
 * **Data Vault (Backup & Restore):** 1-tap export of your complete athletic history to a standardized `.json` backup file with instant restoration.
 
 ---
@@ -154,17 +153,17 @@ ASCEND is engineered to meet all guidelines for mobile app store publication:
 
 | Layer | Technology |
 |---|---|
-| **Framework** | [Next.js 14](https://nextjs.org/) (App Router, React 18) |
+| **Framework** | [Next.js 16](https://nextjs.org/) (App Router, React 19) |
 | **Language** | [TypeScript 5](https://www.typescriptlang.org/) |
 | **Styling** | [Tailwind CSS 3](https://tailwindcss.com/) with custom design tokens |
 | **State Management** | [Zustand](https://zustand-demo.pmnd.rs/) with localStorage persistence & migration |
 | **Cloud & Auth** | [Supabase](https://supabase.com/) (PostgreSQL with RLS, Google OAuth, Web Push) |
 | **Data Visualization** | [Recharts](https://recharts.org/) (Custom Volume Load & Fatigue charts) |
-| **Athletic AI** | [Google Gemini API](https://ai.google.dev/) (`gemini-2.5-flash` / `gemini-1.5-flash`) |
+| **Athletic AI** | Provider cascade — Groq → OpenRouter → Google Gemini (text); vision provider cascade for meal scans (see Privacy Policy) |
 | **Barcode Scanning** | [@zxing/browser](https://github.com/zxing-js/browser) + [Open Food Facts](https://world.openfoodfacts.org/) |
 | **Icons** | [Lucide React](https://lucide.dev/) |
 | **Offline Caching** | Native PWA Service Worker (`CacheStorage` API) + Web Push notifications |
-| **Testing** | [Vitest](https://vitest.dev/) (686 unit & integration tests) |
+| **Testing** | [Vitest](https://vitest.dev/) (2,622 unit & integration tests; 20 further security-integration tests require a local Docker database) |
 
 ---
 
@@ -176,10 +175,10 @@ ASCEND enforces a strict multi-tier verification gate across all mathematical mo
 # 1. Type check (0 errors)
 npx tsc --noEmit
 
-# 2. Lint check (0 errors, 0 warnings)
+# 2. Lint check (0 errors)
 npm run lint
 
-# 3. Full Automated Test Suite (50 test files, 686 passed tests)
+# 3. Full Automated Test Suite (229 test files, 2,622 passed tests; 20 Docker-gated security tests need a local DB)
 npm test
 
 # 4. Production Next.js Build
