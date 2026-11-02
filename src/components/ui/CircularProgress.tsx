@@ -36,6 +36,8 @@ export default function CircularProgress({
         height={size}
         viewBox={`0 0 ${size} ${size}`}
         className="rotate-[-90deg] transform"
+        role="img"
+        aria-label={`${Math.round(normalizedValue)}%`}
       >
         {/* Track */}
         <circle

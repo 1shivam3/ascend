@@ -1491,6 +1491,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'progress.last7Days': 'पिछले 7 दिन',
   'progress.last4Weeks': 'पिछले 4 हफ़्ते',
   'progress.noData': 'कोई डेटा नहीं',
+  'progress.noDataYet': 'अभी कोई डेटा नहीं — ट्रेंड शुरू करने के लिए एक लॉग करें',
   'progress.baseline': 'बेसलाइन',
   'progress.noLogsYet': 'अभी कोई लॉग नहीं',
   'progress.current': 'वर्तमान',

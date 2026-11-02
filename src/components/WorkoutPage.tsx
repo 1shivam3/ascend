@@ -600,7 +600,10 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
         >
           <h3 className="font-bold text-text-primary truncate leading-tight" title={plan.name}>{plan.name}</h3>
           <p className="text-xs text-text-muted font-mono mt-0.5">
-            {plan.exercises.length} exercise{plan.exercises.length !== 1 ? 's' : ''}
+            {/* Pre-play D-UX-5: single-string count via plural() — the
+                split {count} exercise{'s'} nodes glued together as
+                "5exercises" in text flow. */}
+            {plural(plan.exercises.length, 'exercise')}
             {/* SIM-P2-17: a duration estimate before starting. */}
             {' · '}{(() => { const d = estimatePlanDurationMin(plan); return t('plan.estDuration', { min: d.min, max: d.max }); })()}
           </p>

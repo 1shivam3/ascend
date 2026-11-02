@@ -170,6 +170,15 @@ export default function CoachChatTab({
   const [sleep, setSleep] = useState<number>(seed?.sleep ?? 3);
   const [soreness, setSoreness] = useState<number>(seed?.soreness ?? 3);
   const [energy, setEnergy] = useState<number>(seed?.energy ?? 3);
+  // Pre-play D-UX-1: the rating values above seed to 3 (or to the last
+  // check-in), which made chip "3" render pressed/selected before the
+  // user answered anything. Selection is now presentational only once
+  // the user has actually tapped a rating (or filled via "Same as
+  // usual"); the seeded values still drive the digest exactly as
+  // before until a real answer replaces them.
+  const [touchedRatings, setTouchedRatings] = useState<
+    ReadonlySet<'sleep' | 'soreness' | 'energy'>
+  >(new Set());
   const [soreAreas, setSoreAreas] = useState<MuscleGroup[]>(seed?.soreAreas ?? []);
   const [painAreas, setPainAreas] = useState<MuscleGroup[]>(seed?.painAreas ?? []);
   const [painYes, setPainYes] = useState<boolean>(false);
@@ -336,6 +345,8 @@ export default function CoachChatTab({
     setSleep(next.sleep);
     setSoreness(next.soreness);
     if (typeof next.energy === 'number') setEnergy(next.energy);
+    // "Same as usual" is a real answer for all three ratings (D-UX-1).
+    setTouchedRatings(new Set(['sleep', 'soreness', 'energy']));
     setSoreAreas(next.soreAreas ?? []);
     setPainAreas(next.painAreas ?? []);
     setNotes({ ...(next.notes ?? {}) });
@@ -394,11 +405,13 @@ export default function CoachChatTab({
           <Chip
             key={v}
             active={
-              key === 'sleep' ? sleep === v : key === 'soreness' ? soreness === v : energy === v
+              touchedRatings.has(key) &&
+              (key === 'sleep' ? sleep === v : key === 'soreness' ? soreness === v : energy === v)
             }
-            onClick={() =>
-              answer({ [key]: v } as Partial<ManualCheckin>, () => set(v))
-            }
+            onClick={() => {
+              setTouchedRatings((prev) => new Set(prev).add(key));
+              answer({ [key]: v } as Partial<ManualCheckin>, () => set(v));
+            }}
           >
             {v}
           </Chip>

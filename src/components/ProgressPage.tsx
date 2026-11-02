@@ -1126,6 +1126,11 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 <div>
                   <h2 className="text-base font-bold text-text-primary">{t('progress.spotQuestionE1rm', { lift: heroLift.name })}</h2>
                   <span className="text-xs font-semibold text-text-secondary">{heroLift.name}</span>
+                  {/* Pre-play D-UX-3: explicit space in the text flow —
+                      the badge visually separates via ml-2, but as text
+                      it concatenated straight onto the lift name
+                      ("Bench Press" + est. suffix with no space). */}
+                  {' '}
                   <span className="ml-2 rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent-text">{t('common.estimatedShort')}</span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-accent transition-colors" />
@@ -1255,13 +1260,23 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   <div className="flex items-center gap-2">
                     {/* Final-cert J4.1: an estimated 1RM in this list gets
                         the same "est." label the charts carry — the tile
-                        previously showed an estimate as a bare number. */}
+                        previously showed an estimate as a bare number.
+                        Pre-play D-UX-3: leading {' '} keeps the badge
+                        from concatenating onto the lift name as text. */}
                     {lift.isEstimate && (
-                      <span className="rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent-text">{t('common.estimatedShort')}</span>
+                      <span className="rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent-text">{' '}{t('common.estimatedShort')}</span>
                     )}
-                    <span className="font-bold text-text-primary tabular-nums font-mono text-sm">
-                      {displayWeight(lift.best1RMKg)}
-                    </span>
+                    {/* Pre-play D-UX-6: an untrained lift shows a short
+                        no-data line instead of a bare dash. */}
+                    {lift.best1RMKg != null && lift.best1RMKg > 0 ? (
+                      <span className="font-bold text-text-primary tabular-nums font-mono text-sm">
+                        {displayWeight(lift.best1RMKg)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-text-muted font-medium">
+                        {t('progress.noDataYet')}
+                      </span>
+                    )}
                     <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-accent transition-colors" />
                   </div>
                 </div>
@@ -1605,39 +1620,49 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 <div className="divide-y divide-border/60">
                   <div className="py-3 flex items-center justify-between text-xs">
                     <span className="text-text-secondary">{t('progress.bodyFat')}</span>
-                    <span className="font-bold text-text-primary font-mono tabular-nums text-sm">
-                      {latestMetrics.bodyFatPct !== undefined ? `${latestMetrics.bodyFatPct}%` : '—'}
-                    </span>
+                    {latestMetrics.bodyFatPct !== undefined ? (
+                      <span className="font-bold text-text-primary font-mono tabular-nums text-sm">
+                        {`${latestMetrics.bodyFatPct}%`}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-text-muted font-medium">{t('progress.noDataYet')}</span>
+                    )}
                   </div>
                   <div className="py-3 flex items-center justify-between text-xs">
                     <span className="text-text-secondary">{t('progress.chest')}</span>
-                    <span className="font-bold text-text-primary font-mono tabular-nums text-sm">
-                      {latestMetrics.chestIn !== undefined
-                        ? userUnit === 'lbs'
+                    {latestMetrics.chestIn !== undefined ? (
+                      <span className="font-bold text-text-primary font-mono tabular-nums text-sm">
+                        {userUnit === 'lbs'
                           ? `${latestMetrics.chestIn} in`
-                          : `${Math.round(latestMetrics.chestIn * 2.54)} cm`
-                        : '—'}
-                    </span>
+                          : `${Math.round(latestMetrics.chestIn * 2.54)} cm`}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-text-muted font-medium">{t('progress.noDataYet')}</span>
+                    )}
                   </div>
                   <div className="py-3 flex items-center justify-between text-xs">
                     <span className="text-text-secondary">{t('progress.waist')}</span>
-                    <span className="font-bold text-text-primary font-mono tabular-nums text-sm">
-                      {latestMetrics.waistIn !== undefined
-                        ? userUnit === 'lbs'
+                    {latestMetrics.waistIn !== undefined ? (
+                      <span className="font-bold text-text-primary font-mono tabular-nums text-sm">
+                        {userUnit === 'lbs'
                           ? `${latestMetrics.waistIn} in`
-                          : `${Math.round(latestMetrics.waistIn * 2.54)} cm`
-                        : '—'}
-                    </span>
+                          : `${Math.round(latestMetrics.waistIn * 2.54)} cm`}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-text-muted font-medium">{t('progress.noDataYet')}</span>
+                    )}
                   </div>
                   <div className="py-3 flex items-center justify-between text-xs">
                     <span className="text-text-secondary">{t('progress.hips')}</span>
-                    <span className="font-bold text-text-primary font-mono tabular-nums text-sm">
-                      {latestMetrics.hipsIn !== undefined
-                        ? userUnit === 'lbs'
+                    {latestMetrics.hipsIn !== undefined ? (
+                      <span className="font-bold text-text-primary font-mono tabular-nums text-sm">
+                        {userUnit === 'lbs'
                           ? `${latestMetrics.hipsIn} in`
-                          : `${Math.round(latestMetrics.hipsIn * 2.54)} cm`
-                        : '—'}
-                    </span>
+                          : `${Math.round(latestMetrics.hipsIn * 2.54)} cm`}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-text-muted font-medium">{t('progress.noDataYet')}</span>
+                    )}
                   </div>
                 </div>
               </div>

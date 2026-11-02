@@ -854,7 +854,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <span className="text-xs font-medium text-text-muted">{t('home.level')} {levelInfo.level} · {t(levelInfo.nameKey)}</span>
           <span className="mt-1.5 block">
             <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums leading-tight">
-              {levelInfo.total.toLocaleString()} XP
+              {`${levelInfo.total.toLocaleString()} XP`}
             </span>
             <span className="w-full h-1.5 rounded-full bg-border/60 overflow-hidden mt-2 block">
               <span

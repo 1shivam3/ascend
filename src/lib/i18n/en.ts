@@ -1487,6 +1487,7 @@ export const en = {
   'progress.last7Days': 'Last 7 Days',
   'progress.last4Weeks': 'Last 4 Weeks',
   'progress.noData': 'No data',
+  'progress.noDataYet': 'No data yet — log one to start the trend',
   'progress.baseline': 'Baseline',
   'progress.noLogsYet': 'No logs yet',
   'progress.current': 'Current',
