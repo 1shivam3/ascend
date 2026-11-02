@@ -1696,6 +1696,8 @@ export const en = {
   'bodyMetrics.savedMsg': 'Body metrics saved successfully!',
   'meals.addFoodHint': 'Tap "Add Food", select from Favorites above, or scan a barcode.',
   'meals.myVersionBadge': 'My version',
+  'meals.suggKcalDb': '{kcal} kcal / 100 g',
+  'meals.suggKcalCustom': '{kcal} kcal (your portion)',
   'meals.qtyHint': 'Enter quantity above to calculate macros automatically.',
   'meals.zeroNutritionHint': '“{name}” has no calories or macros yet — enter a quantity or fill in the values above, or remove it to save.',
   'meals.gheeOilHeading': 'GHEE/OIL IN THIS?',

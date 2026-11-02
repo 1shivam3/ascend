@@ -145,7 +145,7 @@ describe('Fix 3 — README and Terms tell the truth', () => {
   });
 
   it('legal version was bumped with the change', () => {
-    expect(LEGAL_VERSION).toBe('2.8');
+    expect(LEGAL_VERSION).toBe('2.9');
     expect(LEGAL_LAST_UPDATED).toBe('November 2, 2026');
   });
 });

@@ -356,7 +356,11 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
       detailI18n: painEscalationI18n ?? undefined,
     };
   } else if (scheduledDays.length > 0 && sessionsCompleted / scheduledDays.length < 0.75 && missedDays.length > 0) {
-    const day = missedDays[0];
+    // DayOfWeek values are lowercase ('monday'); weekday names are
+    // proper nouns in display text, so capitalize for the headline,
+    // the detail sentence, and both i18n params built from `day`.
+    const rawDay = missedDays[0];
+    const day = rawDay.charAt(0).toUpperCase() + rawDay.slice(1);
     focus = {
       kind: 'adherence',
       headline: `Protect your ${day} session`,

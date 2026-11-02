@@ -3017,7 +3017,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                         e.preventDefault();
                                         handleSelectSuggestion(i, sugg);
                                       }}
-                                      className="flex-1 text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-elevated hover:text-accent-text flex items-center justify-between font-medium"
+                                      className="flex-1 text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-elevated flex items-center justify-between font-medium"
                                     >
                                       <span className="flex items-center gap-2">
                                         {sugg.name}
@@ -3033,7 +3033,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                           </span>
                                         )}
                                       </span>
-                                      <ChevronRight className="w-3 h-3 text-text-muted" />
+                                      <span className="flex items-center gap-1.5 shrink-0">
+                                        <span className="text-2xs text-text-secondary font-medium">
+                                          {sugg.kind === 'custom' && sugg.customFood
+                                            ? t('meals.suggKcalCustom', { kcal: Math.round(sugg.customFood.calories) })
+                                            : t('meals.suggKcalDb', { kcal: Math.round(estimateMacros(sugg.name, 100, 'g').calories) })}
+                                        </span>
+                                        <ChevronRight className="w-3 h-3 text-text-muted" />
+                                      </span>
                                     </button>
                                     {sugg.kind === 'custom' && (
                                       <button

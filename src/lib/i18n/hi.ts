@@ -1700,6 +1700,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'bodyMetrics.savedMsg': 'शरीर के माप सेव हुए!',
   'meals.addFoodHint': '"खाना जोड़ें" दबाएं, ऊपर पसंदीदा से चुनें, या बारकोड स्कैन करें।',
   'meals.myVersionBadge': 'मेरा संस्करण',
+  'meals.suggKcalDb': '{kcal} kcal / 100 g',
+  'meals.suggKcalCustom': '{kcal} kcal (आपकी मात्रा)',
   'meals.qtyHint': 'मैक्रो अपने आप गिनने के लिए ऊपर मात्रा दर्ज करें।',
   'meals.zeroNutritionHint': '“{name}” में अभी कोई कैलोरी या मैक्रो नहीं है — मात्रा दर्ज करें या ऊपर मान भरें, या सेव करने के लिए इसे हटा दें।',
   'meals.gheeOilHeading': 'इसमें घी/तेल?',

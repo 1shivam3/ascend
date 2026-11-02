@@ -852,7 +852,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           aria-label={t('home.viewLevelDetails')}
           className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors pressable`}
         >
-          <span className="text-xs font-medium text-text-muted">{t('home.level')} {levelInfo.level} · {t(levelInfo.nameKey)}</span>
+          <span className="text-xs font-medium text-text-muted">{t('home.level')} {levelInfo.level}</span>
           <span className="mt-1.5 block">
             <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums leading-tight">
               {`${levelInfo.total.toLocaleString()} XP`}
