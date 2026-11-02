@@ -493,13 +493,16 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     const sessions = getExerciseHistorySessions(selectedExercise, workouts, userUnit, { exact: true }) || [];
     const prMatches = prs.filter((p) => exerciseNamesEqual(p.exercise, selectedExercise));
 
-    type Row = { date: string; bestWeight: number; bestReps: number; bestE1RM: number; source: 'session' | 'pr' };
+    type Row = { date: string; bestWeight: number; bestReps: number; bestE1RM: number; source: 'session' | 'pr'; sets: { weight: number; reps: number }[] };
     const rows: Row[] = sessions.map((s) => ({
       date: s.date,
       bestWeight: s.bestWeight,
       bestReps: s.bestReps,
       bestE1RM: s.bestE1RM,
       source: 'session' as const,
+      // Open-items J4.2: carry every set so the row can show the whole
+      // session compactly instead of implying the best set was it.
+      sets: s.sets.map((st) => ({ weight: typeof st.weight === 'number' ? st.weight : 0, reps: st.reps })),
     }));
     for (const p of prMatches) {
       const val = userUnit === 'lbs' ? p.weightLbs : p.weightKg;
@@ -512,6 +515,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
           bestReps: p.reps,
           bestE1RM: e1rm,
           source: 'pr' as const,
+          sets: [],
         });
       }
     }
@@ -531,6 +535,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
         bestWeight: s.bestWeight,
         bestReps: s.bestReps,
         bestE1RM: s.bestE1RM,
+        sets: s.sets,
         deltaStr,
         hasData: true,
       };
@@ -598,6 +603,13 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     if (sortedMetrics.length > 0) return sortedMetrics[0].weightKg;
     return profile?.bodyweightKg || null;
   }, [sortedMetrics, profile]);
+
+  // Open-items UX F-01b: every BodyMetricEntry is a real user log
+  // (weightKg is required on the type), so an empty metrics list means
+  // the displayed bodyweight is the seeded profile default — it must
+  // not be labelled "measured". Once a real body log exists, measured
+  // labelling returns automatically.
+  const weightIsMeasured = sortedMetrics.length > 0;
 
   // Bodyweight trend chart & real delta
   const bodyweightAnalytics = useMemo(() => {
@@ -973,6 +985,10 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   <div>
                     <div className="text-3xl font-black text-text-primary font-sans tabular-nums">
                       {bodyweightAnalytics.latestWeight ? `${bodyweightAnalytics.latestWeight} ${userUnit}` : '—'}
+                      {/* Open-items UX F-01b: an unmeasured (profile-default) weight carries the est. marker. */}
+                      {!weightIsMeasured && bodyweightAnalytics.latestWeight != null && (
+                        <span className="ml-2 align-middle rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent-text">{t('common.estimatedShort')}</span>
+                      )}
                     </div>
                   </div>
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#5E615A] dark:text-[#A5A096]">
@@ -1013,7 +1029,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     ))}
                   </div>
                   <div className="flex justify-between text-2xs text-text-muted font-mono pt-1">
-                    <span>{t('progress.legendMeasured')}</span>
+                    <span>{weightIsMeasured ? t('progress.legendMeasured') : t('progress.legendProfileDefault')}</span>
                     <span>{dataWindow(bodyweightAnalytics.dataPoints)}{dataWindow(bodyweightAnalytics.dataPoints) ? ` · ${bodyTimeRange}` : ''}</span>
                   </div>
                 </div>
@@ -1413,6 +1429,13 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                           <span className="font-bold text-text-primary font-mono block">
                             {userUnit === 'lbs' ? `${s.bestWeight} lbs` : `${s.bestWeight} kg`} × {s.bestReps} reps
                           </span>
+                          {/* Open-items J4.2: the best set is not the whole
+                              session — every set, compactly, underneath. */}
+                          {s.sets.length > 1 && (
+                            <span className="text-2xs text-text-muted font-mono block">
+                              {s.sets.map((set) => `${set.weight}×${set.reps}`).join(' · ')}
+                            </span>
+                          )}
                           <span className="text-2xs text-text-muted font-mono">
                             Est. 1RM: {userUnit === 'lbs' ? `${s.bestE1RM} lbs` : `${s.bestE1RM} kg`}
                           </span>
@@ -1477,6 +1500,10 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     </span>
                     <div className="text-3xl sm:text-4xl font-black text-text-primary font-sans tabular-nums mt-0.5">
                       {bodyweightAnalytics.latestWeight ? `${bodyweightAnalytics.latestWeight} ${userUnit}` : '—'}
+                      {/* Open-items UX F-01b: an unmeasured (profile-default) weight carries the est. marker. */}
+                      {!weightIsMeasured && bodyweightAnalytics.latestWeight != null && (
+                        <span className="ml-2 align-middle rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent-text">{t('common.estimatedShort')}</span>
+                      )}
                     </div>
                   </div>
                   <div className="text-right">
@@ -1555,7 +1582,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     ))}
                   </div>
                   <div className="flex justify-between text-2xs text-text-muted font-mono pt-1">
-                    <span>{t('progress.legendMeasured')}</span>
+                    <span>{weightIsMeasured ? t('progress.legendMeasured') : t('progress.legendProfileDefault')}</span>
                     <span>{minMaxLabel(bodyweightAnalytics.dataPoints, userUnit) ?? ''}</span>
                   </div>
                 </div>

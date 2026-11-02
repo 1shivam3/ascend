@@ -781,6 +781,14 @@ export default function Onboarding() {
           {currentMacroGoals && currentMacroGoals.maintenanceCalories ? (
             <div className="bg-bg-card border border-border rounded-2xl px-4 py-3 shadow-2xs space-y-1">
               <p className="text-sm font-bold">{t('onboarding.foodTargetTitle', { calories: currentMacroGoals.calories.toLocaleString() })}</p>
+              {/* Open-items UX F-01: the target is computed from seeded
+                  default body stats in the simplified flow (weight /
+                  height are never asked). That fact gets its own
+                  prominent line — not just the small-print estimate
+                  note inside the paragraph below. */}
+              <p className="text-xs font-semibold text-accent-text leading-relaxed">
+                {t('onboarding.foodTargetDefaultsNote', { weight, unit, height: heightCm })}
+              </p>
               <p className="text-xs text-text-primary/70 leading-relaxed">
                 {t('onboarding.foodTargetBurn', { maintenance: currentMacroGoals.maintenanceCalories.toLocaleString() })}
                 {typeof currentMacroGoals.calorieDelta === 'number' && currentMacroGoals.calorieDelta < 0
@@ -857,6 +865,10 @@ export default function Onboarding() {
         daysPerWeek={trainingProfile?.daysPerWeek ?? 4}
         diet={t(summaryDietKey)}
         injuries={trainingProfile?.injuriesOrLimitations ?? []}
+        // Open-items UX F-01: in the simplified flow, level / days /
+        // diet are seeded defaults (ONBOARDING_DEFAULTS), never asked —
+        // the summary must say so instead of restating them as choices.
+        defaulted={{ level: true, days: true, diet: true }}
         onContinue={completeOnboarding}
         onEdit={handleSummaryEdit}
       />

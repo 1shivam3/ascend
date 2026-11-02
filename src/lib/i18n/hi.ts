@@ -934,6 +934,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'workout.previousSessions': 'पिछले सत्र',
   'workout.viewMode': 'वर्कआउट व्यू',
   'workout.viewAuto': 'ऑटो',
+  'workout.viewIndependentHint': 'सिर्फ़ वर्कआउट स्क्रीन के लिए — Today की डेंसिटी बदलने से यह अब नहीं बदलता।',
   'workout.viewSimple': 'सिंपल',
   'workout.viewAdvanced': 'एडवांस्ड',
   'workout.lastPerformance': '{weight} {unit} × {reps} रेप्स',
@@ -3115,6 +3116,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'coachChat.subtitle':
     'अपने कोच से पूछें — हर जवाब सामान्य सलाह पर नहीं, बल्कि आपके अपने लॉग किए गए प्रशिक्षण पर आधारित होता है।',
   'coachChat.placeholder': 'अपनी ट्रेनिंग के बारे में पूछें…',
+  'coachChat.emptyState':
+    'अभी कोई संदेश नहीं है — अपने प्रशिक्षण के बारे में अपने कोच से कुछ भी पूछें, जवाब आपके अपने लॉग किए गए डेटा पर आधारित होगा।',
   'coachChat.send': 'भेजें',
   'coachChat.sending': 'सोच रहे हैं…',
   'coachChat.basedOn': 'आपके डेटा पर आधारित:',
@@ -3134,4 +3137,14 @@ export const hi: Partial<Record<StringKey, string>> = {
   'sw.updateAvailable': 'नया संस्करण उपलब्ध है',
   'sw.refresh': 'रीफ़्रेश करें',
   'sw.dismissUpdate': 'अपडेट सूचना बंद करें',
+  'onboarding.foodTargetDefaultsNote': 'डिफ़ॉल्ट शारीरिक आंकड़ों से अनुमानित ({weight} {unit} · {height} cm) — सटीक लक्ष्यों के लिए प्रोफ़ाइल में अपना असली वजन और ऊंचाई जोड़ें।',
+  'onboarding.summaryDefaultBadge': 'डिफ़ॉल्ट',
+  'onboarding.summaryDefaultsNote': 'लेवल, ट्रेनिंग दिन और डाइट शुरुआती डिफ़ॉल्ट हैं — इन्हें सेटिंग्स में कभी भी बदल सकते हैं।',
+  'progress.legendProfileDefault': 'प्रोफ़ाइल मान — अभी मापा नहीं गया',
+  'coach.segmentCheckin': 'चेक-इन',
+  'coach.segmentAsk': 'कोच से पूछें',
+  'coach.segmentAria': 'कोच सेक्शन',
+  'home.durationDoneExercises': '{min} मिनट में पूरा • {count} व्यायाम',
+  'home.durationDoneExercisesOne': '{min} मिनट में पूरा • {count} व्यायाम',
+  'home.durationDoneOnly': '{min} मिनट में पूरा',
 };

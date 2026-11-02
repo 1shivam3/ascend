@@ -682,12 +682,17 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               rest title is 'Rest & Recovery' (or the user's custom
               title), which /^rest day/i never matched, so genuine
               rest days rendered a fake '0 min · N exercises' line. */}
+          {/* Open-items J6: a completed session's real duration reads
+              as done-in time; the same number on an upcoming session
+              is the plan estimate (plain keys). */}
           {sessionInfo.isRestDay
             ? t('home.restDayLine')
             : exerciseCount !== null && durationMinutes !== null
-              ? t(exerciseCount === 1 ? 'home.durationExercisesOne' : 'home.durationExercises', { min: durationMinutes, count: exerciseCount })
+              ? sessionInfo.status === 'completed'
+                ? t(exerciseCount === 1 ? 'home.durationDoneExercisesOne' : 'home.durationDoneExercises', { min: durationMinutes, count: exerciseCount })
+                : t(exerciseCount === 1 ? 'home.durationExercisesOne' : 'home.durationExercises', { min: durationMinutes, count: exerciseCount })
               : durationMinutes !== null
-                ? t('home.durationOnly', { min: durationMinutes })
+                ? t(sessionInfo.status === 'completed' ? 'home.durationDoneOnly' : 'home.durationOnly', { min: durationMinutes })
                 : exerciseCount !== null
                   ? t(exerciseCount === 1 ? 'home.exercisesOnlyOne' : 'home.exercisesOnly', { count: exerciseCount })
                   : null}

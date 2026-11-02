@@ -1,14 +1,18 @@
 /**
  * UX redesign Stage 4 — workout view resolution.
  *
- * The perform surface's Beginner/Advanced split now follows the app
- * density by default (Simple -> Beginner, Detailed -> Advanced) unless
- * the user pinned an explicit workoutModeOverride (null = follow
- * density; an explicit override survives density switches).
+ * Open-items J5.1 DECOUPLED the workout view from Today density:
+ * uiPreferences.workoutModeOverride is now the persisted workout-view
+ * preference itself, and sanitizeUiPreferences materializes any
+ * legacy null ("Auto = follow density") to the mode density resolved
+ * at upgrade time. This resolver stays as the defensive read path:
+ * a concrete override wins; a null/invalid override (only possible
+ * in unsanitized legacy data) still falls back to the density rule,
+ * which is exactly the value sanitize would have materialized.
  *
- * This is a pure derivation: it never writes the store and never
- * touches the legacy userMode key (onboarding still writes that key;
- * it no longer drives the perform/display split, whose rendering was
+ * Pure derivation: it never writes the store and never touches the
+ * legacy userMode key (onboarding still writes that key; it no
+ * longer drives the perform/display split, whose rendering was
  * binary — `=== 'advanced'` vs everything else — so 'intermediate'
  * never rendered distinctly from 'beginner').
  */

@@ -43,17 +43,17 @@ export default function TermsPage() {
             TERMS OF SERVICE
           </h1>
         </div>
-        <p className="text-xs text-text-muted font-mono">
+        <p className="text-xs text-text-muted">
           Effective Date: {LEGAL_LAST_UPDATED} • Version {LEGAL_VERSION} • Global &amp; Play Store Agreement
         </p>
       </div>
 
       {/* Summary Box */}
-      <div className="p-4 rounded-xl bg-bg-secondary border border-border space-y-2 font-mono text-xs text-text-secondary">
-        <span className="text-2xs uppercase tracking-wider font-bold text-accent-text block">
+      <div className="p-4 rounded-xl bg-bg-secondary border border-border space-y-2 text-sm text-text-secondary">
+        <span className="text-xs uppercase tracking-wider font-bold text-accent-text block">
           Key Takeaways
         </span>
-        <ul className="space-y-1.5 text-2xs">
+        <ul className="space-y-1.5 text-sm">
           <li className="flex items-start gap-1.5">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
             <span>ASCEND is an analytical workout journal, NOT a doctor, physical therapist, or clinical dietitian.</span>
@@ -74,27 +74,27 @@ export default function TermsPage() {
       </div>
 
       {/* Terms Content */}
-      <div className="space-y-6 text-xs font-mono text-text-secondary leading-relaxed">
+      <div className="space-y-6 text-sm text-text-secondary leading-relaxed">
         {/* Section 1 */}
         <section className="space-y-2">
           <h2 className="text-sm font-bold text-text-primary">
             1. Acceptance of Terms &amp; Age Eligibility
           </h2>
-          <p className="text-2xs">
+          <p>
             By accessing or using the ASCEND application (&quot;ASCEND&quot;, &quot;Service&quot;, &quot;App&quot;), you confirm that you have read, understood, and agreed to be bound by these Terms of Service. If you do not agree, you must discontinue use immediately.
           </p>
-          <p className="text-2xs">
+          <p>
             You must be at least 13 years of age (or 16 years of age in jurisdictions subject to GDPR-K) to use this Service. If you are under 18, you may use ASCEND only with the active involvement and consent of a parent or legal guardian.
           </p>
         </section>
 
         {/* Section 2 */}
         <section className="space-y-2">
-          <h2 className="text-sm font-bold text-amber-400 flex items-center gap-1.5">
-            <AlertTriangle className="w-4 h-4 text-amber-400" />
+          <h2 className="text-sm font-bold text-amber-800 dark:text-amber-400 flex items-center gap-1.5">
+            <AlertTriangle className="w-4 h-4 text-amber-800 dark:text-amber-400" />
             2. Medical &amp; Physical Activity Assumption of Risk
           </h2>
-          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200/90 text-2xs space-y-2">
+          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/40 text-amber-900 dark:border-amber-500/20 dark:text-amber-200/90 text-sm space-y-2">
             <p>
               <strong>WARNING:</strong> Weightlifting, powerlifting, and maximal strength attempts (such as 1-Rep Max squats, bench presses, and deadlifts) involve intrinsic physical hazards, including musculoskeletal strains, tears, joint injuries, drops, and acute cardiovascular strain.
             </p>
@@ -113,10 +113,10 @@ export default function TermsPage() {
             <HardDrive className="w-4 h-4 text-accent" />
             3. Data Architecture, Backup &amp; Account Eradication
           </h2>
-          <p className="text-2xs">
+          <p>
             ASCEND operates on a local-first architecture. In Guest Mode, your personal records, body metrics, workouts, active drafts, and meals reside strictly within your device&apos;s browser memory (<code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">localStorage</code>). For athletes opting into Cloud Mode, records are synchronized with an encrypted Supabase database protected by Row Level Security.
           </p>
-          <p className="text-2xs">
+          <p>
             In Guest Mode, ASCEND cannot recover your data if you clear your browser history, reset your device, or delete web storage without a previously exported backup file. You are encouraged to download regular <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">.json</code> backups via the Data Vault or sign in for cloud sync. Users can delete their account and all associated cloud data at any time in Settings or via <Link href="/delete-account" className="text-accent underline">our deletion portal</Link>.
           </p>
         </section>
@@ -127,16 +127,16 @@ export default function TermsPage() {
             <Sparkles className="w-4 h-4 text-accent" />
             4. Generative Athletic Intelligence, Reporting &amp; Conduct
           </h2>
-          <p className="text-2xs">
+          <p>
             ASCEND provides optional generative athletic utilities (Autoregulated Coach, Macro Lens Photo Estimator, Natural Language Voice Logger) powered by commercial AI providers — Groq, OpenRouter, and Google Gemini — via a server-side fallback chain. Output generated by AI is synthetic and probabilistic. ASCEND does not warrant the clinical accuracy of nutrition estimates or the fitness suitability of training splits. ASCEND&apos;s fitness and nutrition guidance is general educational information, not medical advice; see Section 2 and our <Link href="/disclaimer" className="text-accent underline">Medical &amp; Safety Disclaimer</Link>.
           </p>
-          <p className="text-2xs">
+          <p>
             Users agree NOT to use AI features to generate abusive, offensive, defamatory, or harmful content, or to attempt prompt injection attacks against the service.
           </p>
-          <p className="text-2xs">
+          <p>
             <strong>Free-Tier Models &amp; Your Data:</strong> Some models in the AI fallback chain are free-tier services (served via OpenRouter). When a free-tier model handles your request, its provider may retain the text you submitted and use it to operate, improve, or train its models, under that provider&apos;s own terms and privacy policy. Commercial-tier providers in the chain do not train on API data, and meal photos are never sent to free-tier models. Do not enter sensitive personal information into AI features. See our <Link href="/privacy" className="text-accent underline">Privacy Policy</Link> for exactly what is sent.
           </p>
-          <p className="text-2xs">
+          <p>
             <strong>In-App Reporting:</strong> If you receive any objectionable, unsafe, or inappropriate AI output, you must report it using the integrated in-app flag button. Flagged content is immediately suppressed and logged for safety review in compliance with Google Play Store AI Policies.
           </p>
         </section>
@@ -146,7 +146,7 @@ export default function TermsPage() {
           <h2 className="text-sm font-bold text-text-primary">
             5. Intellectual Property &amp; Open Scientific Formulas
           </h2>
-          <p className="text-2xs">
+          <p>
             The ASCEND brand, user interface, software code, and styling are protected by copyright and intellectual property laws. Scientific formulas utilized within the app (including the Epley equation for 1RM estimation and the DOTS polynomial scoring formula for bodyweight normalization) remain open mathematical standards credited to their respective researchers and powerlifting federations.
           </p>
         </section>
@@ -156,7 +156,7 @@ export default function TermsPage() {
           <h2 className="text-sm font-bold text-text-primary">
             6. Disclaimer of Warranties (&quot;As-Is&quot;)
           </h2>
-          <p className="text-2xs">
+          <p>
             ASCEND IS PROVIDED ON AN &quot;AS-IS&quot; AND &quot;AS-AVAILABLE&quot; BASIS WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS OR IMPLIED, INCLUDING FITNESS FOR A PARTICULAR PURPOSE, ACCURACY OF FORMULAS, OR UNINTERRUPTED AVAILABILITY.
           </p>
         </section>
@@ -166,7 +166,7 @@ export default function TermsPage() {
           <h2 className="text-sm font-bold text-text-primary">
             7. Limitation of Liability
           </h2>
-          <p className="text-2xs">
+          <p>
             TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL ASCEND, ITS CREATORS, OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, PUNITIVE, OR CONSEQUENTIAL DAMAGES ARISING OUT OF YOUR USE OF THE APPLICATION, INCLUDING PHYSICAL INJURY, LOSS OF DATA, OR HARDWARE FAILURE.
           </p>
         </section>
@@ -176,8 +176,8 @@ export default function TermsPage() {
           <h2 className="text-sm font-bold text-text-primary">
             8. Contact &amp; Updates to Terms
           </h2>
-          <p className="text-2xs">
-            We reserve the right to modify these Terms of Service at any time. Continued use of the application following any modifications signifies your acceptance of the updated terms. For legal inquiries, contact <a href={`mailto:${SUPPORT_EMAIL}`} className="text-accent underline font-mono">{SUPPORT_EMAIL}</a>.
+          <p>
+            We reserve the right to modify these Terms of Service at any time. Continued use of the application following any modifications signifies your acceptance of the updated terms. For legal inquiries, contact <a href={`mailto:${SUPPORT_EMAIL}`} className="text-accent underline">{SUPPORT_EMAIL}</a>.
           </p>
         </section>
       </div>
@@ -186,13 +186,13 @@ export default function TermsPage() {
       <div className="pt-4 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
         <Link
           href="/privacy"
-          className="text-2xs font-mono text-accent-text hover:underline"
+          className="text-sm text-accent-text hover:underline"
         >
           View Privacy Policy &rarr;
         </Link>
         <Link
           href="/"
-          className="btn-primary inline-flex items-center justify-center gap-2 py-2 px-5 text-xs font-bold font-mono"
+          className="btn-primary inline-flex items-center justify-center gap-2 py-2 px-5 text-xs font-bold"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Back to Dashboard</span>

@@ -19,6 +19,14 @@ export interface SummaryScreenProps {
   daysPerWeek: number;
   diet: string;
   injuries: string[];
+  /**
+   * Open-items UX F-01: rows whose values came from seeded defaults
+   * rather than a user answer (in the simplified flow: level, days,
+   * diet — none of them is asked upfront). Defaulted rows carry a
+   * visible "default" badge and the card gains a footnote, so the
+   * summary never presents a default as a choice the user made.
+   */
+  defaulted?: { level?: boolean; days?: boolean; diet?: boolean };
   onContinue: () => void;
   onEdit: () => void;
 }
@@ -29,21 +37,23 @@ export default function SummaryScreen({
   daysPerWeek,
   diet,
   injuries,
+  defaulted,
   onContinue,
   onEdit,
 }: SummaryScreenProps) {
   const { t } = useTranslation();
 
-  const rows: { label: string; value: string }[] = [
+  const rows: { label: string; value: string; defaulted?: boolean }[] = [
     { label: t('onboarding.summaryGoal'), value: goal },
-    { label: t('onboarding.summaryLevel'), value: level },
-    { label: t('onboarding.summaryDays'), value: t('onboarding.summaryDaysValue', { days: daysPerWeek }) },
-    { label: t('onboarding.summaryDiet'), value: diet },
+    { label: t('onboarding.summaryLevel'), value: level, defaulted: defaulted?.level },
+    { label: t('onboarding.summaryDays'), value: t('onboarding.summaryDaysValue', { days: daysPerWeek }), defaulted: defaulted?.days },
+    { label: t('onboarding.summaryDiet'), value: diet, defaulted: defaulted?.diet },
     {
       label: t('onboarding.summaryInjuries'),
       value: injuries.length > 0 ? injuries.join(', ') : t('onboarding.summaryNoInjuries'),
     },
   ];
+  const anyDefaulted = rows.some((r) => r.defaulted);
 
   return (
     <div className="min-h-screen w-full bg-bg-primary text-text-primary flex flex-col justify-between pb-8 animate-fade-in">
@@ -58,10 +68,22 @@ export default function SummaryScreen({
               <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted shrink-0">
                 {row.label}
               </span>
-              <span className="text-sm font-bold text-right">{row.value}</span>
+              <span className="text-sm font-bold text-right">
+                {row.value}
+                {row.defaulted && (
+                  <span className="ml-2 align-middle px-1.5 py-0.5 rounded-md bg-bg-secondary border border-border text-2xs font-bold uppercase tracking-wide text-text-muted">
+                    {t('onboarding.summaryDefaultBadge')}
+                  </span>
+                )}
+              </span>
             </div>
           ))}
         </div>
+        {anyDefaulted && (
+          <p className="text-xs text-text-muted leading-relaxed px-1">
+            {t('onboarding.summaryDefaultsNote')}
+          </p>
+        )}
         <div className="space-y-3">
           <button
             type="button"

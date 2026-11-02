@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { tabListKeyDown } from '@/lib/tab-keyboard';
 import { useStore } from '@/lib/store';
+import { resolveDefaultCoachSegment } from '@/lib/coach-session';
 import { useTranslation } from '@/lib/i18n';
 import { validatePlanExercises } from '@/lib/plan-validation';
 import { useToday } from '@/lib/use-today';
@@ -952,6 +953,25 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   useEffect(() => {
     setLastTrainSubTab(trainSubTab);
   }, [trainSubTab, setLastTrainSubTab]);
+
+  // Open-items UX F-03: the Coach tab shows ONE segment at a time —
+  // the guided check-in OR the free-form coach chat (they previously
+  // stacked into one long scroll of two chat surfaces). The default
+  // resolves when the Coach tab is entered: check-in while today's
+  // check-in is unanswered, otherwise Ask (initializer covers a
+  // restored Coach tab; enterTrainSubTab re-resolves on each entry).
+  // Switching segments loses nothing — the check-in re-seeds from
+  // today's persisted record and the chat lives in its own persisted
+  // store.
+  const [coachSegment, setCoachSegment] = useState<'checkin' | 'ask'>(() =>
+    resolveDefaultCoachSegment(useStore.getState().dailyCheckins, getLocalTodayStr()),
+  );
+  const enterTrainSubTab = (tab: 'plans' | 'coach' | 'history') => {
+    setTrainSubTab(tab);
+    if (tab === 'coach') {
+      setCoachSegment(resolveDefaultCoachSegment(useStore.getState().dailyCheckins, getLocalTodayStr()));
+    }
+  };
 
   // ── Progressive Disclosure UI States ──────────────────────────────────────
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
@@ -2157,12 +2177,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       </header>
 
       {/* ── Segmented Control: Plans + Coach + History ── */}
-      <div role="tablist" aria-label="Train navigation" className="segmented-control" onKeyDown={tabListKeyDown((i) => setTrainSubTab((['plans', 'coach', 'history'] as const)[i]))}>
+      <div role="tablist" aria-label="Train navigation" className="segmented-control" onKeyDown={tabListKeyDown((i) => enterTrainSubTab((['plans', 'coach', 'history'] as const)[i]))}>
         <button
           type="button"
           role="tab"
           aria-selected={trainSubTab === 'plans'}
-          onClick={() => setTrainSubTab('plans')}
+          onClick={() => enterTrainSubTab('plans')}
           className={`segmented-item ${trainSubTab === 'plans' ? 'active' : ''}`}
         >
           {t('train.plans')} {plannedWorkouts.length > 0 && `(${plannedWorkouts.length})`}
@@ -2171,7 +2191,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           type="button"
           role="tab"
           aria-selected={trainSubTab === 'coach'}
-          onClick={() => setTrainSubTab('coach')}
+          onClick={() => enterTrainSubTab('coach')}
           className={`segmented-item ${trainSubTab === 'coach' ? 'active' : ''}`}
         >
           {t('train.coach')}
@@ -2180,7 +2200,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           type="button"
           role="tab"
           aria-selected={trainSubTab === 'history'}
-          onClick={() => setTrainSubTab('history')}
+          onClick={() => enterTrainSubTab('history')}
           className={`segmented-item ${trainSubTab === 'history' ? 'active' : ''}`}
         >
           {t('train.history')}
@@ -2225,6 +2245,55 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             </button>
           </div>
         </div>
+      )}
+
+      {/* ── Contextual Rest Timer (Visible when timer is active) ── */}
+      {/* Open-items J2.5: hoisted above Your Plans — while a session
+          is active (the only time this renders), the live-session
+          UI comes before the plans list. It renders nothing when no
+          timer runs, so the no-session layout is unchanged. */}
+      {isRestRunning && (
+        <section className="px-3.5 py-2.5 rounded-xl bg-bg-card border border-border flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Timer className="w-4 h-4 text-accent shrink-0" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-sm font-bold text-text-primary font-mono">
+                {isTimerFinished ? (
+                  <span className="text-emerald-500">READY</span>
+                ) : (
+                  formatTimer(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)
+                )}
+              </span>
+              <span className="text-2xs text-text-muted hidden sm:inline">Rest Timer</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {[60, 90, 120, 180, 300].map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => startTimer(s)}
+                className={`px-2 py-1 rounded-lg text-2xs font-semibold border transition-all ${
+                  restTotalSeconds === s && restSecondsLeft > 0
+                    ? 'bg-accent text-accent-on border-accent'
+                    : 'bg-bg-secondary border-border text-text-muted hover:text-text-primary'
+                }`}
+              >
+                {s >= 60 ? `${s / 60}m` : `${s}s`}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={togglePauseTimer}
+              className="p-1.5 rounded-lg bg-accent text-accent-on hover:brightness-105 active:scale-95 transition-all"
+              title={isRestRunning ? 'Pause' : 'Start'}
+              aria-label={isRestRunning ? 'Pause' : 'Start'}
+            >
+              {isRestRunning ? <Pause className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white" />}
+            </button>
+          </div>
+        </section>
       )}
 
       {/* Weekly review row (PR-C) — block management now lives in the Coach tab */}
@@ -2437,51 +2506,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           )}
         </div>
       </section>
-
-      {/* ── Contextual Rest Timer (Visible when timer is active) ── */}
-      {isRestRunning && (
-        <section className="px-3.5 py-2.5 rounded-xl bg-bg-card border border-border flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <Timer className="w-4 h-4 text-accent shrink-0" />
-            <div className="flex items-baseline gap-2">
-              <span className="text-sm font-bold text-text-primary font-mono">
-                {isTimerFinished ? (
-                  <span className="text-emerald-500">READY</span>
-                ) : (
-                  formatTimer(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)
-                )}
-              </span>
-              <span className="text-2xs text-text-muted hidden sm:inline">Rest Timer</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {[60, 90, 120, 180, 300].map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => startTimer(s)}
-                className={`px-2 py-1 rounded-lg text-2xs font-semibold border transition-all ${
-                  restTotalSeconds === s && restSecondsLeft > 0
-                    ? 'bg-accent text-accent-on border-accent'
-                    : 'bg-bg-secondary border-border text-text-muted hover:text-text-primary'
-                }`}
-              >
-                {s >= 60 ? `${s / 60}m` : `${s}s`}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={togglePauseTimer}
-              className="p-1.5 rounded-lg bg-accent text-accent-on hover:brightness-105 active:scale-95 transition-all"
-              title={isRestRunning ? 'Pause' : 'Start'}
-              aria-label={isRestRunning ? 'Pause' : 'Start'}
-            >
-              {isRestRunning ? <Pause className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white" />}
-            </button>
-          </div>
-        </section>
-      )}
 
       {/* ── Schedule Status Footer (Reference: Screen 10 Schedule Context) ── */}
       <section className="card p-4 bg-bg-card border border-border/80 space-y-3">
@@ -2896,21 +2920,53 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         </div>
       )}
 
-      {/* ── TAB: COACH (simple coach chat — designs today's session from
-          the check-in; readiness comes from the existing coach engine) ── */}
+      {/* ── TAB: COACH (segmented since open-items UX F-03: guided
+          check-in / free-form coach chat, one segment at a time;
+          readiness comes from the existing coach engine) ── */}
       {trainSubTab === 'coach' && (
         <div className="space-y-4">
-          <CoachChatTab
-            onStartPlan={handleStartPlan}
-            onBuildBlock={() => { setCoachBlockAtReview(false); setIsCoachBlockOpen(true); }}
-            onReviewBlock={() => { setCoachBlockAtReview(true); setIsCoachBlockOpen(true); }}
-            onOpenWeeklyReview={() => setIsReviewOpen(true)}
-            onOpenDebrief={() => setIsDebriefOpen(true)}
+          <SegmentedControl
+            ariaLabel={t('coach.segmentAria')}
+            value={coachSegment}
+            onChange={(value) => setCoachSegment(value as 'checkin' | 'ask')}
+            options={[
+              { value: 'checkin', label: t('coach.segmentCheckin') },
+              { value: 'ask', label: t('coach.segmentAsk') },
+            ]}
           />
-          {/* Conversational coach chat — an inline section below the
-              guided check-in (not a drawer; the removed drawer stays
-              removed). Answers are grounded in the user's own data. */}
-          <CoachChatSection />
+          {/* Both segments stay MOUNTED; the inactive one is hidden.
+              The original F-03 ternary UNMOUNTED the inactive panel,
+              which discarded the check-in's in-progress state: the
+              unsent note draft and the current question step live in
+              CoachChatTab useState, while chip answers survived only
+              because they persist immediately (spot-check regression,
+              2026-11-01). Tailwind `hidden` (display:none) also drops
+              the panel from the tab order and accessibility tree;
+              aria-hidden states it explicitly. Safe for the chat:
+              CoachChatSection sends ONLY from its Enter/Send handlers
+              (no mount effect), so a hidden mounted panel issues no
+              coach-chat requests. */}
+          <div
+            className={coachSegment === 'checkin' ? undefined : 'hidden'}
+            aria-hidden={coachSegment !== 'checkin'}
+          >
+            <CoachChatTab
+              onStartPlan={handleStartPlan}
+              onBuildBlock={() => { setCoachBlockAtReview(false); setIsCoachBlockOpen(true); }}
+              onReviewBlock={() => { setCoachBlockAtReview(true); setIsCoachBlockOpen(true); }}
+              onOpenWeeklyReview={() => setIsReviewOpen(true)}
+              onOpenDebrief={() => setIsDebriefOpen(true)}
+            />
+          </div>
+          {/* Conversational coach chat (not a drawer; the removed
+              drawer stays removed). Answers are grounded in the
+              user's own data; history persists in coachChatStore. */}
+          <div
+            className={coachSegment === 'ask' ? undefined : 'hidden'}
+            aria-hidden={coachSegment !== 'ask'}
+          >
+            <CoachChatSection />
+          </div>
         </div>
       )}
 
@@ -3396,24 +3452,24 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               </button>
             </div>
 
-            {/* Workout view — follows app density unless overridden (Stage 4) */}
+            {/* Workout view — its own persisted preference since
+                open-items J5.1 (was: follows app density unless
+                overridden; the Auto option is gone) */}
             <div className="pt-3 border-t border-border/80 space-y-2">
               <div>
                 <span className="text-xs font-bold text-text-primary block">{t('workout.viewMode')}</span>
                 <span className="text-2xs text-text-muted">
                   {workoutMode === 'advanced' ? t('tools.viewAdvanced') : t('tools.viewSimple')}
-                  {workoutModeOverride ? '' : ` · ${t('workout.viewAuto')}`}
                 </span>
               </div>
               <SegmentedControl
                 ariaLabel={t('workout.viewMode')}
-                value={workoutModeOverride ?? 'auto'}
+                value={workoutMode}
                 options={[
-                  { value: 'auto', label: t('workout.viewAuto') },
                   { value: 'beginner', label: t('workout.viewSimple') },
                   { value: 'advanced', label: t('workout.viewAdvanced') },
                 ]}
-                onChange={(v) => setUiPreferences({ workoutModeOverride: v === 'auto' ? null : v })}
+                onChange={(v) => setUiPreferences({ workoutModeOverride: v })}
               />
             </div>
           </div>

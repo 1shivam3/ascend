@@ -10,7 +10,9 @@ describe('UX redesign personalization prefs', () => {
     expect(DEFAULT_UI_PREFERENCES.density).toBe('simple');
     expect(DEFAULT_UI_PREFERENCES.accentTheme).toBe('vermilion');
     expect(DEFAULT_UI_PREFERENCES.customAccentHex).toBeNull();
-    expect(DEFAULT_UI_PREFERENCES.workoutModeOverride).toBeNull();
+    // Open-items J5.1: the workout view is its own preference now —
+    // the fresh-store default is the concrete Simple-density mode.
+    expect(DEFAULT_UI_PREFERENCES.workoutModeOverride).toBe('beginner');
     expect(DEFAULT_UI_PREFERENCES.pinnedProgressChart).toBeNull();
   });
   it('simple-for-everyone (v3): pre-redesign blobs migrate existing accounts to Simple', () => {
@@ -51,7 +53,11 @@ describe('UX redesign personalization prefs', () => {
     ) as any;
     expect(out.accentTheme).toBe('vermilion');
     expect(out.customAccentHex).toBeNull();
-    expect(out.workoutModeOverride).toBeNull();
+    // Open-items J5.1: an invalid override no longer repairs to null
+    // ("follow density") — it materializes to the mode the sanitized
+    // density resolves (no density stored + no user data → simple →
+    // beginner). Explicit valid choices are honored untouched.
+    expect(out.workoutModeOverride).toBe('beginner');
     expect(out.pinnedProgressChart).toBeNull();
     expect(out.todayLayout.order).toContain('coach');
     expect(out.todayLayout.visible).toEqual({});

@@ -80,7 +80,7 @@ function SettingsToggle({ on, onToggle, label }: { on: boolean; onToggle: () => 
       aria-checked={on}
       aria-label={label}
       onClick={onToggle}
-      className={`w-11 h-6 rounded-full transition-colors shrink-0 cursor-pointer relative ${on ? 'bg-accent' : 'bg-border'}`}
+      className={`tap-44 w-11 h-6 rounded-full transition-colors shrink-0 cursor-pointer relative ${on ? 'bg-accent' : 'bg-border'}`}
     >
       <span
         className={`block w-5 h-5 rounded-full bg-white shadow absolute top-0.5 transition-all ${on ? 'left-[22px]' : 'left-0.5'}`}
@@ -613,7 +613,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             key={chip.labelKey}
             type="button"
             onClick={() => scrollToSection(chip.ref)}
-            className="shrink-0 px-3 py-1.5 rounded-full bg-bg-secondary border border-border text-2xs font-bold text-text-secondary hover:text-accent-text hover:border-accent/40 transition-colors cursor-pointer"
+            className="shrink-0 px-3 py-1.5 min-h-[44px] inline-flex items-center rounded-full bg-bg-secondary border border-border text-2xs font-bold text-text-secondary hover:text-accent-text hover:border-accent/40 transition-colors cursor-pointer"
           >
             {t(chip.labelKey)}
           </button>
@@ -932,7 +932,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                   if (profile) setProfile({ ...profile, unit: 'lbs' });
                   toast.info(t('settings.unitsImperialMsg'), t('settings.unitsUpdatedTitle'));
                 }}
-                className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`py-1.5 min-h-[44px] rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   profile?.unit === 'lbs'
                     ? 'bg-bg-card text-text-primary shadow-xs border border-border'
                     : 'text-text-muted hover:text-text-primary'
@@ -946,7 +946,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                   if (profile) setProfile({ ...profile, unit: 'kg' });
                   toast.info(t('settings.unitsMetricMsg'), t('settings.unitsUpdatedTitle'));
                 }}
-                className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`py-1.5 min-h-[44px] rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   profile?.unit === 'kg'
                     ? 'bg-bg-card text-text-primary shadow-xs border border-border'
                     : 'text-text-muted hover:text-text-primary'
@@ -973,46 +973,42 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             <DietPreferencePicker />
           </div>
 
-          {/* Workout view mode — density-following, NOT the athlete's
-              experience level (live-fix L3: this row used to be labeled
-              "Athlete Experience", so a Simple→Detailed switch that moved
-              the view to Advanced read as the user's level flipping).
-              Micro-fix L3 (round 2): the flip itself is DESIGNED (Auto =
-              follows density), but nothing said so — the hint below
-              states the current Auto mapping from existing keys only,
-              so a density switch that moves the value is legible. */}
+          {/* Workout view mode — NOT the athlete's experience level
+              (live-fix L3: this row used to be labeled "Athlete
+              Experience"). Open-items J5.1: the view is its own
+              persisted preference, DECOUPLED from Today density —
+              the old Auto option is gone; a legacy Auto materialized
+              to the then-current mode at upgrade (sanitize), so the
+              control now always shows a concrete value. */}
           <div className="space-y-2 pt-2 border-t border-border/60">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-text-secondary font-sans">{t('workout.viewMode')}</span>
-              <span className="text-2xs font-mono text-text-muted capitalize">{modeLabel(workoutMode)}{uiPreferences.workoutModeOverride ? '' : ` · ${t('workout.viewAuto')}`}</span>
+              <span className="text-2xs font-mono text-text-muted capitalize">{modeLabel(workoutMode)}</span>
             </div>
-            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-bg-secondary border border-border">
-              {(['auto', 'beginner', 'advanced'] as const).map((m) => (
+            <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-bg-secondary border border-border">
+              {(['beginner', 'advanced'] as const).map((m) => (
                 <button
                   key={m}
                   type="button"
                   onClick={() => {
-                    setUiPreferences({ workoutModeOverride: m === 'auto' ? null : m });
+                    setUiPreferences({ workoutModeOverride: m });
                     // Toast names the control it came from (workout view),
                     // not "experience mode" — same L3 mislabel, same fix.
-                    // Built from existing keys only, no new strings.
-                    toast.info(`${t('workout.viewMode')}: ${m === 'auto' ? t('workout.viewAuto') : modeLabel(m)}`, t('settings.modeUpdatedTitle'));
+                    toast.info(`${t('workout.viewMode')}: ${modeLabel(m)}`, t('settings.modeUpdatedTitle'));
                   }}
-                  className={`py-1.5 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer ${
-                    (uiPreferences.workoutModeOverride ?? 'auto') === m
+                  className={`py-1.5 min-h-[44px] rounded-lg text-xs font-bold capitalize transition-all cursor-pointer ${
+                    workoutMode === m
                       ? 'bg-bg-card text-text-primary shadow-xs border border-border'
                       : 'text-text-muted hover:text-text-primary'
                   }`}
                 >
-                  {m === 'auto' ? t('workout.viewAuto') : modeLabel(m)}
+                  {modeLabel(m)}
                 </button>
               ))}
             </div>
-            {!uiPreferences.workoutModeOverride && (
-              <p className="text-2xs text-text-muted">
-                {t('workout.viewAuto')}: {uiPreferences.density === 'detailed' ? t('settings.densityDetailed') : t('settings.densitySimple')} → {modeLabel(workoutMode)}
-              </p>
-            )}
+            <p className="text-2xs text-text-muted">
+              {t('workout.viewIndependentHint')}
+            </p>
           </div>
 
           {/* Notifications — the single home for reminder settings.

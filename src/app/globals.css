@@ -246,6 +246,23 @@
     transform: translate(-50%, -50%);
   }
 
+  /* Open-items UX F-05: same hit-area expansion as .tap-40, at the
+     full 44px floor — for controls whose visual size must stay small
+     but which are primary targets (e.g. the Settings switch track,
+     44×24px visual). Same ≥12px neighbour-gap rule as .tap-40. */
+  .tap-44 {
+    position: relative;
+  }
+  .tap-44::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+
   .btn-danger {
     @apply bg-danger/10 text-danger font-medium px-3 py-2 rounded-xl text-sm;
     @apply border border-danger/20;
@@ -389,7 +406,7 @@
   }
 
   .segmented-item {
-    @apply flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center cursor-pointer select-none active:scale-[0.97];
+    @apply flex-1 py-2 px-3 min-h-[44px] rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center cursor-pointer select-none active:scale-[0.97];
   }
 
   .segmented-item.active {

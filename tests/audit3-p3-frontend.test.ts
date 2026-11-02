@@ -134,7 +134,13 @@ describe('audit3 FE-12/21/22/08/10: Home + Settings wiring', () => {
   it('FE-08: the fabricated 6-exercise fallback is gone', () => {
     const s = src('components/HomePage.tsx');
     expect(s).not.toContain('exerciseCount * 8');
-    expect(s).toContain("t('home.durationOnly'");
+    // Open-items J6: durationOnly is now one arm of a completed-vs-
+    // estimate key choice (completed sessions read "Done in …"), so
+    // the pin matches the key reference rather than the call form.
+    // FE-08's intent stands: the duration line is the estimate/done
+    // key family, never a fabricated per-exercise multiplication.
+    expect(s).toContain("'home.durationOnly'");
+    expect(s).toContain("'home.durationDoneOnly'");
   });
   it('FE-10: consistency displays are capped', () => {
     const s = src('components/ProgressPage.tsx');

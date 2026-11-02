@@ -68,6 +68,22 @@ const nextConfig = {
             // scan (no dangerouslySetInnerHTML/eval anywhere in src)
             // and the violation reporting wired below.
             "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms https://*.clarity.ms https://js.sentry-cdn.com",
+            // OPEN-ITEMS SEC F-06 (2026-11-01): the nonce/hash routes
+            // were re-attempted for this batch and remain impossible
+            // for the same reason — the prerendered pages carry 4–6
+            // inline flight-data scripts whose bytes are page-specific
+            // JSON (no stable hash) and which never receive a nonce
+            // (0/8 in the SEC-16 live test). What CAN be tightened
+            // safely was: object-src 'none' (no plugin content is ever
+            // legitimate here) and script-src-attr 'none' (the whole
+            // production build contains zero inline on* handler
+            // attributes; React never emits them). script-src
+            // 'unsafe-inline' therefore stays, still compensated by
+            // the SEC-17 sink scan + violation reporting below.
+            // style-src 'unsafe-inline' also stays: React style props
+            // render as style attributes at runtime across the app.
+            "script-src-attr 'none'",
+            "object-src 'none'",
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: blob: https://*.supabase.co https://images.openfoodfacts.org https://*.openfoodfacts.org https://lh3.googleusercontent.com https://*.google-analytics.com https://*.googletagmanager.com https://*.clarity.ms",
             "font-src 'self' data:",
