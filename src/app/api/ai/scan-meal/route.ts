@@ -320,7 +320,7 @@ Return ONLY valid, parseable JSON matching this schema with NO markdown ticks or
     } catch (visionErr: any) {
       console.warn('Multi-provider vision failed, falling back to offline nutrition database:', redactSecrets(visionErr?.message || String(visionErr)));
       resultJson = generateOfflineMealEstimate(userNotes, hiddenIngredients);
-      resultJson.coachingNote = 'AI vision providers were unavailable or rate-limited. Estimated using ASCEND calibrated food database.';
+      resultJson.coachingNote = 'AI vision providers were unavailable or rate-limited. Estimated using the ASCEND food database.';
     }
 
     if (!resultJson) {
