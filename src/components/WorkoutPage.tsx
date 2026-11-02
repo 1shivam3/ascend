@@ -170,6 +170,14 @@ function PlanModal({
   const prs = useStore((state) => state.prs);
   const workouts = useStore((state) => state.workouts);
   const trainingProfile = useStore((state) => state.trainingProfile);
+  // Programs entry (create mode): Couch to 5K discovery lives in the
+  // New Plan flow now — Train renders the Running section enrolled-only.
+  const runProgram = useStore((state) => state.runProgram);
+  const enrollRunProgram = useStore((state) => state.enrollRunProgram);
+  const runProgress = useMemo(
+    () => getRunProgramProgress(workouts, runProgram),
+    [workouts, runProgram],
+  );
   const [planName, setPlanName] = useState('');
   const [planExercises, setPlanExercises] = useState<PlannedExercise[]>([emptyPlanExercise(userUnit, defaultTargetReps)]);
   const [intensityMode, setIntensityMode] = useState<'rpe' | 'percent'>('rpe');
@@ -258,6 +266,11 @@ function PlanModal({
     onClose();
   };
 
+  const handleStartRunProgram = () => {
+    enrollRunProgram(getLocalTodayStr());
+    onClose();
+  };
+
   const isValid = planName.trim().length > 0 && planExercises.some(e => e.name.trim());
 
   if (!isOpen) return null;
@@ -302,6 +315,43 @@ function PlanModal({
               </div>
             );
           })()}
+          {/* Programs (create mode only): structured programs a user can
+              start instead of building a plan. Train renders the Running
+              section enrolled-only, so this is the discovery + start
+              surface for Couch to 5K. Already-enrolled users get a status
+              row with NO enroll action — Train owns progress/leave. */}
+          {!initial && (
+            <div className="border border-border rounded-xl p-3.5 bg-bg-elevated/40 space-y-2.5">
+              <div className="flex items-center gap-2">
+                <Footprints className="w-4 h-4 text-accent" />
+                <span className="text-xs font-semibold text-text-primary uppercase tracking-wide">
+                  {t('plan.programsTitle')}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-text-primary">{t('run.programName')}</p>
+                  <p className="text-2xs text-text-muted mt-0.5 leading-relaxed">
+                    {runProgram
+                      ? runProgress.complete
+                        ? t('run.programComplete')
+                        : `${t('run.weekOf', { week: runProgress.currentWeek })} · ${t('run.sessionsDone', { done: runProgress.completedCount, total: runProgress.totalCount })}`
+                      : t('run.programDesc')}
+                  </p>
+                </div>
+                {!runProgram && (
+                  <button
+                    type="button"
+                    onClick={handleStartRunProgram}
+                    className="btn-primary py-2 px-4 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-white" />
+                    <span>{t('run.startProgram')}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           {/* Plan Name */}
           <div>
             <label htmlFor="plan-builder-name" className="section-title mb-2 block">Plan Name</label>
@@ -789,7 +839,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     [workouts, runProgram],
   );
   const [activeRunSession, setActiveRunSession] = useState<RunSession | null>(null);
-  const [isRunIntroOpen, setIsRunIntroOpen] = useState(false);
   const toast = useToast();
   const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
 
@@ -2403,43 +2452,17 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         )}
       </section>
 
-      {/* ── Running (opt-in Couch to 5K program) ── */}
+      {/* ── Running (Couch to 5K) — ENROLLED ONLY. Non-enrolled users
+          discover + start the program from the New Plan flow (PlanModal
+          Programs entry); Train lists only what the user actually has. ── */}
+      {runProgram && (
       <section className="space-y-2.5" aria-label={t('run.title')}>
         <div className="flex items-center gap-2">
           <Footprints className="w-4 h-4 text-accent" />
           <h2 className="section-title text-[0.6875rem] mb-0">{t('run.title').toUpperCase()}</h2>
         </div>
         <div className="card p-4 sm:p-5 space-y-3">
-          {!runProgram ? (
-            <>
-              {/* Non-enrolled: one row until tapped — the full intro and
-                  enroll button live behind it, so nothing is lost. */}
-              <button
-                type="button"
-                onClick={() => setIsRunIntroOpen((o) => !o)}
-                aria-expanded={isRunIntroOpen}
-                className="w-full flex items-center justify-between gap-3 text-left cursor-pointer"
-              >
-                <span className="text-sm font-bold text-text-primary">{t('run.programName')}</span>
-                <ChevronDown className={`w-4 h-4 text-text-muted shrink-0 transition-transform ${isRunIntroOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
-              </button>
-              {isRunIntroOpen && (
-                <>
-                  <div>
-                    <p className="text-2xs text-text-muted mt-0.5 leading-relaxed">{t('run.programDesc')}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => enrollRunProgram(getLocalTodayStr())}
-                    className="btn-primary py-2 px-4 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-white" />
-                    <span>{t('run.startProgram')}</span>
-                  </button>
-                </>
-              )}
-            </>
-          ) : runProgress.complete ? (
+          {runProgress.complete ? (
             <>
               <div className="flex items-center gap-2.5">
                 <span className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0">
@@ -2517,6 +2540,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           )}
         </div>
       </section>
+      )}
 
       {/* ── Schedule Status Footer (Reference: Screen 10 Schedule Context) ── */}
       <section className="card p-4 bg-bg-card border border-border/80 space-y-3">

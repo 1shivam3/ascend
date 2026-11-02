@@ -315,6 +315,7 @@ export const en = {
   'plan.intensityPercentHint': 'Turn this on and ASCEND suggests a weight for your main lifts, based on the heaviest weight you could lift just once: about 80% of that for your hardest set, then about 70% for the easier sets after it. Prefer going by feel? You can always judge each set by how hard it felt instead.',
   'plan.intensityNoData': 'Log a heavy set or a PR for a main lift to enable % suggestions.',
   'plan.suggestedFrom1rm': '≈ {weight} {unit} top set · {pct}% of {e1rm} {unit} est. 1RM',
+  'plan.programsTitle': 'Programs',
 
   // ── Run program (Couch to 5K) ────────────────────────────────────────
   'run.title': 'Running',
