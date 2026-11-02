@@ -3,6 +3,7 @@ import { AITrainingProfile, isSetCompleted } from './types';
 import { toLocalDateString, calculateHydrationTarget, getCreatineStats } from './habits';
 import { getVolumeComparison, getConsecutiveWorkoutDays, getDaysSinceLastWorkout } from './ai-coach';
 import { isBodyweightExercise } from './strength-standards';
+import { DEFAULT_BODYWEIGHT_KG } from './defaults';
 
 export const DEFAULT_AI_TRAINING_PROFILE: AITrainingProfile = {
   goal: 'build_muscle',
@@ -23,7 +24,7 @@ export const DEFAULT_AI_TRAINING_PROFILE: AITrainingProfile = {
 export function buildCompactUserContext(state: AppState): string {
   const profile = state.profile;
   const trainingProfile = state.trainingProfile || DEFAULT_AI_TRAINING_PROFILE;
-  const bw = profile?.bodyweightKg || 75;
+  const bw = profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG;
   const unit = profile?.unit || 'kg';
   const todayStr = toLocalDateString(new Date());
 

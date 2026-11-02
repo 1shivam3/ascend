@@ -51,6 +51,7 @@ import { ExerciseRank, EquipmentType, Gender } from '@/lib/types';
 import { useAppNavigation } from '@/lib/navigation';
 import { useTranslation } from '@/lib/i18n';
 import { safeRandomId, getLocalTodayStr, formatLocalDate } from '@/lib/formatters';
+import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -682,7 +683,7 @@ function LiftCard({
 export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
   const { profile, prs, workouts, prTargets, addPR, deletePR, setPRTarget } = useStore();
   const userUnit = profile?.unit || 'kg';
-  const bodyweightKg = profile?.bodyweightKg || 75;
+  const bodyweightKg = profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG;
   const gender = profile?.gender || 'male';
   const toast = useToast();
   const { t } = useTranslation();

@@ -76,6 +76,7 @@ import {
 } from '@/lib/local-notifications';
 import { safeRandomId, getLocalTodayStr, getLocalDateOfTimestamp, formatDuration } from '@/lib/formatters';
 import ConfirmationModal from '@/components/ConfirmationModal';
+import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
 
 interface ActiveWorkoutScreenProps {
   initialExercises: WorkoutExercise[];
@@ -1899,7 +1900,7 @@ export default function ActiveWorkoutScreen({
       // PR detection (only evaluates completed sets)
       let newPRsCount = 0;
       if (hasCompletedSets) {
-        const userBW = profile?.bodyweightKg || 75;
+        const userBW = profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG;
         for (const ex of validExercises) {
           const isBW = isBodyweightExercise(ex.name);
           const existingPRs = prs.filter((p) => p.exercise.toLowerCase() === ex.name.toLowerCase());

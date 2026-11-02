@@ -39,6 +39,7 @@ import { getWeekDateStrings, plural, formatKg, getLocalTodayStr, parseLocalDate 
 import { EXERCISE_LIBRARY } from './exercise-library';
 import type { MuscleGroup } from './exercise-library';
 import { DAY_ORDER, type LocalizedSentence } from './coach-i18n';
+import { DEFAULT_BODYWEIGHT_KG } from './defaults';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers
@@ -706,7 +707,7 @@ export function calculateReadiness(
   }
 
   const latest = [...(bodyMetrics || [])].sort((a, b) => (a.date < b.date ? -1 : 1)).pop();
-  const bodyweightKg = latest && latest.weightKg > 0 ? latest.weightKg : 75;
+  const bodyweightKg = latest && latest.weightKg > 0 ? latest.weightKg : DEFAULT_BODYWEIGHT_KG;
   const tonnageOf = (w: WorkoutEntry) => calculateWorkoutTonnage(w, bodyweightKg);
 
   let score = READINESS_START;
@@ -863,7 +864,7 @@ interface SessionInsight {
  * celebrates specific PRs, diagnoses stalls, flags effort anomalies, and always
  * ends with what to do next. Never a robotic recap of what you just did.
  */
-export function generateCoachTake(workout: WorkoutEntry, history: WorkoutEntry[], bodyweightKg = 75): string {
+export function generateCoachTake(workout: WorkoutEntry, history: WorkoutEntry[], bodyweightKg = DEFAULT_BODYWEIGHT_KG): string {
   if (!workout || !(workout.exercises || []).length) {
     return 'Session logged — even a quiet entry keeps the streak honest, and today\'s data makes next week\'s plan smarter.';
   }
@@ -871,7 +872,7 @@ export function generateCoachTake(workout: WorkoutEntry, history: WorkoutEntry[]
   const prior = (history || []).filter((w) => w.id !== workout.id);
   // Bodyweight comes from the athlete's profile; 75 kg is only the last-resort
   // fallback so tonnage math never divides by zero.
-  const safeBodyweightKg = bodyweightKg && bodyweightKg > 0 ? bodyweightKg : 75;
+  const safeBodyweightKg = bodyweightKg && bodyweightKg > 0 ? bodyweightKg : DEFAULT_BODYWEIGHT_KG;
   const tonnage = calculateWorkoutTonnage(workout, safeBodyweightKg);
   const priorTonnages = prior.slice(-4).map((w) => calculateWorkoutTonnage(w, safeBodyweightKg)).filter((t) => t > 0);
   const avgPriorTonnage =

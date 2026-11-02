@@ -88,6 +88,7 @@ import { calculateMealMacros, scaleMacroGoalsToCalories } from '@/lib/macros';
 import { effectiveMacroGoals, dayScaledGoals, fallbackMacroGoals, fallbackProteinTargetG } from '@/lib/effective-goals';
 import { toLocalDateString, calculateHydrationTarget } from '@/lib/habits';
 import { getTimeGreeting, getWeekRange } from '@/lib/formatters';
+import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
 import { useToast } from '@/components/ui/Toast';
 import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
 import { PlannedWorkout, PlannedExercise, DayOfWeek, FoodItem, MealEntry } from '@/lib/types';
@@ -322,7 +323,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   // stale `dailyTargetMl || 2700` snapshot, which disagreed with Fuel
   // for every bodyweight except ~77 kg.
   const hydrationTargetMl = calculateHydrationTarget({
-    bodyweightKg: profile?.bodyweightKg || 75,
+    bodyweightKg: profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG,
     customTargetMl: hydrationConfig?.dailyTargetMl,
     isCustomTarget: hydrationConfig?.isCustomTarget,
   });
@@ -1190,7 +1191,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           }
           meals={meals}
           waterTargetMl={calculateHydrationTarget({
-            bodyweightKg: profile?.bodyweightKg || 75,
+            bodyweightKg: profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG,
             customTargetMl: hydrationConfig?.dailyTargetMl,
             isCustomTarget: hydrationConfig?.isCustomTarget,
           })}

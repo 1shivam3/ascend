@@ -7,6 +7,7 @@ import { useStore } from '@/lib/store';
 import { calculateDOTS } from '@/lib/dots';
 import { calculatePlates } from '@/lib/plate-calculator';
 import { useTranslation } from '@/lib/i18n';
+import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
 
 interface MeetAttemptPlannerModalProps {
   isOpen: boolean;
@@ -68,7 +69,7 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
     const deadlift = calculateAttempts(deadliftMax);
 
     const projectedTotal = squat.third + bench.third + deadlift.third;
-    const bodyweightKg = profile?.bodyweightKg || 75;
+    const bodyweightKg = profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG;
     const gender = profile?.gender || 'male';
     // DOTS is defined on kilograms — convert the user-unit total back.
     const projectedTotalKg = userUnit === 'lbs' ? projectedTotal * 0.453592 : projectedTotal;

@@ -7,6 +7,7 @@ import { getExerciseMuscle } from './exercise-library';
 import { buildCompactUserContext } from './ai-context';
 import { getAiAuthHeaders } from './ai-client-auth';
 import { getNextSessionTarget, exerciseHadPain } from './workout-engine';
+import { DEFAULT_BODYWEIGHT_KG } from './defaults';
 
 /**
  * Calculates total tonnage (volume in kg) for a workout session.
@@ -21,7 +22,7 @@ import { getNextSessionTarget, exerciseHadPain } from './workout-engine';
  * That credit is a coach-load equivalent only; it is not part of the
  * displayed volume definition.
  */
-export function calculateWorkoutTonnage(workout: WorkoutEntry, bodyweightKg = 75): number {
+export function calculateWorkoutTonnage(workout: WorkoutEntry, bodyweightKg = DEFAULT_BODYWEIGHT_KG): number {
   if (!workout?.exercises) return 0;
 
   let total = calculateWorkoutVolumeKg(workout, bodyweightKg);
@@ -49,7 +50,7 @@ export function calculateWorkoutTonnage(workout: WorkoutEntry, bodyweightKg = 75
  */
 export function getVolumeComparison(
   workouts: WorkoutEntry[],
-  bodyweightKg = 75,
+  bodyweightKg = DEFAULT_BODYWEIGHT_KG,
   targetDate: Date = new Date()
 ): { thisWeekKg: number; lastWeekKg: number; diffPercent: number } {
   // Calendar weeks: this Mon–Sun vs last Mon–Sun.

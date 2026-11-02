@@ -8,6 +8,7 @@ import { X, Scale, History, Trash2, Plus } from 'lucide-react';
 import { getLocalTodayStr, round1 } from '@/lib/formatters';
 import { useTranslation } from '@/lib/i18n';
 import { useToast } from '@/components/ui/Toast';
+import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
 
 interface BodyMetricsModalProps {
   isOpen: boolean;
@@ -184,7 +185,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
   const deleteBodyMetric = useStore((state) => state.deleteBodyMetric);
 
   const preferredUnit = profile?.unit || 'kg';
-  const currentWeightKg = profile?.bodyweightKg || 75;
+  const currentWeightKg = profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG;
 
   const [weightInput, setWeightInput] = useState<string>('');
   const [heightInput, setHeightInput] = useState<string>('');

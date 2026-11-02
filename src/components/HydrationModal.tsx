@@ -25,6 +25,7 @@ import {
   formatWaterLiters,
   getDayType,
 } from '@/lib/habits';
+import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
 
 interface HydrationModalProps {
   isOpen: boolean;
@@ -79,7 +80,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
   const currentWaterMl = waterLogs[activeDateStr] || 0;
 
   const currentTargetMl = calculateHydrationTarget({
-    bodyweightKg: profile?.bodyweightKg || 75,
+    bodyweightKg: profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG,
     isTrainingDay: currentDayType === 'training',
     climateHeat: isHotEnvironment,
     customTargetMl: isCustom && Number(customMl) > 0 ? Number(customMl) : undefined,
