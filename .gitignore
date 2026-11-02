@@ -30,3 +30,7 @@ run-checks.sh
 *.apk
 android/app/build/
 android/.gradle/
+
+# Generated service worker (scripts/generate-sw.js) — never commit;
+# a stale committed copy shipped once (pre-play D-PWA-1).
+/public/sw.js

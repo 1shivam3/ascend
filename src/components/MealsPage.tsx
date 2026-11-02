@@ -524,6 +524,19 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             oilAssumedTsp: oil?.assumedTsp,
             oilLevel: oil?.level,
           };
+        } else if (name.length > 1) {
+          // Pre-play D-UX-7: resolve the match state as soon as the
+          // name is typed — the not-in-database warning must not wait
+          // for a quantity. Macros stay untouched (they are computed
+          // per quantity); only the match flags are refreshed, using a
+          // nominal estimate whose values are discarded.
+          const est = estimateMacros(name, 100, next[index].unit);
+          next[index] = {
+            ...next[index],
+            isUnmatched: est.isUnmatched,
+            isApproximateMatch: est.isApproximateMatch,
+            matchedEntry: est.matchedEntry,
+          };
         }
       }
 
@@ -1745,7 +1758,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
             {/* Circular Donut Ring */}
             <div className="relative inline-flex items-center justify-center">
-              <svg width={130} height={130} className="transform -rotate-90">
+              <svg width={130} height={130} className="transform -rotate-90" role="img" aria-label={`${Math.round(todayMacros.calories).toLocaleString()} cal, ${t('meals.ofDailyTarget', { target: displayGoals?.calories || splitFallback.calories })}`}>
                 <circle
                   cx={65}
                   cy={65}
@@ -2822,7 +2835,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
               {/* ── Meal Name + Quick Templates ── */}
               <div>
-                <label className="section-title mb-1.5 block">{t('meals.mealName')}</label>
+                <label htmlFor="meal-builder-name" className="section-title mb-1.5 block">{t('meals.mealName')}</label>
 
                 {/* Quick-log template buttons */}
                 <div className="flex flex-wrap gap-1.5 mb-2">
@@ -2843,6 +2856,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 </div>
 
                 <input
+                  id="meal-builder-name"
                   type="text"
                   placeholder={`e.g. ${getDefaultMealName()}, Post-Workout Shake`}
                   value={mealName}
@@ -2946,9 +2960,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                         >
                           {/* Row header: label + favorite star + delete */}
                           <div className="flex items-center justify-between">
-                            <span className="text-2xs font-mono text-accent-text font-semibold">
+                            <label htmlFor={`food-${i}-name`} className="text-2xs font-mono text-accent-text font-semibold">
                               FOOD {i + 1}
-                            </span>
+                            </label>
                             <div className="flex items-center gap-1">
                               {hasName && (
                                 <button
@@ -2980,6 +2994,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                             ref={(el) => { suggestionRefs.current[i] = el; }}
                           >
                             <input
+                              id={`food-${i}-name`}
                               type="text"
                               placeholder={t('meals.foodNamePlaceholder')}
                               value={food.name}
@@ -3043,6 +3058,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                           <div className="flex gap-2">
                             <input
                               type="number"
+                              aria-label={t('meals.qtyPlaceholder')}
                               placeholder={t('meals.qtyPlaceholder')}
                               value={food.quantity ?? ''}
                               onChange={(e) => {
@@ -3053,6 +3069,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                             />
 
                             <select
+                              aria-label={t('meals.unit')}
                               value={food.unit || 'g'}
                               onChange={(e) => handleFoodChange(i, 'unit', e.target.value)}
                               className="bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-xs outline-none focus:border-accent min-w-[90px]"
@@ -3076,6 +3093,20 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                           {/* Macro breakdown indicators / manual override */}
                           {hasName && (
                             <div className="bg-bg-primary/70 p-2 rounded-lg border border-border/80 space-y-1.5">
+                              {/* Pre-play D-UX-7: the not-in-database /
+                                  estimated-from banner shows as soon as
+                                  the name search resolves — it used to sit
+                                  behind the quantity gate, so a food that
+                                  matches nothing looked fine until a
+                                  quantity was typed. */}
+                              {(food.isUnmatched || food.isApproximateMatch) && (
+                                <div className="flex items-center gap-1.5 text-2xs text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 font-mono">
+                                  <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-amber-700 dark:text-amber-400" />
+                                  {/* Approximate rows carry another entry's values: name the
+                                      entry so the estimate is never mistaken for a match. */}
+                                  <span>{food.isUnmatched ? t('meals.notInDb') : t('meals.estimatedFrom', { entry: food.matchedEntry ?? '' })}</span>
+                                </div>
+                              )}
                               {/* Quantity guidance banner if quantity is missing */}
                               {!isQtySet ? (
                                 <p className="text-[0.6875rem] text-text-muted font-mono italic">
@@ -3083,14 +3114,6 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                 </p>
                               ) : (
                                 <div className="space-y-1.5">
-                                  {(food.isUnmatched || food.isApproximateMatch) && (
-                                    <div className="flex items-center gap-1.5 text-2xs text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 font-mono">
-                                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-amber-700 dark:text-amber-400" />
-                                      {/* Approximate rows carry another entry's values: name the
-                                          entry so the estimate is never mistaken for a match. */}
-                                      <span>{food.isUnmatched ? t('meals.notInDb') : t('meals.estimatedFrom', { entry: food.matchedEntry ?? '' })}</span>
-                                    </div>
-                                  )}
                                   <div className="flex items-center justify-between text-2xs font-mono text-text-muted pb-0.5 border-b border-border/40">
                                     <span className="flex items-center gap-1 text-accent font-semibold">
                                       <Sparkles className="w-3 h-3" />
@@ -3110,10 +3133,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                               {/* Editable macro input fields */}
                               <div className="grid grid-cols-4 gap-1.5 pt-0.5">
                                 <div>
-                                  <span className="text-2xs text-text-muted block mb-0.5 font-mono">
+                                  <label htmlFor={`food-${i}-calories`} className="text-2xs text-text-muted block mb-0.5 font-mono">
                                     {isQtySet ? '~CAL' : 'CAL'}
-                                  </span>
+                                  </label>
                                   <input
+                                    id={`food-${i}-calories`}
                                     type="number"
                                     value={food.calories || ''}
                                     placeholder="0"
@@ -3122,10 +3146,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                   />
                                 </div>
                                 <div>
-                                  <span className="text-2xs text-text-muted block mb-0.5 font-mono">
+                                  <label htmlFor={`food-${i}-protein`} className="text-2xs text-text-muted block mb-0.5 font-mono">
                                     {isQtySet ? '~PRO' : 'PRO'}
-                                  </span>
+                                  </label>
                                   <input
+                                    id={`food-${i}-protein`}
                                     type="number"
                                     step="0.1"
                                     value={food.proteinG ? round1(food.proteinG) : ''}
@@ -3135,10 +3160,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                   />
                                 </div>
                                 <div>
-                                  <span className="text-2xs text-text-muted block mb-0.5 font-mono">
+                                  <label htmlFor={`food-${i}-carbs`} className="text-2xs text-text-muted block mb-0.5 font-mono">
                                     {isQtySet ? '~CARB' : 'CARB'}
-                                  </span>
+                                  </label>
                                   <input
+                                    id={`food-${i}-carbs`}
                                     type="number"
                                     step="0.1"
                                     value={food.carbsG ? round1(food.carbsG) : ''}
@@ -3148,10 +3174,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                   />
                                 </div>
                                 <div>
-                                  <span className="text-2xs text-text-muted block mb-0.5 font-mono">
+                                  <label htmlFor={`food-${i}-fat`} className="text-2xs text-text-muted block mb-0.5 font-mono">
                                     {isQtySet ? '~FAT' : 'FAT'}
-                                  </span>
+                                  </label>
                                   <input
+                                    id={`food-${i}-fat`}
                                     type="number"
                                     step="0.1"
                                     value={food.fatG ? round1(food.fatG) : ''}
@@ -3226,23 +3253,47 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 <span>•</span>
                 <span>{foods.length === 0 ? '' : tildeForFoods(foods)}{round1(currentMealMacros.fatG)}g F</span>
               </div>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => { resetBuilderForm(); setIsModalOpen(false); }}
-                  className="btn-ghost flex-1 text-xs"
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveMeal}
-                  disabled={foods.length === 0 || !foods.some((f) => f.name.trim())}
-                  className="btn-primary flex-1 disabled:opacity-40 text-xs"
-                >
-                  {t('meals.saveMeal')}
-                </button>
-              </div>
+              {/* Pre-play D-UX-7: an entry whose calories AND macros are
+                  all zero carries no nutrition information (usually a
+                  not-in-database food whose values were never filled
+                  in) — disable Save with a hint instead of logging a
+                  phantom food. */}
+              {(() => {
+                const zeroFood = foods.find(
+                  (f) =>
+                    f.name.trim() &&
+                    !(f.calories > 0) &&
+                    !(f.proteinG > 0) &&
+                    !(f.carbsG > 0) &&
+                    !(f.fatG > 0),
+                );
+                return (
+                  <>
+                    {zeroFood && (
+                      <p className="text-2xs text-warning font-medium mb-3">
+                        {t('meals.zeroNutritionHint', { name: zeroFood.name.trim() })}
+                      </p>
+                    )}
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => { resetBuilderForm(); setIsModalOpen(false); }}
+                        className="btn-ghost flex-1 text-xs"
+                      >
+                        {t('common.cancel')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveMeal}
+                        disabled={foods.length === 0 || !foods.some((f) => f.name.trim()) || !!zeroFood}
+                        className="btn-primary flex-1 disabled:opacity-40 text-xs"
+                      >
+                        {t('meals.saveMeal')}
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -3301,10 +3352,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             {/* Input Fields */}
             <div className="space-y-3 font-mono">
               <div>
-                <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
+                <label htmlFor="meal-goal-calories" className="text-2xs font-bold text-text-muted uppercase block mb-1">
                   {t('meals.calorieTargetLabel')}
                 </label>
                 <input
+                  id="meal-goal-calories"
                   type="number"
                   placeholder="e.g. 2500"
                   value={goalCalories}
@@ -3314,10 +3366,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </div>
 
               <div>
-                <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
+                <label htmlFor="meal-goal-protein" className="text-2xs font-bold text-text-muted uppercase block mb-1">
                   {t('meals.proteinTargetLabel')}
                 </label>
                 <input
+                  id="meal-goal-protein"
                   type="number"
                   placeholder="e.g. 160"
                   value={goalProtein}
@@ -3328,10 +3381,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
+                  <label htmlFor="meal-goal-carbs" className="text-2xs font-bold text-text-muted uppercase block mb-1">
                     {t('meals.carbsOptionalLabel')}
                   </label>
                   <input
+                    id="meal-goal-carbs"
                     type="number"
                     placeholder="e.g. 260"
                     value={goalCarbs}
@@ -3340,10 +3394,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   />
                 </div>
                 <div>
-                  <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
+                  <label htmlFor="meal-goal-fat" className="text-2xs font-bold text-text-muted uppercase block mb-1">
                     {t('meals.fatOptionalLabel')}
                   </label>
                   <input
+                    id="meal-goal-fat"
                     type="number"
                     placeholder="e.g. 70"
                     value={goalFat}
@@ -3608,10 +3663,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <div className="space-y-3">
               {/* Name */}
               <div>
-                <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
+                <label htmlFor="pinned-food-name" className="text-2xs font-bold text-text-muted uppercase block mb-1">
                   {t('meals.foodNameLabel')}
                 </label>
                 <input
+                  id="pinned-food-name"
                   type="text"
                   placeholder={t('meals.foodNameExamplePlaceholder')}
                   value={pinnedName}
@@ -3623,10 +3679,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               {/* Default Quantity & Unit */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
+                  <label htmlFor="pinned-food-quantity" className="text-2xs font-bold text-text-muted uppercase block mb-1">
                     {t('meals.defaultQuantity')}
                   </label>
                   <input
+                    id="pinned-food-quantity"
                     type="number"
                     step="any"
                     placeholder="e.g. 150"
@@ -3636,10 +3693,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   />
                 </div>
                 <div>
-                  <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
+                  <label htmlFor="pinned-food-unit" className="text-2xs font-bold text-text-muted uppercase block mb-1">
                     {t('meals.unit')}
                   </label>
                   <select
+                    id="pinned-food-unit"
                     value={pinnedUnit}
                     onChange={(e) => setPinnedUnit(e.target.value)}
                     className="w-full bg-bg-elevated border border-border rounded-lg p-2 text-text-primary text-sm focus:border-accent outline-none"
@@ -3666,10 +3724,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               {/* Macros Breakdown */}
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <div>
-                  <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
+                  <label htmlFor="pinned-food-calories" className="text-2xs font-bold text-text-muted uppercase block mb-1">
                     {t('meals.caloriesKcal')}
                   </label>
                   <input
+                    id="pinned-food-calories"
                     type="number"
                     step="any"
                     placeholder="e.g. 250"
@@ -3679,10 +3738,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   />
                 </div>
                 <div>
-                  <label className="text-2xs font-bold text-emerald-600 uppercase block mb-1">
+                  <label htmlFor="pinned-food-protein" className="text-2xs font-bold text-emerald-600 uppercase block mb-1">
                     {t('scan.proteinLabel')}
                   </label>
                   <input
+                    id="pinned-food-protein"
                     type="number"
                     step="any"
                     placeholder="e.g. 30"
@@ -3692,10 +3752,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   />
                 </div>
                 <div>
-                  <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
+                  <label htmlFor="pinned-food-carbs" className="text-2xs font-bold text-text-muted uppercase block mb-1">
                     {t('scan.carbsLabel')}
                   </label>
                   <input
+                    id="pinned-food-carbs"
                     type="number"
                     step="any"
                     placeholder="e.g. 15"
@@ -3705,10 +3766,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   />
                 </div>
                 <div>
-                  <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
+                  <label htmlFor="pinned-food-fat" className="text-2xs font-bold text-text-muted uppercase block mb-1">
                     {t('scan.fatLabel')}
                   </label>
                   <input
+                    id="pinned-food-fat"
                     type="number"
                     step="any"
                     placeholder="e.g. 5"

@@ -5,12 +5,15 @@ import * as path from 'node:path';
 
 // P0-2/D6: the SW generator must stamp a per-build cache name into
 // public/sw.js. This test runs the real script against the real
-// template, then restores the checked-in dev fallback afterwards.
+// template, then restores the prior state afterwards.
+// Pre-play D-PWA-1: public/sw.js is generated and git-ignored — on a
+// fresh tree it may not exist yet; the restore step then removes the
+// file the test generated instead of writing back a stale copy.
 const root = process.cwd();
 const templatePath = path.join(root, 'public', 'sw.template.js');
 const outPath = path.join(root, 'public', 'sw.js');
 
-let originalSw: string;
+let originalSw: string | null;
 
 function runGenerator(envOverrides: Record<string, string | undefined>) {
   const env: NodeJS.ProcessEnv = { ...process.env };
@@ -24,12 +27,13 @@ function runGenerator(envOverrides: Record<string, string | undefined>) {
 
 describe('generate-sw.js (P0-2/D6)', () => {
   beforeAll(() => {
-    originalSw = fs.readFileSync(outPath, 'utf8');
+    originalSw = fs.existsSync(outPath) ? fs.readFileSync(outPath, 'utf8') : null;
     expect(fs.readFileSync(templatePath, 'utf8')).toContain('__ASCEND_CACHE_NAME__');
   });
 
   afterAll(() => {
-    fs.writeFileSync(outPath, originalSw);
+    if (originalSw !== null) fs.writeFileSync(outPath, originalSw);
+    else if (fs.existsSync(outPath)) fs.unlinkSync(outPath);
   });
 
   it('stamps the SHA cache name and leaves no placeholder', () => {
@@ -58,5 +62,24 @@ describe('generate-sw.js (P0-2/D6)', () => {
       NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA: '1234567fedcba',
     });
     expect(out).toContain('ascend-1234567-cache');
+  });
+
+  it('leaves no app-shell assets placeholder (D-PWA-2)', () => {
+    const out = runGenerator({});
+    expect(out).not.toContain('__APP_SHELL_ASSETS__');
+  });
+
+  it('precaches the shell HTML’s JS/CSS assets when a build exists (D-PWA-2)', () => {
+    const shellPath = path.join(root, '.next', 'server', 'app', 'index.html');
+    if (!fs.existsSync(shellPath)) return; // no build yet — nothing to pin
+    const html = fs.readFileSync(shellPath, 'utf8');
+    const assets = new Set(
+      [...html.matchAll(/\/_next\/static\/[^\s"'\\]+\.(?:js|css)/g)].map((m) => m[0]),
+    );
+    expect(assets.size).toBeGreaterThan(0);
+    const out = runGenerator({});
+    for (const a of assets) {
+      expect(out).toContain(`'${a}'`);
+    }
   });
 });

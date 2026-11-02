@@ -991,7 +991,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       )}
                     </div>
                   </div>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#5E615A] dark:text-[#A5A096]">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[var(--text-secondary)]/15 text-[#5E615A] dark:text-[#A5A096]">
                     {bodyweightAnalytics.deltaText}
                   </span>
                 </div>
@@ -999,22 +999,22 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   <svg viewBox="0 0 320 110" className="w-full h-28 overflow-visible" preserveAspectRatio="none" role="img" aria-label={summarizeSeries(t('progress.chartWeight'), bodyweightAnalytics.dataPoints, userUnit)}>
                     <defs>
                       <linearGradient id="spotWeightGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#858076" stopOpacity="0.2" />
-                        <stop offset="100%" stopColor="#858076" stopOpacity="0.0" />
+                        <stop offset="0%" stopColor="rgb(var(--text-secondary))" stopOpacity="0.2" />
+                        <stop offset="100%" stopColor="rgb(var(--text-secondary))" stopOpacity="0.0" />
                       </linearGradient>
                     </defs>
-                    <line x1="0" y1="30" x2="320" y2="30" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
-                    <line x1="0" y1="80" x2="320" y2="80" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
+                    <line x1="0" y1="30" x2="320" y2="30" stroke="currentColor" strokeOpacity="0.12" strokeDasharray="3 3" />
+                    <line x1="0" y1="80" x2="320" y2="80" stroke="currentColor" strokeOpacity="0.12" strokeDasharray="3 3" />
                     {bodyChartGeometry.points.length > 0 ? (
                       <>
                         {bodyChartGeometry.pathD ? (
                           <>
                             <path d={bodyChartGeometry.areaD} fill="url(#spotWeightGradient)" />
-                            <path d={bodyChartGeometry.pathD} fill="none" stroke="#858076" strokeWidth="2.5" strokeLinecap="round" />
+                            <path d={bodyChartGeometry.pathD} fill="none" stroke="rgb(var(--text-secondary))" strokeWidth="2.5" strokeLinecap="round" />
                           </>
                         ) : null}
                         {bodyChartGeometry.points.map((pt, i) => (
-                          <circle key={i} cx={pt.x} cy={pt.y} r={i === bodyChartGeometry.points.length - 1 ? 4 : 3} fill="#858076" stroke={i === bodyChartGeometry.points.length - 1 ? '#FFFFFF' : 'none'} strokeWidth={i === bodyChartGeometry.points.length - 1 ? 2 : 0} />
+                          <circle key={i} cx={pt.x} cy={pt.y} r={i === bodyChartGeometry.points.length - 1 ? 4 : 3} fill="rgb(var(--text-secondary))" stroke={i === bodyChartGeometry.points.length - 1 ? 'rgb(var(--bg-card))' : 'none'} strokeWidth={i === bodyChartGeometry.points.length - 1 ? 2 : 0} />
                         ))}
                       </>
                     ) : (
@@ -1071,7 +1071,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                         {big3Analytics.latest1RM ? `${big3Analytics.latest1RM} ${userUnit}` : '—'}
                       </div>
                     </div>
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#5E615A] dark:text-[#A5A096]">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[var(--text-secondary)]/15 text-[#5E615A] dark:text-[#A5A096]">
                       {big3Analytics.deltaText}
                     </span>
                   </div>
@@ -1079,19 +1079,19 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     <svg viewBox="0 0 320 120" className="w-full h-28 overflow-visible" preserveAspectRatio="none" role="img" aria-label={summarizeSeries(`${big3Lift} estimated 1RM`, big3Analytics.dataPoints, userUnit)}>
                       <defs>
                         <linearGradient id="spotBig3Gradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#E44427" stopOpacity="0.22" />
-                          <stop offset="100%" stopColor="#E44427" stopOpacity="0.0" />
+                          <stop offset="0%" stopColor="rgb(var(--accent))" stopOpacity="0.22" />
+                          <stop offset="100%" stopColor="rgb(var(--accent))" stopOpacity="0.0" />
                         </linearGradient>
                       </defs>
-                      <line x1="0" y1="90" x2="320" y2="90" stroke="currentColor" strokeOpacity="0.1" strokeDasharray="3 3" />
+                      <line x1="0" y1="90" x2="320" y2="90" stroke="currentColor" strokeOpacity="0.14" strokeDasharray="3 3" />
                       {big3Geometry.pathD ? (
                         <>
                           <path d={big3Geometry.areaD} fill="url(#spotBig3Gradient)" />
-                          <path d={big3Geometry.pathD} fill="none" stroke="#E44427" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="6 3" />
+                          <path d={big3Geometry.pathD} fill="none" stroke="rgb(var(--accent))" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="6 3" />
                         </>
                       ) : null}
                       {big3Geometry.points.map((pt, i) => (
-                        <circle key={i} cx={pt.x} cy={pt.y} r={i === big3Geometry.points.length - 1 ? 4 : 3} fill="#E44427" stroke={i === big3Geometry.points.length - 1 ? '#FFFFFF' : 'none'} strokeWidth={i === big3Geometry.points.length - 1 ? 2 : 0} />
+                        <circle key={i} cx={pt.x} cy={pt.y} r={i === big3Geometry.points.length - 1 ? 4 : 3} fill="rgb(var(--accent))" stroke={i === big3Geometry.points.length - 1 ? 'rgb(var(--bg-card))' : 'none'} strokeWidth={i === big3Geometry.points.length - 1 ? 2 : 0} />
                       ))}
                     </svg>
                     <div className="flex justify-between text-2xs text-text-muted font-mono pt-1">
@@ -1126,6 +1126,11 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 <div>
                   <h2 className="text-base font-bold text-text-primary">{t('progress.spotQuestionE1rm', { lift: heroLift.name })}</h2>
                   <span className="text-xs font-semibold text-text-secondary">{heroLift.name}</span>
+                  {/* Pre-play D-UX-3: explicit space in the text flow —
+                      the badge visually separates via ml-2, but as text
+                      it concatenated straight onto the lift name
+                      ("Bench Press" + est. suffix with no space). */}
+                  {' '}
                   <span className="ml-2 rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent-text">{t('common.estimatedShort')}</span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-accent transition-colors" />
@@ -1137,7 +1142,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   </div>
                   <span className="text-2xs text-text-muted font-mono">Current 1RM (your estimated best single lift)</span>
                 </div>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#5E615A] dark:text-[#A5A096]">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[var(--text-secondary)]/15 text-[#5E615A] dark:text-[#A5A096]">
                   {heroLiftAnalytics.deltaText}
                 </span>
               </div>
@@ -1145,11 +1150,11 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 <svg viewBox="0 0 320 120" className="w-full h-28 overflow-visible" preserveAspectRatio="none" role="img" aria-label={summarizeSeries(`${heroLift.name} estimated 1RM`, heroLiftAnalytics.dataPoints, userUnit)}>
                   <defs>
                     <linearGradient id="strengthGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#E44427" stopOpacity="0.22" />
-                      <stop offset="100%" stopColor="#E44427" stopOpacity="0.0" />
+                      <stop offset="0%" stopColor="rgb(var(--accent))" stopOpacity="0.22" />
+                      <stop offset="100%" stopColor="rgb(var(--accent))" stopOpacity="0.0" />
                     </linearGradient>
                   </defs>
-                  <line x1="0" y1="90" x2="320" y2="90" stroke="currentColor" strokeOpacity="0.1" strokeDasharray="3 3" />
+                  <line x1="0" y1="90" x2="320" y2="90" stroke="currentColor" strokeOpacity="0.14" strokeDasharray="3 3" />
                   {heroChartGeometry.points.length > 0 ? (
                     <>
                       {heroChartGeometry.pathD ? (
@@ -1158,7 +1163,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                           <path
                             d={heroChartGeometry.pathD}
                             fill="none"
-                            stroke="#E44427"
+                            stroke="rgb(var(--accent))"
                             strokeWidth="2.5"
                             strokeLinecap="round"
                             strokeDasharray="6 3"
@@ -1171,8 +1176,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                           cx={pt.x}
                           cy={pt.y}
                           r={i === heroChartGeometry.points.length - 1 ? 4 : 3}
-                          fill="#E44427"
-                          stroke={i === heroChartGeometry.points.length - 1 ? '#FFFFFF' : 'none'}
+                          fill="rgb(var(--accent))"
+                          stroke={i === heroChartGeometry.points.length - 1 ? 'rgb(var(--bg-card))' : 'none'}
                           strokeWidth={i === heroChartGeometry.points.length - 1 ? 2 : 0}
                         />
                       ))}
@@ -1255,13 +1260,23 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   <div className="flex items-center gap-2">
                     {/* Final-cert J4.1: an estimated 1RM in this list gets
                         the same "est." label the charts carry — the tile
-                        previously showed an estimate as a bare number. */}
+                        previously showed an estimate as a bare number.
+                        Pre-play D-UX-3: leading {' '} keeps the badge
+                        from concatenating onto the lift name as text. */}
                     {lift.isEstimate && (
-                      <span className="rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent-text">{t('common.estimatedShort')}</span>
+                      <span className="rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent-text">{' '}{t('common.estimatedShort')}</span>
                     )}
-                    <span className="font-bold text-text-primary tabular-nums font-mono text-sm">
-                      {displayWeight(lift.best1RMKg)}
-                    </span>
+                    {/* Pre-play D-UX-6: an untrained lift shows a short
+                        no-data line instead of a bare dash. */}
+                    {lift.best1RMKg != null && lift.best1RMKg > 0 ? (
+                      <span className="font-bold text-text-primary tabular-nums font-mono text-sm">
+                        {displayWeight(lift.best1RMKg)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-text-muted font-medium">
+                        {t('progress.noDataYet')}
+                      </span>
+                    )}
                     <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-accent transition-colors" />
                   </div>
                 </div>
@@ -1351,23 +1366,30 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     </div>
                     <span className="text-2xs text-text-muted font-mono">Estimated 1RM (best single lift, worked out from your sets)</span>
                   </div>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#5E615A] dark:text-[#A5A096]">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-[var(--text-secondary)]/15 text-[#5E615A] dark:text-[#A5A096]">
                     {selectedExerciseAnalytics.deltaText}
                   </span>
                 </div>
 
-                {/* Dynamic Progression Chart */}
+                {/* Dynamic Progression Chart.
+                    Pre-play D-UX-4 follow-up: --accent / --text-secondary /
+                    --bg-card are RGB TRIPLETS (e.g. `235 78 48`), so a bare
+                    var(--accent) is an INVALID SVG paint — the declaration
+                    drops and the series falls back to stroke:none + black
+                    fill (the Graphite "invisible chart" bug). Every paint
+                    below wraps the token: rgb(var(--accent)). Pinned in
+                    tests/preplay-ux-fixes.test.ts. */}
                 <div className="pt-2">
                   <svg viewBox="0 0 320 130" className="w-full h-32 overflow-visible" preserveAspectRatio="none" role="img" aria-label={summarizeSeries(`${selectedExercise} estimated 1RM`, selectedExerciseAnalytics.dataPoints, userUnit)}>
                     <defs>
                       <linearGradient id="analyticsGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#E44427" stopOpacity="0.25" />
-                        <stop offset="100%" stopColor="#E44427" stopOpacity="0.0" />
+                        <stop offset="0%" stopColor="rgb(var(--accent))" stopOpacity="0.25" />
+                        <stop offset="100%" stopColor="rgb(var(--accent))" stopOpacity="0.0" />
                       </linearGradient>
                     </defs>
-                    <line x1="0" y1="30" x2="320" y2="30" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
-                    <line x1="0" y1="70" x2="320" y2="70" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
-                    <line x1="0" y1="110" x2="320" y2="110" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
+                    <line x1="0" y1="30" x2="320" y2="30" stroke="currentColor" strokeOpacity="0.12" strokeDasharray="3 3" />
+                    <line x1="0" y1="70" x2="320" y2="70" stroke="currentColor" strokeOpacity="0.12" strokeDasharray="3 3" />
+                    <line x1="0" y1="110" x2="320" y2="110" stroke="currentColor" strokeOpacity="0.12" strokeDasharray="3 3" />
                     {strengthChartGeometry.points.length > 0 ? (
                       <>
                         {strengthChartGeometry.pathD ? (
@@ -1376,7 +1398,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                             <path
                               d={strengthChartGeometry.pathD}
                               fill="none"
-                              stroke="#E44427"
+                              stroke="rgb(var(--accent))"
                               strokeWidth="2.5"
                               strokeLinecap="round"
                               strokeDasharray="6 3"
@@ -1389,9 +1411,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                             cx={pt.x}
                             cy={pt.y}
                             r={i === strengthChartGeometry.points.length - 1 ? 4.5 : 3.5}
-                            fill="#E44427"
-                            stroke={i === strengthChartGeometry.points.length - 1 ? '#FFFFFF' : 'none'}
-                            strokeWidth={i === strengthChartGeometry.points.length - 1 ? 2 : 0}
+                            fill="rgb(var(--accent))"
+                            stroke="rgb(var(--bg-card))"
+                            strokeWidth={2}
                           />
                         ))}
                       </>
@@ -1507,7 +1529,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#5E615A] dark:text-[#A5A096]">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-[var(--text-secondary)]/15 text-[#5E615A] dark:text-[#A5A096]">
                       {bodyweightAnalytics.deltaText}
                     </span>
                   </div>
@@ -1538,12 +1560,12 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   <svg viewBox="0 0 320 110" className="w-full h-28 overflow-visible" preserveAspectRatio="none" role="img" aria-label={summarizeSeries(t('progress.chartWeight'), bodyweightAnalytics.dataPoints, userUnit)}>
                     <defs>
                       <linearGradient id="bodyWeightGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#858076" stopOpacity="0.2" />
-                        <stop offset="100%" stopColor="#858076" stopOpacity="0.0" />
+                        <stop offset="0%" stopColor="rgb(var(--text-secondary))" stopOpacity="0.2" />
+                        <stop offset="100%" stopColor="rgb(var(--text-secondary))" stopOpacity="0.0" />
                       </linearGradient>
                     </defs>
-                    <line x1="0" y1="30" x2="320" y2="30" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
-                    <line x1="0" y1="80" x2="320" y2="80" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
+                    <line x1="0" y1="30" x2="320" y2="30" stroke="currentColor" strokeOpacity="0.12" strokeDasharray="3 3" />
+                    <line x1="0" y1="80" x2="320" y2="80" stroke="currentColor" strokeOpacity="0.12" strokeDasharray="3 3" />
                     {bodyChartGeometry.points.length > 0 ? (
                       <>
                         {bodyChartGeometry.pathD ? (
@@ -1552,7 +1574,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                             <path
                               d={bodyChartGeometry.pathD}
                               fill="none"
-                              stroke="#858076"
+                              stroke="rgb(var(--text-secondary))"
                               strokeWidth="2.5"
                               strokeLinecap="round"
                             />
@@ -1564,8 +1586,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                             cx={pt.x}
                             cy={pt.y}
                             r={i === bodyChartGeometry.points.length - 1 ? 4 : 3}
-                            fill="#858076"
-                            stroke={i === bodyChartGeometry.points.length - 1 ? '#FFFFFF' : 'none'}
+                            fill="rgb(var(--text-secondary))"
+                            stroke={i === bodyChartGeometry.points.length - 1 ? 'rgb(var(--bg-card))' : 'none'}
                             strokeWidth={i === bodyChartGeometry.points.length - 1 ? 2 : 0}
                           />
                         ))}
@@ -1605,39 +1627,49 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 <div className="divide-y divide-border/60">
                   <div className="py-3 flex items-center justify-between text-xs">
                     <span className="text-text-secondary">{t('progress.bodyFat')}</span>
-                    <span className="font-bold text-text-primary font-mono tabular-nums text-sm">
-                      {latestMetrics.bodyFatPct !== undefined ? `${latestMetrics.bodyFatPct}%` : '—'}
-                    </span>
+                    {latestMetrics.bodyFatPct !== undefined ? (
+                      <span className="font-bold text-text-primary font-mono tabular-nums text-sm">
+                        {`${latestMetrics.bodyFatPct}%`}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-text-muted font-medium">{t('progress.noDataYet')}</span>
+                    )}
                   </div>
                   <div className="py-3 flex items-center justify-between text-xs">
                     <span className="text-text-secondary">{t('progress.chest')}</span>
-                    <span className="font-bold text-text-primary font-mono tabular-nums text-sm">
-                      {latestMetrics.chestIn !== undefined
-                        ? userUnit === 'lbs'
+                    {latestMetrics.chestIn !== undefined ? (
+                      <span className="font-bold text-text-primary font-mono tabular-nums text-sm">
+                        {userUnit === 'lbs'
                           ? `${latestMetrics.chestIn} in`
-                          : `${Math.round(latestMetrics.chestIn * 2.54)} cm`
-                        : '—'}
-                    </span>
+                          : `${Math.round(latestMetrics.chestIn * 2.54)} cm`}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-text-muted font-medium">{t('progress.noDataYet')}</span>
+                    )}
                   </div>
                   <div className="py-3 flex items-center justify-between text-xs">
                     <span className="text-text-secondary">{t('progress.waist')}</span>
-                    <span className="font-bold text-text-primary font-mono tabular-nums text-sm">
-                      {latestMetrics.waistIn !== undefined
-                        ? userUnit === 'lbs'
+                    {latestMetrics.waistIn !== undefined ? (
+                      <span className="font-bold text-text-primary font-mono tabular-nums text-sm">
+                        {userUnit === 'lbs'
                           ? `${latestMetrics.waistIn} in`
-                          : `${Math.round(latestMetrics.waistIn * 2.54)} cm`
-                        : '—'}
-                    </span>
+                          : `${Math.round(latestMetrics.waistIn * 2.54)} cm`}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-text-muted font-medium">{t('progress.noDataYet')}</span>
+                    )}
                   </div>
                   <div className="py-3 flex items-center justify-between text-xs">
                     <span className="text-text-secondary">{t('progress.hips')}</span>
-                    <span className="font-bold text-text-primary font-mono tabular-nums text-sm">
-                      {latestMetrics.hipsIn !== undefined
-                        ? userUnit === 'lbs'
+                    {latestMetrics.hipsIn !== undefined ? (
+                      <span className="font-bold text-text-primary font-mono tabular-nums text-sm">
+                        {userUnit === 'lbs'
                           ? `${latestMetrics.hipsIn} in`
-                          : `${Math.round(latestMetrics.hipsIn * 2.54)} cm`
-                        : '—'}
-                    </span>
+                          : `${Math.round(latestMetrics.hipsIn * 2.54)} cm`}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-text-muted font-medium">{t('progress.noDataYet')}</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1849,7 +1881,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                         <div
                           style={{ width: `${w.pct}%` }}
                           className={`h-full rounded-full ${
-                            w.pct >= 80 ? 'bg-[#858076]' : 'bg-accent'
+                            w.pct >= 80 ? 'bg-[var(--text-secondary)]' : 'bg-accent'
                           }`}
                         />
                       </div>
@@ -1985,7 +2017,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-[#858076]/20 text-[#5E615A] dark:text-[#A5A096] flex items-center justify-center shrink-0">
+                  <div className="w-9 h-9 rounded-lg bg-[var(--text-secondary)]/20 text-[#5E615A] dark:text-[#A5A096] flex items-center justify-center shrink-0">
                     <Scale className="w-4 h-4" />
                   </div>
                   <div>

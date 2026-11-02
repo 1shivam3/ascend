@@ -606,7 +606,12 @@ describe('Web Push Dispatch Route (/api/notifications/dispatch)', () => {
 
   // 11. Existing service-worker payloads and navigation compatibility
   it('11 & 14. service worker handles push payload structure and navigation tabs', () => {
-    const swPath = path.resolve(process.cwd(), 'public/sw.js');
+    // D-PWA-1: sw.js is generated (git-ignored); fall back to the
+    // template it is generated from when no build has run yet.
+    const generatedPath = path.resolve(process.cwd(), 'public/sw.js');
+    const swPath = fs.existsSync(generatedPath)
+      ? generatedPath
+      : path.resolve(process.cwd(), 'public/sw.template.js');
     const swContent = fs.readFileSync(swPath, 'utf-8');
 
     // Verifies sw.js expects data.tab, data.url, and data.tag

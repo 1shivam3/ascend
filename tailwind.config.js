@@ -78,9 +78,9 @@ module.exports = {
         // globals.css --success / --success-bg. Always paired with a
         // check icon + label, never color alone.
         success: 'rgb(var(--success) / <alpha-value>)',
-        warning: '#f59e0b',
-        danger: '#ef4444',
-        error: '#ef4444',
+        warning: 'rgb(var(--warning) / <alpha-value>)',
+        danger: 'rgb(var(--danger) / <alpha-value>)',
+        error: 'rgb(var(--danger) / <alpha-value>)',
         info: '#3b82f6',
       },
       fontFamily: {

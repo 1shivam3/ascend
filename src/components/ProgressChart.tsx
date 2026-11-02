@@ -423,8 +423,8 @@ export default function ProgressChart() {
               >
                 <defs>
                   <linearGradient id="strengthGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.28" />
-                    <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.0" />
+                    <stop offset="0%" stopColor="rgb(var(--accent))" stopOpacity="0.28" />
+                    <stop offset="100%" stopColor="rgb(var(--accent))" stopOpacity="0.0" />
                   </linearGradient>
                 </defs>
 
@@ -435,7 +435,7 @@ export default function ProgressChart() {
                   x2={width - paddingX}
                   y2={paddingY}
                   stroke="currentColor"
-                  className="text-border/60"
+                  className="text-text-muted/50"
                   strokeDasharray="4 4"
                   strokeWidth="1"
                 />
@@ -445,7 +445,7 @@ export default function ProgressChart() {
                   x2={width - paddingX}
                   y2={height - paddingY}
                   stroke="currentColor"
-                  className="text-border/60"
+                  className="text-text-muted/50"
                   strokeWidth="1"
                 />
 
@@ -458,7 +458,7 @@ export default function ProgressChart() {
                 <path
                   d={points}
                   fill="none"
-                  stroke="var(--accent)"
+                  stroke="rgb(var(--accent))"
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -474,8 +474,8 @@ export default function ProgressChart() {
                         ? '#f59e0b'
                         : effortTrend === 'low'
                         ? '#10b981'
-                        : 'var(--accent)'
-                      : 'var(--accent)';
+                        : 'rgb(var(--accent))'
+                      : 'rgb(var(--accent))';
 
                   return (
                     <g key={i}>

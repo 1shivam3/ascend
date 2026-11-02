@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prebuild": "node scripts/generate-sw.js"
+    "prebuild": "node scripts/generate-sw.js",
+    "postbuild": "node scripts/generate-sw.js && node scripts/assert-sw.js"
   },
   "dependencies": {
     "@capacitor-community/speech-recognition": "^7.0.1",
