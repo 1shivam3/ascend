@@ -1696,6 +1696,7 @@ export const en = {
   'meals.addFoodHint': 'Tap "Add Food", select from Favorites above, or scan a barcode.',
   'meals.myVersionBadge': 'My version',
   'meals.qtyHint': 'Enter quantity above to calculate macros automatically.',
+  'meals.zeroNutritionHint': '“{name}” has no calories or macros yet — enter a quantity or fill in the values above, or remove it to save.',
   'meals.gheeOilHeading': 'GHEE/OIL IN THIS?',
   'meals.noPinnedFoods': 'No pinned foods. Tap "Add Custom Food" below to create your first pinned food!',
   'meals.clearPinnedWarn': 'This will remove all items from your pinned foods list. This action cannot be undone.',

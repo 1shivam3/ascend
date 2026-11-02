@@ -304,8 +304,9 @@ function PlanModal({
           })()}
           {/* Plan Name */}
           <div>
-            <label className="section-title mb-2 block">Plan Name</label>
+            <label htmlFor="plan-builder-name" className="section-title mb-2 block">Plan Name</label>
             <input
+              id="plan-builder-name"
               type="text"
               placeholder='e.g. "Push Day", "Leg Day", "Full Body A"'
               value={planName}
@@ -403,6 +404,7 @@ function PlanModal({
                   <input
                     type="text"
                     placeholder="Exercise name (e.g. Bench Press)"
+                    aria-label={`Exercise ${i + 1} name`}
                     value={ex.name}
                     onChange={e => updateExercise(i, 'name', e.target.value)}
                     list="plan-exercises-list"
@@ -412,8 +414,9 @@ function PlanModal({
                   {/* Sets / Reps / Weight row */}
                   <div className="grid grid-cols-2 gap-2 mb-2">
                     <div>
-                      <label className="text-2xs text-text-muted font-mono block mb-1">TARGET SETS</label>
+                      <label htmlFor={`plan-ex-${i}-sets`} className="text-2xs text-text-muted font-mono block mb-1">TARGET SETS</label>
                       <input
+                        id={`plan-ex-${i}-sets`}
                         type="number"
                         min={1}
                         max={20}
@@ -423,8 +426,9 @@ function PlanModal({
                       />
                     </div>
                     <div>
-                      <label className="text-2xs text-text-muted font-mono block mb-1">TARGET REPS</label>
+                      <label htmlFor={`plan-ex-${i}-reps`} className="text-2xs text-text-muted font-mono block mb-1">TARGET REPS</label>
                       <input
+                        id={`plan-ex-${i}-reps`}
                         type="number"
                         min={1}
                         max={100}
@@ -437,9 +441,10 @@ function PlanModal({
 
                   {/* Optional Weight */}
                   <div>
-                    <label className="text-2xs text-text-muted font-mono block mb-1">TARGET WEIGHT (OPTIONAL)</label>
+                    <label htmlFor={`plan-ex-${i}-weight`} className="text-2xs text-text-muted font-mono block mb-1">TARGET WEIGHT (OPTIONAL)</label>
                     <div className="flex gap-2">
                       <input
+                        id={`plan-ex-${i}-weight`}
                         type="number"
                         min={0}
                         placeholder="e.g. 80"
@@ -448,6 +453,7 @@ function PlanModal({
                         className="flex-1 bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-sm outline-none focus:border-accent"
                       />
                       <select
+                        aria-label="Weight unit"
                         value={ex.targetUnit ?? userUnit}
                         onChange={e => updateExercise(i, 'targetUnit', e.target.value)}
                         className="bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-xs outline-none focus:border-accent"
@@ -480,8 +486,9 @@ function PlanModal({
                   {/* Target RPE — the plan schema carries it and sharing
                       now preserves it, but this editor never exposed it */}
                   <div className="mt-2">
-                    <label className="text-2xs text-text-muted font-mono block mb-1">TARGET RPE (OPTIONAL)</label>
+                    <label htmlFor={`plan-ex-${i}-rpe`} className="text-2xs text-text-muted font-mono block mb-1">TARGET RPE (OPTIONAL)</label>
                     <input
+                      id={`plan-ex-${i}-rpe`}
                       type="number"
                       min={1}
                       max={10}
@@ -503,8 +510,9 @@ function PlanModal({
 
                   {/* Notes */}
                   <div className="mt-2">
-                    <label className="text-2xs text-text-muted font-mono block mb-1">NOTES (OPTIONAL)</label>
+                    <label htmlFor={`plan-ex-${i}-notes`} className="text-2xs text-text-muted font-mono block mb-1">NOTES (OPTIONAL)</label>
                     <input
+                      id={`plan-ex-${i}-notes`}
                       type="text"
                       placeholder="e.g. Pause at bottom, control eccentric"
                       value={ex.notes ?? ''}
