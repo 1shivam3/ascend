@@ -20,7 +20,9 @@ const DEVANAGARI = /[\u0900-\u097F]/;
 describe('Hindi exercise how-to (SIM-P1-05 Round 5)', () => {
   it('covers every exercise that has English howTo, with matching step counts', () => {
     const withHowTo = EXERCISE_LIBRARY.filter((e) => e.howTo && e.howTo.length > 0);
-    expect(withHowTo.length).toBe(20);
+    // Was 20 when Round 5 landed; the slop-audit next batch (WS5)
+    // wrote instructions for the remaining 84, so coverage is total.
+    expect(withHowTo.length).toBe(104);
     for (const e of withHowTo) {
       expect(e.howToHi, `${e.id} missing howToHi`).toBeDefined();
       expect(e.howToHi!.length).toBe(e.howTo!.length);

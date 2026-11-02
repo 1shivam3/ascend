@@ -13,10 +13,13 @@ describe('Google Play Store Launch Readiness Verification', () => {
       expect(fs.existsSync(deletePagePath)).toBe(true);
       const content = fs.readFileSync(deletePagePath, 'utf8');
 
-      // Play Store requirement: Disclose what data is deleted and retention period
+      // Play Store requirement: Disclose what data is deleted and retention period.
+      // Slop-audit WS2: the old pin asserted the "0 days retention" claim
+      // itself — false, since AI provider logs persist up to 30 days. The
+      // comment now discloses the implemented truth.
       expect(content).toContain('Google Play Store Data Safety');
-      expect(content).toContain('0 days retention');
-      expect(content).toContain('Permanently');
+      expect(content).toContain('erased from');
+      expect(content).toContain('up to 30 days');
     });
 
     it('has an in-app Account & Privacy settings section with export and deletion', () => {

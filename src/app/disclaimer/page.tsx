@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import LegalLangSync from '@/components/LegalLangSync';
+import { LEGAL_LAST_UPDATED, LEGAL_VERSION } from '@/lib/legal';
 import {
   Dumbbell,
   ArrowLeft,
@@ -47,7 +48,7 @@ export default function DisclaimerPage() {
       </div>
 
       <div className="space-y-2">
-        <div className="flex items-center gap-2 text-amber-400">
+        <div className="flex items-center gap-2 text-amber-800 dark:text-amber-400">
           <HeartPulse className="w-6 h-6" />
           <h1 className="text-xl sm:text-2xl font-black font-mono tracking-tight uppercase">
             MEDICAL &amp; SAFETY DISCLAIMER
@@ -56,18 +57,21 @@ export default function DisclaimerPage() {
         <p className="text-xs text-text-muted font-mono">
           Physical Activity Readiness, Health Policies &amp; Play Store Compliance • Please Read Carefully
         </p>
+        <p className="text-xs text-text-muted font-mono">
+          Last Updated: {LEGAL_LAST_UPDATED} • Version {LEGAL_VERSION}
+        </p>
       </div>
 
       {/* Primary Alert Banner */}
-      <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200/90 text-xs font-mono space-y-2">
-        <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
+      <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-900 dark:border-amber-500/20 dark:text-amber-200/90 text-xs font-mono space-y-2">
+        <div className="flex items-center gap-2 text-amber-800 dark:text-amber-400 font-bold text-sm">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
           <span>NOT MEDICAL, CLINICAL OR PROFESSIONAL HEALTHCARE ADVICE</span>
         </div>
         <p className="text-2xs leading-relaxed">
           ASCEND is an analytical workout journal, mathematical strength standards calculator, and habit tracker. The features, 1RM estimations, AI coaching insights, workout plan generators, hydration targets, and nutritional calculations are provided solely for informational and motivational purposes. ASCEND does not provide medical advice, diagnosis, treatment, physical therapy, or individualized clinical prescriptions.
         </p>
-        <p className="text-2xs leading-relaxed font-bold text-amber-300">
+        <p className="text-2xs leading-relaxed font-bold text-amber-900 dark:text-amber-300">
           Always seek the advice of a qualified physician or licensed healthcare provider with any questions you may have regarding a medical condition or before starting any new physical training program.
         </p>
       </div>
@@ -101,7 +105,7 @@ export default function DisclaimerPage() {
             <p>5. Are you currently prescribed medication for blood pressure, heart rate, or kidney function?</p>
             <p>6. Do you know of any other medical or physical condition that should prevent you from strenuous lifting?</p>
           </div>
-          <p className="text-2xs text-amber-300/90">
+          <p className="text-2xs text-amber-900 dark:text-amber-300/90">
             <strong>If you answered YES to any question:</strong> You must consult a qualified physician and obtain medical clearance before attempting heavy lifts or high-intensity resistance training.
           </p>
         </section>

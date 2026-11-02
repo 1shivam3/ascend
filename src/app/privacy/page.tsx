@@ -63,13 +63,13 @@ export default function PrivacyPage() {
       </div>
 
       {/* Guarantee Card */}
-      <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm space-y-1.5">
+      <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/40 text-emerald-900 dark:border-emerald-500/20 dark:text-emerald-200/90 text-sm space-y-1.5">
         <div className="flex items-center gap-2 font-bold text-sm">
           <Lock className="w-4 h-4" />
           <span>Local-First Default &amp; Transparent Cloud Privacy</span>
         </div>
         <p className="opacity-90 leading-relaxed">
-          ASCEND is engineered with privacy as a foundational principle. By default, ASCEND operates in <strong>Guest Mode (100% local-first)</strong> with zero cloud tracking. For trainees who choose to link a cloud account or enable push reminders, your data is protected with strict Row Level Security (RLS), zero advertising monetization, and instantaneous 0-day cascade account deletion.
+          ASCEND is engineered with privacy as a foundational principle. By default, ASCEND operates in <strong>Guest Mode (100% local-first)</strong> with zero cloud tracking. For trainees who choose to link a cloud account or enable push reminders, your data is protected with strict Row Level Security (RLS), zero advertising monetization, and account deletion that erases your cloud data from our systems right away (third-party AI provider logs may be kept for up to 30 days, as Section 2 explains).
         </p>
       </div>
 
@@ -155,7 +155,7 @@ export default function PrivacyPage() {
               <p>• <strong>Device &amp; Other Identifiers:</strong> Web Push subscription tokens (endpoint and cryptographic keys) are stored solely for delivering user-configured workout and habit reminders when push notifications are enabled.</p>
               <p>• <strong>Data Shared with Third Parties:</strong> None with advertisers, data brokers, or marketing networks. Third-party API communication is strictly user-initiated (Groq, OpenRouter, and Google Gemini for athletic coaching and meal analysis — some OpenRouter text models are free-tier and may retain submitted text, as disclosed in Section 2 — Open Food Facts for barcode lookups, Web Push for reminders).</p>
               <p>• <strong>Tracking &amp; Diagnostics:</strong> Zero advertising tracking, zero cross-app tracking, zero marketing cookies. Anonymous diagnostics (Google Analytics 4, Microsoft Clarity, Sentry error monitoring, Vercel Analytics) load <em>only</em> if you explicitly opt in via the consent banner or Settings toggle, and transmit only sanitized, non-identifying app events — never workout, nutrition, or body data. If you do not opt in, none of these services load and nothing is collected.</p>
-              <p>• <strong>Data Deletion:</strong> 1-tap local device wiping and instant 0-day cascade cloud account deletion via in-app settings or the external deletion portal.</p>
+              <p>• <strong>Data Deletion:</strong> 1-tap local device wiping, and cloud account deletion via in-app settings or the external deletion portal that erases ASCEND&apos;s own records right away (AI provider logs may persist for up to 30 days — see Section 2).</p>
             </div>
           </div>
         </section>
@@ -173,7 +173,7 @@ export default function PrivacyPage() {
             <ul className="list-disc list-inside space-y-1.5 pl-1">
               <li><strong>Instant In-App Deletion:</strong> Open <em>Settings &rarr; Account &amp; Privacy &rarr; Delete My Account</em>. This immediately and permanently deletes your Supabase cloud account, all synchronized workout, PR, meal, and biometric records, and wipes all device storage.</li>
               <li><strong>External Web Deletion Portal:</strong> In compliance with Google Play Data Safety requirements, you can also initiate deletion without having the app installed via our dedicated <Link href="/delete-account" className="text-accent underline font-semibold">Account &amp; Data Deletion Request Page</Link>.</li>
-              <li><strong>Zero Retention Policy:</strong> Wiping or requesting deletion results in immediate 0-day erasure across cloud databases and authentication directories.</li>
+              <li><strong>Erasure Scope:</strong> Wiping or requesting deletion erases your data from ASCEND&apos;s cloud databases and authentication directory immediately. Logs held by third-party AI providers may be retained for up to 30 days under their own policies (see Section 2); ASCEND keeps no copy.</li>
               <li><strong>Manual Support Inquiries:</strong> Contact our privacy team at <a href={`mailto:${SUPPORT_EMAIL}`} className="text-accent underline">{SUPPORT_EMAIL}</a>.</li>
             </ul>
           </div>
@@ -214,7 +214,7 @@ export default function PrivacyPage() {
           </h2>
           <div className="space-y-2">
             <p>
-              <strong>Retention:</strong> Cloud data is kept only while your account exists — account deletion triggers immediate, zero-day erasure across all databases and authentication records. Guest Mode data lives in your device&apos;s local storage until you clear site data, reset the app, or delete it yourself. AI provider request logs are retained by the providers only for their standard short abuse-detection windows (typically up to 30 days); ASCEND keeps no copy.
+              <strong>Retention:</strong> Cloud data is kept only while your account exists — account deletion triggers immediate erasure from all of ASCEND&apos;s own databases and authentication records. Guest Mode data lives in your device&apos;s local storage until you clear site data, reset the app, or delete it yourself. AI provider request logs are retained by the providers only for their standard short abuse-detection windows (typically up to 30 days); ASCEND keeps no copy.
             </p>
             <p>
               <strong>Your rights:</strong> You can access and export all of your local data at any time via Settings &rarr; Data Vault (JSON backup), correct anything in the app itself, and delete everything via Settings &rarr; Delete Account or the <Link href="/delete-account" className="text-accent underline font-semibold">Account &amp; Data Deletion Request Page</Link>. For access, rectification, portability, or erasure requests you cannot complete yourself, email <a href={`mailto:${SUPPORT_EMAIL}`} className="text-accent underline">{SUPPORT_EMAIL}</a> and we will act within 30 days.

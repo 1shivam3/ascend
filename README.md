@@ -127,7 +127,7 @@ ASCEND is engineered to meet all guidelines for mobile app store publication:
 * **In-App Account Deletion:** Trainees can erase their account, all synchronized cloud data (10 tables cascade purged), and wiped local storage at any time via **Settings $\rightarrow$ Account & Privacy $\rightarrow$ "Delete My Account"**.
 * **External Web Deletion Portal:** In strict compliance with Google Play Data Safety policies, users can request account and data deletion without reinstalling the app via [`/delete-account`](https://ascendtonext.vercel.app/delete-account).
 * **Guest Local Wiping:** Guest users can instantly wipe all local device storage via **Settings $\rightarrow$ Data Vault $\rightarrow$ "Wipe All Data"**.
-* **Zero Retention Guarantee:** Deletion results in immediate 0-day purging across cloud databases and authentication directories.
+* **Deletion & Retention:** Deleting your account erases your data from ASCEND's cloud databases and authentication directory right away; manual deletion requests are completed within 30 days. AI providers may retain request logs for up to 30 days under their own policies (see Terms §4 / Privacy Policy) — ASCEND keeps no copy.
 * **Support Contact:** Trainees can contact `shivamvats744@gmail.com` for privacy questions or manual verification.
 
 ### 5. Hardware Permissions
