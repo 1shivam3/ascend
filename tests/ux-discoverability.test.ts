@@ -110,9 +110,21 @@ describe('UX discoverability: placement wiring (source assertions)', () => {
     expect(meals).toContain('meals.sugarNote');
   });
 
-  it('Train collapses the non-enrolled Running intro and keeps the ledger advanced-gated', () => {
+  it('Train shows Running enrolled-only; Couch to 5K discovery lives in the New Plan flow', () => {
     const workout = src('src/components/WorkoutPage.tsx');
-    expect(workout).toContain('isRunIntroOpen');
+    // Owner decision (2026-11-02) supersedes the old collapsed-promo
+    // design: the non-enrolled promo card (isRunIntroOpen) is REMOVED —
+    // Train lists only what the user has, so the Running section is
+    // gated on enrollment…
+    expect(workout).not.toContain('isRunIntroOpen');
+    expect(workout).toContain('{runProgram && (');
+    // …and discovery moved into the New Plan flow: the plan builder's
+    // Programs entry is wired to the same enroll action, and its
+    // heading key resolves in both languages.
+    expect(workout).toContain("t('plan.programsTitle')");
+    expect(workout).toContain('handleStartRunProgram');
+    expect(translate('en', 'plan.programsTitle')).toBe('Programs');
+    expect(translate('hi', 'plan.programsTitle')).not.toBe('plan.programsTitle');
     expect(workout).toContain('{workoutMode === \'advanced\' && (activePolicyDecision');
   });
 

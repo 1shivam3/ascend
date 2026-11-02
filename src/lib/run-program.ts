@@ -24,6 +24,23 @@ export const RUNS_PER_WEEK = 3;
 export const WARMUP_SECONDS = 300;
 export const COOLDOWN_SECONDS = 300;
 
+/** Sanity ceiling for a user-entered run distance (an ultra is ~100 km;
+ *  500 leaves generous headroom while catching unit slips like metres). */
+export const MAX_RUN_DISTANCE_KM = 500;
+
+/**
+ * The one distance rule, shared by the completion save
+ * (buildRunWorkoutEntry) and the history edit path
+ * (sanitizeWorkoutUpdate): a finite number in (0, MAX_RUN_DISTANCE_KM],
+ * rounded to 2 decimals. Anything else normalizes to undefined
+ * ("no distance recorded").
+ */
+export function normalizeRunDistanceKm(value: unknown): number | undefined {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n) || n <= 0 || n > MAX_RUN_DISTANCE_KM) return undefined;
+  return Math.round(n * 100) / 100;
+}
+
 export interface RunSegment {
   kind: 'run' | 'walk';
   seconds: number;
@@ -259,15 +276,14 @@ export function buildRunWorkoutEntry(input: {
     input.intervalsTotal > 0 && input.intervalsCompleted < input.intervalsTotal
       ? ` · ${input.intervalsCompleted} of ${input.intervalsTotal} intervals finished`
       : '';
+  const distanceKm = normalizeRunDistanceKm(input.distanceKm);
   return {
     id: input.id,
     date: input.date,
     name: `Couch to 5K — Week ${session.week}, Run ${session.day}`,
     kind: 'run',
     runSessionId: session.id,
-    ...(typeof input.distanceKm === 'number' && input.distanceKm > 0
-      ? { distanceKm: Math.round(input.distanceKm * 100) / 100 }
-      : {}),
+    ...(distanceKm !== undefined ? { distanceKm } : {}),
     durationMinutes: Math.round(durationSeconds / 60),
     durationSeconds,
     exercises: [

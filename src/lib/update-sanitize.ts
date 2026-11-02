@@ -12,7 +12,8 @@
  */
 import { isValidEntryDate } from './formatters';
 import { MAX_PR_WEIGHT_KG } from './strength-standards';
-import type { FoodItem, MealEntry, PersonalRecord, PlannedWorkout } from './types';
+import { normalizeRunDistanceKm } from './run-program';
+import type { FoodItem, MealEntry, PersonalRecord, PlannedWorkout, WorkoutEntry } from './types';
 
 const MAX_WEIGHT_LBS = Math.ceil(MAX_PR_WEIGHT_KG * 2.20462);
 const MAX_FOOD_CALORIES = 10000;
@@ -65,6 +66,36 @@ export function sanitizeMealUpdate(
   }
   if (Array.isArray(updated.foods)) {
     next.foods = updated.foods.map((f) => sanitizeFoodItem(f));
+  }
+  return next;
+}
+
+export function sanitizeWorkoutUpdate(
+  existing: WorkoutEntry,
+  updated: Partial<WorkoutEntry>,
+): WorkoutEntry {
+  const next: WorkoutEntry = { ...existing, ...updated };
+  if (typeof updated.date === 'string' && !isValidEntryDate(updated.date)) {
+    next.date = existing.date;
+  }
+  if ('distanceKm' in updated) {
+    if (updated.distanceKm === undefined) {
+      // Explicit clear (the history editor saved an empty field):
+      // remove the field entirely, back to "no distance recorded".
+      delete next.distanceKm;
+    } else {
+      // Same rule as the completion save (normalizeRunDistanceKm):
+      // finite, > 0, ≤ 500 km, 2-decimal rounding. An invalid number
+      // keeps the existing value — clearing is explicit via undefined,
+      // never a side effect of a corrupt caller.
+      const km = normalizeRunDistanceKm(updated.distanceKm);
+      if (km === undefined) {
+        if (existing.distanceKm === undefined) delete next.distanceKm;
+        else next.distanceKm = existing.distanceKm;
+      } else {
+        next.distanceKm = km;
+      }
+    }
   }
   return next;
 }

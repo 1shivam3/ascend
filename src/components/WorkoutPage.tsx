@@ -105,6 +105,7 @@ import SegmentedControl from '@/components/ui/SegmentedControl';
 import RunSessionScreen from '@/components/RunSessionScreen';
 import {
   getRunProgramProgress,
+  normalizeRunDistanceKm,
   describeSession,
   sessionTotalSeconds,
   type RunSession,
@@ -170,6 +171,14 @@ function PlanModal({
   const prs = useStore((state) => state.prs);
   const workouts = useStore((state) => state.workouts);
   const trainingProfile = useStore((state) => state.trainingProfile);
+  // Programs entry (create mode): Couch to 5K discovery lives in the
+  // New Plan flow now — Train renders the Running section enrolled-only.
+  const runProgram = useStore((state) => state.runProgram);
+  const enrollRunProgram = useStore((state) => state.enrollRunProgram);
+  const runProgress = useMemo(
+    () => getRunProgramProgress(workouts, runProgram),
+    [workouts, runProgram],
+  );
   const [planName, setPlanName] = useState('');
   const [planExercises, setPlanExercises] = useState<PlannedExercise[]>([emptyPlanExercise(userUnit, defaultTargetReps)]);
   const [intensityMode, setIntensityMode] = useState<'rpe' | 'percent'>('rpe');
@@ -258,6 +267,11 @@ function PlanModal({
     onClose();
   };
 
+  const handleStartRunProgram = () => {
+    enrollRunProgram(getLocalTodayStr());
+    onClose();
+  };
+
   const isValid = planName.trim().length > 0 && planExercises.some(e => e.name.trim());
 
   if (!isOpen) return null;
@@ -302,6 +316,43 @@ function PlanModal({
               </div>
             );
           })()}
+          {/* Programs (create mode only): structured programs a user can
+              start instead of building a plan. Train renders the Running
+              section enrolled-only, so this is the discovery + start
+              surface for Couch to 5K. Already-enrolled users get a status
+              row with NO enroll action — Train owns progress/leave. */}
+          {!initial && (
+            <div className="border border-border rounded-xl p-3.5 bg-bg-elevated/40 space-y-2.5">
+              <div className="flex items-center gap-2">
+                <Footprints className="w-4 h-4 text-accent" />
+                <span className="text-xs font-semibold text-text-primary uppercase tracking-wide">
+                  {t('plan.programsTitle')}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-text-primary">{t('run.programName')}</p>
+                  <p className="text-2xs text-text-muted mt-0.5 leading-relaxed">
+                    {runProgram
+                      ? runProgress.complete
+                        ? t('run.programComplete')
+                        : `${t('run.weekOf', { week: runProgress.currentWeek })} · ${t('run.sessionsDone', { done: runProgress.completedCount, total: runProgress.totalCount })}`
+                      : t('run.programDesc')}
+                  </p>
+                </div>
+                {!runProgram && (
+                  <button
+                    type="button"
+                    onClick={handleStartRunProgram}
+                    className="btn-primary py-2 px-4 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-white" />
+                    <span>{t('run.startProgram')}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           {/* Plan Name */}
           <div>
             <label htmlFor="plan-builder-name" className="section-title mb-2 block">Plan Name</label>
@@ -553,6 +604,99 @@ function PlanModal({
   );
 }
 
+// ─── Run Distance Row (History expansion, run records only) ──────────────
+
+/**
+ * Distance display + inline editor for a SAVED run. Distance used to be
+ * enterable only on the RunSessionScreen completion screen — once the
+ * run was saved there was no way to add or correct it. This row lives in
+ * the History expansion (the saved-workout detail surface) and writes
+ * through the store's updateWorkout, so the record itself changes and
+ * every surface reading distanceKm sees the edit. Saving an empty field
+ * clears the distance back to unset.
+ */
+function RunDistanceRow({ workout }: { workout: WorkoutEntry }) {
+  const { t } = useTranslation();
+  const updateWorkout = useStore((state) => state.updateWorkout);
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  const startEdit = () => {
+    setDraft(workout.distanceKm !== undefined ? String(workout.distanceKm) : '');
+    setIsEditing(true);
+  };
+
+  const trimmed = draft.trim();
+  const parsed = trimmed === '' ? undefined : Number(trimmed);
+  // Empty = clear (valid); otherwise the shared distance rule decides.
+  const isValidDraft = trimmed === '' || normalizeRunDistanceKm(parsed) !== undefined;
+
+  const handleSave = () => {
+    if (!isValidDraft) return;
+    updateWorkout(workout.id, {
+      distanceKm: trimmed === '' ? undefined : normalizeRunDistanceKm(parsed),
+    });
+    setIsEditing(false);
+  };
+
+  if (!isEditing) {
+    return (
+      <div className="bg-bg-elevated p-3 rounded-lg flex items-center justify-between gap-3">
+        <span className="text-xs font-semibold text-text-secondary">{t('run.distanceLabel')}</span>
+        <button
+          type="button"
+          onClick={startEdit}
+          aria-label={t('common.edit')}
+          className="flex items-center gap-1.5 text-sm font-semibold text-text-primary cursor-pointer shrink-0"
+        >
+          {workout.distanceKm !== undefined ? (
+            <span className="tabular-nums">{workout.distanceKm} km</span>
+          ) : (
+            <span className="text-text-muted">{t('common.add')}</span>
+          )}
+          <Edit2 className="w-3.5 h-3.5 text-text-muted" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-bg-elevated p-3 rounded-lg space-y-2">
+      <label className="block">
+        <span className="text-xs font-semibold text-text-secondary">{t('run.distanceLabel')}</span>
+        <input
+          type="number"
+          inputMode="decimal"
+          min="0"
+          step="0.01"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="5.00"
+          autoFocus
+          className="mt-1 w-full bg-bg-secondary border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:border-accent outline-none"
+        />
+      </label>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setIsEditing(false)}
+          className="py-2 px-4 rounded-xl bg-bg-secondary border border-border text-xs font-bold text-text-secondary flex-1 cursor-pointer"
+        >
+          {t('common.cancel')}
+        </button>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!isValidDraft}
+          className="py-2 px-4 rounded-xl bg-accent text-accent-on text-xs font-bold flex-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {t('common.save')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Plan Card ───────────────────────────────────────────────────────────────
 
 interface PlanCardProps {
@@ -789,7 +933,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     [workouts, runProgram],
   );
   const [activeRunSession, setActiveRunSession] = useState<RunSession | null>(null);
-  const [isRunIntroOpen, setIsRunIntroOpen] = useState(false);
   const toast = useToast();
   const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
 
@@ -2403,43 +2546,17 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         )}
       </section>
 
-      {/* ── Running (opt-in Couch to 5K program) ── */}
+      {/* ── Running (Couch to 5K) — ENROLLED ONLY. Non-enrolled users
+          discover + start the program from the New Plan flow (PlanModal
+          Programs entry); Train lists only what the user actually has. ── */}
+      {runProgram && (
       <section className="space-y-2.5" aria-label={t('run.title')}>
         <div className="flex items-center gap-2">
           <Footprints className="w-4 h-4 text-accent" />
           <h2 className="section-title text-[0.6875rem] mb-0">{t('run.title').toUpperCase()}</h2>
         </div>
         <div className="card p-4 sm:p-5 space-y-3">
-          {!runProgram ? (
-            <>
-              {/* Non-enrolled: one row until tapped — the full intro and
-                  enroll button live behind it, so nothing is lost. */}
-              <button
-                type="button"
-                onClick={() => setIsRunIntroOpen((o) => !o)}
-                aria-expanded={isRunIntroOpen}
-                className="w-full flex items-center justify-between gap-3 text-left cursor-pointer"
-              >
-                <span className="text-sm font-bold text-text-primary">{t('run.programName')}</span>
-                <ChevronDown className={`w-4 h-4 text-text-muted shrink-0 transition-transform ${isRunIntroOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
-              </button>
-              {isRunIntroOpen && (
-                <>
-                  <div>
-                    <p className="text-2xs text-text-muted mt-0.5 leading-relaxed">{t('run.programDesc')}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => enrollRunProgram(getLocalTodayStr())}
-                    className="btn-primary py-2 px-4 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-white" />
-                    <span>{t('run.startProgram')}</span>
-                  </button>
-                </>
-              )}
-            </>
-          ) : runProgress.complete ? (
+          {runProgress.complete ? (
             <>
               <div className="flex items-center gap-2.5">
                 <span className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0">
@@ -2517,6 +2634,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           )}
         </div>
       </section>
+      )}
 
       {/* ── Schedule Status Footer (Reference: Screen 10 Schedule Context) ── */}
       <section className="card p-4 bg-bg-card border border-border/80 space-y-3">
@@ -2731,6 +2849,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
                   {isExpanded && (
                     <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4">
+                      {workout.kind === 'run' && <RunDistanceRow workout={workout} />}
                       {displayExercises.map((ex, i) => {
                         const effortSummary = ex.sets.some((s) => s.rpe !== undefined)
                           ? calculateSetEffortDrift(ex.sets)
