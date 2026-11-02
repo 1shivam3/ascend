@@ -320,7 +320,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
       const url = canvas.toDataURL('image/png');
       setImagePreviewUrl(url);
     } catch (e) {
-      console.error(e);
+      console.error('WeeklyRecapModal: recap image render failed:', e);
     }
     setIsGenerating(false);
   }, [isOpen, weeklyStats, profile, t]);

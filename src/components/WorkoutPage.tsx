@@ -5,6 +5,7 @@ import { useModalA11y } from '@/lib/use-modal-a11y';
 import { tabListKeyDown } from '@/lib/tab-keyboard';
 import { useStore } from '@/lib/store';
 import { resolveDefaultCoachSegment } from '@/lib/coach-session';
+import { renderLocalizedSentence } from '@/lib/coach-i18n';
 import { useTranslation } from '@/lib/i18n';
 import { validatePlanExercises } from '@/lib/plan-validation';
 import { useToday } from '@/lib/use-today';
@@ -2466,7 +2467,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                 )}
               </p>
               <p className="text-2xs text-text-muted truncate">
-                {weeklyReviews[weeklyReviews.length - 1].focus.headline}
+                {renderLocalizedSentence(
+                  t,
+                  language,
+                  weeklyReviews[weeklyReviews.length - 1].focus.headlineI18n,
+                  weeklyReviews[weeklyReviews.length - 1].focus.headline
+                )}
               </p>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted shrink-0" />
