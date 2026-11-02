@@ -131,7 +131,12 @@ describe('Google Play Store Launch Readiness Verification', () => {
 
   describe('4. Push Notifications & Reminder Center', () => {
     it('service worker implements push delivery and navigation message dispatch', () => {
-      const swPath = path.join(rootDir, 'public', 'sw.js');
+      // D-PWA-1: sw.js is generated (git-ignored); fall back to the
+      // template it is generated from when no build has run yet.
+      const generatedPath = path.join(rootDir, 'public', 'sw.js');
+      const swPath = fs.existsSync(generatedPath)
+        ? generatedPath
+        : path.join(rootDir, 'public', 'sw.template.js');
       const swContent = fs.readFileSync(swPath, 'utf8');
 
       expect(swContent).toContain("self.addEventListener('push'");

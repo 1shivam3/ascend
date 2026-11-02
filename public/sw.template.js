@@ -8,6 +8,14 @@ const STATIC_PRECACHE = [
   '/icon-192.png',
   '/icon-512.png',
   '/icon-maskable-512.png',
+  // Pre-play D-PWA-2: scripts/generate-sw.js replaces this placeholder
+  // with the current build's critical JS/CSS chunk URLs (from
+  // .next/build-manifest.json + app-build-manifest.json), so a single
+  // online visit leaves the whole app shell in cache and an offline
+  // relaunch renders instead of falling back to the offline page.
+  // (No trailing comma on the placeholder line: the generator emits
+  // one comma-terminated line per asset.)
+  '__APP_SHELL_ASSETS__'
 ];
 
 // Install Event: Precaches the core app shell
