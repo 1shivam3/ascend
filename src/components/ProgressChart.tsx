@@ -435,7 +435,7 @@ export default function ProgressChart() {
                   x2={width - paddingX}
                   y2={paddingY}
                   stroke="currentColor"
-                  className="text-border/60"
+                  className="text-text-muted/50"
                   strokeDasharray="4 4"
                   strokeWidth="1"
                 />
@@ -445,7 +445,7 @@ export default function ProgressChart() {
                   x2={width - paddingX}
                   y2={height - paddingY}
                   stroke="currentColor"
-                  className="text-border/60"
+                  className="text-text-muted/50"
                   strokeWidth="1"
                 />
 

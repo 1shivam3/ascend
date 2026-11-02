@@ -12,7 +12,7 @@
   --bg-elevated: 255 255 255;     /* #FFFFFF elevated card */
   --text-primary: 23 25 22;       /* #171916 Graphite primary typography */
   --text-secondary: 94 97 90;     /* #5E615A refined secondary body text */
-  --text-muted: 110 106 94;       /* #6E6A5E darkened Sage — 4.7:1 on Chalk (was #858076 at 3.45:1, failing WCAG AA for meta text) */
+  --text-muted: 98 93 80;       /* #625D50 darkened Sage — pre-play D-A11Y-3: 4.78:1 on tertiary, 5.21:1 on secondary (was #6E6A5E at 3.94:1 / 4.29:1, failing AA) */
   --border: 226 223 214;          /* #E2DFD6 hairline subtle border */
   --border-subtle: 234 231 223;   /* #EAE7DF */
   --border-hover: 160 156 148;    /* #A09C94 */
@@ -33,7 +33,7 @@
   --border-control: #A09C94;
   --text: #171916;
   --text-2: #5E615A;
-  --text-3: #6E6A5E;
+  --text-3: #625D50;
   --accent-hex: #E44427;
   --accent-on: #000000;           /* UX redesign contrast audit: white on
     Vermilion #E44427 is 4.07:1 (fails AA for labels); near-black #171916
@@ -47,9 +47,9 @@
   --success: 21 115 71;            /* D2 fix: success is NO LONGER sage.
     Light #157347 on #E6F4EA; always with check icon + label. */
   --success-bg: #E6F4EA;
-  --warning: #8A5A00;
+  --warning: 138 90 0;
   --warning-bg: #FBF0D3;
-  --danger: #B42318;
+  --danger: 180 35 24;
   --danger-bg: #FDE8E6;
   --scrim: rgba(23, 25, 22, 0.5);
   --inverse: #171916;
@@ -67,7 +67,7 @@
   --bg-elevated: 46 50 45;        /* #2E322D */
   --text-primary: 243 240 231;    /* #F3F0E7 readable warm Chalk white */
   --text-secondary: 175 179 171;  /* #AFB3AB brighter secondary text */
-  --text-muted: 139 143 135;      /* #8B8F87 muted meta — lifted for legibility */
+  --text-muted: 158 162 154;      /* #9EA29A muted meta — pre-play D-A11Y-3: 5.02:1 on elevated, 5.77:1 on card (was #8B8F87 at 3.96:1 / 4.55:1) */
   --border: 52 57 50;             /* #343932 defined hairline dark border */
   --border-subtle: 40 44 39;      /* #282C27 */
   --border-hover: 82 90 79;       /* #525A4F */
@@ -88,7 +88,7 @@
   --border-control: #474E45;
   --text: #F3F0E7;
   --text-2: #A5A9A1;
-  --text-3: #8B8F87;
+  --text-3: #9EA29A;
   --accent-hex: #E44427;
   --accent-on: #171916;           /* UX redesign contrast audit: white on
     dark Vermilion #EB4E30 is 3.72:1 (fails AA for labels); near-black
@@ -101,9 +101,9 @@
   --success: 74 222 128;            /* D2 fix (dark): #4ADE80 on
     rgba(74,222,128,0.15); always with check icon + label. */
   --success-bg: rgba(74, 222, 128, 0.15);
-  --warning: #FBBF24;
+  --warning: 251 191 36;
   --warning-bg: #2B2210;
-  --danger: #F87171;
+  --danger: 248 113 113;
   --danger-bg: #3A1714;
   --scrim: rgba(0, 0, 0, 0.75);
   --inverse: #F3F0E7;
@@ -498,4 +498,23 @@ input[type="number"]::-webkit-outer-spin-button {
 :focus-visible {
   outline: 2px solid rgb(var(--accent));
   outline-offset: 2px;
+}
+
+/* ── Graphite filled-vermilion pairing (pre-play D-UX-4) ───────────── */
+/* Unlayered on purpose (same trick as :focus-visible above): the
+   bg-accent / text-accent-on utilities live in the utilities cascade
+   layer, and unlayered CSS wins over layered CSS. In Graphite,
+   filled-vermilion controls pair chalk text (#F3F0E7) with the
+   deepened vermilion (accent-dim #C7351B) — that pairing computes to
+   4.66:1, while chalk on the bright Graphite accent (#EB4E30) is only
+   3.25:1 and the near-black accent-on read as muddy dark-on-red on
+   dark cards. Applies to the primary CTA, the segmented control's
+   active pill, and every utility-paired bg-accent + text-accent-on
+   control. The light theme keeps its proven pairing (near-black on
+   vermilion, 5.15:1) untouched. */
+.dark .btn-primary,
+.dark .segmented-item.active,
+.dark .bg-accent.text-accent-on {
+  background-color: rgb(var(--accent-dim));
+  color: #F3F0E7;
 }

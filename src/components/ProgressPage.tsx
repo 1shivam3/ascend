@@ -991,7 +991,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       )}
                     </div>
                   </div>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#5E615A] dark:text-[#A5A096]">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[var(--text-secondary)]/15 text-[#5E615A] dark:text-[#A5A096]">
                     {bodyweightAnalytics.deltaText}
                   </span>
                 </div>
@@ -999,22 +999,22 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   <svg viewBox="0 0 320 110" className="w-full h-28 overflow-visible" preserveAspectRatio="none" role="img" aria-label={summarizeSeries(t('progress.chartWeight'), bodyweightAnalytics.dataPoints, userUnit)}>
                     <defs>
                       <linearGradient id="spotWeightGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#858076" stopOpacity="0.2" />
-                        <stop offset="100%" stopColor="#858076" stopOpacity="0.0" />
+                        <stop offset="0%" stopColor="var(--text-secondary)" stopOpacity="0.2" />
+                        <stop offset="100%" stopColor="var(--text-secondary)" stopOpacity="0.0" />
                       </linearGradient>
                     </defs>
-                    <line x1="0" y1="30" x2="320" y2="30" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
-                    <line x1="0" y1="80" x2="320" y2="80" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
+                    <line x1="0" y1="30" x2="320" y2="30" stroke="currentColor" strokeOpacity="0.12" strokeDasharray="3 3" />
+                    <line x1="0" y1="80" x2="320" y2="80" stroke="currentColor" strokeOpacity="0.12" strokeDasharray="3 3" />
                     {bodyChartGeometry.points.length > 0 ? (
                       <>
                         {bodyChartGeometry.pathD ? (
                           <>
                             <path d={bodyChartGeometry.areaD} fill="url(#spotWeightGradient)" />
-                            <path d={bodyChartGeometry.pathD} fill="none" stroke="#858076" strokeWidth="2.5" strokeLinecap="round" />
+                            <path d={bodyChartGeometry.pathD} fill="none" stroke="var(--text-secondary)" strokeWidth="2.5" strokeLinecap="round" />
                           </>
                         ) : null}
                         {bodyChartGeometry.points.map((pt, i) => (
-                          <circle key={i} cx={pt.x} cy={pt.y} r={i === bodyChartGeometry.points.length - 1 ? 4 : 3} fill="#858076" stroke={i === bodyChartGeometry.points.length - 1 ? '#FFFFFF' : 'none'} strokeWidth={i === bodyChartGeometry.points.length - 1 ? 2 : 0} />
+                          <circle key={i} cx={pt.x} cy={pt.y} r={i === bodyChartGeometry.points.length - 1 ? 4 : 3} fill="var(--text-secondary)" stroke={i === bodyChartGeometry.points.length - 1 ? 'var(--bg-card)' : 'none'} strokeWidth={i === bodyChartGeometry.points.length - 1 ? 2 : 0} />
                         ))}
                       </>
                     ) : (
@@ -1071,7 +1071,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                         {big3Analytics.latest1RM ? `${big3Analytics.latest1RM} ${userUnit}` : '—'}
                       </div>
                     </div>
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#5E615A] dark:text-[#A5A096]">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[var(--text-secondary)]/15 text-[#5E615A] dark:text-[#A5A096]">
                       {big3Analytics.deltaText}
                     </span>
                   </div>
@@ -1079,19 +1079,19 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     <svg viewBox="0 0 320 120" className="w-full h-28 overflow-visible" preserveAspectRatio="none" role="img" aria-label={summarizeSeries(`${big3Lift} estimated 1RM`, big3Analytics.dataPoints, userUnit)}>
                       <defs>
                         <linearGradient id="spotBig3Gradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#E44427" stopOpacity="0.22" />
-                          <stop offset="100%" stopColor="#E44427" stopOpacity="0.0" />
+                          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.22" />
+                          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.0" />
                         </linearGradient>
                       </defs>
-                      <line x1="0" y1="90" x2="320" y2="90" stroke="currentColor" strokeOpacity="0.1" strokeDasharray="3 3" />
+                      <line x1="0" y1="90" x2="320" y2="90" stroke="currentColor" strokeOpacity="0.14" strokeDasharray="3 3" />
                       {big3Geometry.pathD ? (
                         <>
                           <path d={big3Geometry.areaD} fill="url(#spotBig3Gradient)" />
-                          <path d={big3Geometry.pathD} fill="none" stroke="#E44427" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="6 3" />
+                          <path d={big3Geometry.pathD} fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="6 3" />
                         </>
                       ) : null}
                       {big3Geometry.points.map((pt, i) => (
-                        <circle key={i} cx={pt.x} cy={pt.y} r={i === big3Geometry.points.length - 1 ? 4 : 3} fill="#E44427" stroke={i === big3Geometry.points.length - 1 ? '#FFFFFF' : 'none'} strokeWidth={i === big3Geometry.points.length - 1 ? 2 : 0} />
+                        <circle key={i} cx={pt.x} cy={pt.y} r={i === big3Geometry.points.length - 1 ? 4 : 3} fill="var(--accent)" stroke={i === big3Geometry.points.length - 1 ? 'var(--bg-card)' : 'none'} strokeWidth={i === big3Geometry.points.length - 1 ? 2 : 0} />
                       ))}
                     </svg>
                     <div className="flex justify-between text-2xs text-text-muted font-mono pt-1">
@@ -1137,7 +1137,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   </div>
                   <span className="text-2xs text-text-muted font-mono">Current 1RM (your estimated best single lift)</span>
                 </div>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#5E615A] dark:text-[#A5A096]">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[var(--text-secondary)]/15 text-[#5E615A] dark:text-[#A5A096]">
                   {heroLiftAnalytics.deltaText}
                 </span>
               </div>
@@ -1145,11 +1145,11 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 <svg viewBox="0 0 320 120" className="w-full h-28 overflow-visible" preserveAspectRatio="none" role="img" aria-label={summarizeSeries(`${heroLift.name} estimated 1RM`, heroLiftAnalytics.dataPoints, userUnit)}>
                   <defs>
                     <linearGradient id="strengthGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#E44427" stopOpacity="0.22" />
-                      <stop offset="100%" stopColor="#E44427" stopOpacity="0.0" />
+                      <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.22" />
+                      <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.0" />
                     </linearGradient>
                   </defs>
-                  <line x1="0" y1="90" x2="320" y2="90" stroke="currentColor" strokeOpacity="0.1" strokeDasharray="3 3" />
+                  <line x1="0" y1="90" x2="320" y2="90" stroke="currentColor" strokeOpacity="0.14" strokeDasharray="3 3" />
                   {heroChartGeometry.points.length > 0 ? (
                     <>
                       {heroChartGeometry.pathD ? (
@@ -1158,7 +1158,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                           <path
                             d={heroChartGeometry.pathD}
                             fill="none"
-                            stroke="#E44427"
+                            stroke="var(--accent)"
                             strokeWidth="2.5"
                             strokeLinecap="round"
                             strokeDasharray="6 3"
@@ -1171,8 +1171,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                           cx={pt.x}
                           cy={pt.y}
                           r={i === heroChartGeometry.points.length - 1 ? 4 : 3}
-                          fill="#E44427"
-                          stroke={i === heroChartGeometry.points.length - 1 ? '#FFFFFF' : 'none'}
+                          fill="var(--accent)"
+                          stroke={i === heroChartGeometry.points.length - 1 ? 'var(--bg-card)' : 'none'}
                           strokeWidth={i === heroChartGeometry.points.length - 1 ? 2 : 0}
                         />
                       ))}
@@ -1351,7 +1351,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     </div>
                     <span className="text-2xs text-text-muted font-mono">Estimated 1RM (best single lift, worked out from your sets)</span>
                   </div>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#5E615A] dark:text-[#A5A096]">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-[var(--text-secondary)]/15 text-[#5E615A] dark:text-[#A5A096]">
                     {selectedExerciseAnalytics.deltaText}
                   </span>
                 </div>
@@ -1361,13 +1361,13 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   <svg viewBox="0 0 320 130" className="w-full h-32 overflow-visible" preserveAspectRatio="none" role="img" aria-label={summarizeSeries(`${selectedExercise} estimated 1RM`, selectedExerciseAnalytics.dataPoints, userUnit)}>
                     <defs>
                       <linearGradient id="analyticsGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#E44427" stopOpacity="0.25" />
-                        <stop offset="100%" stopColor="#E44427" stopOpacity="0.0" />
+                        <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.25" />
+                        <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.0" />
                       </linearGradient>
                     </defs>
-                    <line x1="0" y1="30" x2="320" y2="30" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
-                    <line x1="0" y1="70" x2="320" y2="70" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
-                    <line x1="0" y1="110" x2="320" y2="110" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
+                    <line x1="0" y1="30" x2="320" y2="30" stroke="currentColor" strokeOpacity="0.12" strokeDasharray="3 3" />
+                    <line x1="0" y1="70" x2="320" y2="70" stroke="currentColor" strokeOpacity="0.12" strokeDasharray="3 3" />
+                    <line x1="0" y1="110" x2="320" y2="110" stroke="currentColor" strokeOpacity="0.12" strokeDasharray="3 3" />
                     {strengthChartGeometry.points.length > 0 ? (
                       <>
                         {strengthChartGeometry.pathD ? (
@@ -1376,7 +1376,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                             <path
                               d={strengthChartGeometry.pathD}
                               fill="none"
-                              stroke="#E44427"
+                              stroke="var(--accent)"
                               strokeWidth="2.5"
                               strokeLinecap="round"
                               strokeDasharray="6 3"
@@ -1389,8 +1389,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                             cx={pt.x}
                             cy={pt.y}
                             r={i === strengthChartGeometry.points.length - 1 ? 4.5 : 3.5}
-                            fill="#E44427"
-                            stroke={i === strengthChartGeometry.points.length - 1 ? '#FFFFFF' : 'none'}
+                            fill="var(--accent)"
+                            stroke={i === strengthChartGeometry.points.length - 1 ? 'var(--bg-card)' : 'none'}
                             strokeWidth={i === strengthChartGeometry.points.length - 1 ? 2 : 0}
                           />
                         ))}
@@ -1507,7 +1507,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#5E615A] dark:text-[#A5A096]">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-[var(--text-secondary)]/15 text-[#5E615A] dark:text-[#A5A096]">
                       {bodyweightAnalytics.deltaText}
                     </span>
                   </div>
@@ -1538,12 +1538,12 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   <svg viewBox="0 0 320 110" className="w-full h-28 overflow-visible" preserveAspectRatio="none" role="img" aria-label={summarizeSeries(t('progress.chartWeight'), bodyweightAnalytics.dataPoints, userUnit)}>
                     <defs>
                       <linearGradient id="bodyWeightGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#858076" stopOpacity="0.2" />
-                        <stop offset="100%" stopColor="#858076" stopOpacity="0.0" />
+                        <stop offset="0%" stopColor="var(--text-secondary)" stopOpacity="0.2" />
+                        <stop offset="100%" stopColor="var(--text-secondary)" stopOpacity="0.0" />
                       </linearGradient>
                     </defs>
-                    <line x1="0" y1="30" x2="320" y2="30" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
-                    <line x1="0" y1="80" x2="320" y2="80" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
+                    <line x1="0" y1="30" x2="320" y2="30" stroke="currentColor" strokeOpacity="0.12" strokeDasharray="3 3" />
+                    <line x1="0" y1="80" x2="320" y2="80" stroke="currentColor" strokeOpacity="0.12" strokeDasharray="3 3" />
                     {bodyChartGeometry.points.length > 0 ? (
                       <>
                         {bodyChartGeometry.pathD ? (
@@ -1552,7 +1552,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                             <path
                               d={bodyChartGeometry.pathD}
                               fill="none"
-                              stroke="#858076"
+                              stroke="var(--text-secondary)"
                               strokeWidth="2.5"
                               strokeLinecap="round"
                             />
@@ -1564,8 +1564,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                             cx={pt.x}
                             cy={pt.y}
                             r={i === bodyChartGeometry.points.length - 1 ? 4 : 3}
-                            fill="#858076"
-                            stroke={i === bodyChartGeometry.points.length - 1 ? '#FFFFFF' : 'none'}
+                            fill="var(--text-secondary)"
+                            stroke={i === bodyChartGeometry.points.length - 1 ? 'var(--bg-card)' : 'none'}
                             strokeWidth={i === bodyChartGeometry.points.length - 1 ? 2 : 0}
                           />
                         ))}
@@ -1849,7 +1849,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                         <div
                           style={{ width: `${w.pct}%` }}
                           className={`h-full rounded-full ${
-                            w.pct >= 80 ? 'bg-[#858076]' : 'bg-accent'
+                            w.pct >= 80 ? 'bg-[var(--text-secondary)]' : 'bg-accent'
                           }`}
                         />
                       </div>
@@ -1985,7 +1985,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-[#858076]/20 text-[#5E615A] dark:text-[#A5A096] flex items-center justify-center shrink-0">
+                  <div className="w-9 h-9 rounded-lg bg-[var(--text-secondary)]/20 text-[#5E615A] dark:text-[#A5A096] flex items-center justify-center shrink-0">
                     <Scale className="w-4 h-4" />
                   </div>
                   <div>
