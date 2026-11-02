@@ -69,6 +69,11 @@ import ConstraintAdapterModal from '@/components/ConstraintAdapterModal';
 import ExerciseSelectorModal from '@/components/ExerciseSelectorModal';
 import { VoiceWorkoutResult } from '@/lib/voice-logger';
 import { useAppNavigation } from '@/lib/navigation';
+import { playRestDoneChime, unlockRestAudio } from '@/lib/rest-chime';
+import {
+  cancelRestDoneNotification,
+  scheduleRestDoneNotification,
+} from '@/lib/local-notifications';
 import { safeRandomId, getLocalTodayStr, getLocalDateOfTimestamp, formatDuration } from '@/lib/formatters';
 import ConfirmationModal from '@/components/ConfirmationModal';
 
@@ -440,6 +445,27 @@ export default function ActiveWorkoutScreen({
   const [isRestFinished, setIsRestFinished] = useState<boolean>(false);
   const [isRestPopoverOpen, setIsRestPopoverOpen] = useState<boolean>(false);
 
+  // Rest-timer sound fix — alert plumbing. The finish chime lives in
+  // lib/rest-chime on a shared, gesture-unlocked AudioContext; a
+  // one-shot local notification (lib/local-notifications) covers the
+  // locked/background case where web audio cannot sound at all. Both
+  // helpers are fire-and-forget: neither may ever break the workout
+  // flow. Copy reuses the existing set-ready toast keys (EN + HI).
+  const scheduleRestAlert = useCallback(
+    (endTimeMs: number) => {
+      void scheduleRestDoneNotification(
+        new Date(endTimeMs),
+        t('toast.titleSetReady'),
+        t('toast.restReady')
+      );
+    },
+    [t]
+  );
+
+  const cancelRestAlert = useCallback(() => {
+    void cancelRestDoneNotification();
+  }, []);
+
   // ── Screen 13: Dedicated Set Complete Transition state ────────────────────
   const [completedSetSummary, setCompletedSetSummary] = useState<{
     exerciseName: string;
@@ -466,8 +492,9 @@ export default function ActiveWorkoutScreen({
     if (isRestRunning) {
       restTargetEndTimeRef.current = null;
       setIsRestRunning(false);
+      cancelRestAlert();
     }
-  }, [isRestRunning]);
+  }, [isRestRunning, cancelRestAlert]);
 
   // Micro-fix L4 (round 2): the live path is the pill + popover, NOT the
   // Set Complete overlay — the first round hid the pill only while the
@@ -480,8 +507,9 @@ export default function ActiveWorkoutScreen({
     if (isRestRunning) {
       restTargetEndTimeRef.current = null;
       setIsRestRunning(false);
+      cancelRestAlert();
     }
-  }, [isRestRunning]);
+  }, [isRestRunning, cancelRestAlert]);
 
   useEffect(() => {
     if (completedSetSummary) {
@@ -903,27 +931,10 @@ export default function ActiveWorkoutScreen({
     };
   }, []);
 
-  // Web Audio chime when rest finishes
-  const playRestDoneChime = useCallback(() => {
-    try {
-      const AudioCtx = typeof window !== 'undefined' ? (window.AudioContext || (window as any).webkitAudioContext) : null;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12); // A5
-      gain.gain.setValueAtTime(0.12, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.4);
-    } catch {
-      // Autoplay restrictions or unsupported audio
-    }
-  }, []);
+  // Rest-done chime: lib/rest-chime (shared, gesture-unlocked
+  // AudioContext) — the inline copy that lived here built a NEW
+  // AudioContext at finish time, which Android starts suspended, so
+  // the chime never sounded on real phones.
 
   // Timestamp-based drift-free rest timer reference
   const restTargetEndTimeRef = useRef<number | null>(null);
@@ -953,6 +964,9 @@ export default function ActiveWorkoutScreen({
         restTargetEndTimeRef.current = null;
         playRestDoneChime();
         triggerHaptic('rest_done');
+        // The chime + haptic just fired in the foreground — the
+        // scheduled locked-screen alert must not fire a second later.
+        cancelRestAlert();
       } else {
         setRestSecondsLeft(remaining);
       }
@@ -972,18 +986,32 @@ export default function ActiveWorkoutScreen({
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [isRestRunning, playRestDoneChime]);
+  }, [isRestRunning, cancelRestAlert]);
 
-  // Start rest timer
+  // Rest-timer sound fix: leaving the workout (finish/discard/unmount)
+  // must never leave a rest alert pending behind it.
+  useEffect(() => {
+    return () => {
+      void cancelRestDoneNotification();
+    };
+  }, []);
+
+  // Start rest timer. Called only from user-gesture paths (set
+  // complete, pill, pause toggle), so it also unlocks the shared audio
+  // context while the gesture is on the stack, and schedules the
+  // locked-screen alert for the exact end time.
   const startTimer = useCallback(
     (seconds?: number) => {
       const targetSec = seconds || defaultRestDuration;
-      restTargetEndTimeRef.current = Date.now() + targetSec * 1000;
+      const endTime = Date.now() + targetSec * 1000;
+      restTargetEndTimeRef.current = endTime;
       setRestSecondsLeft(targetSec);
       setIsRestRunning(true);
       setIsRestFinished(false);
+      unlockRestAudio();
+      scheduleRestAlert(endTime);
     },
-    [defaultRestDuration]
+    [defaultRestDuration, scheduleRestAlert]
   );
 
   const togglePauseTimer = () => {
@@ -992,13 +1020,22 @@ export default function ActiveWorkoutScreen({
     } else if (isRestRunning) {
       restTargetEndTimeRef.current = null;
       setIsRestRunning(false);
+      cancelRestAlert();
     } else {
-      restTargetEndTimeRef.current = Date.now() + restSecondsLeft * 1000;
+      const endTime = Date.now() + restSecondsLeft * 1000;
+      restTargetEndTimeRef.current = endTime;
       setIsRestRunning(true);
+      unlockRestAudio();
+      scheduleRestAlert(endTime);
     }
   };
 
   const adjustTimer = (delta: number) => {
+    // The shifted end time is computed from the current ref BEFORE the
+    // state updater runs (updaters execute at render time) so the
+    // locked-screen alert can be moved to the same instant.
+    const endTime = restTargetEndTimeRef.current;
+    const shiftedEnd = endTime !== null ? endTime + delta * 1000 : null;
     setRestSecondsLeft((prev) => {
       const next = Math.max(0, prev + delta);
       if (restTargetEndTimeRef.current) {
@@ -1006,6 +1043,9 @@ export default function ActiveWorkoutScreen({
       }
       return next;
     });
+    if (shiftedEnd !== null && isRestRunning) {
+      scheduleRestAlert(shiftedEnd);
+    }
   };
 
   const skipTimer = () => {
@@ -1013,6 +1053,7 @@ export default function ActiveWorkoutScreen({
     setRestSecondsLeft(0);
     setIsRestRunning(false);
     setIsRestFinished(false);
+    cancelRestAlert();
   };
 
   const formatTime = (totalSec: number) => {
@@ -1357,6 +1398,10 @@ export default function ActiveWorkoutScreen({
       setRestSecondsLeft(restDuration);
       setIsRestRunning(true);
       setIsRestFinished(false);
+      // This tap is the gesture that unlocks the chime audio; the
+      // locked-screen alert tracks the same end time.
+      unlockRestAudio();
+      scheduleRestAlert(Date.now() + restDuration * 1000);
       toast.info(
         t('workout.toastSetLogged', {
           n: setIdx + 1,
@@ -1641,6 +1686,8 @@ export default function ActiveWorkoutScreen({
     setRestSecondsLeft(restDuration);
     setIsRestRunning(true);
     setIsRestFinished(false);
+    unlockRestAudio();
+    scheduleRestAlert(Date.now() + restDuration * 1000);
   };
 
   // Warm-up sets generator preview
