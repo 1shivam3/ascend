@@ -763,7 +763,7 @@ describe('Account Deletion & Data Safety Specification', () => {
     const html = renderToStaticMarkup(React.createElement(DeleteAccountView));
     expect(html).toContain('ACCOUNT &amp; DATA DELETION');
     expect(html).toContain('Google Play Store Data Safety');
-    expect(html).toContain('zero-retention policy');
+    expect(html).toContain('erased from ASCEND');
     expect(html).toContain('Method 1: Direct In-App Deletion');
     expect(html).toContain('Method 2: External Web Deletion Request Form');
     expect(html).toContain('Send Deletion Verification Link');

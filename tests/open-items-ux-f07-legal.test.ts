@@ -36,7 +36,7 @@ describe('open-items UX F-07: legal pages readable', () => {
 
   it('privacy: guarantee card + data-safety box are text-sm, disclosure wording intact', () => {
     const src = read('src/app/privacy/page.tsx');
-    expect(src).toContain('text-emerald-300 text-sm space-y-1.5');
+    expect(src).toContain('dark:text-emerald-200/90 text-sm space-y-1.5');
     expect(src).toContain('Free-Tier Text Models &amp; Data Use:');
     expect(src).toContain('Summary of Data Practices for App Store Reviewers');
   });
@@ -62,5 +62,35 @@ describe('open-items UX F-07: legal pages readable', () => {
     const privacy = read('src/app/privacy/page.tsx');
     expect(privacy).toContain('text-amber-800 dark:text-amber-300/80');
     expect(privacy).not.toContain('className="text-amber-300/80 pt-1"');
+  });
+
+  // Slop-audit next batch (WS2/WS3): the Disclaimer was missed by the
+  // contrast pass above — its alert banner was amber-200 text on the
+  // same 10% amber wash (yellow on pale yellow in light mode), and the
+  // page imported nothing from lib/legal, so it carried no version.
+  // The Privacy intro ("Guarantee") card had the same defect in
+  // emerald. Both now follow the established pattern; the Disclaimer
+  // also renders the shared legal version line like Terms/Privacy.
+  it('disclaimer: alert banner + headings follow the amber callout pattern', () => {
+    const src = read('src/app/disclaimer/page.tsx');
+    expect(src).toContain('text-amber-900 dark:border-amber-500/20 dark:text-amber-200/90');
+    expect(src).toContain('text-amber-800 dark:text-amber-400');
+    // The old pale-on-pale combinations must not return.
+    expect(src).not.toContain('border-amber-500/30 text-amber-200/90');
+    expect(src).not.toContain('text-2xs text-amber-300/90');
+    expect(src).not.toContain('font-bold text-amber-300"');
+  });
+
+  it('disclaimer: wired to the shared legal constants', () => {
+    const src = read('src/app/disclaimer/page.tsx');
+    expect(src).toContain("from '@/lib/legal'");
+    expect(src).toContain('LEGAL_VERSION');
+    expect(src).toContain('LEGAL_LAST_UPDATED');
+  });
+
+  it('privacy: guarantee card meets contrast in light AND dark mode', () => {
+    const src = read('src/app/privacy/page.tsx');
+    expect(src).toContain('text-emerald-900 dark:border-emerald-500/20 dark:text-emerald-200/90');
+    expect(src).not.toContain('border-emerald-500/30 text-emerald-300');
   });
 });
