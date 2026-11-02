@@ -128,7 +128,16 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Default: Network with cache fallback
+  // Default: Network with cache fallback — SAME-ORIGIN ONLY
+  // (final-cert SEC F-05). The old branch cache.put() ANY GET 200,
+  // including cross-origin responses (e.g. Supabase REST reads), and
+  // replayed them from Cache Storage on network failure. Cross-origin
+  // requests now go straight to the network and are never cached or
+  // served from cache by this branch.
+  if (url.origin !== self.location.origin) {
+    event.respondWith(fetch(request));
+    return;
+  }
   event.respondWith(
     fetch(request)
       .then((networkResponse) => {

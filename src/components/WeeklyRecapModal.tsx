@@ -8,6 +8,7 @@ import { calculateDOTS, getDOTSClassification } from '@/lib/dots';
 import { X, Share2, Download, MessageCircle, Trophy, Flame, Dumbbell, Sparkles } from 'lucide-react';
 import { useToast } from './ui/Toast';
 import { getWeekRange, parseLocalDate } from '@/lib/formatters';
+import { calculateWorkoutVolumeKg } from '@/lib/volume';
 import { useTranslation } from '@/lib/i18n';
 
 interface WeeklyRecapModalProps {
@@ -40,20 +41,26 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
       return dStr >= weekStartStr && dStr <= weekEndStr;
     });
 
-    let totalVolume = 0;
+    // Final-cert D-2: volume is the canonical DI-05 definition
+    // (calculateWorkoutVolumeKg — lbs→kg conversion + bodyweight load),
+    // not an ad-hoc raw weight×reps sum. The old loop showed 1000 "KG"
+    // for a 100 lbs × 10 set (canonical: 453.6 kg) and 0 for all
+    // bodyweight work. The stored/displayed number is converted from
+    // the canonical kg result into the profile unit, so the unit label
+    // beside it (canvas + share text) stays honest.
+    let totalVolumeKg = 0;
     let totalSets = 0;
 
     for (const w of thisWeekWorkouts) {
+      totalVolumeKg += calculateWorkoutVolumeKg(w, profile?.bodyweightKg);
       for (const ex of w.exercises) {
         for (const set of ex.sets) {
           if (!isSetCompleted(set)) continue;
           totalSets += 1;
-          const weight = typeof set.weight === 'number' ? set.weight : parseFloat(String(set.weight)) || 0;
-          const reps = typeof set.reps === 'number' ? set.reps : parseInt(String(set.reps), 10) || 0;
-          totalVolume += weight * reps;
         }
       }
     }
+    const totalVolume = profile?.unit === 'lbs' ? totalVolumeKg * 2.20462 : totalVolumeKg;
 
     // Recent PRs this calendar week (Mon–Sun)
     const recentPRs = prs
@@ -218,9 +225,11 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
 
     // ── 4. Hero: giant total volume ──
     const unit = profile?.unit || 'kg';
-    const heroValue = weeklyStats.totalVolume >= 1000
+    // Tonnes only in kg mode — totalVolume is in the profile unit, so
+    // dividing an lbs figure by 1000 would mislabel kilopounds as tonnes.
+    const heroValue = unit === 'kg' && weeklyStats.totalVolume >= 1000
       ? `${(weeklyStats.totalVolume / 1000).toFixed(1)}t`
-      : `${weeklyStats.totalVolume}`;
+      : `${weeklyStats.totalVolume.toLocaleString()}`;
     drawText(ctx, heroValue, width / 2, 640, '900 200px system-ui, sans-serif', INK);
     drawText(ctx, `${t('recap.totalVolume')} · ${unit.toUpperCase()}`, width / 2, 690, '700 26px ui-monospace, monospace', MUTED);
 

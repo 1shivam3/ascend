@@ -236,6 +236,11 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     setUiPreferences({
       accentTheme: id as 'vermilion' | 'cobalt' | 'forest' | 'plum' | 'teal' | 'rose',
     });
+    // Final-cert J5.2: the custom-hex draft is local state initialized
+    // once — reverting to a preset left the OLD custom hex sitting in
+    // the custom field for the rest of the session. The field mirrors
+    // the active theme: a preset means no custom hex is in use.
+    setDraftHex('');
   };
   const handleApplyCustom = () => {
     if (!normalizedDraft) return;
@@ -249,6 +254,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     // when something actually changed.
     if (uiPreferences.accentTheme === 'vermilion' && uiPreferences.customAccentHex == null) return;
     setUiPreferences({ accentTheme: 'vermilion', customAccentHex: null });
+    setDraftHex(''); // J5.2: same stale-draft sync as preset selection
     toast.info(t('settings.themeResetMsg'));
   };
 

@@ -29,6 +29,8 @@ import {
 import { getBigThreeStats, calculateDOTS, getDOTSClassification } from '@/lib/dots';
 import { calculateOneRepMax } from '@/lib/strength-standards';
 import { exerciseNamesEqual, getExerciseHistorySessions } from '@/lib/lifter-twin';
+import { computeCoreLifts } from '@/lib/core-lifts';
+import { summarizeSeries } from '@/lib/chart-a11y';
 import WorkoutHeatmap from '@/components/WorkoutHeatmap';
 import MuscleVolumeSection from '@/components/MuscleVolumeSection';
 import EmptyState from '@/components/ui/EmptyState';
@@ -415,49 +417,11 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   // it also persists — a deps array may not reference a later const.)
 
   // ── 1. REAL STRENGTH ANALYTICS & PRs DATA ─────────────────────────────────
-  // Core compound lifts computed strictly from real records
-  const coreLifts = useMemo(() => {
-    const list = [
-      { name: 'Squat', search: ['squat'] },
-      { name: 'Bench Press', search: ['bench press', 'bench'] },
-      { name: 'Deadlift', search: ['deadlift'] },
-      { name: 'Overhead Press', search: ['overhead press', 'ohp', 'military press'] },
-    ];
-
-    return list.map((item) => {
-      // Check PRs
-      const matchPRs = prs
-        .filter((p) => item.search.some((s) => p.exercise.toLowerCase().includes(s)))
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-      let best1RMKg: number | null = matchPRs.length > 0 ? Math.max(...matchPRs.map((p) => p.oneRepMax)) : null;
-
-      // Check workouts if no PR found
-      if (best1RMKg === null) {
-        let maxWorkout1RM = 0;
-        workouts.forEach((w) => {
-          w.exercises.forEach((ex) => {
-            if (item.search.some((s) => ex.name.toLowerCase().includes(s))) {
-              ex.sets.filter(isSetCompleted).forEach((s) => {
-                if (s.weight && s.reps) {
-                  const wKg = s.unit === 'lbs' ? s.weight * 0.453592 : s.weight;
-                  const e1rm = calculateOneRepMax(wKg, s.reps);
-                  if (e1rm > maxWorkout1RM) maxWorkout1RM = e1rm;
-                }
-              });
-            }
-          });
-        });
-        if (maxWorkout1RM > 0) best1RMKg = maxWorkout1RM;
-      }
-
-      return {
-        name: item.name,
-        best1RMKg,
-        hasRealRecord: best1RMKg !== null,
-      };
-    });
-  }, [prs, workouts]);
+  // Core compound lifts computed strictly from real records. Final-cert
+  // D-1: matching is exact normalized (computeCoreLifts / core-lifts.ts)
+  // — the old substring `.includes('bench')` listed an Incline Bench
+  // Press PR as Bench Press's 1RM.
+  const coreLifts = useMemo(() => computeCoreLifts(prs, workouts), [prs, workouts]);
 
   // Distinct exercises available in user's history or defaults
   const availableExercises = useMemo(() => {
@@ -1016,7 +980,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   </span>
                 </div>
                 <div className="pt-2">
-                  <svg viewBox="0 0 320 110" className="w-full h-28 overflow-visible" preserveAspectRatio="none">
+                  <svg viewBox="0 0 320 110" className="w-full h-28 overflow-visible" preserveAspectRatio="none" role="img" aria-label={summarizeSeries(t('progress.chartWeight'), bodyweightAnalytics.dataPoints, userUnit)}>
                     <defs>
                       <linearGradient id="spotWeightGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#858076" stopOpacity="0.2" />
@@ -1096,7 +1060,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     </span>
                   </div>
                   <div className="pt-2">
-                    <svg viewBox="0 0 320 120" className="w-full h-28 overflow-visible" preserveAspectRatio="none">
+                    <svg viewBox="0 0 320 120" className="w-full h-28 overflow-visible" preserveAspectRatio="none" role="img" aria-label={summarizeSeries(`${big3Lift} estimated 1RM`, big3Analytics.dataPoints, userUnit)}>
                       <defs>
                         <linearGradient id="spotBig3Gradient" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#E44427" stopOpacity="0.22" />
@@ -1162,7 +1126,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 </span>
               </div>
               <div className="pt-2">
-                <svg viewBox="0 0 320 120" className="w-full h-28 overflow-visible" preserveAspectRatio="none">
+                <svg viewBox="0 0 320 120" className="w-full h-28 overflow-visible" preserveAspectRatio="none" role="img" aria-label={summarizeSeries(`${heroLift.name} estimated 1RM`, heroLiftAnalytics.dataPoints, userUnit)}>
                   <defs>
                     <linearGradient id="strengthGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#E44427" stopOpacity="0.22" />
@@ -1273,6 +1237,12 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     {lift.name}
                   </span>
                   <div className="flex items-center gap-2">
+                    {/* Final-cert J4.1: an estimated 1RM in this list gets
+                        the same "est." label the charts carry — the tile
+                        previously showed an estimate as a bare number. */}
+                    {lift.isEstimate && (
+                      <span className="rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent-text">{t('common.estimatedShort')}</span>
+                    )}
                     <span className="font-bold text-text-primary tabular-nums font-mono text-sm">
                       {displayWeight(lift.best1RMKg)}
                     </span>
@@ -1372,7 +1342,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
                 {/* Dynamic Progression Chart */}
                 <div className="pt-2">
-                  <svg viewBox="0 0 320 130" className="w-full h-32 overflow-visible" preserveAspectRatio="none">
+                  <svg viewBox="0 0 320 130" className="w-full h-32 overflow-visible" preserveAspectRatio="none" role="img" aria-label={summarizeSeries(`${selectedExercise} estimated 1RM`, selectedExerciseAnalytics.dataPoints, userUnit)}>
                     <defs>
                       <linearGradient id="analyticsGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#E44427" stopOpacity="0.25" />
@@ -1538,7 +1508,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
                 {/* SVG Trend Chart */}
                 <div className="pt-1">
-                  <svg viewBox="0 0 320 110" className="w-full h-28 overflow-visible" preserveAspectRatio="none">
+                  <svg viewBox="0 0 320 110" className="w-full h-28 overflow-visible" preserveAspectRatio="none" role="img" aria-label={summarizeSeries(t('progress.chartWeight'), bodyweightAnalytics.dataPoints, userUnit)}>
                     <defs>
                       <linearGradient id="bodyWeightGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#858076" stopOpacity="0.2" />

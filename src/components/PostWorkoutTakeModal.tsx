@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
-import { AIPostWorkoutTake, isSetCompleted } from '@/lib/types';
+import { AIPostWorkoutTake, isSetCompleted, type WorkoutEntry } from '@/lib/types';
+import { calculateWorkoutVolumeKg } from '@/lib/volume';
 import { fetchPostWorkoutTake, generateDeterministicPostWorkoutTake } from '@/lib/ai-coach';
 import { buildSessionDebrief } from '@/lib/weekly-review';
 import { getNextSessionTarget, exerciseHadPain } from '@/lib/workout-engine';
@@ -28,6 +29,13 @@ import {
 interface PostWorkoutTakeModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /**
+   * Final-cert UX F-02: the finish SUMMARY (duration / volume / lifts /
+   * sets / PRs) always renders; only the AI Coach's Take content is
+   * conditional on the Coach toggle. Defaults to true so existing
+   * coach-surface callers are unchanged.
+   */
+  coachEnabled?: boolean;
   completedWorkout: {
     name: string;
     durationMinutes?: number;
@@ -42,6 +50,7 @@ interface PostWorkoutTakeModalProps {
 export default function PostWorkoutTakeModal({
   isOpen,
   onClose,
+  coachEnabled = true,
   completedWorkout,
 }: PostWorkoutTakeModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
@@ -73,6 +82,14 @@ export default function PostWorkoutTakeModal({
   const [targetRationale, setTargetRationale] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isOpen && !coachEnabled) {
+      // UX F-02: Coach off — the summary renders without any take
+      // fetch (no AI call, no loading state to resolve).
+      setLoading(false);
+      setTake(null);
+      setTargetRationale(null);
+      return;
+    }
     if (isOpen) {
       let isMounted = true;
       let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -147,7 +164,7 @@ export default function PostWorkoutTakeModal({
       };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, coachEnabled]);
 
   const userUnit = store.profile?.unit || 'kg';
   const totalSets = useMemo(() => {
@@ -155,21 +172,16 @@ export default function PostWorkoutTakeModal({
   }, [completedWorkout.exercises]);
 
   const totalVolume = useMemo(() => {
-    let volKg = 0;
-    for (const ex of completedWorkout.exercises) {
-      for (const s of ex.sets) {
-        if (!isSetCompleted(s as any)) continue;
-        const w = parseFloat(String(s.weight)) || 0;
-        const r = parseInt(String(s.reps), 10) || 0;
-        if (r > 0 && w > 0) {
-          const wKg = s.unit === 'lbs' ? w * 0.453592 : w;
-          volKg += wKg * r;
-        }
-      }
-    }
+    // Final-cert D-3: canonical DI-05 volume (lib/volume) — the old
+    // loop required w > 0 and never added bodyweight load, so a
+    // pull-ups-only session displayed 0 kg instead of 2400 kg.
+    const volKg = calculateWorkoutVolumeKg(
+      completedWorkout as unknown as WorkoutEntry,
+      store.profile?.bodyweightKg,
+    );
     const displayVal = userUnit === 'lbs' ? Math.round(volKg * 2.20462) : Math.round(volKg);
     return `${displayVal.toLocaleString()} ${userUnit}`;
-  }, [completedWorkout.exercises, userUnit]);
+  }, [completedWorkout, store.profile?.bodyweightKg, userUnit]);
 
   // QA4-024: PR dates are local-day keys — a UTC key hides PRs set
   // earlier the same local day (and can show yesterday's as today's).
@@ -296,8 +308,9 @@ export default function PostWorkoutTakeModal({
           </div>
         )}
 
-        {/* Coach's Take Card */}
-        {loading ? (
+        {/* Coach's Take Card — the ONLY coach-conditional section
+            (UX F-02): the summary above always renders. */}
+        {coachEnabled && (loading ? (
           <div className="py-6 text-center space-y-2">
             <Sparkles className="w-5 h-5 text-accent animate-spin mx-auto" />
             <p className="text-xs text-text-muted font-medium">
@@ -357,7 +370,7 @@ export default function PostWorkoutTakeModal({
               )}
             </div>
           </div>
-        ) : null}
+        ) : null)}
 
         {/* Vs your block (PR-C) — coach-managed workouts only */}
         {blockDebrief && (

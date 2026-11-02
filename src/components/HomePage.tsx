@@ -535,6 +535,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       calories: Math.round(macros.calories),
       targetCalories: calTarget,
       protein: Math.round(macros.proteinG),
+      // Final-cert J3.3: the UNROUNDED protein for gap computations —
+      // the protein-gap helper rounds the gap itself, and feeding it
+      // the display-rounded value made Today disagree with Fuel by
+      // 1 g (126 − 47 = 79 here vs 126 − 46.5 → 80 on Fuel).
+      proteinExact: macros.proteinG,
       targetProtein: protTarget,
       carbs: Math.round(macros.carbsG),
       fat: Math.round(macros.fatG),
@@ -547,7 +552,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     uiPreferences.coachEnabled && !isHintDismissed(todayStr, 'protein')
       ? getProteinGapSuggestion({
           diet: profile?.dietPreference || 'non_vegetarian',
-          proteinLoggedG: fuelStats.protein,
+          proteinLoggedG: fuelStats.proteinExact,
           proteinTargetG: fuelStats.targetProtein,
           hour: new Date().getHours(),
         })

@@ -123,6 +123,7 @@ import {
   getScheduledWorkoutForDay,
 } from '@/lib/workout-schedule';
 import { plural, safeRandomId, getLocalTodayStr, formatLocalDate, parseLocalDate } from '@/lib/formatters';
+import { getSessionDuration } from '@/lib/workout-elapsed';
 import { useAppNavigation } from '@/lib/navigation';
 
 interface WorkoutPageProps {
@@ -918,7 +919,14 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     durationSeconds?: number;
     exercises: WorkoutExercise[];
   } | null>(null);
-  const [sessionStartTime, setSessionStartTime] = useState<number>(Date.now());
+  // Final-cert J2.3: pages unmount on every tab switch (page.tsx), so
+  // this state must seed from the PERSISTED draft's start marker when
+  // a session is in progress — a fresh Date.now() here restarted the
+  // session clock after a tab switch + resume. Explicit starts
+  // (handleStartPlan, repeat, suggested) overwrite it as before.
+  const [sessionStartTime, setSessionStartTime] = useState<number>(
+    () => useStore.getState().activeWorkoutDraft?.sessionStartTime || Date.now(),
+  );
 
   // ── Plan modal state ───────────────────────────────────────────────────────
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
@@ -1615,8 +1623,10 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       if (prescribed > 0) plannedTotalSets = prescribed;
     }
 
-    const sessionDurationSeconds = Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000));
-    const durationMin = Math.round(sessionDurationSeconds / 60);
+    // J2.3: same duration source as the Active screen's finish path
+    // (lib/workout-elapsed, from the persisted start timestamp).
+    const { durationSeconds: sessionDurationSeconds, durationMinutes: durationMin } =
+      getSessionDuration(sessionStartTime, Date.now());
 
     const newWorkout: WorkoutEntry = {
       id: workoutId,
@@ -2927,8 +2937,13 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           onFinish={(workoutEntry, newPRsCount) => {
             addWorkout(workoutEntry);
             clearWorkoutDraft();
-            const durationMin = workoutEntry.durationMinutes ?? Math.round((Date.now() - sessionStartTime) / 60000);
-            const durationSec = workoutEntry.durationSeconds ?? Math.round((Date.now() - sessionStartTime) / 1000);
+            // J2.3: the completion summary reads the entry's duration —
+            // computed by the finish path from the persisted start
+            // timestamp — and falls back to that same source, never a
+            // second divergent computation.
+            const fallbackDuration = getSessionDuration(sessionStartTime, Date.now());
+            const durationMin = workoutEntry.durationMinutes ?? fallbackDuration.durationMinutes;
+            const durationSec = workoutEntry.durationSeconds ?? fallbackDuration.durationSeconds;
             setPostWorkoutSummary({
               name: startedFromPlan || 'Workout Session',
               durationMinutes: durationMin,
@@ -3027,12 +3042,16 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         initialWeight={userUnit === 'kg' ? 100 : 225}
       />
 
-      {/* Post-Workout Coach's Take Modal — a coach surface: with Coach
-          off in Settings it must not auto-appear after every workout. */}
-      {postWorkoutSummary && coachEnabled && (
+      {/* Post-Workout Summary Modal (final-cert UX F-02): the finish
+          summary must appear regardless of the Coach toggle — a user
+          who turned Coach off previously got NO summary at all, only
+          toasts. Only the AI Coach's Take inside the modal is
+          conditional on coachEnabled. */}
+      {postWorkoutSummary && (
         <PostWorkoutTakeModal
           isOpen={!!postWorkoutSummary}
           onClose={() => setPostWorkoutSummary(null)}
+          coachEnabled={coachEnabled}
           completedWorkout={postWorkoutSummary}
         />
       )}

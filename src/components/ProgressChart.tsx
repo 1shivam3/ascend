@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import { TrendingUp, ArrowUpRight, ArrowDownRight, Activity } from 'lucide-react';
 import { calculateOneRepMax } from '@/lib/strength-standards';
 import { getExerciseHistorySessions } from '@/lib/lifter-twin';
+import { summarizeSeries } from '@/lib/chart-a11y';
 import { useTranslation } from '@/lib/i18n';
 
 const PRIMARY_EXERCISES = ['Squat', 'Bench Press', 'Deadlift', 'Overhead Press'];
@@ -413,6 +414,12 @@ export default function ProgressChart() {
               <svg
                 viewBox={`0 0 ${width} ${height}`}
                 className="w-full h-32 overflow-visible"
+                role="img"
+                aria-label={summarizeSeries(
+                  `${selectedExercise} ${metricMode === 'volume' ? 'volume' : 'estimated 1RM'}`,
+                  currentChartData,
+                  userUnit,
+                )}
               >
                 <defs>
                   <linearGradient id="strengthGradient" x1="0" y1="0" x2="0" y2="1">

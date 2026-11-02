@@ -50,7 +50,7 @@ import {
 import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
 import { sanitizeTodayLayout, DEFAULT_TODAY_LAYOUT } from './today-layout';
 import { normalizeHex } from './accent-themes';
-import { purgeLocalAppData, isRecognizedBackupData, buildFullBackup, getCustomBarcodes, getOrCreateGuestId } from './storage';
+import { purgeLocalAppData, purgeAppCaches, isRecognizedBackupData, buildFullBackup, getCustomBarcodes, getOrCreateGuestId } from './storage';
 import { ARCHIVED_HISTORY_KEY, ARCHIVED_HISTORY_PREV_KEY, hasRetainedHistory } from './history-fork';
 import { calculateHydrationTarget } from './habits';
 import { getTabLeaderGuard } from './tab-leader';
@@ -3509,6 +3509,10 @@ export const useAppStore = create<AppState>()(
       },
 
       logout: (options) => {
+        // Final-cert SEC F-05: logout must also delete the app's Cache
+        // Storage caches — the localStorage sweep alone left SW-cached
+        // content behind for the next person on a shared device.
+        void purgeAppCaches();
         // FE-06 (audit-3): the coach-chat thread lives in its own
         // persisted store — clear it on ANY logout, so one user's
         // conversation (their own words, grounded in their data)

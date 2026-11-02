@@ -112,17 +112,60 @@ export const COACH_CHAT_NOTES_SECTION_HEADER =
   "NOTES FROM TODAY'S CHECK-IN (the user's own words):";
 
 /**
+ * Every section header buildCoachChatContext can emit (final-cert
+ * SEC F-01). extractCheckinNotes bounds the notes span by the NEXT of
+ * these — the notes section is delimited by structure, not by blank
+ * lines inside the user's own text.
+ */
+export const COACH_CHAT_KNOWN_SECTION_HEADERS: readonly string[] = [
+  'USER: ',
+  'TODAY (',
+  "TODAY'S SESSION (",
+  'WHAT YOUR COACH HAS LEARNED (from your logged data):',
+  'LIFTS (your logged numbers, not estimates of potential):',
+  'CURRENT COACH BLOCK: ',
+  'ADOPTED PLANS: ',
+  'RECENT WORKOUTS (most recent first):',
+  'PERSONAL RECORDS:',
+  'READINESS TODAY: ',
+  'MUSCLES NEEDING CAUTION TODAY: ',
+  'WEEKLY REVIEWS:',
+  'NUTRITION TODAY: ',
+  'LATEST BODY MEASUREMENT: ',
+  "TODAY'S CHECK-IN: ",
+  COACH_CHAT_NOTES_SECTION_HEADER,
+  'PAIN EPISODES ON RECORD (respect these — do not program the flagged lifts):',
+  'FLAGGED MOVEMENT FAMILIES (excluded from new plans): ',
+  'NO USER HISTORY YET: ',
+];
+
+/**
  * Extract the user's check-in notes (their own words) from a built
  * context text; '' when the context carries no notes section.
+ *
+ * Final-cert SEC F-01: the old extraction split the context on '\n\n'
+ * and scanned only the chunk STARTING with the notes header, so a
+ * disclosure after a blank line inside the notes — or a header not at
+ * a chunk start — escaped the safety scan while still reaching the
+ * provider verbatim. The notes span now runs from the header's first
+ * occurrence to the next KNOWN section header (or end of string),
+ * regardless of internal blank lines. Generated scaffolding outside
+ * that span (e.g. the PAIN EPISODES section) is still never scanned
+ * (the SEC2-2 property).
  */
 export function extractCheckinNotes(contextText: string): string {
   if (!contextText) return '';
-  const section = contextText
-    .split('\n\n')
-    .find((s) => s.startsWith(COACH_CHAT_NOTES_SECTION_HEADER));
-  if (!section) return '';
-  return section
-    .slice(COACH_CHAT_NOTES_SECTION_HEADER.length)
+  const start = contextText.indexOf(COACH_CHAT_NOTES_SECTION_HEADER);
+  if (start < 0) return '';
+  const bodyStart = start + COACH_CHAT_NOTES_SECTION_HEADER.length;
+  let end = contextText.length;
+  for (const header of COACH_CHAT_KNOWN_SECTION_HEADERS) {
+    if (header === COACH_CHAT_NOTES_SECTION_HEADER) continue;
+    const idx = contextText.indexOf(`\n${header}`, bodyStart);
+    if (idx >= 0 && idx < end) end = idx;
+  }
+  return contextText
+    .slice(bodyStart, end)
     .split('\n')
     .map((line) => line.replace(/^-\s*/, '').trim())
     .filter((line) => line.length > 0)
@@ -241,6 +284,47 @@ export function isCoachChatInScope(
   if (TOPIC_SIGNAL_HI.some((term) => text.includes(term))) return true;
   if (TOPIC_UNIT_SIGNAL.test(text)) return true;
   return false;
+}
+
+// ── Context directive screen (final-cert SEC F-02) ───────────────────────
+/**
+ * Instruction-override screen for the client-supplied contextText.
+ * contextText is never topic-scanned (workout data is off-'topic' by
+ * nature), but it sits in the prompt's highest-trust slot, so
+ * instruction-LIKE directives inside it — override attempts,
+ * system-prompt extraction, role reassignment — are screened
+ * mechanically and declined like the topic gate. Patterns target the
+ * directive shape, not content words: a normal buildCoachChatContext
+ * output (training data, the PAIN EPISODES scaffolding, check-in notes
+ * with ordinary training language) must never match. Hindi patterns are
+ * machine-written starter equivalents, flagged for native review like
+ * the rest of the Hindi safety set.
+ */
+const CONTEXT_DIRECTIVE_PATTERNS: RegExp[] = [
+  /\b(ignore|disregard|forget|override|bypass)\b[^.\n]{0,40}\b(previous|prior|above|earlier|system)\b[^.\n]{0,20}\b(instructions?|prompts?|rules?|directions?)\b/i,
+  /\bdo not (follow|obey|listen to)\b[^.\n]{0,30}\b(instructions?|rules?|prompt)\b/i,
+  /\b(reveal|show|print|repeat|leak|tell me|output)\b[^.\n]{0,30}\b(system prompt|initial instructions?|hidden instructions?|your prompt)\b/i,
+  /\bsystem prompt\b[^.\n]{0,20}\b(is|was|:)/i,
+  /\byou are now\b[^.\n]{0,40}\b(act as|a |an |the )/i,
+  /\bact as (a |an |the )?(?!coach\b)[a-z]/i,
+  /\bpretend (to be|you are)\b/i,
+  /\bfrom now on,? you (are|will|must|should)\b/i,
+  /\byour new (instructions?|role|persona|task|identity) (is|are)\b/i,
+  /\bnew persona\b/i,
+  /\bdeveloper mode\b/i,
+  /\bjailbreak\b/i,
+  // Hindi starter equivalents (machine-written): "ignore/forget the
+  // previous instructions", "show/tell the system prompt", "your new role".
+  /पिछले\s*(सभी\s*)?निर्देशों?\s*को\s*(अनदेखा|भूल)/,
+  /निर्देशों?\s*को\s*अनदेखा\s*करो/,
+  /सिस्टम\s*प्रॉम्प्ट\s*(बताओ|दिखाओ|बताइए|बता\s*दो)/,
+  /तुम्हारी\s*नई\s*भूमिका/,
+];
+
+/** True when contextText carries an instruction-like directive (SEC F-02). */
+export function findContextDirective(contextText: string): boolean {
+  if (!contextText) return false;
+  return CONTEXT_DIRECTIVE_PATTERNS.some((re) => re.test(contextText));
 }
 
 // ── Reply caution enforcement (re-audit E2E-R1, prompt rule 8 by code) ────

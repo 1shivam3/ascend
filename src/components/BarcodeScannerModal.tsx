@@ -20,6 +20,7 @@ import {
   Flag,
 } from 'lucide-react';
 import { FoodItem } from '@/lib/types';
+import { round1 } from '@/lib/formatters';
 import { toUserMessage } from '@/lib/user-error';
 import { fetchProductByBarcode, ScannedProduct, scannedProductToFoodItem } from '@/lib/openfoodfacts';
 import { getFoodSuggestions, estimateMacros } from '@/lib/macros';
@@ -996,19 +997,19 @@ export default function BarcodeScannerModal({
                   </div>
                   <div className="p-2 rounded-xl bg-bg-card border border-border/80">
                     <span className="text-xs font-bold text-emerald-500 block">
-                      {currentFoodItem.proteinG}g
+                      {round1(currentFoodItem.proteinG)}g
                     </span>
                     <span className="text-2xs text-text-muted uppercase">PRO</span>
                   </div>
                   <div className="p-2 rounded-xl bg-bg-card border border-border/80">
                     <span className="text-xs font-bold text-text-primary block">
-                      {currentFoodItem.carbsG}g
+                      {round1(currentFoodItem.carbsG)}g
                     </span>
                     <span className="text-2xs text-text-muted uppercase">CARB</span>
                   </div>
                   <div className="p-2 rounded-xl bg-bg-card border border-border/80">
                     <span className="text-xs font-bold text-text-primary block">
-                      {currentFoodItem.fatG}g
+                      {round1(currentFoodItem.fatG)}g
                     </span>
                     <span className="text-2xs text-text-muted uppercase">FAT</span>
                   </div>
