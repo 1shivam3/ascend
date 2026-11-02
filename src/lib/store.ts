@@ -411,8 +411,6 @@ export interface AppState {
 
   // AI Training Profile & Plans
   trainingProfile: AITrainingProfile;
-  todaysAIWorkoutPlan?: AIPlannedWorkout;
-  latestWeeklyReview?: AIWeeklyReview;
 
   // Habit Operating System (Tier 1 & 2)
   waterLogs: Record<string, number>;
@@ -424,7 +422,6 @@ export interface AppState {
   dayTypeOverrides: Record<string, DayType>;
   gymLogs: Record<string, boolean>;
   toggleGymToday: (date?: string) => boolean;
-  aiInsightsCache: Record<string, AICoachInsight>;
   
   setHasHydrated: (state: boolean) => void;
   setProfile: (profile: UserProfile) => void;
@@ -518,10 +515,7 @@ export interface AppState {
   logQuickProtein: (proteinG: number, date?: string) => void;
 
   // AI Coach Actions
-  cacheAIInsight: (date: string, insight: AICoachInsight) => void;
   setTrainingProfile: (profile: Partial<AITrainingProfile>) => void;
-  setTodaysAIWorkoutPlan: (plan: AIPlannedWorkout | undefined) => void;
-  saveWeeklyReview: (review: AIWeeklyReview) => void;
 
   // Lifter Twin & Decisions Ledger
   trainingDecisions: Record<string, TrainingDecision>;
@@ -988,10 +982,7 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   creatineSupply: state.creatineSupply,
   dayTypeOverrides: state.dayTypeOverrides,
   gymLogs: state.gymLogs,
-  aiInsightsCache: state.aiInsightsCache,
   trainingProfile: state.trainingProfile,
-  todaysAIWorkoutPlan: state.todaysAIWorkoutPlan,
-  latestWeeklyReview: state.latestWeeklyReview,
   trainingDecisions: state.trainingDecisions,
   decisionsLedgerHistory: state.decisionsLedgerHistory,
   lifterProfile: state.lifterProfile,
@@ -1126,10 +1117,7 @@ export function buildFreshHistoryState(): Partial<AppState> {
     creatineConfig: DEFAULT_CREATINE_CONFIG,
     creatineSupply: DEFAULT_CREATINE_SUPPLY,
     dayTypeOverrides: {},
-    aiInsightsCache: {},
     trainingProfile: DEFAULT_AI_TRAINING_PROFILE,
-    todaysAIWorkoutPlan: undefined,
-    latestWeeklyReview: undefined,
     trainingDecisions: {},
     decisionsLedgerHistory: [],
     lifterProfile: null,
@@ -1542,12 +1530,9 @@ export const useAppStore = create<AppState>()(
       creatineSupply: DEFAULT_CREATINE_SUPPLY,
       dayTypeOverrides: {},
       gymLogs: {},
-      aiInsightsCache: {},
 
       // AI State
       trainingProfile: DEFAULT_AI_TRAINING_PROFILE,
-      todaysAIWorkoutPlan: undefined,
-      latestWeeklyReview: undefined,
 
       // Lifter Twin & Decisions Ledger State
       trainingDecisions: {},
@@ -2761,22 +2746,13 @@ export const useAppStore = create<AppState>()(
           },
         })),
 
-      cacheAIInsight: (date: string, insight: AICoachInsight) =>
-        set((state) => ({
-          aiInsightsCache: {
-            ...state.aiInsightsCache,
-            [date]: insight,
-          },
-        })),
 
       setTrainingProfile: (profileUpdates) =>
         set((state) => ({
           trainingProfile: { ...state.trainingProfile, ...profileUpdates },
         })),
 
-      setTodaysAIWorkoutPlan: (plan) => set({ todaysAIWorkoutPlan: plan }),
 
-      saveWeeklyReview: (review) => set({ latestWeeklyReview: review }),
 
       // Lifter Twin & Decisions Ledger Handlers
       acceptTrainingDecision: (exerciseName: string, decision?: TrainingDecision) => {
@@ -3477,10 +3453,7 @@ export const useAppStore = create<AppState>()(
           creatineConfig: DEFAULT_CREATINE_CONFIG,
           creatineSupply: DEFAULT_CREATINE_SUPPLY,
           dayTypeOverrides: {},
-          aiInsightsCache: {},
           trainingProfile: DEFAULT_AI_TRAINING_PROFILE,
-          todaysAIWorkoutPlan: undefined,
-          latestWeeklyReview: undefined,
           trainingDecisions: {},
           decisionsLedgerHistory: [],
           lifterProfile: null,
@@ -3576,10 +3549,7 @@ export const useAppStore = create<AppState>()(
             creatineConfig: DEFAULT_CREATINE_CONFIG,
             creatineSupply: DEFAULT_CREATINE_SUPPLY,
             dayTypeOverrides: {},
-            aiInsightsCache: {},
             trainingProfile: DEFAULT_AI_TRAINING_PROFILE,
-            todaysAIWorkoutPlan: undefined,
-            latestWeeklyReview: undefined,
             trainingDecisions: {},
             decisionsLedgerHistory: [],
             lifterProfile: null,
@@ -3639,8 +3609,6 @@ export const useAppStore = create<AppState>()(
           profile: null,
           hasCompletedOnboarding: false,
           activeWorkoutDraft: null,
-          todaysAIWorkoutPlan: undefined,
-          latestWeeklyReview: undefined,
           lifterProfile: null,
           athleteModel: null,
         });
@@ -4089,10 +4057,7 @@ export const useAppStore = create<AppState>()(
             creatineSupply: data.creatineSupply || state.creatineSupply,
             dayTypeOverrides: data.dayTypeOverrides && typeof data.dayTypeOverrides === 'object' ? data.dayTypeOverrides : state.dayTypeOverrides,
             gymLogs: data.gymLogs && typeof data.gymLogs === 'object' ? data.gymLogs : state.gymLogs,
-            aiInsightsCache: data.aiInsightsCache && typeof data.aiInsightsCache === 'object' ? data.aiInsightsCache : state.aiInsightsCache,
             trainingProfile: data.trainingProfile || state.trainingProfile,
-            todaysAIWorkoutPlan: data.todaysAIWorkoutPlan || state.todaysAIWorkoutPlan,
-            latestWeeklyReview: data.latestWeeklyReview || state.latestWeeklyReview,
             trainingDecisions: data.trainingDecisions || state.trainingDecisions,
             decisionsLedgerHistory: Array.isArray(data.decisionsLedgerHistory) ? data.decisionsLedgerHistory : state.decisionsLedgerHistory,
             lifterProfile: data.lifterProfile || state.lifterProfile,

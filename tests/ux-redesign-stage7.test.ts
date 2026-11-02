@@ -102,8 +102,6 @@ describe('Stage 7 — onboarding', () => {
   it('step titles use the design-system tokens', () => {
     for (const f of [
       'src/components/onboarding/FitnessGoalsScreen.tsx',
-      'src/components/onboarding/ExperienceLevelScreen.tsx',
-      'src/components/onboarding/ScheduleScreen.tsx',
       'src/components/onboarding/PersonalDetailsScreen.tsx',
     ]) {
       expect(read(f), `${f} not on page-title`).toContain('className="page-title"');

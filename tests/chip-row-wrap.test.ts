@@ -35,7 +35,6 @@ const FIXED_FILES = [
   'components/WorkoutHeatmap.tsx',
   'components/ExerciseLibraryModal.tsx',
   'components/PRsPage.tsx',
-  'components/PolicyDecisionLedger.tsx',
   'components/ExerciseSelectorModal.tsx',
   'components/ProgressChart.tsx',
 ];
@@ -60,7 +59,6 @@ describe('chip-row wrap: no hidden-scrollbar filter rows', () => {
         'flex flex-wrap items-center gap-1.5',
       ],
       'components/PRsPage.tsx': ['flex flex-wrap items-center gap-1.5 pb-1'],
-      'components/PolicyDecisionLedger.tsx': ['flex flex-wrap items-center gap-1.5 pb-1'],
       'components/ExerciseSelectorModal.tsx': ['flex flex-wrap items-center gap-1.5 pb-1 text-2xs'],
       'components/ProgressChart.tsx': ['flex flex-wrap gap-1.5 pb-1'],
     };

@@ -2,9 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
-  generateDeterministicWeeklyReview,
   generateDeterministicPostWorkoutTake,
-  generateOfflineHeuristic,
 } from '../src/lib/ai-coach';
 import { ALL_QUOTES, getDailyQuote } from '../src/lib/quotes';
 import { en } from '../src/lib/i18n/en';
@@ -36,65 +34,7 @@ function expectNoBannedPhrases(text: string) {
   }
 }
 
-function localDateStr(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function daysAgoStr(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return localDateStr(d);
-}
-
 const doneSet = (weight: number, reps: number) => ({ weight, reps, status: 'completed' as const });
-
-describe('Fix 1 — honest weekly-review fallback', () => {
-  it('reports only measured facts when workouts exist', () => {
-    const review = generateDeterministicWeeklyReview({
-      workouts: [
-        {
-          date: daysAgoStr(2),
-          exercises: [
-            { name: 'Barbell Back Squat', sets: [doneSet(100, 5), doneSet(100, 5), doneSet(100, 5)] },
-          ],
-        },
-      ],
-      trainingProfile: { daysPerWeek: 3 },
-    } as any);
-
-    expect(review.workoutsCompleted).toBe(1);
-    expect(review.plannedDaysPerWeek).toBe(3);
-    expect(review.weekSummary).toContain('Completed 1 of 3 target training sessions');
-    // 3 sets × 100 kg × 5 reps = 1,500 kg, top exercise named.
-    expect(review.strengthHighlight).toContain('1,500 kg');
-    expect(review.strengthHighlight).toContain('Barbell Back Squat');
-    expect(review.habitInsight).toContain('training fell on 1 day');
-    expect(review.focusNextWeek).toContain('2 planned sessions');
-    expectNoBannedPhrases(
-      [review.weekSummary, review.strengthHighlight, review.habitInsight, review.focusNextWeek].join('\n')
-    );
-  });
-
-  it('is honestly empty on a cold start — no invented plan, no invented highlights', () => {
-    const review = generateDeterministicWeeklyReview({
-      workouts: [],
-      trainingProfile: undefined,
-    } as any);
-
-    expect(review.workoutsCompleted).toBe(0);
-    // No training profile → no invented "of 4 target" plan.
-    expect(review.weekSummary).toBe('Completed 0 training sessions over the past 7 days.');
-    expect(review.plannedDaysPerWeek).toBe(0);
-    expect(review.strengthHighlight).toContain('No workouts were logged');
-    expect(review.habitInsight).toContain('no training pattern to report');
-    expectNoBannedPhrases(
-      [review.weekSummary, review.strengthHighlight, review.habitInsight, review.focusNextWeek].join('\n')
-    );
-  });
-});
 
 describe('Fix 1 — honest post-workout take fallback', () => {
   it('reports this session\'s measured volume instead of a canned claim', () => {
@@ -130,50 +70,19 @@ describe('Fix 1 — honest post-workout take fallback', () => {
   });
 });
 
-describe('Fix 1 — honest daily-insight heuristic', () => {
+describe('Fix 1 — prompt schema and digest sentence join', () => {
+  // Slop-tail note: the weekly-review and daily-insight deterministic
+  // generators pinned here in PR #72 turned out to be unreachable (zero
+  // production callers — their only would-be callers were archived
+  // components). Both generators and their pins were removed in the
+  // slop-tail pass; the live post-workout take keeps its honesty pins
+  // in the describe above.
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it('low-water warning states the measured fact, not invented physiology', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date(2026, 10, 2, 18, 30)); // 6:30 PM local
-    const insight = generateOfflineHeuristic({
-      workouts: [],
-      prs: [],
-      profile: { bodyweightKg: 80 },
-      waterLogs: {},
-      hydrationConfig: undefined,
-      creatineLogs: {},
-      creatineConfig: undefined,
-      meals: [],
-      macroGoals: undefined,
-    } as any);
-    expect(insight.fatigueWarning).toContain('less than 800 ml');
-    expectNoBannedPhrases(
-      [insight.volumeTrend, insight.recoveryStatus, insight.fatigueWarning || '', insight.tacticalAdvice].join('\n')
-    );
-  });
-
-  it('trained-yesterday recovery status states the fact without claiming energy', () => {
-    const insight = generateOfflineHeuristic(
-      {
-        workouts: [{ date: daysAgoStr(1), exercises: [{ name: 'Row', sets: [doneSet(50, 8)] }] }],
-        prs: [],
-        profile: { bodyweightKg: 80 },
-        waterLogs: {},
-        hydrationConfig: undefined,
-        creatineLogs: {},
-        creatineConfig: undefined,
-        meals: [],
-        macroGoals: undefined,
-      } as any,
-      new Date()
-    );
-    expect(insight.recoveryStatus).toBe("Last session was yesterday. No workout logged yet today.");
-    expectNoBannedPhrases(insight.recoveryStatus);
-  });
-
+  
+  
   it('COACH_INSIGHT schema no longer seeds CNS jargon', () => {
     const route = fs.readFileSync(path.join(process.cwd(), 'src/app/api/ai/coach/route.ts'), 'utf-8');
     expect(route).not.toContain('CNS and muscular recovery');
