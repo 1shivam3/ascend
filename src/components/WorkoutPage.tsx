@@ -105,6 +105,7 @@ import SegmentedControl from '@/components/ui/SegmentedControl';
 import RunSessionScreen from '@/components/RunSessionScreen';
 import {
   getRunProgramProgress,
+  normalizeRunDistanceKm,
   describeSession,
   sessionTotalSeconds,
   type RunSession,
@@ -599,6 +600,99 @@ function PlanModal({
         }}
         onSelectExercise={handleSelectFromLibrary}
       />
+    </div>
+  );
+}
+
+// ─── Run Distance Row (History expansion, run records only) ──────────────
+
+/**
+ * Distance display + inline editor for a SAVED run. Distance used to be
+ * enterable only on the RunSessionScreen completion screen — once the
+ * run was saved there was no way to add or correct it. This row lives in
+ * the History expansion (the saved-workout detail surface) and writes
+ * through the store's updateWorkout, so the record itself changes and
+ * every surface reading distanceKm sees the edit. Saving an empty field
+ * clears the distance back to unset.
+ */
+function RunDistanceRow({ workout }: { workout: WorkoutEntry }) {
+  const { t } = useTranslation();
+  const updateWorkout = useStore((state) => state.updateWorkout);
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  const startEdit = () => {
+    setDraft(workout.distanceKm !== undefined ? String(workout.distanceKm) : '');
+    setIsEditing(true);
+  };
+
+  const trimmed = draft.trim();
+  const parsed = trimmed === '' ? undefined : Number(trimmed);
+  // Empty = clear (valid); otherwise the shared distance rule decides.
+  const isValidDraft = trimmed === '' || normalizeRunDistanceKm(parsed) !== undefined;
+
+  const handleSave = () => {
+    if (!isValidDraft) return;
+    updateWorkout(workout.id, {
+      distanceKm: trimmed === '' ? undefined : normalizeRunDistanceKm(parsed),
+    });
+    setIsEditing(false);
+  };
+
+  if (!isEditing) {
+    return (
+      <div className="bg-bg-elevated p-3 rounded-lg flex items-center justify-between gap-3">
+        <span className="text-xs font-semibold text-text-secondary">{t('run.distanceLabel')}</span>
+        <button
+          type="button"
+          onClick={startEdit}
+          aria-label={t('common.edit')}
+          className="flex items-center gap-1.5 text-sm font-semibold text-text-primary cursor-pointer shrink-0"
+        >
+          {workout.distanceKm !== undefined ? (
+            <span className="tabular-nums">{workout.distanceKm} km</span>
+          ) : (
+            <span className="text-text-muted">{t('common.add')}</span>
+          )}
+          <Edit2 className="w-3.5 h-3.5 text-text-muted" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-bg-elevated p-3 rounded-lg space-y-2">
+      <label className="block">
+        <span className="text-xs font-semibold text-text-secondary">{t('run.distanceLabel')}</span>
+        <input
+          type="number"
+          inputMode="decimal"
+          min="0"
+          step="0.01"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="5.00"
+          autoFocus
+          className="mt-1 w-full bg-bg-secondary border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:border-accent outline-none"
+        />
+      </label>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setIsEditing(false)}
+          className="py-2 px-4 rounded-xl bg-bg-secondary border border-border text-xs font-bold text-text-secondary flex-1 cursor-pointer"
+        >
+          {t('common.cancel')}
+        </button>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!isValidDraft}
+          className="py-2 px-4 rounded-xl bg-accent text-accent-on text-xs font-bold flex-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {t('common.save')}
+        </button>
+      </div>
     </div>
   );
 }
@@ -2755,6 +2849,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
                   {isExpanded && (
                     <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4">
+                      {workout.kind === 'run' && <RunDistanceRow workout={workout} />}
                       {displayExercises.map((ex, i) => {
                         const effortSummary = ex.sets.some((s) => s.rpe !== undefined)
                           ? calculateSetEffortDrift(ex.sets)

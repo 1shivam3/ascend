@@ -118,6 +118,7 @@ import {
 import {
   sanitizePRUpdate,
   sanitizeMealUpdate,
+  sanitizeWorkoutUpdate,
   sanitizePlannedWorkout,
 } from './update-sanitize';
 import {
@@ -447,7 +448,12 @@ export interface AppState {
    *  are NOT restored here — they survive deletion today (delete does
    *  not remove PRs), so undo only restores the session itself. */
   insertWorkoutAt: (workout: WorkoutEntry, index: number) => void;
-  
+  /** Edit a saved workout in place (same update mechanism as
+   *  updateMeal / updatePR: sanitize at the store boundary + stamp the
+   *  edit so sync newest-wins sees it). First consumer: correcting a
+   *  run's distanceKm from History. */
+  updateWorkout: (id: string, updated: Partial<WorkoutEntry>) => void;
+
   addMeal: (meal: MealEntry) => void;
   deleteMeal: (id: string) => void;
   /** QA4-014 Undo: re-insert a deleted meal at its original index (no-op if present). */
@@ -2126,7 +2132,12 @@ export const useAppStore = create<AppState>()(
           deletedWorkoutIds: (state.deletedWorkoutIds || []).filter((d) => d !== workout.id),
         };
       }),
-      
+      updateWorkout: (id, updated) => set((state) => ({
+        // Gauntlet DI-15: clamp/validate at the store boundary, exactly
+        // like updateMeal / updatePR.
+        workouts: state.workouts.map(w => w.id === id ? stampEditedRow(sanitizeWorkoutUpdate(w, updated)) : w),
+      })),
+
       addMeal: (meal) => {
         // QA4-028: idempotency guard, mirroring addWorkout — a fast
         // double-tap re-submits the SAME meal id; storing it twice would
