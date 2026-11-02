@@ -607,7 +607,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     if (matched) {
       const updated = recalculateMealResult(analysis, itemsCopy);
       setAnalysis(updated);
-      toast.success(t('scan.aiAdjustedMsg'), t('scan.aiAdjustedTitle'));
+      // This path is a purely local edit (regex match + offline DB
+      // re-estimate) — no AI call happens, so it is labelled with the
+      // honest offline label, never "AI Adjusted".
+      toast.success(t('scan.localAdjustMsg'), t('scan.offlineAdjustTitle'));
       setRefinementInput('');
       setIsRefining(false);
       return;

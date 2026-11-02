@@ -437,7 +437,7 @@ export function adjustNextTargets(
       reasonI18n = { key: 'coachDigest.adjPush25', params: { exercise: target.exercise, rpe: fmtRpe(avgRpe) } };
     } else {
       const rpeNote = avgRpe !== undefined ? ` (RPE ${fmtRpe(avgRpe)})` : '';
-      const missedNote = missedReps ? ' Some reps were missed,' : '';
+      const missedNote = missedReps ? ' Some reps were missed.' : '';
       reason =
         `Holding ${target.exercise} steady${rpeNote}.${missedNote} The load is in the right zone — ` +
         `right now the win is repeating it cleanly, not chasing a bigger number.`;
