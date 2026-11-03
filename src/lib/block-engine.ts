@@ -1046,15 +1046,23 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
   // athlete's own statement of current strength (§4.1).
   const topLiftByCompound = new Map<string, number>();
   const enteredCompounds = new Set<string>();
+  // F-06: an entry with e1rmKg 0 is a DELIBERATE CLEAR from the
+  // intake modal ("that prefilled number is wrong"). The zero entry
+  // used to be skipped here, so the estimate fallback below silently
+  // resurrected the very PR the user had just cleared.
+  const clearedCompounds = new Set<string>();
   for (const tl of intake.topLifts) {
     const compound = mainCompoundKey(tl.name);
-    if (compound && tl.e1rmKg > 0) {
+    if (!compound) continue;
+    if (tl.e1rmKg > 0) {
       topLiftByCompound.set(compound, tl.e1rmKg);
       // Only an ENTERED top lift is the athlete's own statement (§4.1).
       // Prefill-derived entries (source 'history' / 'pr') are estimates
       // the app made from records — the load-continuity floor below
       // governs them like any other history estimate.
       if (tl.source === 'entered') enteredCompounds.add(compound);
+    } else {
+      clearedCompounds.add(compound);
     }
   }
   const schemes: ProgressionScheme[] = [];
@@ -1078,15 +1086,21 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
         schemes.push(scheme);
       }
       const compoundKey = mainCompoundKey(ex.name);
+      // F-06: a cleared lift skips BOTH estimate fallbacks and lands
+      // on the conservative skeleton default below — exactly like a
+      // lift with no history at all.
+      const liftCleared = compoundKey ? clearedCompounds.has(compoundKey) : false;
       const e1rm =
         (compoundKey ? topLiftByCompound.get(compoundKey) : undefined) ??
-        estimateE1rmKg(ex.name, input.prs, input.workouts) ??
-        (() => {
-          const lift = athleteModel?.lifts.find(
-            (l) => l.key === canonicalizeExerciseName(ex.name)
-          );
-          return lift && lift.bestE1rmKg > 0 ? lift.bestE1rmKg : null;
-        })();
+        (liftCleared
+          ? null
+          : estimateE1rmKg(ex.name, input.prs, input.workouts) ??
+            (() => {
+              const lift = athleteModel?.lifts.find(
+                (l) => l.key === canonicalizeExerciseName(ex.name)
+              );
+              return lift && lift.bestE1rmKg > 0 ? lift.bestE1rmKg : null;
+            })());
       let targetWeight = ex.targetWeight;
       if (e1rm && role !== 'accessory') {
         const pct = role === 'main' ? MAIN_LOAD_PCT[focus] : 0.68;
