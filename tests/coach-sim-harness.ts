@@ -486,9 +486,13 @@ function runSimulationInner(persona: PersonaDef): SimTrace {
         const isProgression =
           d.actionCategory === 'candidate_rep_progression' ||
           d.actionCategory === 'candidate_load_progression';
+        // The engaged user also confirms the block deload cut when the
+        // coach proposes one — same decision-card flow (accept, then
+        // apply to the future prescription), never automatic.
+        const isDeload = d.actionCategory === 'candidate_load_reduction';
         let applied = false;
         let applyError: string | undefined;
-        if (isProgression) {
+        if (isProgression || isDeload) {
           // The app's real flow: the athlete accepts the recommendation on
           // the decision card, then applies it to the future prescription.
           useAppStore.getState().acceptPolicyDecision(d.id);

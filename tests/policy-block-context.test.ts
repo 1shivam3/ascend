@@ -130,7 +130,7 @@ describe('Policy v0 — block week discipline (Rule 0.5)', () => {
     expect(decision.ruleId).toBe('HOLD-BLOCK-DELOAD');
   });
 
-  it('deload week + above-target effort proposes the 10% cut as review_required', () => {
+  it('deload week + above-target effort proposes the 10% cut as an athlete-confirmable load reduction', () => {
     const hotHistory = [
       workout('2026-10-13', 80, 6, 9.5),
       workout('2026-10-20', 80, 6, 9.5),
@@ -140,7 +140,7 @@ describe('Policy v0 — block week discipline (Rule 0.5)', () => {
       blockContext: { weekType: 'deload' },
     });
     expect(decision.ruleId).toBe('BLOCK-DELOAD-01');
-    expect(decision.actionCategory).toBe('review_required');
+    expect(decision.actionCategory).toBe('candidate_load_reduction');
     expect(decision.proposedPrescription.deltaWeight).toBeCloseTo(-8);
   });
 

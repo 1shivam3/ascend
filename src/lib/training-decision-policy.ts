@@ -41,6 +41,7 @@ export type DecisionActionCategory =
   | 'hold_current_target'
   | 'candidate_rep_progression'
   | 'candidate_load_progression'
+  | 'candidate_load_reduction'
   | 'review_required';
 
 /**
@@ -837,9 +838,11 @@ export function evaluateTrainingDecisionPolicyV0(
   // Test weeks hold progression: the week exists to measure what the
   // block built. Deload weeks hold progression too, and when the latest
   // evidence shows the lift arriving hot (above-target effort), the
-  // policy proposes the standard 10% deload cut as a reviewable decision
-  // — never an auto-edit (D3): its negative delta cannot pass
-  // validatePolicyDecisionApplication, so it can only ever be shown.
+  // policy proposes the standard 10% deload cut as a
+  // candidate_load_reduction — never an auto-edit (D3): the validator
+  // admits its negative delta only for this rule and only after the
+  // athlete has explicitly accepted the decision, so the cut reaches a
+  // plan solely through the athlete-confirmed apply path, never silently.
   const blockWeekType = options?.blockContext?.weekType;
   if (blockWeekType === 'test') {
     return buildRecord({
@@ -862,11 +865,11 @@ export function evaluateTrainingDecisionPolicyV0(
           latestComparableExp.averageRpeDelta > 0.5));
     if (arrivingHot && targetWeight > 0) {
       return buildRecord({
-        actionCategory: 'review_required',
+        actionCategory: 'candidate_load_reduction',
         ruleId: 'BLOCK-DELOAD-01',
         headline: 'Deload Week — Review the Standard 10% Cut',
         explanation:
-          'Deload week in your coach block, and recent sets on this lift have been running above target effort, so the coach proposes the standard 10% deload cut. It is shown for review and never applied silently.',
+          'Deload week in your coach block, and recent sets on this lift have been running above target effort, so the coach proposes the standard 10% deload cut. It applies only if you accept and confirm it here — never silently.',
         proposedWeight: targetWeight * 0.9,
         proposedReps: targetReps,
         deltaWeight: -(targetWeight * 0.1),
@@ -1218,6 +1221,28 @@ export function validatePolicyDecisionApplication(
     };
   }
 
+  // 2b-i. Load reduction provenance: a negative load delta may only ever be
+  // applied when it is the coach block's standard deload proposal
+  // (BLOCK-DELOAD-01) carried as candidate_load_reduction. The athlete's
+  // 'accepted' status — enforced in step 1 above — is the explicit deload
+  // authorization; nothing reduces a load silently.
+  if (decision.actionCategory === 'candidate_load_reduction') {
+    if (decision.ruleId !== 'BLOCK-DELOAD-01') {
+      return {
+        valid: false,
+        error: 'unauthorized_reduction',
+        message: 'Load reductions require verified rule approval (BLOCK-DELOAD-01).',
+      };
+    }
+    if (!(decision.proposedPrescription?.deltaWeight < 0) || decision.proposedPrescription.deltaReps < 0) {
+      return {
+        valid: false,
+        error: 'invalid_proposed_values',
+        message: 'A load reduction must lower the load and must not lower repetitions.',
+      };
+    }
+  }
+
   // 2b. External load increment provenance and rule validation
   if (decision.actionCategory === 'candidate_load_progression') {
     if (decision.ruleId !== 'LOAD-PROG-01') {
@@ -1286,7 +1311,12 @@ export function validatePolicyDecisionApplication(
     };
   }
 
-  if (deltaWeight < 0 || (deltaWeight === 0 && deltaReps < 0)) {
+  // candidate_load_reduction passed its own provenance gate in 2b-i; its
+  // negative deltaWeight is the authorized deload, not a regression.
+  if (
+    decision.actionCategory !== 'candidate_load_reduction' &&
+    (deltaWeight < 0 || (deltaWeight === 0 && deltaReps < 0))
+  ) {
     return {
       valid: false,
       error: 'invalid_progression_delta',

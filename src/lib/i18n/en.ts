@@ -2695,6 +2695,7 @@ export const en = {
   'pdc.overridden': 'OVERRIDDEN',
   'pdc.dismissed': 'DISMISSED',
   'pdc.load': '+{delta} {unit} LOAD',
+  'pdc.deloadBadge': '{delta} {unit} DELOAD',
   'pdc.repsBadge': '+{delta} REPS',
   'pdc.holdTarget': 'HOLD TARGET',
   'pdc.reviewRequired': 'REVIEW REQUIRED',
