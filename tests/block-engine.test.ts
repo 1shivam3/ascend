@@ -686,6 +686,52 @@ describe('plateau proposals', () => {
     if ('error' in result) throw new Error('unexpected stale');
     expect(result.plan.exercises[0].targetWeight).toBe(72.5); // 80 * 0.9 = 72 → loadable 72.5
   });
+
+  it('[characterization] a variation swap can rename a lift onto a name already in the plan', () => {
+    // applyPlateauProposalToPlan performs no collision check: swapping
+    // Squat -> Leg Press in a plan that already contains Leg Press
+    // leaves the plan with two exercises named 'Leg Press'. Pinned at
+    // unit level after the sim stopped reproducing the duplicate
+    // end-to-end (its driver was merged stall history, fixed separately;
+    // the sim's remaining swap-hygiene symptom is the placeholder name
+    // pinned in coach-simulation.test.ts).
+    const plan: PlannedWorkout = {
+      id: 'p1',
+      name: 'Lower A',
+      createdAt: '2026-01-01',
+      exercises: [
+        { name: 'Squat', targetSets: 4, targetReps: 5, targetWeight: 100, targetUnit: 'kg' },
+        { name: 'Leg Press', targetSets: 3, targetReps: 10, targetWeight: 200, targetUnit: 'kg' },
+      ],
+    };
+    const schemes = deriveAdoptionSchemes(plan, null);
+    const blocks: CoachBlocksState = {
+      ...getInitialCoachBlocksState(),
+      adoptedPlans: { p1: { planId: 'p1', adoptedOn: TODAY, schemes } },
+    };
+    const squatFlag: StallFlag = {
+      ...flag,
+      exercise: 'Squat',
+      variationName: 'Leg Press',
+      variationSets: 3,
+      variationReps: 10,
+    };
+    const [proposal] = snapshotPlateauExpectations(
+      buildPlateauProposals({
+        stalls: [squatFlag],
+        blocks,
+        planIdByExerciseKey: { squat: 'p1' },
+        acknowledgedKeys: new Set(),
+        todayStr: TODAY,
+      }),
+      [plan]
+    );
+    const result = applyPlateauProposalToPlan(plan, schemes, proposal, TODAY);
+    if ('error' in result) throw new Error('unexpected error');
+    expect(
+      result.plan.exercises.filter((e) => e.name === 'Leg Press')
+    ).toHaveLength(2);
+  });
 });
 
 describe('buildIntakePrefill', () => {

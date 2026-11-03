@@ -92,10 +92,15 @@ export function exerciseNamesEqual(a: string, b: string): boolean {
  * Extracts and chronologically sorts past sessions for a specific exercise.
  *
  * Matching defaults to the historical fuzzy rule (exact, or substring
- * in either direction — coach-engine's stall/previous-session lookups
- * rely on it for plan-vs-log name drift). Progress surfaces pass
- * { exact: true } so a variant lift never pollutes the selected
- * exercise's chart (FE-03).
+ * in either direction). Callers that must never merge variant lifts pass
+ * { exact: true } (normalized name equality via exerciseNamesEqual):
+ * progress surfaces (FE-03 — a variant lift never pollutes the selected
+ * exercise's chart) and coach-engine's stall detection, whose names come
+ * from the logs themselves, so substring matching there only ever merged
+ * different lifts' histories into false stall flags. The fuzzy default
+ * remains for the previous-session / training-decision / profile
+ * lookups, which bridge plan-vs-log name drift and were deliberately
+ * kept fuzzy by the FE-03 audit — audited again 2026-11-03, preserved.
  */
 export function getExerciseHistorySessions(
   exerciseName: string,
