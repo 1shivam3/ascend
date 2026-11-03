@@ -181,6 +181,12 @@ export interface BlockEngineInput {
   bodyweightKg?: number;
   ageYears?: number;
   dislikedExercises?: string[];
+  /**
+   * The weekdays the lifter currently trains on (from their live
+   * schedule ∩ the active block's plans), in week order. When the new
+   * block has the same day count, these are preserved verbatim.
+   */
+  currentWeekdays?: DayOfWeek[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -247,7 +253,8 @@ const FOCUS_LABEL: Record<BlockFocus, string> = {
 
 function resolveFocus(
   goal: AthleteGoal,
-  nutritionPhase: NutritionPhase | null | undefined
+  nutritionPhase: NutritionPhase | null | undefined,
+  hasHistory: boolean
 ): { focus: BlockFocus; reason: string } {
   switch (goal) {
     case 'get_stronger':
@@ -260,9 +267,16 @@ function resolveFocus(
       // store only ever passes nutritionPhase for lose_fat — the branch
       // was unreachable dead code. Deleted rather than kept "just in
       // case": a branch that cannot fire is a branch nobody tests.
+      // The reason must be truthful at cold start: a brand-new lifter
+      // has no logged progress for loads to "come from" (the sim's
+      // first-ever hypertrophy blocks claimed exactly that), so the
+      // no-history wording says what actually happens — conservative
+      // defaults that calibrate against real training.
       return {
         focus: 'hypertrophy',
-        reason: 'Your goal is muscle, so the block runs moderate loads in the 6–15 rep ranges where your logged progress has come from.',
+        reason: hasHistory
+          ? 'Your goal is muscle, so the block runs moderate loads in the 6–15 rep ranges where your logged progress has come from.'
+          : 'Your goal is muscle, so the block runs moderate loads in the 6–15 rep ranges, starting from conservative defaults that calibrate to your real strength as you train.',
       };
     case 'lose_fat':
       return {
@@ -313,18 +327,49 @@ function mergeFullBody(a: PlannedExercise[], b: PlannedExercise[]): PlannedExerc
   return dedupeExercises([...mains, ...rest]);
 }
 
-function classifyForPpl(ex: PlannedExercise): 'push' | 'pull' | 'legs' {
-  const family = getMovementFamily(ex.name);
+function classifyNameForPpl(name: string): 'push' | 'pull' | 'legs' {
+  const family = getMovementFamily(name);
   if (family === 'horizontal_push' || family === 'vertical_push') return 'push';
   if (family === 'horizontal_pull' || family === 'vertical_pull') return 'pull';
   if (family === 'squat' || family === 'hinge' || family === 'carry' || family === 'core') {
     return 'legs';
   }
-  const muscle = getExerciseMuscle(ex.name);
+  const muscle = getExerciseMuscle(name);
   if (muscle === 'Back') return 'pull';
   if (muscle === 'Legs' || muscle === 'Core' || muscle === 'Conditioning') return 'legs';
-  if (muscle === 'Arms') return /curl|pull|row/i.test(ex.name) ? 'pull' : 'push';
+  if (muscle === 'Arms') return /curl|pull|row/i.test(name) ? 'pull' : 'push';
   return 'push'; // Chest / Shoulders
+}
+
+function classifyForPpl(ex: PlannedExercise): 'push' | 'pull' | 'legs' {
+  return classifyNameForPpl(ex.name);
+}
+
+type FillPattern = 'push' | 'pull' | 'legs' | 'upper' | 'lower' | 'full';
+
+/**
+ * Whether an exercise belongs on a day of the given fill pattern. The
+ * fill pass used to pick by muscle alone, so a Back pick for an Upper
+ * day could be a hinge lift (the sim's pain persona got Conventional
+ * Deadlift backfilled onto Upper A). Upper accepts push/pull work
+ * only; push/pull/legs days accept only their own class; lower is
+ * legs-class; full-body accepts anything.
+ */
+function patternAcceptsExercise(pattern: FillPattern, name: string): boolean {
+  const cls = classifyNameForPpl(name);
+  switch (pattern) {
+    case 'push':
+      return cls === 'push';
+    case 'pull':
+      return cls === 'pull';
+    case 'legs':
+    case 'lower':
+      return cls === 'legs';
+    case 'upper':
+      return cls !== 'legs';
+    default:
+      return true; // 'full'
+  }
 }
 
 /** Compose the week's day skeletons from the goal templates (§4.2). */
@@ -415,8 +460,22 @@ const WEEKDAY_CANDIDATES: Record<number, DayOfWeek[][]> = {
  */
 function chooseWeekdays(
   dayMuscles: Set<MuscleGroup>[],
-  athleteModel: AthleteModel | null
+  athleteModel: AthleteModel | null,
+  currentWeekdays?: DayOfWeek[]
 ): { weekdays: DayOfWeek[]; reason: string } {
+  // Continuity first: a lifter who already trains on a set of weekdays
+  // keeps them across a block rollover — their week is built around
+  // those days, and silently moving Mon/Wed/Fri to Tue/Thu/Sat (what
+  // the recovery-only scoring did whenever the data shifted) breaks
+  // the habit the block depends on. Only a day-count change (a new
+  // intake with more/fewer days) re-opens the choice.
+  if (currentWeekdays && currentWeekdays.length === dayMuscles.length) {
+    const names = currentWeekdays.map((d) => d[0].toUpperCase() + d.slice(1)).join(', ');
+    return {
+      weekdays: [...currentWeekdays],
+      reason: `Your training days stay ${names} — a new block keeps the week you already train on.`,
+    };
+  }
   const candidates = WEEKDAY_CANDIDATES[dayMuscles.length] ?? WEEKDAY_CANDIDATES[4];
   const recoveryByMuscle = new Map<MuscleGroup, number>();
   for (const row of athleteModel?.recovery ?? []) {
@@ -645,7 +704,8 @@ function pickExercisesForMuscle(
     disliked: string[];
     bannedFamilies: Set<MovementFamily>;
     usedKeys: Set<string>;
-  }
+  },
+  dayPattern?: FillPattern
 ): PlannedExercise[] {
   const banned = getInjuryBannedFamilies(ctx.limitations);
   ctx.bannedFamilies.forEach((f) => banned.add(f));
@@ -659,6 +719,9 @@ function pickExercisesForMuscle(
     if (banned.has(item.movementPattern)) return false;
     if (isExerciseJointBanned(item.name, bannedJoints)) return false;
     if (ctx.experience === 'beginner' && item.difficulty === 'advanced') return false;
+    // Day-pattern discipline (fill pass only): a pick must belong to
+    // the day's movement pattern — no hinge lifts on upper days.
+    if (dayPattern && !patternAcceptsExercise(dayPattern, item.name)) return false;
     return true;
   }).sort((a, b) => {
     const mainA = mainCompoundKey(a.name) ? 0 : 1;
@@ -740,7 +803,11 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
   const { intake, athleteModel, unit, todayStr } = input;
   const disliked = input.dislikedExercises ?? [];
   const warnings: string[] = [];
-  const { focus, reason: focusReason } = resolveFocus(intake.goal, input.nutritionPhase);
+  const { focus, reason: focusReason } = resolveFocus(
+    intake.goal,
+    input.nutritionPhase,
+    input.workouts.length > 0 || input.prs.length > 0
+  );
   const weekTypes = blockWeeks(intake.daysPerWeek, intake.experience);
   const startMonday = blockStartMonday(todayStr);
 
@@ -913,7 +980,7 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
     while (exercises.length < MIN_DAY_EXERCISES && rotations < muscles.length * 2) {
       const muscle = muscles[rotations % muscles.length];
       rotations++;
-      const picks = pickExercisesForMuscle(muscle, 1, pickCtx);
+      const picks = pickExercisesForMuscle(muscle, 1, pickCtx, pattern);
       if (picks.length === 0) continue;
       const p = picks[0];
       exercises.push(p);
@@ -947,7 +1014,11 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
   const dayMuscles = skeletons.map(
     (d) => new Set(d.exercises.map((e) => getExerciseMuscle(e.name)))
   );
-  const { weekdays, reason: weekdayReason } = chooseWeekdays(dayMuscles, athleteModel);
+  const { weekdays, reason: weekdayReason } = chooseWeekdays(
+    dayMuscles,
+    athleteModel,
+    input.currentWeekdays
+  );
 
   // 7) Prescriptions + schemes + per-exercise rationale.
   // Entered top lifts (intake) outrank history estimates: they are the
@@ -1072,6 +1143,34 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
     };
   });
 
+  // 7b) One starting load per lift across the whole block. The day
+  // skeletons come from different split templates whose per-plan
+  // defaults for the same lift disagree — a cold-start block
+  // prescribed Lat Pulldown at 30 kg on one day and 0 kg on another —
+  // and nothing downstream reconciles them; the lifter just sees the
+  // same lift priced two ways inside one block. Unify here, at
+  // generation: the strongest positive prescription wins (a real load
+  // beats a zero/missing template default); a lift that is bodyweight
+  // everywhere stays 0. Later sessions still diverge legitimately as
+  // each plan's own progression applies.
+  const unifiedLoadByKey = new Map<string, number>();
+  for (const day of days) {
+    for (const ex of day.exercises) {
+      const w = ex.targetWeight;
+      if (typeof w === 'number' && w > 0) {
+        const k = canonicalizeExerciseName(ex.name);
+        const cur = unifiedLoadByKey.get(k);
+        if (cur === undefined || w > cur) unifiedLoadByKey.set(k, w);
+      }
+    }
+  }
+  for (const day of days) {
+    day.exercises = day.exercises.map((ex) => {
+      const w = unifiedLoadByKey.get(canonicalizeExerciseName(ex.name));
+      return w !== undefined && ex.targetWeight !== w ? { ...ex, targetWeight: w } : ex;
+    });
+  }
+
   // 8) Names (collision-safe) + ids.
   const blockName = `${FOCUS_LABEL[focus]} Block`;
   const existingNames = new Set(input.existingPlans.map((p) => p.name.trim().toLowerCase()));
@@ -1133,6 +1232,25 @@ export function materializeProposal(
     coachBlockId: proposal.id,
   }));
   const nextSchedule: WeeklySchedule = { ...schedule };
+  // Retire the superseded block's days. The old code only ever SET the
+  // new block's weekdays, so after a rollover that moved days (say
+  // Mon/Wed/Fri → Tue/Thu/Sat) the schedule kept all six entries —
+  // and every consumer of the schedule (today view, notifications,
+  // the weekly review's adherence count) treated the stale days as
+  // still planned. The staller's review invented two missed sessions
+  // a week for six straight weeks this way ("Protect your monday
+  // session" with zero sessions actually missed). Entries pointing
+  // at plans from another coach block become rest days; entries for
+  // the lifter's own non-block plans are never touched.
+  const blockIdByPlanId = new Map(existingPlans.map((p) => [p.id, p.coachBlockId]));
+  for (const d of Object.keys(nextSchedule) as DayOfWeek[]) {
+    const pid = nextSchedule[d]?.workoutPlanId;
+    if (typeof pid !== 'string' || pid === 'rest') continue;
+    const owner = blockIdByPlanId.get(pid);
+    if (owner && owner !== proposal.id) {
+      nextSchedule[d] = { workoutPlanId: 'rest' };
+    }
+  }
   for (const day of liveDays) {
     nextSchedule[day.weekday] = {
       workoutPlanId: day.planId,

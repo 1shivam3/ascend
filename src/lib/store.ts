@@ -2830,6 +2830,17 @@ export const useAppStore = create<AppState>()(
       proposeCoachBlock: (intake) => {
         const state = get();
         const todayStr = getLocalTodayStr();
+        // Weekday continuity: the days the ACTIVE block's plans are
+        // actually scheduled on right now (which already reflects any
+        // manual moves the lifter made) are the days the next block
+        // keeps, when the day count is unchanged.
+        const activePlanIds = new Set(state.coachBlocks.activeBlock?.planIds ?? []);
+        const currentWeekdays = (
+          ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const
+        ).filter((d) => {
+          const pid = state.weeklySchedule?.[d]?.workoutPlanId;
+          return typeof pid === 'string' && activePlanIds.has(pid);
+        });
         const proposal = generateBlockProposal({
           intake,
           athleteModel: state.athleteModel,
@@ -2842,6 +2853,7 @@ export const useAppStore = create<AppState>()(
           bodyweightKg: state.profile?.bodyweightKg,
           ageYears: state.profile?.age,
           dislikedExercises: state.trainingProfile?.dislikedExercises ?? [],
+          currentWeekdays: currentWeekdays.length > 0 ? [...currentWeekdays] : undefined,
         });
         set({ coachBlocks: { ...state.coachBlocks, pendingProposal: proposal } });
         return proposal;

@@ -172,12 +172,24 @@ describe('persona: consistent beginner', () => {
     expect(t.sessions).toHaveLength(36);
   });
 
-  it('[CHARACTERIZATION] one plan prescribes Lat Pulldown at 0 kg while another prescribes it at 30 kg', () => {
+  it('one starting load per lift across a block: Lat Pulldown agrees across plans and is never 0', () => {
+    // Was a pinned defect: the same cold-start block prescribed Lat
+    // Pulldown at 30 kg in one plan and 0 kg in another (per-template
+    // skeleton defaults, never reconciled). Generation now unifies the
+    // starting load per lift across the block's plans. Proof at the
+    // first prescription per plan inside block 1 (later sessions may
+    // diverge legitimately as each plan's progression applies).
     const t = traceFor(beginnerPersona);
-    const upperB = exerciseSeries(t, 'Lat Pulldown').find((r) =>
-      r.planName.includes('Upper B')
-    );
-    expect(upperB?.targetBefore.weight).toBe(0);
+    const block1Weeks = t.blocks[0].weeks.length;
+    const firstByPlan = new Map<string, number | undefined>();
+    for (const r of exerciseSeries(t, 'Lat Pulldown')) {
+      if (r.week > block1Weeks) break;
+      if (!firstByPlan.has(r.planName)) firstByPlan.set(r.planName, r.targetBefore.weight);
+    }
+    expect(firstByPlan.size).toBeGreaterThanOrEqual(2);
+    const weights = [...firstByPlan.values()];
+    for (const w of weights) expect(w).toBeGreaterThan(0);
+    expect(new Set(weights).size).toBe(1);
   });
 });
 
@@ -607,15 +619,77 @@ describe('cold start (no fabricated history)', () => {
     }
   });
 
-  it('[CHARACTERIZATION] the first-ever hypertrophy block claims loads come from "your logged progress"', () => {
-    // build_muscle focusReason template: present at cold start for the two
-    // hypertrophy personas, absent for the strength template.
+  it('the first-ever block never claims loads come from "your logged progress"', () => {
+    // Was a pinned defect: the build_muscle focusReason statically
+    // claimed loads run in ranges "where your logged progress has come
+    // from" — shown to brand-new lifters with zero history. The reason
+    // is now history-aware (cold start says the loads are conservative
+    // defaults that calibrate). Every persona's FIRST block is a cold
+    // start, so none of them may carry the claim.
+    for (const p of ALL_PERSONAS) {
+      expect(traceFor(p).blocks[0].summary).not.toContain(
+        'where your logged progress has come from'
+      );
+    }
+    // And the hypertrophy cold-start wording says what actually happens.
     expect(traceFor(painFlarePersona).blocks[0].summary).toContain(
-      'where your logged progress has come from'
+      'conservative defaults that calibrate'
     );
-    expect(traceFor(beginnerPersona).blocks[0].summary).not.toContain(
-      'where your logged progress has come from'
-    );
+  });
+});
+
+describe('block continuity (Fix D)', () => {
+  it('every block rollover preserves the lifter\'s training weekdays', () => {
+    // Was probe-verified broken: the beginner's block 1 ran Mon/Wed/Fri
+    // and blocks 2–3 silently moved to Tue/Thu/Sat (chooseWeekdays
+    // scored recovery data only). The store now feeds the live
+    // schedule's active-block weekdays into generation, and generation
+    // keeps them when the day count is unchanged. (Plan names gain
+    // (2)/(3) suffixes across blocks — that is fine and unchanged.)
+    for (const p of ALL_PERSONAS) {
+      const t = traceFor(p);
+      const first = t.blocks[0].planDays.map((d) => d.weekday).sort();
+      for (const b of t.blocks.slice(1)) {
+        expect(b.planDays.map((d) => d.weekday).sort()).toEqual(first);
+      }
+    }
+  });
+
+  it('the staller\'s weekly review never invents missed sessions after rollover', () => {
+    // Was probe-verified broken: materializeProposal only ever SET the
+    // new block's weekdays, so the stale block-1 entries stayed in the
+    // schedule and buildWeeklyReview counted 6 planned days against 4
+    // trained — "Protect your monday session" for six straight weeks
+    // with zero missed sessions. Superseded block days now retire to
+    // rest at materialization.
+    const t = traceFor(stallerPersona);
+    for (const w of t.weeks.slice(6)) {
+      expect(w.missedDetected).toBe(0);
+      expect(w.review).not.toBeNull();
+      expect(w.review!.sessionsPlanned).toBe(w.review!.sessionsCompleted);
+      expect(w.review!.focusHeadline).not.toMatch(/^Protect your/);
+    }
+  });
+
+  it('no Upper day in any block contains a hinge lift', () => {
+    // The fill pass picked by muscle alone, so the pain persona's
+    // Upper A was backfilled with Conventional Deadlift. Fill picks
+    // must now respect the day's movement pattern (upper = push/pull
+    // classes only). Sweep every persona and block.
+    for (const p of ALL_PERSONAS) {
+      const t = traceFor(p);
+      for (const b of t.blocks) {
+        for (const day of b.planDays) {
+          if (!day.planName.includes('Upper')) continue;
+          for (const name of day.exercises) {
+            expect(
+              getMovementFamily(name),
+              `${p.id} ${day.planName} contains hinge lift ${name}`
+            ).not.toBe('hinge');
+          }
+        }
+      }
+    }
   });
 });
 
