@@ -119,7 +119,7 @@ export interface ActiveCoachBlock {
   weeks: { index: number; type: BlockWeekType }[];
   schemes: ProgressionScheme[];
   intake: BlockIntake;
-  status: 'active' | 'completed';
+  status: 'active' | 'completed' | 'replaced';
   createdOn: string;
 }
 
@@ -200,6 +200,27 @@ function fnv1a(text: string): string {
     h = Math.imul(h, 0x01000193);
   }
   return (h >>> 0).toString(36);
+}
+
+/**
+ * F-01: plan ids must be unique against every id already taken (plan
+ * names already get this treatment). First use passes through
+ * unchanged; a collision earns a `_2`, `_3`, … suffix — the same shape
+ * as the name suffixing below. Mutates `taken` to include the result.
+ */
+function uniquePlanId(base: string, taken: Set<string>): string {
+  if (!taken.has(base)) {
+    taken.add(base);
+    return base;
+  }
+  let n = 2;
+  let candidate = `${base}_${n}`;
+  while (taken.has(candidate)) {
+    n++;
+    candidate = `${base}_${n}`;
+  }
+  taken.add(candidate);
+  return candidate;
 }
 
 function dateStrOf(d: Date): string {
@@ -1174,6 +1195,12 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
   // 8) Names (collision-safe) + ids.
   const blockName = `${FOCUS_LABEL[focus]} Block`;
   const existingNames = new Set(input.existingPlans.map((p) => p.name.trim().toLowerCase()));
+  // F-01: the proposal id is a deterministic hash of {intake, today,
+  // focus}, so rebuilding the same day with an unchanged intake yields
+  // the SAME base plan ids. Suffix them against the plans that already
+  // exist, exactly like the names — a second approval must never mint
+  // a plan id that is already in the list.
+  const existingIds = new Set(input.existingPlans.map((p) => p.id));
   const proposalId = `block_${fnv1a(
     JSON.stringify({ intake, todayStr, focus })
   )}`;
@@ -1186,7 +1213,7 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
     }
     existingNames.add(planName.trim().toLowerCase());
     day.planName = planName;
-    day.planId = `${proposalId}_${day.weekday}`;
+    day.planId = uniquePlanId(`${proposalId}_${day.weekday}`, existingIds);
   }
 
   const weekWord = weekTypes.length;
@@ -1222,8 +1249,17 @@ export function materializeProposal(
   todayStr: string
 ): { plans: PlannedWorkout[]; schedule: WeeklySchedule; activeBlock: ActiveCoachBlock } {
   const liveDays = proposal.days.filter((day) => day.exercises.length > 0);
+  // F-01 (defense in depth): generation already suffixes colliding
+  // ids, but materialization is the last chance to keep the invariant
+  // "no two plans share an id" — remap here too, and use the remapped
+  // id consistently for the plan, the schedule and the active block.
+  const takenIds = new Set(existingPlans.map((p) => p.id));
+  const planIdByWeekday = new Map<string, string>();
+  for (const day of liveDays) {
+    planIdByWeekday.set(day.weekday, uniquePlanId(day.planId, takenIds));
+  }
   const newPlans: PlannedWorkout[] = liveDays.map((day) => ({
-    id: day.planId,
+    id: planIdByWeekday.get(day.weekday)!,
     name: day.planName,
     exercises: day.exercises,
     createdAt: `${todayStr}T12:00:00.000Z`,
@@ -1253,7 +1289,7 @@ export function materializeProposal(
   }
   for (const day of liveDays) {
     nextSchedule[day.weekday] = {
-      workoutPlanId: day.planId,
+      workoutPlanId: planIdByWeekday.get(day.weekday)!,
       bodyParts: getWorkoutBodyParts(day.exercises),
     };
   }

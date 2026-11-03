@@ -76,6 +76,7 @@ import type { BlockIntake } from './block-intake';
 import { getInjuryBannedFamilies } from './workout-engine';
 import {
   buildWeeklyReview,
+  isBlockEnded,
   lastCompletedWeekMonday,
   type WeeklyReview,
 } from './weekly-review';
@@ -2874,6 +2875,10 @@ export const useAppStore = create<AppState>()(
         const proposal =
           editedProposal && editedProposal.id === pending.id ? editedProposal : pending;
         const todayStr = getLocalTodayStr();
+        const previous = state.coachBlocks.activeBlock;
+        // F-02: clearing the outgoing block's schedule residue happens
+        // inside materializeProposal (it retires every superseded coach
+        // block's days); only the archive label is decided here.
         const { plans, schedule, activeBlock } = materializeProposal(
           proposal,
           state.plannedWorkouts,
@@ -2885,7 +2890,6 @@ export const useAppStore = create<AppState>()(
         // with no plans in it — a block that could never run. The
         // proposal stays pending so the user can adjust and retry.
         if (plans.length === state.plannedWorkouts.length) return false;
-        const previous = state.coachBlocks.activeBlock;
         set({
           plannedWorkouts: plans,
           weeklySchedule: schedule,
@@ -2895,7 +2899,16 @@ export const useAppStore = create<AppState>()(
             activeBlock,
             pastBlocks: previous
               ? [
-                  { ...previous, status: 'completed' as const },
+                  {
+                    ...previous,
+                    // F-02: a block swapped out before its final week
+                    // did not complete — label it 'replaced'. Only a
+                    // block that had already run its course is
+                    // truthfully 'completed'.
+                    status: (isBlockEnded(previous, todayStr)
+                      ? 'completed'
+                      : 'replaced') as 'completed' | 'replaced',
+                  },
                   ...state.coachBlocks.pastBlocks,
                 ].slice(0, 8)
               : state.coachBlocks.pastBlocks,
