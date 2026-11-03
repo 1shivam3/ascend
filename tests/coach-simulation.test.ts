@@ -22,7 +22,7 @@ import {
 } from './coach-sim-personas';
 import { detectStalls } from '@/lib/coach-engine';
 import { getExerciseHistorySessions } from '@/lib/lifter-twin';
-import { getMovementFamily } from '@/lib/workout-engine';
+import { getMovementFamily, isPlaceholderSubstitute } from '@/lib/workout-engine';
 import type { WorkoutEntry } from '@/lib/types';
 
 const traces = new Map<string, SimTrace>();
@@ -489,33 +489,47 @@ describe('persona: staller — plateau observation', () => {
     }
   });
 
-  it('[CHARACTERIZATION] a variation swap still serves a placeholder exercise name ("Dumbbell alternative") in a live plan', () => {
-    // The swap-fallback defect outlives the three fixes in this stack:
-    // getStimulusPreservingSwaps' generic fallback returns targets
-    // literally named 'Dumbbell alternative' / 'Machine alternative',
-    // detectStalls offers swaps[0] as the variation for a stalled lift
-    // with no table entry, and an applied proposal writes the
-    // placeholder into the plan as an exercise. Earlier pins chased
-    // its symptoms through the bogus-flag cascade (a plan containing
-    // Leg Press twice — that shape is gone, Leg Press now appears
-    // once); the current live instance is the Upper B plan from
-    // week 9 on. The defect is pinned at its source in
-    // coach-engine.test.ts, and its duplicate-name half in
-    // block-engine.test.ts (no collision check on variation applies).
-    const t = traceFor(stallerPersona);
-    const lowerB = t.weeks[8].planSnapshot.find((p) => p.planName.includes('Lower B'));
-    expect(lowerB!.exercises.filter((e) => e.name === 'Leg Press')).toHaveLength(1);
-    const upperB = t.weeks[8].planSnapshot.find((p) => p.planName.includes('Upper B'));
-    expect(upperB!.exercises.map((e) => e.name)).toContain('Dumbbell alternative');
+  it('no plan in any persona ever contains a duplicate or placeholder exercise name', () => {
+    // Was a pinned defect with two halves: the swap table's generic
+    // fallback invented targets literally named 'Dumbbell alternative'
+    // (written into the staller's Upper B plan as an exercise), and
+    // variation applies had no collision check (a plan held Leg Press
+    // twice). Both are fixed at the source — fallbacks return no
+    // swaps, detectStalls only offers real library candidates, and
+    // proposal creation/apply refuse collisions — so sweep every
+    // persona, every week, every plan snapshot.
+    for (const p of ALL_PERSONAS) {
+      const t = traceFor(p);
+      for (const week of t.weeks) {
+        for (const plan of week.planSnapshot) {
+          const names = plan.exercises.map((e) => e.name);
+          expect(
+            new Set(names.map((n) => n.trim().toLowerCase())).size,
+            `${p.id} wk${week.week} ${plan.planName} has a duplicate exercise`
+          ).toBe(names.length);
+          for (const n of names) {
+            expect(
+              isPlaceholderSubstitute(n),
+              `${p.id} wk${week.week} ${plan.planName} contains placeholder "${n}"`
+            ).toBe(false);
+          }
+        }
+      }
+    }
   });
 
-  it('[CHARACTERIZATION] Bulgarian Split Squat is prescribed like a main lift (>= 100 kg)', () => {
-    // mainCompoundKey('Bulgarian Split Squat') resolves to 'Squat' via
-    // substring matching, so the unilateral accessory inherits the squat
-    // e1RM and main-lift loading.
+  it('Bulgarian Split Squat is prescribed in its own range, never squat-derived', () => {
+    // Was a pinned defect: mainCompoundKey substring-matched 'squat',
+    // so the unilateral accessory inherited the barbell squat's e1RM
+    // and was prescribed at 107.5→112.5 kg. Compound identity is now
+    // canonical — Bulgarian resolves to itself and is loaded as the
+    // accessory it is.
     const t = traceFor(stallerPersona);
     const bulgarian = exerciseSeries(t, 'Bulgarian Split Squat');
-    expect(bulgarian[0].targetBefore.weight!).toBeGreaterThanOrEqual(100);
+    expect(bulgarian.length).toBeGreaterThan(0);
+    for (const s of bulgarian) {
+      expect(s.targetBefore.weight!).toBeLessThan(100);
+    }
   });
 });
 

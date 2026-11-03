@@ -63,6 +63,33 @@ describe('mainCompoundKey', () => {
     expect(isMainCompound('Squat')).toBe(true);
     expect(isMainCompound('Plank')).toBe(false);
   });
+
+  it('never derives identity by substring — accessories inherit nothing', () => {
+    // Regression (coach sim): substring matching priced Bulgarian
+    // Split Squat off the barbell squat's e1RM (107.5→112.5 kg
+    // prescribed). Every name below merely CONTAINS a compound's name.
+    expect(mainCompoundKey('Bulgarian Split Squat')).toBeNull();
+    expect(mainCompoundKey('Goblet Squat')).toBeNull();
+    expect(mainCompoundKey('Hack Squat Machine')).toBeNull();
+    expect(mainCompoundKey('Bodyweight Squats')).toBeNull();
+    expect(mainCompoundKey('Dumbbell Bench Press')).toBeNull();
+    expect(mainCompoundKey('Close-Grip Bench Press')).toBeNull();
+    expect(mainCompoundKey('Decline Barbell Bench Press')).toBeNull();
+    expect(mainCompoundKey('Dumbbell Romanian Deadlift')).toBeNull();
+    expect(mainCompoundKey('Overhead Cable Tricep Extension')).toBeNull();
+    expect(mainCompoundKey('Overhead Dumbbell Tricep Extension')).toBeNull();
+    expect(mainCompoundKey('Smith Machine Squat')).toBeNull();
+    expect(mainCompoundKey('Smith Machine Bench Press')).toBeNull();
+    expect(mainCompoundKey('Decline Bench Crunch')).toBeNull();
+  });
+
+  it('resolves true variants through the canonical alias table', () => {
+    expect(mainCompoundKey('Barbell Front Squat')).toBe('Front Squat');
+    expect(mainCompoundKey('Overhead Press (Barbell OHP)')).toBe('Overhead Press');
+    expect(mainCompoundKey('Romanian Deadlift (RDL)')).toBe('Romanian Deadlift');
+    expect(mainCompoundKey('Barbell Bent-Over Row')).toBe('Barbell Row');
+    expect(mainCompoundKey('Conventional Deadlift')).toBe('Deadlift');
+  });
 });
 
 describe('estimateE1rmKg', () => {

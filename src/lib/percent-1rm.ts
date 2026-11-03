@@ -16,7 +16,7 @@
  * explains what's missing. A plan's own explicit targetWeight ALWAYS
  * wins over a % suggestion.
  */
-import { calculateOneRepMax, normalizeExerciseName } from './strength-standards';
+import { calculateOneRepMax, resolveCompoundVariant } from './strength-standards';
 import { isSetCompleted } from './types';
 import type { PersonalRecord, PlannedWorkout, Unit, WorkoutEntry } from './types';
 
@@ -38,26 +38,20 @@ const MAIN_COMPOUND_KEYS = new Set([
 /**
  * Canonical key for a main compound lift, or null for everything
  * else. Variant lifts stay separate (a front-squat e1RM must never
- * price a back squat): specific patterns are checked before generic
- * ones ('front squat' before 'squat', 'incline bench' before 'bench').
+ * price a back squat) — and identity is canonical, never substring:
+ * resolution goes through resolveCompoundVariant (normalizeExerciseName
+ * aliases + the closed COMPOUND_VARIANT_ALIASES table), so an
+ * accessory whose name merely CONTAINS a compound's name — Bulgarian
+ * Split Squat, Goblet Squat, Hack Squat Machine, Bodyweight Squats,
+ * Overhead Tricep Extension, Dumbbell Bench Press — resolves to
+ * itself and inherits nothing. Substring matching previously priced
+ * Bulgarian Split Squat off the barbell squat's e1RM (the sim
+ * measured it prescribed at 107.5→112.5 kg).
  */
 export function mainCompoundKey(name: string): string | null {
   if (!name) return null;
-  const canonical = normalizeExerciseName(name);
-  if (MAIN_COMPOUND_KEYS.has(canonical)) return canonical;
-  const lower = name.toLowerCase();
-  if (lower.includes('front squat')) return 'Front Squat';
-  if (lower.includes('sumo') && lower.includes('deadlift')) return 'Sumo Deadlift';
-  if (lower.includes('romanian') || /\brdl\b/.test(lower)) return 'Romanian Deadlift';
-  if (lower.includes('incline') && lower.includes('bench')) return 'Incline Bench';
-  if (lower.includes('squat')) return 'Squat';
-  if (lower.includes('bench')) return 'Bench Press';
-  if (lower.includes('deadlift')) return 'Deadlift';
-  if (lower.includes('overhead') || lower.includes('military') || /\bohp\b/.test(lower)) {
-    return 'Overhead Press';
-  }
-  if (lower.includes('barbell row') || lower.includes('bent over row')) return 'Barbell Row';
-  return null;
+  const canonical = resolveCompoundVariant(name);
+  return MAIN_COMPOUND_KEYS.has(canonical) ? canonical : null;
 }
 
 export function isMainCompound(name: string): boolean {

@@ -122,18 +122,51 @@ export const MAIN_COMPOUND_LIFTS = new Set([
   'Sumo Deadlift',
 ]);
 
-export function isMainCompoundLift(exercise: string): boolean {
-  if (MAIN_COMPOUND_LIFTS.has(exercise)) return true;
-  const name = exercise.toLowerCase();
+/**
+ * Canonical variant aliases for compound identity: lowercased exercise
+ * name → the canonical lift it IS. This closed table is the ONLY way a
+ * name resolves to a compound lift beyond normalizeExerciseName's own
+ * aliases. Compound identity used to be derived by substring matching
+ * ('squat' inside 'Bulgarian Split Squat', 'overhead' inside 'Overhead
+ * Cable Tricep Extension'), which made accessories inherit main-lift
+ * e1RMs and loading; earlier exclusion lists (goblet, split, close
+ * grip) were band-aids on the same leak. A name that is not a known
+ * compound — exact or via this table — is not a compound: variant
+ * lifts stay separate, per the principle that a front-squat e1RM must
+ * never price a back squat.
+ */
+export const COMPOUND_VARIANT_ALIASES: Record<string, string> = {
+  'barbell back squat': 'Squat',
+  'barbell front squat': 'Front Squat',
+  'barbell bench press': 'Bench Press',
+  'incline barbell bench press': 'Incline Bench',
+  'overhead press (barbell ohp)': 'Overhead Press',
+  'romanian deadlift (rdl)': 'Romanian Deadlift',
+  'barbell bent-over row': 'Barbell Row',
+  'barbell bent over row': 'Barbell Row',
+  'conventional deadlift': 'Deadlift',
+  'sumo deadlift': 'Sumo Deadlift',
+  'chin-ups': 'Pull-ups',
+};
+
+/**
+ * The canonical lift name an exercise name refers to, for compound
+ * classification: normalizeExerciseName first (its aliases cover the
+ * common shorthand), then the variant-alias table on either spelling.
+ */
+export function resolveCompoundVariant(name: string): string {
+  if (!name) return '';
+  const canonical = normalizeExerciseName(name);
   return (
-    (name.includes('bench') && !name.includes('dumbbell') && !name.includes('close grip')) ||
-    (name.includes('squat') && !name.includes('goblet') && !name.includes('split')) ||
-    name.includes('deadlift') ||
-    name.includes('overhead press') ||
-    name.includes('barbell row') ||
-    name.includes('pull-up') ||
-    name.includes('chin-up')
+    COMPOUND_VARIANT_ALIASES[canonical.toLowerCase()] ??
+    COMPOUND_VARIANT_ALIASES[name.trim().toLowerCase()] ??
+    canonical
   );
+}
+
+export function isMainCompoundLift(exercise: string): boolean {
+  if (!exercise) return false;
+  return MAIN_COMPOUND_LIFTS.has(resolveCompoundVariant(exercise));
 }
 
 // Exercises where the tracked "weight" is ADDED weight beyond bodyweight (or 0 for pure bodyweight)
