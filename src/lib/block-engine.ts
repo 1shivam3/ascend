@@ -1352,16 +1352,30 @@ export function managedPlanIdByExerciseKey(
   plans: PlannedWorkout[]
 ): Record<string, string> {
   const out: Record<string, string> = {};
-  const planIds = new Set(plans.map((p) => p.id));
+  const planById = new Map(plans.map((p) => [p.id, p]));
   const active = blocks.activeBlock;
   if (active && active.status === 'active') {
+    // The block's scheme list is flat across all of its plans — a scheme
+    // carries no plan association of its own. The owning plan of a lift
+    // is the plan whose exercises actually contain it: the same lookup
+    // applyPlateauProposalToPlan performs when applying a proposal.
+    // (Assigning every scheme key to each planId in turn left every key
+    // mapped to the LAST plan, so proposals for lifts in any other plan
+    // failed with exercise_not_found and were silently dismissed.)
+    // First plan in planIds order wins when a lift appears in two plans —
+    // the same fill-if-absent rule the adopted-plans path below uses.
+    const managedKeys = new Set(active.schemes.map((s) => s.exerciseKey));
     for (const planId of active.planIds) {
-      if (!planIds.has(planId)) continue;
-      for (const s of active.schemes) out[s.exerciseKey] = planId;
+      const plan = planById.get(planId);
+      if (!plan) continue;
+      for (const ex of plan.exercises ?? []) {
+        const key = canonicalizeExerciseName(ex.name);
+        if (managedKeys.has(key) && !(key in out)) out[key] = planId;
+      }
     }
   }
   for (const [planId, adopted] of Object.entries(blocks.adoptedPlans ?? {})) {
-    if (!planIds.has(planId)) continue;
+    if (!planById.has(planId)) continue;
     for (const s of adopted.schemes) {
       if (!(s.exerciseKey in out)) out[s.exerciseKey] = planId;
     }
