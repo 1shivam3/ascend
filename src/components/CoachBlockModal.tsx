@@ -118,6 +118,7 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
   const proposeCoachBlock = useStore((s) => s.proposeCoachBlock);
   const approveBlockProposal = useStore((s) => s.approveBlockProposal);
   const dismissBlockProposal = useStore((s) => s.dismissBlockProposal);
+  const updatePendingProposal = useStore((s) => s.updatePendingProposal);
 
   const [step, setStep] = useState<'intake' | 'review'>('intake');
   const [intake, setIntake] = useState<BlockIntake | null>(null);
@@ -129,6 +130,11 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
   const [errors, setErrors] = useState<string[]>([]);
   const [edited, setEdited] = useState<BlockProposal | null>(null);
   const [expandedDay, setExpandedDay] = useState<number>(0);
+  // F-07: approve is one-shot. A double-tap used to fire approve
+  // twice: the first succeeded (success toast), the second found no
+  // pending proposal and showed the "nothing was created" error.
+  const approvingRef = useRef(false);
+  const [approving, setApproving] = useState(false);
 
   // (Re)seed whenever the modal opens: prefill is computed from the
   // CURRENT store, never cached from a previous open.
@@ -143,6 +149,8 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
     });
     setIntake(prefill.intake);
     setPrefillNotes(prefill.notes);
+    approvingRef.current = false;
+    setApproving(false);
     setFlaggedReasons(prefill.flaggedChips);
     setErrors([]);
     if (startAtReview && pendingProposal) {
@@ -203,11 +211,15 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
         (di === dayIdx ? exercises : d.exercises).map((e) => canonicalizeExerciseName(e.name))
       )
     );
-    setEdited({
+    const next = {
       ...proposal,
       days: proposal.days.map((d, di) => (di === dayIdx ? { ...d, exercises } : d)),
       schemes: proposal.schemes.filter((s) => remainingKeys.has(s.exerciseKey)),
-    });
+    };
+    setEdited(next);
+    // F-05: persist the edit onto the pending proposal itself, so
+    // closing and reopening the modal keeps it.
+    updatePendingProposal(next);
   };
 
   // SIM-P3-07: review used to be remove-only — a wrong load meant
@@ -220,15 +232,29 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
       const exercises = d.exercises.map((e, ei) => (ei === exIdx ? { ...e, ...patch } : e));
       return { ...d, exercises, estimatedMinutes: estimateSessionMinutes({ exercises }) };
     });
-    setEdited({ ...proposal, days });
+    const next = { ...proposal, days };
+    setEdited(next);
+    // F-05: same persistence as removeExercise.
+    updatePendingProposal(next);
   };
 
   const handleApprove = () => {
-    if (!proposal) return;
+    if (!proposal || approvingRef.current) return;
+    approvingRef.current = true;
+    setApproving(true);
     // A block with no live days refuses materialization (the store
     // returns false) — say so and stay open instead of toasting a
     // success for a block that was never created.
     if (!approveBlockProposal(proposal)) {
+      // F-07: if the pending proposal is already gone, a racing first
+      // tap approved it — that is a success, not the "nothing was
+      // created" failure. Close quietly; never show both toasts.
+      if (useStore.getState().coachBlocks.pendingProposal === null) {
+        onClose();
+        return;
+      }
+      approvingRef.current = false;
+      setApproving(false);
       toast.error(t('coachBlock.approveEmpty'), t('toast.titleError'));
       return;
     }
@@ -633,13 +659,24 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
             </div>
 
             <div className="flex gap-2 pt-1">
-              <button type="button" onClick={handleApprove} className="btn-primary flex-1 py-2.5 font-bold">
+              <button
+                type="button"
+                onClick={handleApprove}
+                disabled={approving}
+                className="btn-primary flex-1 py-2.5 font-bold disabled:opacity-50"
+              >
                 {t('coachBlock.approveButton')}
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  setEdited(null);
+                  // F-05: Start over is one of the three actions that
+                  // clear review edits (approve and dismiss are the
+                  // others) — regenerate a pristine proposal from the
+                  // same intake so the persisted edits are replaced,
+                  // not just hidden behind local state.
+                  const fresh = proposeCoachBlock(proposal.intake);
+                  setEdited(fresh);
                   setStep('intake');
                 }}
                 className="btn-secondary px-4 py-2.5 font-semibold"
