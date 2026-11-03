@@ -248,6 +248,15 @@ export default function FormSessionSummaryModal({
         )}
       </div>
 
+      {/* Safety & scope note — technique feedback only, never medical advice */}
+      <p className="pt-3 text-2xs leading-relaxed text-text-muted flex items-start gap-1.5">
+        <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-px" />
+        <span>
+          Technique feedback from camera measurements — not medical advice. Stop if you feel pain or
+          discomfort; if pain persists, see a qualified professional.
+        </span>
+      </p>
+
       {/* Action Footer */}
       <div className="pt-4 flex items-center space-x-2.5 border-t border-border-subtle mt-4">
         {onAnalyzeAnother && (

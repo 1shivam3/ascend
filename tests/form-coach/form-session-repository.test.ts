@@ -107,4 +107,54 @@ describe('FormSessionRepository', () => {
     expect(squatEx?.sets[0].reps).toBe(6);
     expect(squatEx?.notes).toContain('Form Coach: 5 valid reps');
   });
+
+  it('returns false and changes nothing when no draft exercise matches', () => {
+    // Draft contains only Bench Press — the squat session cannot apply.
+    useStore.setState({
+      activeWorkoutDraft: {
+        id: 'draft-2',
+        name: 'Upper Day',
+        date: '2026-11-03',
+        savedAt: new Date().toISOString(),
+        exercises: [
+          {
+            name: 'Bench Press',
+            sets: [{ reps: 0, weight: 60, unit: 'kg', completed: false }],
+          },
+        ],
+      } as any,
+    });
+
+    const success = FormSessionRepository.applyToActiveWorkout(
+      mockSession,
+      'Barbell Back Squat',
+      0,
+      6
+    );
+
+    expect(success).toBe(false);
+
+    // Draft untouched: no set completed, no Form Coach note appended.
+    const draft = useStore.getState().activeWorkoutDraft;
+    const bench = draft?.exercises.find((e) => e.name === 'Bench Press');
+    expect(bench?.sets[0].completed).toBe(false);
+    expect(bench?.sets[0].reps).toBe(0);
+    expect(bench?.notes).toBeUndefined();
+
+    // Session must NOT be persisted as saved-to-workout.
+    const stored = FormSessionRepository.getSessionById('session-abc-123');
+    expect(stored).toBeNull();
+  });
+
+  it('returns false when there is no active workout draft', () => {
+    useStore.setState({ activeWorkoutDraft: null });
+
+    const success = FormSessionRepository.applyToActiveWorkout(
+      mockSession,
+      'Barbell Back Squat',
+      0
+    );
+
+    expect(success).toBe(false);
+  });
 });

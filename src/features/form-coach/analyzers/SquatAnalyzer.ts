@@ -193,6 +193,7 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
         activeCue,
         completedRep: null,
         currentKneeAngleDeg: null,
+        minKneeAngleDeg: null,
         torsoInclinationDeg: null,
         detectedSide: 'unknown',
         trackingConfidence: 0,
@@ -279,12 +280,17 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
 
     const currentPhase = this.stateMachine.getCurrentPhase();
 
+    // The feedback engine judges depth against the rep's running minimum
+    // knee angle (the same minimum stamped onto the completed rep), not the
+    // angle of the single frame that happens to be labelled "bottom".
+    const repMinKneeAngleDeg = this.stateMachine.getCurrentRepMinKneeAngleDeg();
+
     // Evaluate feedback rules
     const activeCue = this.feedbackEngine.evaluate({
       exerciseId: this.exerciseId,
       phase: currentPhase,
       currentKneeAngleDeg: kneeAngleDeg,
-      minKneeAngleDeg: kneeAngleDeg, // or pass state machine minimum
+      minKneeAngleDeg: repMinKneeAngleDeg,
       torsoInclinationDeg,
       trackingConfidence,
       feetVisible: feetInFrame,
@@ -300,6 +306,7 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
       activeCue,
       completedRep,
       currentKneeAngleDeg: kneeAngleDeg !== null ? Math.round(kneeAngleDeg) : null,
+      minKneeAngleDeg: repMinKneeAngleDeg !== null ? Math.round(repMinKneeAngleDeg) : null,
       torsoInclinationDeg: torsoInclinationDeg !== null ? Math.round(torsoInclinationDeg) : null,
       detectedSide: side,
       trackingConfidence,

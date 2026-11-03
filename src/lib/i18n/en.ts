@@ -186,7 +186,7 @@ export const en = {
   'coachBlock.approveEmpty': 'This block has no workouts in it — nothing was created. Try different days, equipment, or limits.',
   'tools.title': 'Training Tools',
   'tools.formCoachTitle': 'ASCEND Form Coach',
-  'tools.formCoachHint': 'Live camera pose analysis & repetition counter',
+  'tools.formCoachHint': 'Upload a squat video for pose analysis & repetition counter',
   'workout.formCoach': 'Form Coach',
   'tools.plateTitle': 'Plate Calculator',
   'tools.plateHint': 'Calculate exact barbell loading plates',

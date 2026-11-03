@@ -192,7 +192,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   // Token-reuse compositions only — flagged for native-speaker review.
   'tools.title': 'ट्रेनिंग देखें',
   'tools.formCoachTitle': 'ASCEND फ़ॉर्म कोच',
-  'tools.formCoachHint': 'लाइव कैमरा पोज़ विश्लेषण और रेप काउंटर',
+  'tools.formCoachHint': 'पोज़ विश्लेषण और रेप काउंट के लिए स्क्वाट वीडियो अपलोड करें',
   'workout.formCoach': 'फ़ॉर्म कोच',
   'tools.plateTitle': 'प्लेट कैलकुलेटर',
   'tools.plateHint': 'प्लेट देखें',

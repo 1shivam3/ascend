@@ -83,6 +83,26 @@ describe('SquatAnalyzer', () => {
     expect(result.detectedSide).toBe('left');
   });
 
+  it('reports the rep running minimum knee angle, not the current frame angle', () => {
+    let t = 1000;
+    analyzer.processFrame(createMockLandmarks('standing'), t);
+
+    t += 250;
+    analyzer.processFrame(createMockLandmarks('descending'), t);
+
+    t += 250;
+    const bottom = analyzer.processFrame(createMockLandmarks('bottom'), t);
+    expect(bottom.minKneeAngleDeg).not.toBeNull();
+    expect(bottom.minKneeAngleDeg).toBe(bottom.currentKneeAngleDeg);
+
+    // On ascent the current angle rises, but the reported minimum must stay
+    // at the bottom value — depth cues and the telemetry tile read this.
+    t += 250;
+    const rising = analyzer.processFrame(createMockLandmarks('ascending'), t);
+    expect(rising.currentKneeAngleDeg).toBeGreaterThan(bottom.currentKneeAngleDeg!);
+    expect(rising.minKneeAngleDeg).toBe(bottom.minKneeAngleDeg);
+  });
+
   it('completes a set and compiles structured summary without 0-100 score', () => {
     let t = 1000;
     // 1. Standing

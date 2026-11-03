@@ -68,6 +68,16 @@ export class RepStateMachine {
     return this.repNumber;
   }
 
+  /**
+   * Running minimum knee angle for the current repetition (the lowest angle
+   * tracked since this rep's descent began), or null before any frame with a
+   * measurable angle has been processed. This is the same minimum that is
+   * stamped onto the completed FormRep at lockout.
+   */
+  getCurrentRepMinKneeAngleDeg(): number | null {
+    return this.minKneeAngle < 180 ? this.minKneeAngle : null;
+  }
+
   setPhase(newPhase: MovementPhase, timestampMs: number) {
     this.phase = newPhase;
     this.phaseEnterTimeMs = timestampMs;

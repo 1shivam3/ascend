@@ -47,6 +47,7 @@ export function useFormCoach({
   const [currentPhase, setCurrentPhase] = useState<MovementPhase>('standing');
   const [activeCue, setActiveCue] = useState<FormCue | null>(null);
   const [currentKneeAngleDeg, setCurrentKneeAngleDeg] = useState<number | null>(null);
+  const [minKneeAngleDeg, setMinKneeAngleDeg] = useState<number | null>(null);
   const [torsoInclinationDeg, setTorsoInclinationDeg] = useState<number | null>(null);
   const [detectedSide, setDetectedSide] = useState<DetectedSide>('unknown');
   const [trackingConfidence, setTrackingConfidence] = useState(0);
@@ -85,6 +86,7 @@ export function useFormCoach({
     setCurrentPhase('standing');
     setActiveCue(null);
     setCurrentKneeAngleDeg(null);
+    setMinKneeAngleDeg(null);
     setTorsoInclinationDeg(null);
     setSummary(null);
     setError(null);
@@ -221,6 +223,7 @@ export function useFormCoach({
             setDetectedSide(result.detectedSide);
             setTrackingConfidence(result.trackingConfidence);
             setCurrentKneeAngleDeg(result.currentKneeAngleDeg);
+            setMinKneeAngleDeg(result.minKneeAngleDeg);
             setTorsoInclinationDeg(result.torsoInclinationDeg);
 
             if (isAnalyzingRef.current) {
@@ -338,6 +341,7 @@ export function useFormCoach({
     currentPhase,
     activeCue,
     currentKneeAngleDeg,
+    minKneeAngleDeg,
     torsoInclinationDeg,
     detectedSide,
     trackingConfidence,

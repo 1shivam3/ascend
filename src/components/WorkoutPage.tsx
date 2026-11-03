@@ -3218,7 +3218,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       <FormCoachModal
         isOpen={isFormCoachOpen}
         onClose={() => setIsFormCoachOpen(false)}
-        exerciseName="Barbell Back Squat"
       />
 
       <PlateCalculatorModal
@@ -3494,7 +3493,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                   </div>
                   <div>
                     <div className="text-xs font-semibold text-text-primary">ASCEND Form Coach</div>
-                    <div className="text-2xs text-text-muted">Live camera pose analysis & repetition counter</div>
+                    <div className="text-2xs text-text-muted">Upload a squat video for pose analysis & repetition counter</div>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-text-primary transition-colors" />

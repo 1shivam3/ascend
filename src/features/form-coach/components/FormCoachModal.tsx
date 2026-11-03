@@ -32,7 +32,9 @@ import {
 interface FormCoachModalProps {
   isOpen: boolean;
   onClose: () => void;
-  exerciseName?: string;
+  // No exerciseName prop on purpose: the only analyzer is the Barbell Back
+  // Squat, and every session is stamped with that canonical identity by the
+  // analyzer itself. Callers must not imply another exercise was analyzed.
   workoutId?: string;
   setIndex?: number;
   workoutName?: string;
@@ -41,7 +43,6 @@ interface FormCoachModalProps {
 export default function FormCoachModal({
   isOpen,
   onClose,
-  exerciseName = 'Barbell Back Squat',
   workoutId,
   setIndex,
   workoutName,
@@ -66,6 +67,7 @@ export default function FormCoachModal({
     currentPhase,
     activeCue,
     currentKneeAngleDeg,
+    minKneeAngleDeg,
     detectedSide,
     isReady,
     analyzeVideo,
@@ -219,7 +221,7 @@ export default function FormCoachModal({
                       Active
                     </span>
                   </div>
-                  <p className="text-2xs text-text-muted">Analyzes squat depth, knee angles, and rep cadence</p>
+                  <p className="text-2xs text-text-muted">Currently the only supported exercise — analysis is tuned for a barbell back squat filmed from the side (depth, knee angles, rep cadence)</p>
                 </div>
               </div>
             </div>
@@ -272,6 +274,14 @@ export default function FormCoachModal({
                   Film from a side-profile angle at hip height. Ensure your head, hips, knees, and feet remain in frame throughout the set.
                 </div>
               </div>
+
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2.5 text-2xs text-text-secondary">
+                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold text-amber-400 block">Lift Safely</span>
+                  Stop the set if you feel pain or discomfort. Form Coach gives technique feedback from video measurements — it is not medical advice. If pain persists, see a qualified professional.
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -314,7 +324,7 @@ export default function FormCoachModal({
               <div className="p-2.5 rounded-xl bg-surface-elevated border border-border-subtle">
                 <span className="text-3xs uppercase font-mono text-text-muted block">Min Knee Angle</span>
                 <span className="text-xl font-bold font-mono text-text-primary">
-                  {currentKneeAngleDeg !== null ? `${Math.round(currentKneeAngleDeg)}°` : '--'}
+                  {minKneeAngleDeg !== null ? `${Math.round(minKneeAngleDeg)}°` : '--'}
                 </span>
               </div>
               <div className="p-2.5 rounded-xl bg-surface-elevated border border-border-subtle">

@@ -78,6 +78,9 @@ export class FormSessionRepository {
 
   /**
    * Applies the completed Form Coach session reps to the active workout draft.
+   * Returns true only when an exercise in the draft actually matched and was
+   * updated; returns false (changing nothing) when there is no draft or no
+   * exercise matches `exerciseName`.
    */
   static applyToActiveWorkout(
     session: FormSessionSummary,
@@ -91,10 +94,12 @@ export class FormSessionRepository {
 
     const repCount = typeof manualReps === 'number' ? manualReps : session.totalValidReps;
 
+    let applied = false;
     const updatedExercises = draft.exercises.map((ex) => {
       if (ex.name.toLowerCase() !== exerciseName.toLowerCase()) {
         return ex;
       }
+      applied = true;
 
       const sets = [...ex.sets];
       const targetSetIdx =
@@ -119,6 +124,11 @@ export class FormSessionRepository {
           : `[Form Coach: ${session.totalValidReps} valid reps, avg ${session.averageRepDurationSeconds}s/rep]`,
       };
     });
+
+    // Nothing matched the target exercise: report failure honestly and
+    // leave the draft and stored sessions untouched, so the caller can
+    // fall back to a local-only save instead of claiming success.
+    if (!applied) return false;
 
     state.saveWorkoutDraft({
       ...draft,

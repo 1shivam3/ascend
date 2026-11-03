@@ -14,6 +14,8 @@ export interface AnalyzerFrameResult {
   activeCue: FormCue | null;
   completedRep: FormRep | null;
   currentKneeAngleDeg: number | null;
+  /** Running minimum knee angle of the current rep (null if not yet measurable). */
+  minKneeAngleDeg: number | null;
   torsoInclinationDeg: number | null;
   detectedSide: DetectedSide;
   trackingConfidence: number;

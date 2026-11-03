@@ -56,6 +56,21 @@ describe('RepStateMachine', () => {
     expect(sm.getCurrentPhase()).toBe('standing');
   });
 
+  it('exposes the running rep minimum knee angle', () => {
+    // No measurable frame processed yet
+    expect(sm.getCurrentRepMinKneeAngleDeg()).toBeNull();
+
+    sm.update(165, 5, 0.95, 1000); // standing
+    sm.update(135, 15, 0.95, 1200); // descent begins — minimum resets to 135
+    expect(sm.getCurrentRepMinKneeAngleDeg()).toBe(135);
+
+    sm.update(85, 30, 0.95, 1600); // bottom
+    expect(sm.getCurrentRepMinKneeAngleDeg()).toBe(85);
+
+    sm.update(105, 25, 0.95, 1900); // ascending — minimum stays at the bottom value
+    expect(sm.getCurrentRepMinKneeAngleDeg()).toBe(85);
+  });
+
   it('rejects incomplete / shallow rep attempts without incrementing rep count', () => {
     let t = 1000;
 

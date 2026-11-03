@@ -1,7 +1,7 @@
 # ASCEND Form Coach — Architecture & Technical Reference
 
 ## 1. Feature Overview
-**ASCEND Form Coach** is an on-device, real-time computer vision training assistant integrated into the ASCEND fitness application. It utilizes the device camera to analyze exercise biomechanics, track skeletal landmarks, determine movement phases, calculate joint angles, evaluate technique observations, automatically count repetitions, and record structured post-set summaries into the athlete's workout session.
+**ASCEND Form Coach** is an on-device computer-vision training assistant integrated into the ASCEND fitness application. The athlete uploads a recorded workout video; frames are sampled locally during playback and analyzed to track skeletal landmarks, determine movement phases, calculate joint angles, evaluate technique observations, automatically count repetitions, and record structured post-set summaries into the athlete's workout session. There is **no live camera mode** — `getUserMedia` is not used anywhere in the feature.
 
 V1 delivers a full production implementation for **Barbell Back Squat**, with an extensible architecture designed for future exercise analyzers (Deadlift, Bench Press, Overhead Press, Lunges).
 
@@ -16,23 +16,23 @@ V1 delivers a full production implementation for **Barbell Back Squat**, with an
 | **WASM Runtime** | `public/mediapipe/wasm/` | Locally bundled WebAssembly binaries (`vision_wasm_internal.*`) |
 | **Threading** | Web Worker (`pose.worker.ts`) | Off-main-thread inference with transferable `ImageBitmap` |
 | **Main-Thread Fallback** | `PoseLandmarkerService` | Direct GPU/WebGL inference if Web Workers are restricted |
-| **Camera Access** | Browser `MediaDevices.getUserMedia` | Video-only stream (`audio: false`), rear-camera preference |
-| **Rendering** | HTML5 Canvas Overlay | 60 FPS skeleton, joint angle badges, and framing guides |
+| **Video Input** | User-selected video file (MP4 / MOV / WebM) | Chosen via file picker or drag-and-drop; played back locally while frames are sampled for inference — never uploaded |
+| **Rendering** | HTML5 Canvas Overlay | Skeleton, joint angle badges, and framing guides drawn over the playing video |
 | **State Machine** | `RepStateMachine` | Deterministic hysteresis-backed movement phase engine |
 | **Persistence** | `FormSessionRepository` & Zustand Store | Local storage (`ascend_form_coach_sessions`) + workout integration |
 
 ### Local Hosting & Privacy
-- **Zero External API Calls**: Pose inference runs 100% on-device. No frames or video bytes leave the athlete's phone or browser.
-- **Audio Privacy**: Camera request is strictly configured with `audio: false`.
+- **Zero External API Calls**: Pose inference runs 100% on-device. No frames or video bytes leave the athlete's phone or browser; the uploaded file exists only as a local object URL for the duration of the analysis.
+- **Audio**: The uploaded video is played muted during analysis; its audio track is never processed or stored.
 - **Model Source & License**: MediaPipe Pose Landmarker Lite is developed by Google and distributed under the Apache License 2.0. Both WASM files and the `.task` model file are served locally from `/mediapipe/` under `public/`.
-- **Offline Resilience**: Static assets are cached by the browser and service worker for offline gym usage.
+- **Asset Loading**: The WASM runtime and model are fetched from the app's own origin lazily, the first time an analysis is started (`PoseLandmarkerService.initialize()`). The service worker does **not** precache them; after the first fetch, ordinary HTTP caching applies.
 
 ---
 
 ## 3. High-Performance Architecture
 
 ```
-[Camera Stream (HTML5 Video)]
+[Uploaded Video File (HTML5 Video Playback)]
        │
        ▼ (Throttled ~14 FPS, Single In-Flight Gate)
 [Transferable ImageBitmap]
@@ -59,7 +59,7 @@ V1 delivers a full production implementation for **Barbell Back Squat**, with an
 ```
 
 ### Performance Mitigations:
-1. **Decoupled Inference from Rendering**: Camera video and canvas overlays render smoothly at 60 FPS via `requestAnimationFrame`, while neural inference runs at ~13–15 FPS.
+1. **Decoupled Inference from Rendering**: Video playback and canvas overlays render via `requestAnimationFrame`, while neural inference runs at ~13–15 FPS.
 2. **Single Frame in Flight**: If the inference worker is currently calculating a frame, incoming video frames are dropped. No backlog or memory leak occurs.
 3. **Immediate GPU Free**: `ImageBitmap.close()` is invoked immediately after inference in the worker.
 
@@ -137,8 +137,8 @@ To implement a new analyzer (e.g. `DeadliftAnalyzer`), follow these steps:
    Create a dedicated or parameterized `RepStateMachine` with hinge thresholds (Setup $\to$ Pulling $\to$ Lockout $\to$ Descent).
 3. **Register Rules**:
    Add exercise-specific rules in `FormFeedbackEngine` (e.g. bar path drift, hip shoot, lockout completion).
-4. **Update Exercise Selector**:
-   In `src/features/form-coach/components/ExerciseSelector.tsx`, switch `status: 'coming_soon'` to `status: 'active'`.
+4. **Wire the Analyzer into the UI**:
+   Route analyzer selection in `useFormCoach` to the new analyzer and surface it in `FormCoachModal` — the exercise card there is currently hardcoded to Barbell Back Squat, the only supported exercise.
 
 ---
 
@@ -154,3 +154,6 @@ npx vitest run tests/form-coach/
 - `tests/form-coach/squat-analyzer.test.ts`: Side-profile detection, readiness gates, post-set summary compilation.
 - `tests/form-coach/feedback-engine.test.ts`: Rule prioritization, cooldown enforcement, flicker prevention.
 - `tests/form-coach/form-session-repository.test.ts`: Local storage persistence and workout draft rep synchronization.
+- `tests/form-coach/pose-landmarker-service.test.ts`: Landmarker lifecycle, frame gating/throttling, monotonic timestamps.
+- `tests/form-coach/video-upload.test.ts`: Upload-flow architecture contracts (no camera APIs anywhere in the hook).
+- `tests/form-coach/runtime-fixes.test.ts`: CSP WASM allowance, layout theme attribute, telemetry ID filtering.
