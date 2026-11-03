@@ -51,6 +51,31 @@ export interface BlockIntake {
 
 export const SESSION_LENGTH_OPTIONS = [30, 45, 60, 75, 90] as const;
 
+/** The four 1RM rows the intake form always shows (F-03). */
+export const MAIN_LIFT_ROW_NAMES = [
+  'Squat',
+  'Bench Press',
+  'Deadlift',
+  'Overhead Press',
+] as const;
+
+/**
+ * Row names for the intake's 1RM fields: the four main lifts ALWAYS,
+ * plus any other lift the athlete has an entry for (e.g. a Barbell Row
+ * PR from the prefill). F-03: the modal used to render "the entered
+ * lifts, or the four defaults when none" — so typing the first number
+ * made the other three fields vanish.
+ */
+export function topLiftRowNames(topLifts: BlockTopLift[]): string[] {
+  const names: string[] = [...MAIN_LIFT_ROW_NAMES];
+  for (const lift of topLifts) {
+    if (!names.some((n) => n.toLowerCase() === lift.name.toLowerCase())) {
+      names.push(lift.name);
+    }
+  }
+  return names;
+}
+
 /** The limitation chips offered in step 2 of the intake (§4.1). */
 export const LIMITATION_CHIPS: { id: string; label: string }[] = [
   { id: 'shoulder', label: 'Shoulder' },
@@ -156,7 +181,15 @@ export function buildIntakePrefill(input: {
   const daysPerWeek = Math.min(6, Math.max(2, Math.round(rawDays) || 3));
   notes.push({
     field: 'daysPerWeek',
-    text: `You currently train ${daysPerWeek} day${daysPerWeek === 1 ? '' : 's'} a week — the block keeps that rhythm.`,
+    // F-12: state the clamp honestly — the old text quoted the
+    // CLAMPED number as the user's own rhythm ("You currently train
+    // 6 days a week" for a 7-day trainer), which was simply false.
+    text:
+      rawDays > 6
+        ? `You currently train ${rawDays} days a week — a block runs at most 6, so this one is set to 6 days.`
+        : rawDays > 0 && rawDays < 2
+          ? `You currently train ${rawDays} day a week — a block runs at least 2 days, so this one is set to ${daysPerWeek}.`
+          : `You currently train ${daysPerWeek} day${daysPerWeek === 1 ? '' : 's'} a week — the block keeps that rhythm.`,
   });
 
   const sessionMinutes = snapSessionMinutes(trainingProfile?.preferredDurationMin);

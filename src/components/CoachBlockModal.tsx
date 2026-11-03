@@ -17,6 +17,7 @@ import { useToast } from './ui/Toast';
 import {
   buildIntakePrefill,
   limitationChipId,
+  topLiftRowNames,
   validateIntake,
   LIMITATION_CHIPS,
   SESSION_LENGTH_OPTIONS,
@@ -120,6 +121,10 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
 
   const [step, setStep] = useState<'intake' | 'review'>('intake');
   const [intake, setIntake] = useState<BlockIntake | null>(null);
+  // F-12: the prefill's provenance notes ("prefilled from your
+  // answers because…") are computed by buildIntakePrefill — keep them
+  // and render each under its field so the prefill is transparent.
+  const [prefillNotes, setPrefillNotes] = useState<{ field: string; text: string }[]>([]);
   const [flaggedReasons, setFlaggedReasons] = useState<{ chipId: string; reason: string }[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [edited, setEdited] = useState<BlockProposal | null>(null);
@@ -137,6 +142,7 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
       prs,
     });
     setIntake(prefill.intake);
+    setPrefillNotes(prefill.notes);
     setFlaggedReasons(prefill.flaggedChips);
     setErrors([]);
     if (startAtReview && pendingProposal) {
@@ -170,6 +176,9 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
   }, [proposal, weeklySchedule, plannedWorkouts, t]);
 
   if (!isOpen) return null;
+
+  // F-12: provenance note for one intake field, if the prefill made one.
+  const noteFor = (field: string) => prefillNotes.find((n) => n.field === field)?.text;
 
   const handleGenerate = () => {
     if (!intake) return;
@@ -292,6 +301,7 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
                   </Chip>
                 ))}
               </div>
+              {noteFor('goal') && <p className="text-2xs text-text-muted mt-1.5">{noteFor('goal')}</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -308,6 +318,9 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
                     </Chip>
                   ))}
                 </div>
+                {noteFor('daysPerWeek') && (
+                  <p className="text-2xs text-text-muted mt-1.5">{noteFor('daysPerWeek')}</p>
+                )}
               </div>
               <div>
                 <FieldLabel>{t('coachBlock.sessionLength')}</FieldLabel>
@@ -375,20 +388,22 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
                   {f.reason}
                 </p>
               ))}
+              {noteFor('limitations') && (
+                <p className="text-2xs text-text-muted mt-1.5">{noteFor('limitations')}</p>
+              )}
               <p className="text-2xs text-text-muted mt-1.5">{t('coachBlock.limitationsHint')}</p>
             </div>
 
             <div>
               <FieldLabel>{t('coachBlock.topLifts')}</FieldLabel>
               <div className="space-y-1.5">
-                {(intake.topLifts.length > 0
-                  ? intake.topLifts
-                  : (['Squat', 'Bench Press', 'Deadlift', 'Overhead Press'] as const).map((name) => ({
-                      name,
-                      e1rmKg: 0,
-                      source: 'entered' as const,
-                    }))
-                ).map((lift) => {
+                {/* F-03: the four main-lift rows ALWAYS render (plus
+                    any extra entered lift) — previously the list was
+                    "entered lifts OR the four defaults", so typing
+                    the first number made the other three fields
+                    disappear. */}
+                {topLiftRowNames(intake.topLifts).map((name) => {
+                  const lift = { name, e1rmKg: 0, source: 'entered' as const };
                   const existingIdx = intake.topLifts.findIndex(
                     (l) => l.name.toLowerCase() === lift.name.toLowerCase()
                   );
@@ -421,7 +436,11 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
                   );
                 })}
               </div>
-              <p className="text-2xs text-text-muted mt-1.5">{t('coachBlock.topLiftsHint')}</p>
+              {/* F-12: when the prefill explains the numbers, that
+                  provenance line replaces the generic hint. */}
+              <p className="text-2xs text-text-muted mt-1.5">
+                {noteFor('topLifts') ?? t('coachBlock.topLiftsHint')}
+              </p>
             </div>
 
             {errors.length > 0 && (
