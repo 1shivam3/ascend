@@ -1005,6 +1005,8 @@ export const en = {
   'workout.targetLabel': 'Target: {weight} {unit}',
   'workout.insertSets': 'Insert Sets',
   'workout.formCuesHeading': 'Form Cues',
+  'workout.pauseDemo': 'Pause animation',
+  'workout.playDemo': 'Play animation',
   'workout.closeFormCues': 'Close form cues',
   'workout.whyThisTarget': 'Why this target?',
   'workout.closeWhy': 'Close prescription explanation',

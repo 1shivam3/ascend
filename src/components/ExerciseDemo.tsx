@@ -153,9 +153,15 @@ const DEMOS: Record<string, DemoSpec> = {
   },
   'barbell-row': {
     duration: 2.2, weightKind: 'barbell',
+    // Declutter PR 3 redraw: the old keyframes put the knee almost
+    // directly under the hip (thigh near-vertical) with a short torso,
+    // so the figure read as a table. The hinge is now unmistakable:
+    // long, near-flat torso (hip 36,50 → neck 72,54), knees pushed
+    // forward of the hip–foot line, bar hanging below the shoulders
+    // and pulling to the ribs.
     poses: [
-      { head: P(75, 40), neck: P(69, 46), hip: P(42, 55), elbowA: P(73, 62), handA: P(75, 82), kneeA: P(46, 75), footA: P(41, 100), weight: P(75, 88) },
-      { head: P(75, 40), neck: P(69, 46), hip: P(42, 55), elbowA: P(57, 54), handA: P(65, 62), kneeA: P(46, 75), footA: P(41, 100), weight: P(65, 68) },
+      { head: P(80, 50), neck: P(72, 54), hip: P(36, 50), elbowA: P(74, 70), handA: P(72, 88), elbowB: P(70, 72), handB: P(70, 90), kneeA: P(45, 76), footA: P(38, 100), kneeB: P(43, 78), footB: P(35, 100), weight: P(72, 92) },
+      { head: P(80, 50), neck: P(72, 54), hip: P(36, 50), elbowA: P(58, 62), handA: P(64, 66), elbowB: P(56, 64), handB: P(62, 68), kneeA: P(45, 76), footA: P(38, 100), kneeB: P(43, 78), footB: P(35, 100), weight: P(64, 70) },
     ],
   },
   'db-row': {
@@ -480,21 +486,39 @@ function Weight({ spec }: { spec: DemoSpec }) {
  * The animated demo for an exercise, or nothing when no demo exists.
  * Surfaces must render this only when it returns non-null content —
  * check `getDemoForExercise(name)` before offering the affordance.
+ *
+ * `large` (declutter PR 3): render the figure filling its frame — the
+ * default size is the compact in-list variant (exercise library); the
+ * form-cues sheet passes `large` so the figure is the sheet's focus.
+ * `paused`: freezes the SMIL animation (the sheet's pause control);
+ * reduced-motion users stay frozen regardless.
  */
-export default function ExerciseDemo({ name }: { name: string }) {
+export default function ExerciseDemo({
+  name,
+  large = false,
+  paused = false,
+}: {
+  name: string;
+  large?: boolean;
+  paused?: boolean;
+}) {
   const { t } = useTranslation();
   const entry = getDemoForExercise(name);
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
+    const svg = svgRef.current as unknown as {
+      pauseAnimations?: () => void;
+      unpauseAnimations?: () => void;
+    } | null;
+    if (!svg) return;
     // Respect reduced-motion: freeze the animation on its first frame.
-    if (
+    const reduced =
       typeof window !== 'undefined' &&
-      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    ) {
-      (svgRef.current as unknown as { pauseAnimations?: () => void } | null)?.pauseAnimations?.();
-    }
-  }, []);
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (paused || reduced) svg.pauseAnimations?.();
+    else svg.unpauseAnimations?.();
+  }, [paused]);
 
   if (!entry) return null;
   const spec = DEMOS[entry.demoId];
@@ -502,11 +526,17 @@ export default function ExerciseDemo({ name }: { name: string }) {
   const groundY = spec.groundY === undefined ? 102 : spec.groundY;
 
   return (
-    <div className="rounded-xl bg-bg-secondary border border-border/60 px-2 py-1">
+    <div
+      className={
+        large
+          ? 'rounded-xl bg-bg-secondary border border-border/60 overflow-hidden'
+          : 'rounded-xl bg-bg-secondary border border-border/60 px-2 py-1'
+      }
+    >
       <svg
         ref={svgRef}
         viewBox="0 0 120 112"
-        className="w-full h-36"
+        className={large ? 'w-full h-auto block' : 'w-full h-36'}
         role="img"
         aria-label={t('demo.aria', { name })}
       >
