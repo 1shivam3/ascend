@@ -722,9 +722,6 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
     coachBlocks.activeBlock?.status === 'active' &&
     coachBlocks.activeBlock.planIds.includes(plan.id);
   const isAdopted = Boolean(coachBlocks.adoptedPlans?.[plan.id]);
-  const MAX_VISIBLE = 3;
-  const visibleExercises = plan.exercises.slice(0, MAX_VISIBLE);
-  const remainder = plan.exercises.length - MAX_VISIBLE;
 
   return (
     <div className="card flex flex-col gap-3">
@@ -815,23 +812,10 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
         </div>
       </div>
 
-      {/* Exercise preview chips */}
-      <div className="flex flex-wrap gap-1.5">
-        {visibleExercises.map((ex, i) => (
-          <span
-            key={i}
-            className="text-2xs bg-bg-elevated border border-border rounded-md px-2 py-0.5 text-text-secondary font-mono break-words"
-            title={ex.name}
-          >
-            {ex.name || <span className="italic opacity-50">Unnamed</span>}
-          </span>
-        ))}
-        {remainder > 0 && (
-          <span className="text-2xs bg-bg-elevated border border-border/60 rounded-md px-2 py-0.5 text-text-muted font-mono">
-            +{remainder} more
-          </span>
-        )}
-      </div>
+      {/* Declutter PR 2: the preview-chips strip that used to sit here
+          repeated the first exercises' names directly above the detail
+          rows below, which list every exercise with its prescription.
+          One rendering of the list is enough. */}
 
       {/* Exercise detail rows */}
       <div className="flex flex-col gap-1">
@@ -2968,7 +2952,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                       })}
 
                       {/* ── Plan vs Actual Workout Review ── */}
-                      <PlanVsActualReview workout={workout} />
+                      <PlanVsActualReview workout={workout} hideToggle />
 
                       <div className="flex justify-end pt-2">
                         {confirmDeleteId === workout.id ? (
