@@ -120,7 +120,9 @@ describe('coach block proposal lifecycle', () => {
     const blocks = useStore.getState().coachBlocks;
     expect(blocks.activeBlock?.proposalId).not.toBe(firstId);
     expect(blocks.pastBlocks.map((b) => b.proposalId)).toContain(firstId);
-    expect(blocks.pastBlocks[0].status).toBe('completed');
+    // F-02: the first block was swapped out the same day it was
+    // approved — it never ran, so it is 'replaced', not 'completed'.
+    expect(blocks.pastBlocks[0].status).toBe('replaced');
   });
 });
 
