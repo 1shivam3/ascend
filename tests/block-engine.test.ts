@@ -15,7 +15,7 @@ import {
 } from '@/lib/block-engine';
 import { buildIntakePrefill, type BlockIntake } from '@/lib/block-intake';
 import type { AthleteModel, LiftResponse } from '@/lib/athlete-model';
-import type { PlannedWorkout, WeeklySchedule } from '@/lib/types';
+import type { PlannedWorkout, WeeklySchedule, WorkoutEntry } from '@/lib/types';
 import type { StallFlag } from '@/lib/coach-engine';
 import { findLibraryExercise } from '@/lib/exercise-library';
 import { adaptExerciseForEquipment, getMovementFamily } from '@/lib/workout-engine';
@@ -525,6 +525,107 @@ describe('managedPlanIdByExerciseKey — block plan ownership', () => {
     // Regression guard for the original bug: keys must NOT all collapse
     // onto the last plan of the block.
     expect(new Set(Object.values(map)).size).toBeGreaterThan(1);
+  });
+});
+
+describe('block load continuity (demonstrated-capacity floor)', () => {
+  function logged(id: string, date: string, name: string, weight: number, reps: number): WorkoutEntry {
+    return {
+      id,
+      date,
+      exercises: [
+        {
+          name,
+          sets: Array.from({ length: 3 }, () => ({
+            reps,
+            weight,
+            unit: 'kg' as const,
+            completed: true,
+          })),
+        },
+      ],
+    } as WorkoutEntry;
+  }
+
+  // Demonstrated bench level: 77.5 kg x 5 across three recent sessions
+  // (best e1RM ~90.4 kg), all inside the 6-week recency window of TODAY.
+  const benchHistory = [
+    logged('b1', '2026-10-08', 'Bench Press', 77.5, 5),
+    logged('b2', '2026-10-12', 'Bench Press', 77.5, 5),
+    logged('b3', '2026-10-19', 'Bench Press', 77.5, 5),
+  ];
+
+  function proposed(p: ReturnType<typeof generateBlockProposal>, name: string) {
+    for (const d of p.days) {
+      const ex = d.exercises.find(
+        (e) => canonicalizeExerciseName(e.name) === canonicalizeExerciseName(name)
+      );
+      if (ex) return ex;
+    }
+    return undefined;
+  }
+
+  it('floors a main lift at its demonstrated level instead of the %1RM restart', () => {
+    // The bare hypertrophy anchor restarts bench at 90.4 x 0.72 = 65 kg.
+    // The floor converts the demonstrated e1RM at the new target reps
+    // (8): 90.4 / (1 + 8/30) ~ 71.4 -> 72.5 kg loadable.
+    const p = generateBlockProposal(input({ workouts: benchHistory }));
+    const bench = proposed(p, 'Bench Press');
+    expect(bench?.targetReps).toBe(8);
+    expect(bench?.targetWeight).toBe(72.5);
+  });
+
+  it('floors accessories too — a library default is not a demonstrated load', () => {
+    const workouts = [
+      ...benchHistory,
+      logged('c1', '2026-10-09', 'Dumbbell Curl', 20, 12),
+      logged('c2', '2026-10-13', 'Dumbbell Curl', 20, 12),
+      logged('c3', '2026-10-20', 'Dumbbell Curl', 20, 12),
+    ];
+    const p = generateBlockProposal(input({ workouts }));
+    expect(proposed(p, 'Dumbbell Curl')?.targetWeight).toBe(20);
+    // Same proposal without curl history: the library default stands.
+    const bare = generateBlockProposal(input({ workouts: benchHistory }));
+    expect(proposed(bare, 'Dumbbell Curl')?.targetWeight).toBe(14);
+  });
+
+  it('does not floor over a stale demonstration (last session > 6 weeks ago)', () => {
+    const stale = [
+      logged('s1', '2026-08-20', 'Bench Press', 77.5, 5),
+      logged('s2', '2026-08-24', 'Bench Press', 77.5, 5),
+      logged('s3', '2026-08-31', 'Bench Press', 77.5, 5),
+    ];
+    const p = generateBlockProposal(input({ workouts: stale }));
+    expect(proposed(p, 'Bench Press')?.targetWeight).toBe(65); // bare %1RM anchor
+  });
+
+  it("an ENTERED top lift is the athlete's own statement — the floor does not override it", () => {
+    const p = generateBlockProposal(
+      input({
+        workouts: benchHistory,
+        intake: baseIntake({
+          topLifts: [{ name: 'Bench Press', e1rmKg: 95, source: 'entered' }],
+        }),
+      })
+    );
+    expect(proposed(p, 'Bench Press')?.targetWeight).toBe(67.5); // 95 x 0.72 anchor, unfloored
+  });
+
+  it('a prefill-derived (history) top lift is an estimate — the floor still governs', () => {
+    const p = generateBlockProposal(
+      input({
+        workouts: benchHistory,
+        intake: baseIntake({
+          topLifts: [{ name: 'Bench Press', e1rmKg: 95, source: 'history' }],
+        }),
+      })
+    );
+    expect(proposed(p, 'Bench Press')?.targetWeight).toBe(72.5);
+  });
+
+  it('cold start: no history, no floor — generation is unchanged', () => {
+    const p = generateBlockProposal(input());
+    expect(proposed(p, 'Bench Press')?.targetWeight).toBe(70);
   });
 });
 
