@@ -10,7 +10,7 @@
  * updated with the fix, never silently.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
-import { runSimulation, type PersonaDef, type SimTrace } from './coach-sim-harness';
+import { isoAdd, runSimulation, type PersonaDef, type SimTrace } from './coach-sim-harness';
 import {
   ALL_PERSONAS,
   beginnerPersona,
@@ -21,6 +21,8 @@ import {
   stallerPersona,
 } from './coach-sim-personas';
 import { detectStalls } from '@/lib/coach-engine';
+import { getExerciseHistorySessions } from '@/lib/lifter-twin';
+import { useAppStore } from '@/lib/store';
 import { getMovementFamily } from '@/lib/workout-engine';
 import type { WorkoutEntry } from '@/lib/types';
 
@@ -268,10 +270,33 @@ describe('persona: fast progresser', () => {
     expect(appliedDecisions(t).length).toBeGreaterThan(100);
   });
 
-  it('[CHARACTERIZATION] the stall detector still flags 8+ of his lifts as stalled by week 10', () => {
-    const t = traceFor(fastProgresserPersona);
-    expect(t.weeks[9].stallFlags.length).toBeGreaterThanOrEqual(8);
-  });
+  it('week-10 stall flags carry each lift\'s OWN numbers — Squat and Front Squat no longer share a series', () => {
+    // Was [CHARACTERIZATION] ("the stall detector still flags 8+ of his
+    // lifts"): the raw count was never the cleanest signal — substring
+    // history merging both manufactured identical flags (see the probe
+    // below) and masked real ones. What exact stall history guarantees
+    // is that every flag is computed from the flagged lift's own
+    // sessions. Re-run the persona fresh so the store holds his
+    // workouts, replay detection at week 10, and compare the two lifts
+    // the merge used to fuse into one series.
+    const t = runSimulation(fastProgresserPersona);
+    const sunday = isoAdd(t.weeks[9].monday, 6);
+    const workouts = useAppStore.getState().workouts.filter((w) => w.date <= sunday);
+    const flags = detectStalls(workouts);
+    const squat = flags.find((f) => f.exercise === 'Squat');
+    const front = flags.find((f) => f.exercise === 'Front Squat');
+    expect(squat).toBeDefined();
+    expect(front).toBeDefined();
+    // Merged, these were one series with identical e1RM evidence.
+    expect(squat!.lastE1rmKg).not.toBe(front!.lastE1rmKg);
+    expect(squat!.peakE1rmKg).toBeGreaterThan(front!.peakE1rmKg);
+    // The flags that remain (17 at week 10, audited session by session)
+    // are all readable from the lifts' own histories: the peak sits in
+    // block 1 and the block-2 restart (the block-boundary anchoring
+    // defect, characterized separately below) keeps the window below it.
+    // This count is expected to FALL when that anchoring is fixed.
+    expect(flags).toHaveLength(17);
+  }, 120000);
 });
 
 describe('persona: staller — plateau observation', () => {
@@ -321,7 +346,10 @@ describe('persona: staller — plateau observation', () => {
       const mine = t.weeks.flatMap((w) => w.plateauProposalsCreated);
       // Proposals must actually land for every persona, not just the ones
       // whose stalled lifts happened to sit in a block's last plan.
-      expect(mine.filter((x) => x.outcome === 'applied').length).toBeGreaterThanOrEqual(20);
+      // (Floor recalibrated after the exact-stall-history fix: fewer,
+      // realer stall flags produce fewer proposals — 136 created across
+      // personas, every one applied, zero dismissed.)
+      expect(mine.filter((x) => x.outcome === 'applied').length).toBeGreaterThanOrEqual(10);
       created += mine.length;
       applied += mine.filter((x) => x.outcome === 'applied').length;
       dismissed += mine.filter((x) => x.outcome === 'dismissed').length;
@@ -359,11 +387,22 @@ describe('persona: staller — plateau observation', () => {
     expect(proposals.every((e) => !e.decision!.applied)).toBe(true);
   });
 
-  it('[CHARACTERIZATION] variation swaps leave one plan containing Leg Press twice', () => {
+  it('[CHARACTERIZATION] a variation swap still serves a placeholder exercise name ("Dumbbell alternative") in a live plan', () => {
+    // Previously pinned as "variation swaps leave one plan containing
+    // Leg Press twice": the duplicate was driven by the bogus stall
+    // flags from merged exercise histories, and with exact stall
+    // history that swap sequence no longer occurs (Leg Press now
+    // appears once in this plan). The underlying swap-hygiene defect is
+    // still live in the very same snapshot: a plan exercise literally
+    // named "Dumbbell alternative" — a placeholder string from the swap
+    // table, served as a real exercise. The duplicate-name half of the
+    // defect is pinned at unit level in block-engine.test.ts
+    // (applyPlateauProposalToPlan performs no collision check).
     const t = traceFor(stallerPersona);
     const lowerB = t.weeks[8].planSnapshot.find((p) => p.planName.includes('Lower B'));
-    const legPresses = lowerB!.exercises.filter((e) => e.name === 'Leg Press');
-    expect(legPresses.length).toBe(2);
+    const names = lowerB!.exercises.map((e) => e.name);
+    expect(names.filter((n) => n === 'Leg Press')).toHaveLength(1);
+    expect(names).toContain('Dumbbell alternative');
   });
 
   it('[CHARACTERIZATION] Bulgarian Split Squat is prescribed like a main lift (>= 100 kg)', () => {
@@ -378,7 +417,7 @@ describe('persona: staller — plateau observation', () => {
 
 // ---------------------------------------------------------------------------
 
-describe('stall detector history merging (root-cause probe)', () => {
+describe('stall detector history separation (root-cause probe)', () => {
   function session(date: string, name: string, weight: number, reps: number): WorkoutEntry {
     return {
       id: `probe-${date}-${name}`,
@@ -403,11 +442,14 @@ describe('stall detector history merging (root-cause probe)', () => {
     };
   }
 
-  it('[CHARACTERIZATION] Squat and Front Squat histories are merged into one series', () => {
-    // getExerciseHistorySessions defaults to substring matching
-    // ('front squat'.includes('squat')), so detectStalls sees ONE mixed
-    // series for both lifts and flags both with identical numbers — even
-    // though both progressed every week in this fixture.
+  it('Squat and Front Squat keep separate histories — no merged series, no phantom flags', () => {
+    // Was [CHARACTERIZATION]: detectStalls resolved histories through
+    // getExerciseHistorySessions' substring default ('front squat'
+    // contains 'squat'), so it saw ONE mixed series for both lifts and
+    // flagged both with identical numbers — even though both progressed
+    // every week in this fixture. detectStalls now uses exact exercise
+    // identity: each lift keeps its own 4 sessions and its own peak,
+    // and neither is flagged (both series grew > 2%).
     const workouts = [
       session('2026-01-07', 'Squat', 107.5, 5),
       session('2026-01-10', 'Front Squat', 70, 5),
@@ -418,13 +460,16 @@ describe('stall detector history merging (root-cause probe)', () => {
       session('2026-01-28', 'Squat', 110, 5),
       session('2026-01-31', 'Front Squat', 72.5, 5),
     ];
+    const squatHist = getExerciseHistorySessions('Squat', workouts, 'kg', { exact: true });
+    const frontHist = getExerciseHistorySessions('Front Squat', workouts, 'kg', { exact: true });
+    expect(squatHist).toHaveLength(4);
+    expect(frontHist).toHaveLength(4);
+    expect(Math.max(...squatHist.map((s) => s.bestE1RM))).toBeGreaterThan(
+      Math.max(...frontHist.map((s) => s.bestE1RM))
+    );
     const flags = detectStalls(workouts);
-    const squat = flags.find((f) => f.exercise === 'Squat');
-    const front = flags.find((f) => f.exercise === 'Front Squat');
-    expect(squat).toBeDefined();
-    expect(front).toBeDefined();
-    expect(squat!.lastE1rmKg).toBe(front!.lastE1rmKg);
-    expect(squat!.sessionsAnalyzed).toBe(6); // 8 real sessions, one merged window
+    expect(flags.find((f) => f.exercise === 'Squat')).toBeUndefined();
+    expect(flags.find((f) => f.exercise === 'Front Squat')).toBeUndefined();
   });
 });
 

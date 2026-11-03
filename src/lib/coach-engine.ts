@@ -206,7 +206,13 @@ export function detectStalls(
   const flags: StallFlag[] = [];
 
   for (const [norm, display] of names) {
-    const sessions = getExerciseHistorySessions(display, workouts, 'kg').slice(-STALL_WINDOW);
+    // Exact exercise identity (exerciseNamesEqual via { exact: true }):
+    // the names iterated here come from the logs themselves, so there is
+    // no plan-vs-log name drift to bridge — the historical substring
+    // default merged variant lifts into one series ('front squat'
+    // contains 'squat'), flagging lifts as stalled on another lift's
+    // numbers and driving variation swaps on lifts that were progressing.
+    const sessions = getExerciseHistorySessions(display, workouts, 'kg', { exact: true }).slice(-STALL_WINDOW);
     if (sessions.length < minSessions) continue;
 
     const e1rms = sessions.map((s) => s.bestE1RM).filter((v) => v > 0);
