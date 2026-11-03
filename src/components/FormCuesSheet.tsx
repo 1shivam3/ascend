@@ -11,8 +11,8 @@
  * check with `hasExerciseFormSurface` before offering the affordance.
  */
 
-import React, { useEffect, useMemo, useRef } from 'react';
-import { Sparkles, X } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Pause, Play, Sparkles, X } from 'lucide-react';
 import ExerciseDemo from '@/components/ExerciseDemo';
 import { getExerciseFormCues, getExerciseHindiName } from '@/lib/exercise-library';
 import { getDemoForExercise } from '@/lib/exercise-media';
@@ -44,6 +44,9 @@ export default function FormCuesSheet({
   );
   const demo = useMemo(() => getDemoForExercise(exerciseName), [exerciseName]);
   const hindiName = language === 'hi' ? getExerciseHindiName(exerciseName) : undefined;
+  // Declutter PR 3: pause/play for the demo animation (SMIL freeze via
+  // ExerciseDemo's `paused` prop). Local display state only.
+  const [demoPaused, setDemoPaused] = useState(false);
 
   useEffect(() => {
     return registerBackHandler(() => {
@@ -59,8 +62,13 @@ export default function FormCuesSheet({
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-accent" />
             <div>
-              <h3 className="font-bold text-text-primary">{t('workout.formCuesHeading')}</h3>
-              <p className="text-2xs text-text-muted">{exerciseName}</p>
+              {/* Declutter PR 3: the exercise name appears exactly once
+                  in the sheet — as the heading. "Form Cues" is the
+                  eyebrow, not a second title competing with it. */}
+              <p className="text-2xs font-bold uppercase tracking-wider text-text-muted">
+                {t('workout.formCuesHeading')}
+              </p>
+              <h3 className="font-bold text-text-primary">{exerciseName}</h3>
               {/* Devanagari name in Hindi mode. */}
               {hindiName ? <p className="text-2xs text-text-secondary">{hindiName}</p> : null}
             </div>
@@ -75,7 +83,28 @@ export default function FormCuesSheet({
           </button>
         </div>
         <div className="p-4 space-y-2.5">
-          {demo && <ExerciseDemo name={exerciseName} />}
+          {demo && (
+            <div className="space-y-1.5">
+              {/* Declutter PR 3: the demo renders large — the figure
+                  fills its frame (ExerciseDemo `large`), no more small
+                  figure floating in an empty box. */}
+              <ExerciseDemo name={exerciseName} large paused={demoPaused} />
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setDemoPaused((v) => !v)}
+                  className="flex items-center gap-1.5 text-2xs font-bold text-text-secondary hover:text-text-primary px-2 py-1 rounded-lg hover:bg-bg-secondary cursor-pointer"
+                  aria-label={demoPaused ? t('workout.playDemo') : t('workout.pauseDemo')}
+                  aria-pressed={demoPaused}
+                >
+                  {demoPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+                  <span>{demoPaused ? t('workout.playDemo') : t('workout.pauseDemo')}</span>
+                </button>
+              </div>
+            </div>
+          )}
+          {/* Numbered step captions: the exercise's own howTo steps
+              (library data, PR #73) — surfaced, never invented. */}
           {formCues.map((cue, idx) => (
             <div key={idx} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-bg-secondary border border-border/60">
               <span className="w-5 h-5 rounded-full bg-accent/15 text-accent-text text-2xs font-bold flex items-center justify-center shrink-0 mt-0.5 font-mono">

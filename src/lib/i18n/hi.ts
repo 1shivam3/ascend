@@ -1012,6 +1012,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'workout.targetLabel': 'लक्ष्य: {weight} {unit}',
   'workout.insertSets': 'सेट डालें',
   'workout.formCuesHeading': 'फ़ॉर्म संकेत',
+  'workout.pauseDemo': 'एनीमेशन रोकें',
+  'workout.playDemo': 'एनीमेशन चलाएं',
   'workout.closeFormCues': 'फ़ॉर्म संकेत बंद करें',
   'workout.whyThisTarget': 'यह लक्ष्य क्यों?',
   'workout.closeWhy': 'बंद करें',
