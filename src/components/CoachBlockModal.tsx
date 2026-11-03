@@ -528,7 +528,7 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
                     <span className="text-xs font-bold text-text-primary">
                       {day.label} · {WEEKDAY_LABEL[day.weekday]}
                       {/* F-08: an empty day is not a session — no duration. */}
-                      {day.exercises.length > 0 ? ` · ~${day.estimatedMinutes}m` : ''}
+                      {day.exercises.length > 0 ? ` · ~${day.estimatedMinutes} min` : ''}
                     </span>
                     <ChevronRight
                       className={`w-4 h-4 text-text-muted transition-transform ${expandedDay === di ? 'rotate-90' : ''}`}
@@ -543,7 +543,7 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
                               {ex.name}{' '}
                               <span className="font-mono text-text-muted font-normal">
                                 {ex.targetSets}×{ex.targetReps}
-                                {ex.targetWeight ? ` @ ${ex.targetWeight}${ex.targetUnit ?? ''}` : ''}
+                                {ex.targetWeight ? ` @ ${ex.targetWeight}${ex.targetUnit ? ` ${ex.targetUnit}` : ''}` : ''}
                                 {ex.targetRpe ? ` · RPE ${ex.targetRpe}` : ''}
                               </span>
                             </p>

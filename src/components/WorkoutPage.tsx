@@ -840,7 +840,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
             <span className="text-text-secondary truncate flex-1 mr-2" title={ex.name || undefined}>{ex.name || '—'}</span>
             <span className="text-text-muted font-mono shrink-0">
               {ex.targetSets}×{ex.targetReps}
-              {ex.targetWeight ? ` @ ${ex.targetWeight}${ex.targetUnit ?? ''}` : ''}
+              {ex.targetWeight ? ` @ ${ex.targetWeight}${ex.targetUnit ? ` ${ex.targetUnit}` : ''}` : ''}
             </span>
           </div>
         ))}

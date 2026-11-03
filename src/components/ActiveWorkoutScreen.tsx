@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { getDemoForExercise } from '@/lib/exercise-media';
-import ExerciseDemo from '@/components/ExerciseDemo';
+import FormCuesSheet from '@/components/FormCuesSheet';
 import { WorkoutExercise, WorkoutSet, WorkoutEntry, PersonalRecord, AthleteGoal, ATHLETE_GOAL_CONFIGS, SetExecutionStatus, isSetCompleted, DEFAULT_GOALS, resolvePrimaryGoal, Unit } from '@/lib/types';
 import { isMainCompoundLift, calculateOneRepMax, getEquipmentType, getExerciseList, isBodyweightExercise, isDumbbellExercise, getEffectiveExerciseLoad, suggestLoad } from '@/lib/strength-standards';
 import {
@@ -39,7 +39,6 @@ import {
   searchExercises,
   getExerciseMuscle,
   getExerciseFormCues,
-  getExerciseHindiName,
 } from '@/lib/exercise-library';
 import {
   getLastExercisePerformance,
@@ -1163,7 +1162,6 @@ export default function ActiveWorkoutScreen({
   const hasFormSurface = formCues.length > 0 || currentDemo !== null;
 
   const [showFormCues, setShowFormCues] = useState(false);
-  const formCuesRef = useRef<HTMLDivElement>(null); const { dialogProps: formCuesDialogProps } = useModalA11y(formCuesRef, showFormCues, () => setShowFormCues(false));
   const [showWhyTarget, setShowWhyTarget] = useState(false);
   const whyTargetRef = useRef<HTMLDivElement>(null); const { dialogProps: whyTargetDialogProps } = useModalA11y(whyTargetRef, showWhyTarget, () => setShowWhyTarget(false));
 
@@ -1173,11 +1171,6 @@ export default function ActiveWorkoutScreen({
     setShowFormCues(false);
     setShowWhyTarget(false);
   }, [activeExerciseIdx]);
-  useEffect(() => {
-    if (showFormCues) {
-      return registerBackHandler(() => { setShowFormCues(false); return true; }, 110);
-    }
-  }, [showFormCues, registerBackHandler]);
   useEffect(() => {
     if (showWhyTarget) {
       return registerBackHandler(() => { setShowWhyTarget(false); return true; }, 110);
@@ -1219,9 +1212,9 @@ export default function ActiveWorkoutScreen({
       if (target.directive === 'progress_load') {
         improved.push(`${ex.name}: moved with reserve — ready for more load`);
       } else if (target.directive === 'hold') {
-        steady.push(`${ex.name}: hard session — consolidating at ${target.weight}${userUnit}`);
+        steady.push(`${ex.name}: hard session — consolidating at ${target.weight} ${userUnit}`);
       } else {
-        steady.push(`${ex.name}: building reps at ${target.weight}${userUnit}`);
+        steady.push(`${ex.name}: building reps at ${target.weight} ${userUnit}`);
       }
       nextRules.push({ summary: target.summaryText, rationale: target.rationale });
     }
@@ -2100,7 +2093,7 @@ export default function ActiveWorkoutScreen({
               aria-label="Form cues for this exercise"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{t('workout.form')}</span>
+              <span className="hidden sm:inline">{t('workout.formCuesHeading')}</span>
             </button>
           )}
           <button
@@ -2166,7 +2159,7 @@ export default function ActiveWorkoutScreen({
                     className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2 cursor-pointer"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-accent" />
-                    <span>{t('workout.formCues')}</span>
+                    <span>{t('workout.formCuesHeading')}</span>
                   </button>
                 )}
                 {prescription?.whyThisWeight && (
@@ -2531,7 +2524,7 @@ export default function ActiveWorkoutScreen({
                   title={t('workout.changeTitle')}
                 >
                   <h2 className="display-title font-display uppercase tracking-tight text-3xl sm:text-4xl text-text-primary group-hover:text-accent transition-colors truncate">
-                    {(currentExercise.name || t('workout.untitled')).toUpperCase()}.
+                    {(currentExercise.name || t('workout.untitled')).toUpperCase()}
                   </h2>
                   <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-bg-secondary group-hover:bg-accent/15 border border-border/60 group-hover:border-accent/40 text-text-muted group-hover:text-accent transition-all shrink-0">
                     <Edit2 className="w-3 h-3" />
@@ -2609,7 +2602,7 @@ export default function ActiveWorkoutScreen({
                     {entry.sets.map((set, j) => (
                       <span key={j}>
                         {j > 0 ? ', ' : ''}
-                        {set.weight ? `${set.weight}${set.unit} × ${set.reps}` : `BW × ${set.reps}`}
+                        {set.weight ? `${set.weight} ${set.unit} × ${set.reps}` : `BW × ${set.reps}`}
                       </span>
                     ))}
                   </span>
@@ -3511,47 +3504,13 @@ export default function ActiveWorkoutScreen({
         </div>
       )}
 
-      {/* ── Form Cues Sheet ──────────────────────────────────────────────── */}
-      {showFormCues && hasFormSurface && (
-        <div ref={formCuesRef} {...formCuesDialogProps} className="modal-overlay" onClick={() => setShowFormCues(false)}>
-          <div className="modal-content max-w-sm" onClick={(e) => e.stopPropagation()}>
-            <div className="p-4 border-b border-border flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-accent" />
-                <div>
-                  <h3 className="font-bold text-text-primary">{t('workout.formCuesHeading')}</h3>
-                  <p className="text-2xs text-text-muted">{currentExercise?.name}</p>
-                  {/* SIM-P1-05 Round 3: Devanagari name in Hindi mode. */}
-                  {language === 'hi' && currentExercise?.name && (() => {
-                    const hi = getExerciseHindiName(currentExercise.name);
-                    return hi ? <p className="text-2xs text-text-secondary">{hi}</p> : null;
-                  })()}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowFormCues(false)}
-                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-text-muted hover:text-text-primary"
-                aria-label={t('workout.closeFormCues')}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-4 space-y-2.5">
-              {currentDemo && currentExercise?.name && (
-                <ExerciseDemo name={currentExercise.name} />
-              )}
-              {formCues.map((cue, idx) => (
-                <div key={idx} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-bg-secondary border border-border/60">
-                  <span className="w-5 h-5 rounded-full bg-accent/15 text-accent-text text-2xs font-bold flex items-center justify-center shrink-0 mt-0.5 font-mono">
-                    {idx + 1}
-                  </span>
-                  <p className="text-xs text-text-secondary leading-relaxed">{cue}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+      {/* ── Form Cues Sheet (shared component — plan detail opens the
+          same sheet; see components/FormCuesSheet) ─────────────────── */}
+      {showFormCues && hasFormSurface && currentExercise?.name && (
+        <FormCuesSheet
+          exerciseName={currentExercise.name}
+          onClose={() => setShowFormCues(false)}
+        />
       )}
 
       {/* ── Why This Target Weight Sheet ─────────────────────────────────── */}
@@ -3979,7 +3938,7 @@ export default function ActiveWorkoutScreen({
                 <div className="p-3 rounded-xl bg-bg-secondary text-center border border-border">
                   <span className="text-2xs uppercase font-mono text-text-muted block">{t('workout.volume')}</span>
                   <span className="text-lg font-black font-mono text-accent block mt-0.5">
-                    {sessionStats.totalVolumeKg}kg
+                    {sessionStats.totalVolumeKg} kg
                   </span>
                 </div>
                 <div className="p-3 rounded-xl bg-bg-secondary text-center border border-border">
