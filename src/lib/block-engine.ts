@@ -36,6 +36,7 @@ import {
   getFilteredSubstitutes,
   getGoalAdaptiveSplitTemplates,
   getInjuryBannedFamilies,
+  getInjuryBannedJoints,
   getPlanBannedJoints,
   getMovementFamily,
   isExerciseJointBanned,
@@ -824,6 +825,27 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
   const { intake, athleteModel, unit, todayStr } = input;
   const disliked = input.dislikedExercises ?? [];
   const warnings: string[] = [];
+  // F-04: a declared limitation that maps to NO banned family and NO
+  // banned joint (the "Other" chip, or free text the tables don't
+  // know) used to be silently inert while the intake copy promised
+  // anything ticked would be kept out. Name each one in the proposal
+  // so the athlete sees it could not be auto-applied and can check
+  // the days themselves. Named chips map to real bans and are
+  // untouched by this.
+  const seenLimitation = new Set<string>();
+  for (const lim of intake.limitations) {
+    const key = lim.trim().toLowerCase();
+    if (!key || seenLimitation.has(key)) continue;
+    seenLimitation.add(key);
+    if (
+      getInjuryBannedFamilies([lim]).size === 0 &&
+      getInjuryBannedJoints([lim]).size === 0
+    ) {
+      warnings.push(
+        `Your "${lim}" limitation isn't one the block builder can apply automatically, so it hasn't removed any exercises. Check the days below and remove anything that aggravates it.`
+      );
+    }
+  }
   const { focus, reason: focusReason } = resolveFocus(
     intake.goal,
     input.nutritionPhase,
