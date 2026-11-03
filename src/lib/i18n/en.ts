@@ -53,6 +53,7 @@ export const en = {
   'home.mealScan': 'Meal Scan',
   'home.scan': 'Scan',
   'home.weight': 'Weight',
+  'home.formCheck': 'Form Check',
   'home.hydration': 'Hydration',
   // Micro-fix L2 (round 2): Simple-mode habit heading. Flagged for
   // native review with the ~94 other new Hindi keys.
@@ -184,6 +185,9 @@ export const en = {
   'fuelPrefs.skip': 'Keep estimates for now',
   'coachBlock.approveEmpty': 'This block has no workouts in it — nothing was created. Try different days, equipment, or limits.',
   'tools.title': 'Training Tools',
+  'tools.formCoachTitle': 'ASCEND Form Coach',
+  'tools.formCoachHint': 'Live camera pose analysis & repetition counter',
+  'workout.formCoach': 'Form Coach',
   'tools.plateTitle': 'Plate Calculator',
   'tools.plateHint': 'Calculate exact barbell loading plates',
   'tools.scheduleTitle': 'Weekly Schedule & Split',

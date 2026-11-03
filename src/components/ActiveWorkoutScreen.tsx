@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import {
   X,
+  Camera,
   Plus,
   Trash2,
   Timer,
@@ -31,6 +32,7 @@ import {
 import { useStore } from '@/lib/store';
 import { getDemoForExercise } from '@/lib/exercise-media';
 import FormCuesSheet from '@/components/FormCuesSheet';
+import FormCoachModal from '@/features/form-coach/components/FormCoachModal';
 import { WorkoutExercise, WorkoutSet, WorkoutEntry, PersonalRecord, AthleteGoal, ATHLETE_GOAL_CONFIGS, SetExecutionStatus, isSetCompleted, DEFAULT_GOALS, resolvePrimaryGoal, Unit } from '@/lib/types';
 import { isMainCompoundLift, calculateOneRepMax, getEquipmentType, getExerciseList, isBodyweightExercise, isDumbbellExercise, getEffectiveExerciseLoad, suggestLoad } from '@/lib/strength-standards';
 import {
@@ -1161,6 +1163,7 @@ export default function ActiveWorkoutScreen({
   }, [currentExercise?.name]);
   const hasFormSurface = formCues.length > 0 || currentDemo !== null;
 
+  const [showFormCoach, setShowFormCoach] = useState(false);
   const [showFormCues, setShowFormCues] = useState(false);
   const [showWhyTarget, setShowWhyTarget] = useState(false);
   const whyTargetRef = useRef<HTMLDivElement>(null); const { dialogProps: whyTargetDialogProps } = useModalA11y(whyTargetRef, showWhyTarget, () => setShowWhyTarget(false));
@@ -2084,6 +2087,18 @@ export default function ActiveWorkoutScreen({
           {/* Form cues + Warm-up: the two things a beginner needs MOST
               were buried 4th/6th in the overflow menu. They get visible
               header buttons (the menu entries stay for discoverability). */}
+          {/* ASCEND Form Coach Live Camera Analysis */}
+          <button
+            type="button"
+            onClick={() => setShowFormCoach(true)}
+            className="px-2.5 py-1.5 min-h-[44px] rounded-lg bg-accent/15 hover:bg-accent/25 border border-accent/40 text-accent font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer"
+            title="ASCEND Form Coach — Live Camera Pose Analysis"
+            aria-label="ASCEND Form Coach"
+          >
+            <Camera className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Form Coach</span>
+          </button>
+
           {hasFormSurface && (
             <button
               type="button"
@@ -2152,6 +2167,18 @@ export default function ActiveWorkoutScreen({
                   <Dumbbell className="w-3.5 h-3.5 text-accent" />
                   <span>{t('workout.plateHelper')}</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    setShowFormCoach(true);
+                  }}
+                  className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                  <Camera className="w-3.5 h-3.5 text-accent" />
+                  <span>ASCEND Form Coach</span>
+                </button>
+
                 {hasFormSurface && (
                   <button
                     type="button"
@@ -3517,6 +3544,18 @@ export default function ActiveWorkoutScreen({
           exerciseName={currentExercise.name}
           onClose={() => setShowFormCues(false)}
         />
+      )}
+
+      {/* ── ASCEND Form Coach Modal (video-upload squat analysis) ─────── */}
+      {showFormCoach && (
+        <FormCoachModal
+          isOpen={showFormCoach}
+          onClose={() => setShowFormCoach(false)}
+          workoutId={planId}
+          setIndex={activeSetIdx}
+          workoutName={workoutName}
+        />
+      )}
       )}
 
       {/* ── Why This Target Weight Sheet ─────────────────────────────────── */}

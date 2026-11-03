@@ -51,6 +51,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'home.mealScan': 'मील स्कैन',
   'home.scan': 'स्कैन',
   'home.weight': 'वज़न',
+  'home.formCheck': 'फ़ॉर्म चेक',
   'home.hydration': 'हाइड्रेशन',
   // Micro-fix L2 (round 2): composed from dictionary words (आज + की +
   // आदतें, as in habitsThisWeek) — flagged for native review.
@@ -190,6 +191,9 @@ export const hi: Partial<Record<StringKey, string>> = {
   'coachBlock.approveEmpty': 'वर्कआउट नहीं है',
   // Token-reuse compositions only — flagged for native-speaker review.
   'tools.title': 'ट्रेनिंग देखें',
+  'tools.formCoachTitle': 'ASCEND फ़ॉर्म कोच',
+  'tools.formCoachHint': 'लाइव कैमरा पोज़ विश्लेषण और रेप काउंटर',
+  'workout.formCoach': 'फ़ॉर्म कोच',
   'tools.plateTitle': 'प्लेट कैलकुलेटर',
   'tools.plateHint': 'प्लेट देखें',
   'tools.scheduleTitle': 'शेड्यूल देखें',

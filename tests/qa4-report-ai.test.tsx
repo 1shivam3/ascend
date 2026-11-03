@@ -37,7 +37,7 @@ function reportAiImporters(): string[] {
           content.includes("from './ReportAIModal'") ||
           content.includes("from '../components/ReportAIModal'")
         ) {
-          hits.push(path.relative(SRC, full));
+          hits.push(path.relative(SRC, full).replace(/\\/g, '/'));
         }
       }
     }

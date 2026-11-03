@@ -24,7 +24,11 @@ export function getGaMeasurementId(): string | undefined {
  * (Same as above: the dev fallback project ID is deleted.)
  */
 export function getClarityProjectId(): string | undefined {
-  return process.env.NEXT_PUBLIC_CLARITY_ID?.trim() || undefined;
+  const id = process.env.NEXT_PUBLIC_CLARITY_ID?.trim();
+  if (!id || id === 'ywdt5rqnzv' || id === 'your_clarity_project_id' || id === 'placeholder') {
+    return undefined;
+  }
+  return id;
 }
 
 /**

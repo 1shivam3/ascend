@@ -102,7 +102,8 @@ describe('SEC-16 + SEC-20: middleware', () => {
     expect(mw).toContain("matcher: ['/api/:path*']");
     const cfg = readSrc('next.config.js');
     const scriptSrc = cfg.match(/"script-src[^"]*"/)?.[0] ?? '';
-    expect(scriptSrc).not.toContain('unsafe-eval');
+    expect(scriptSrc).not.toMatch(/(^|\s)'unsafe-eval'(\s|$)/);
+    expect(scriptSrc).toContain("'wasm-unsafe-eval'");
     expect(scriptSrc).toContain('unsafe-inline');
     expect(cfg).toContain('report-uri /api/csp-report');
     expect(cfg).toContain('Reporting-Endpoints');
