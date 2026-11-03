@@ -36,8 +36,9 @@ import {
 import { calculateWorkoutTonnage } from './ai-coach';
 import { SAFE_MIN_CALORIES } from './macros';
 import { getWeekDateStrings, plural, formatKg, getLocalTodayStr, parseLocalDate } from './formatters';
-import { EXERCISE_LIBRARY } from './exercise-library';
+import { EXERCISE_LIBRARY, findLibraryExercise } from './exercise-library';
 import type { MuscleGroup } from './exercise-library';
+import { isPlaceholderSubstitute } from './workout-engine';
 import { DAY_ORDER, type LocalizedSentence } from './coach-i18n';
 import { DEFAULT_BODYWEIGHT_KG } from './defaults';
 
@@ -152,6 +153,13 @@ export interface StallFlag {
   variationName?: string;
   variationSets?: number;
   variationReps?: number;
+  /**
+   * Every real-library swap candidate for this lift, best first
+   * (variationName is candidates[0]). Proposal creation re-picks from
+   * this list against the target plan — a candidate already in the
+   * plan, or under an injury/pain ban, is skipped for the next one.
+   */
+  variationCandidates?: { name: string; sets: number; reps: number }[];
   /** Plain-English diagnosis naming the likely cause. */
   explanation: string;
 }
@@ -254,17 +262,34 @@ export function detectStalls(
         : 0;
     const repCv = meanReps > 0 ? repSd / meanReps : 0;
 
-    const suggestion = stallSuggestionFor(e1rms, rpes, medianReps, repCv);
+    let suggestion = stallSuggestionFor(e1rms, rpes, medianReps, repCv);
 
     let variationName: string | undefined;
     let variationSets: number | undefined;
     let variationReps: number | undefined;
+    let variationCandidates: { name: string; sets: number; reps: number }[] | undefined;
     if (suggestion === 'variation') {
-      const swap = getStimulusPreservingSwaps(display)[0];
-      if (swap) {
-        variationName = swap.target;
-        variationSets = swap.targetSets;
-        variationReps = swap.targetReps;
+      // Only REAL library exercises may be offered as a swap. The swap
+      // table's authored entries include names the library does not
+      // carry, and its old generic fallbacks were placeholder strings
+      // ('Dumbbell alternative') that detectStalls used to take
+      // uncritically — a placeholder was written into a live plan as
+      // an exercise (coach sim). With no real candidate, the honest
+      // suggestion is a technique reset, never an invented movement.
+      const real = getStimulusPreservingSwaps(display).filter(
+        (s) => !isPlaceholderSubstitute(s.target) && findLibraryExercise(s.target)
+      );
+      if (real.length === 0) {
+        suggestion = 'technique';
+      } else {
+        variationCandidates = real.map((s) => ({
+          name: s.target,
+          sets: s.targetSets,
+          reps: s.targetReps,
+        }));
+        variationName = real[0].target;
+        variationSets = real[0].targetSets;
+        variationReps = real[0].targetReps;
       }
     }
 
@@ -322,6 +347,7 @@ export function detectStalls(
       variationName,
       variationSets,
       variationReps,
+      variationCandidates,
       explanation,
     });
   }

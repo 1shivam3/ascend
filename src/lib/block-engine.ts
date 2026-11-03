@@ -1264,6 +1264,21 @@ export function buildPlateauProposals(input: {
   planIdByExerciseKey: Record<string, string>;
   acknowledgedKeys: Set<string>;
   todayStr: string;
+  /**
+   * Optional plan contents for swap hygiene: when provided, a
+   * variation candidate already present in the target plan is skipped
+   * for the next candidate, and a stall with no clean candidate
+   * produces no proposal at all — a plan must never end up containing
+   * the same exercise twice after a swap.
+   */
+  plans?: PlannedWorkout[];
+  /**
+   * Optional exclusions already in force: swap candidates whose
+   * movement family is banned (declared injuries / intake limits) or
+   * whose canonical key was recently pain-flagged are skipped too.
+   */
+  bannedFamilies?: Set<MovementFamily>;
+  recentPainKeys?: Set<string>;
 }): PlateauProposal[] {
   const { stalls, blocks, planIdByExerciseKey, acknowledgedKeys, todayStr } = input;
   const out: PlateauProposal[] = [];
@@ -1281,15 +1296,39 @@ export function buildPlateauProposals(input: {
     let change: PlateauChange;
     let changeText: string;
     switch (flag.suggestion) {
-      case 'variation':
+      case 'variation': {
+        // Re-pick from the flag's real candidates against the actual
+        // plan and the exclusions in force: never a placeholder, never
+        // onto a name already in the plan, never into a banned family,
+        // never onto a recently pain-flagged lift. No clean candidate
+        // → no proposal (the stall stays visible in the digest).
+        const candidates =
+          flag.variationCandidates ??
+          (flag.variationName
+            ? [{ name: flag.variationName, sets: flag.variationSets ?? 3, reps: flag.variationReps ?? 8 }]
+            : []);
+        const targetPlan = input.plans?.find((p) => p.id === planId);
+        const inPlan = new Set(
+          (targetPlan?.exercises ?? []).map((e) => canonicalizeExerciseName(e.name))
+        );
+        const picked = candidates.find((c) => {
+          const cKey = canonicalizeExerciseName(c.name);
+          if (isPlaceholderSubstitute(c.name)) return false;
+          if (cKey === key || inPlan.has(cKey)) return false;
+          if (input.bannedFamilies?.has(getMovementFamily(c.name))) return false;
+          if (input.recentPainKeys?.has(cKey)) return false;
+          return true;
+        });
+        if (!picked) continue;
         change = {
           type: 'variation',
-          newName: flag.variationName ?? flag.exercise,
-          sets: flag.variationSets ?? 3,
-          reps: flag.variationReps ?? 8,
+          newName: picked.name,
+          sets: picked.sets,
+          reps: picked.reps,
         };
         changeText = `Swap ${flag.exercise} for ${change.newName} (${change.sets}×${change.reps}) for the rest of this block.`;
         break;
+      }
       case 'rep_scheme':
         change = { type: 'rep_scheme', repMin: 8, repMax: 12 };
         changeText = `Move ${flag.exercise} to an 8–12 rep scheme at the same load — the stimulus changes without chasing weight.`;
@@ -1363,6 +1402,23 @@ export function applyPlateauProposalToPlan(
 
   switch (proposal.change.type) {
     case 'variation': {
+      // Swap hygiene backstop, independent of how the proposal was
+      // built: never write a placeholder name into a plan, and never
+      // rename a lift onto a name another slot in the plan already
+      // carries (the sim produced a plan with Leg Press twice).
+      // The store retires these as dismissed — stale by outcome,
+      // never applied.
+      if (isPlaceholderSubstitute(proposal.change.newName)) {
+        return { error: 'placeholder_target' };
+      }
+      const newKey = canonicalizeExerciseName(proposal.change.newName);
+      if (
+        plan.exercises.some(
+          (e, i) => i !== idx && canonicalizeExerciseName(e.name) === newKey
+        )
+      ) {
+        return { error: 'duplicate_target' };
+      }
       nextExercises[idx] = {
         ...ex,
         name: proposal.change.newName,

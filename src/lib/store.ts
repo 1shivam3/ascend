@@ -73,6 +73,7 @@ import {
   type CoachBlocksState,
 } from './block-engine';
 import type { BlockIntake } from './block-intake';
+import { getInjuryBannedFamilies } from './workout-engine';
 import {
   buildWeeklyReview,
   lastCompletedWeekMonday,
@@ -2935,12 +2936,27 @@ export const useAppStore = create<AppState>()(
             state.coachBlocks,
             state.plannedWorkouts
           );
+          // Swap hygiene context: the plans themselves (no duplicate
+          // names after a swap) plus the exclusions already in force —
+          // the active block's declared injury/intake bans and the
+          // athlete model's pain flags.
+          const bannedFamilies = getInjuryBannedFamilies(
+            state.coachBlocks.activeBlock?.intake.limitations ?? []
+          );
+          for (const f of state.athleteModel?.pain.flaggedFamilies ?? []) {
+            bannedFamilies.add(f);
+          }
           const fresh = buildPlateauProposals({
             stalls,
             blocks: state.coachBlocks,
             planIdByExerciseKey,
             acknowledgedKeys,
             todayStr: getLocalTodayStr(),
+            plans: state.plannedWorkouts,
+            bannedFamilies,
+            recentPainKeys: new Set(
+              state.athleteModel?.pain.recentPainExerciseKeys ?? []
+            ),
           });
           if (fresh.length === 0) return;
           const withSnapshots = snapshotPlateauExpectations(fresh, state.plannedWorkouts);

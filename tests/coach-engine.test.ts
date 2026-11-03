@@ -18,6 +18,8 @@ import {
   PlannedTarget,
 } from '../src/lib/coach-engine';
 import { getStimulusPreservingSwaps } from '../src/lib/lifter-twin';
+import { findLibraryExercise } from '../src/lib/exercise-library';
+import { isPlaceholderSubstitute } from '../src/lib/workout-engine';
 import {
   WorkoutEntry,
   WorkoutExercise,
@@ -859,16 +861,40 @@ describe('coach persisted state', () => {
 
 // ── Swap-table placeholder names (pinned characterization) ────────────────
 
-describe('stimulus-preserving swap fallback (pinned defect)', () => {
-  it('[characterization] lifts with no table entry get placeholder targets served as exercise names', () => {
-    // getStimulusPreservingSwaps' generic fallback returns targets
-    // literally named 'Dumbbell alternative' / 'Machine alternative'.
-    // detectStalls takes swaps[0] as a plateau variation suggestion, so
-    // the placeholder can be written into a real plan as an exercise
-    // (observed end-to-end in the coach sim before the bogus-flag
-    // cascade was fixed). Pinned here at the source: the sim no longer
-    // drives a swap onto this lift, but the table still emits it.
-    const targets = getStimulusPreservingSwaps('Hamstring Curl').map((s) => s.target);
-    expect(targets).toEqual(['Dumbbell alternative', 'Machine alternative']);
+describe('stimulus-preserving swap fallback', () => {
+  it('lifts with no table entry get NO swaps — never placeholder targets', () => {
+    // Was a pinned defect: the generic fallback returned targets
+    // literally named 'Dumbbell alternative' / 'Machine alternative',
+    // and detectStalls took swaps[0] as a plateau variation, writing a
+    // placeholder into a real plan as an exercise (coach sim, staller
+    // Upper B). The fallback now returns [] — "no known swap" is
+    // honest; a fake exercise name is not.
+    expect(getStimulusPreservingSwaps('Hamstring Curl')).toEqual([]);
+    expect(getStimulusPreservingSwaps('Wrist Curl')).toEqual([]);
+  });
+
+  it('detectStalls only offers variation targets that are real library exercises', () => {
+    // Flat bench at steady RPE 8 = the classic plateau → 'variation'.
+    const workouts = [
+      benchSession(28, 80, 8, 8),
+      benchSession(21, 80, 8, 8),
+      benchSession(14, 80, 8, 8),
+      benchSession(7, 80, 8, 8),
+      benchSession(1, 80, 8, 8),
+    ];
+    const flags = detectStalls(workouts);
+    expect(flags).toHaveLength(1);
+    const flag = flags[0];
+    // Every candidate on the flag must resolve in the library and must
+    // not be a placeholder name; a 'variation' suggestion must carry
+    // at least one such candidate (else it downgrades to technique).
+    for (const c of flag.variationCandidates ?? []) {
+      expect(isPlaceholderSubstitute(c.name)).toBe(false);
+      expect(findLibraryExercise(c.name)).toBeTruthy();
+    }
+    if (flag.suggestion === 'variation') {
+      expect(flag.variationCandidates?.length).toBeGreaterThan(0);
+      expect(flag.variationName).toBe(flag.variationCandidates?.[0].name);
+    }
   });
 });

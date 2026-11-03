@@ -714,17 +714,15 @@ export function getStimulusPreservingSwaps(exerciseName: string): StimulusPreser
     }
   }
 
-  const eq = getEquipmentType(exerciseName);
-  if (eq === 'dumbbell') {
-    return [
-      { target: 'Barbell equivalent', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Heavier bilateral loading to preserve motor recruitment' },
-      { target: 'Cable variation', targetSets: 3, targetReps: 12, targetRpe: 8, stimulusReason: 'Continuous resistance curve and joint comfort' },
-    ];
-  }
-  return [
-    { target: 'Dumbbell alternative', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Independent limb freedom and stabilizer recruitment' },
-    { target: 'Machine alternative', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'High stability and controlled path when free weights are busy' },
-  ];
+  // No authored entry for this lift: return NO swaps rather than
+  // invented placeholder names. The generic fallbacks used to return
+  // targets literally named 'Dumbbell alternative' / 'Machine
+  // alternative' / 'Barbell equivalent' / 'Cable variation', and
+  // detectStalls took swaps[0] as a plateau variation — so a
+  // placeholder was written into real plans as an exercise (coach
+  // sim, staller Upper B). "No known swap" is honest; a fake exercise
+  // name is not. Callers treat [] as "no suggestion available".
+  return [];
 }
 
 /**

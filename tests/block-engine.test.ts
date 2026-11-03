@@ -17,7 +17,7 @@ import { buildIntakePrefill, type BlockIntake } from '@/lib/block-intake';
 import type { AthleteModel, LiftResponse } from '@/lib/athlete-model';
 import type { PlannedWorkout, WeeklySchedule, WorkoutEntry } from '@/lib/types';
 import type { StallFlag } from '@/lib/coach-engine';
-import { findLibraryExercise } from '@/lib/exercise-library';
+import { findLibraryExercise, type MovementFamily } from '@/lib/exercise-library';
 import { adaptExerciseForEquipment, getMovementFamily } from '@/lib/workout-engine';
 import { canonicalizeExerciseName } from '@/lib/workout-outcome-evidence';
 
@@ -788,14 +788,14 @@ describe('plateau proposals', () => {
     expect(result.plan.exercises[0].targetWeight).toBe(72.5); // 80 * 0.9 = 72 → loadable 72.5
   });
 
-  it('[characterization] a variation swap can rename a lift onto a name already in the plan', () => {
-    // applyPlateauProposalToPlan performs no collision check: swapping
-    // Squat -> Leg Press in a plan that already contains Leg Press
-    // leaves the plan with two exercises named 'Leg Press'. Pinned at
-    // unit level after the sim stopped reproducing the duplicate
-    // end-to-end (its driver was merged stall history, fixed separately;
-    // the sim's remaining swap-hygiene symptom is the placeholder name
-    // pinned in coach-simulation.test.ts).
+  it('a variation swap can never rename a lift onto a name already in the plan', () => {
+    // Was a pinned defect: applyPlateauProposalToPlan performed no
+    // collision check, so swapping Squat -> Leg Press in a plan that
+    // already contained Leg Press left two exercises named 'Leg
+    // Press'. The apply path now refuses with 'duplicate_target'
+    // (and 'placeholder_target' for invented names), and proposal
+    // creation re-picks a clean candidate when plans are supplied —
+    // both pinned below.
     const plan: PlannedWorkout = {
       id: 'p1',
       name: 'Lower A',
@@ -828,10 +828,52 @@ describe('plateau proposals', () => {
       [plan]
     );
     const result = applyPlateauProposalToPlan(plan, schemes, proposal, TODAY);
-    if ('error' in result) throw new Error('unexpected error');
-    expect(
-      result.plan.exercises.filter((e) => e.name === 'Leg Press')
-    ).toHaveLength(2);
+    expect(result).toEqual({ error: 'duplicate_target' });
+    // The plan is untouched: exactly one Leg Press, Squat intact.
+    expect(plan.exercises.filter((e) => e.name === 'Leg Press')).toHaveLength(1);
+    expect(plan.exercises[0].name).toBe('Squat');
+  });
+
+  it('proposal creation skips a colliding candidate for the next clean one, and bans apply', () => {
+    const { plan, blocks } = setup();
+    const squatFlag: StallFlag = {
+      ...flag,
+      exercise: 'Squat',
+      variationName: 'Leg Press',
+      variationCandidates: [
+        { name: 'Leg Press', sets: 3, reps: 10 },
+        { name: 'Hack Squat', sets: 3, reps: 8 },
+      ],
+    };
+    const planWithLegPress: PlannedWorkout = {
+      ...plan,
+      exercises: [
+        ...plan.exercises,
+        { name: 'Leg Press', targetSets: 3, targetReps: 10, targetWeight: 200, targetUnit: 'kg' },
+      ],
+    };
+    // Leg Press already in the plan → the next candidate is proposed.
+    const squatProposal = buildPlateauProposals({
+      stalls: [squatFlag],
+      blocks,
+      planIdByExerciseKey: { squat: 'p1' },
+      acknowledgedKeys: new Set(),
+      todayStr: TODAY,
+      plans: [planWithLegPress],
+    });
+    expect(squatProposal).toHaveLength(1);
+    expect(squatProposal[0].change).toMatchObject({ type: 'variation', newName: 'Hack Squat' });
+    // With the squat family banned, no candidate survives → no proposal.
+    const banned = buildPlateauProposals({
+      stalls: [squatFlag],
+      blocks,
+      planIdByExerciseKey: { squat: 'p1' },
+      acknowledgedKeys: new Set(),
+      todayStr: TODAY,
+      plans: [planWithLegPress],
+      bannedFamilies: new Set<MovementFamily>(['squat']),
+    });
+    expect(banned).toHaveLength(0);
   });
 });
 
