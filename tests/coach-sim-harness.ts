@@ -24,6 +24,7 @@ import { getInitialCoachBlocksState } from '@/lib/block-engine';
 import {
   adjustNextTargets,
   calculateReadiness,
+  recentCheckinsBefore,
   detectMissedSessions,
   detectStalls,
   generateCoachTake,
@@ -550,7 +551,13 @@ function runSimulationInner(persona: PersonaDef): SimTrace {
       );
       const adjByExercise = new Map(adjustments.map((a) => [a.exercise, a]));
 
-      const readiness = calculateReadiness(after.workouts, [], checkin);
+      const readiness = calculateReadiness(
+        after.workouts,
+        [],
+        checkin,
+        undefined,
+        recentCheckinsBefore(after.dailyCheckins, date)
+      );
       const isVeryFirstSession = trace.sessions.length === 0;
       const coachTake = isVeryFirstSession
         ? generateCoachTake(workout, [])

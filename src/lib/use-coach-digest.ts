@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useStore } from './store';
 import {
   calculateReadiness,
+  recentCheckinsBefore,
   detectStalls,
   detectMissedSessions,
   detectPatterns,
@@ -52,7 +53,8 @@ export function useCoachDigest() {
         workouts,
         bodyMetrics,
         dailyCheckins?.[getLocalTodayStr()],
-        buildHealthSignals(healthSummary)
+        buildHealthSignals(healthSummary),
+        recentCheckinsBefore(dailyCheckins, getLocalTodayStr())
       ),
     [workouts, bodyMetrics, dailyCheckins, healthSummary]
   );

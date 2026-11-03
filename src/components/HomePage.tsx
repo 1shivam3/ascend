@@ -33,7 +33,7 @@ import { getExerciseHindiName } from '@/lib/exercise-library';
 import { renderLocalizedSentence, formatCheckInList } from '@/lib/coach-i18n';
 import type { StringKey } from '@/lib/i18n/en';
 import { buildActiveDays, calculateStreak } from '@/lib/streak-freeze';
-import { calculateReadiness } from '@/lib/coach-engine';
+import { calculateReadiness, recentCheckinsBefore } from '@/lib/coach-engine';
 import { buildHealthSignals } from '@/lib/health-connect';
 import { buildPercentSuggestions } from '@/lib/percent-1rm';
 import { useCoachDigest } from '@/lib/use-coach-digest';
@@ -218,9 +218,10 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         normalizedWorkouts,
         bodyMetrics || [],
         todayCheckin,
-        buildHealthSignals(healthSummary)
+        buildHealthSignals(healthSummary),
+        recentCheckinsBefore(dailyCheckins, todayStr)
       ),
-    [normalizedWorkouts, bodyMetrics, todayCheckin, healthSummary]
+    [normalizedWorkouts, bodyMetrics, todayCheckin, healthSummary, dailyCheckins, todayStr]
   );
 
   // FND-02: recompute the coach model on Today mount, so Coach notes

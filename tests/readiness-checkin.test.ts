@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { calculateReadiness, type ManualCheckin } from '../src/lib/coach-engine';
+import { calculateReadiness, recentCheckinsBefore, type ManualCheckin } from '../src/lib/coach-engine';
 import { useStore, partializeAppState } from '../src/lib/store';
 import { getLocalTodayStr } from '../src/lib/formatters';
 import type { WorkoutEntry, WorkoutExercise, WorkoutSet } from '../src/lib/types';
@@ -153,6 +153,67 @@ describe('readiness check-in — absent check-in changes nothing', () => {
     expect(great.score).toBeGreaterThan(70);
     expect(great.score).toBeLessThanOrEqual(79);
     expect(great.band).not.toBe('primed');
+  });
+});
+
+// ── Areas + stacking: the inputs the score used to ignore ─────────────────
+
+describe('readiness check-in — flagged areas move the score', () => {
+  const histories = baseHistory(); // no-check-in score: 80
+
+  it('pain areas: a material penalty, a cap below primed, and a factor that names the area', () => {
+    const great = calculateReadiness(histories, [], { sleep: 5, soreness: 5, energy: 5 });
+    expect(great.score).toBe(100);
+    const pain = calculateReadiness(histories, [], {
+      sleep: 5,
+      soreness: 5,
+      energy: 5,
+      painAreas: ['Shoulders'],
+    });
+    expect(pain.score).toBeLessThanOrEqual(79);
+    expect(pain.band).not.toBe('primed');
+    expect(pain.factors.some((f) => f.includes('Shoulders') && /pain/i.test(f))).toBe(true);
+  });
+
+  it('sore areas: −3 per area, capped at −6, on top of the freshness number', () => {
+    const plain = calculateReadiness(histories, [], { sleep: 3, soreness: 3, energy: 3 }).score;
+    const oneArea = calculateReadiness(histories, [], {
+      sleep: 3, soreness: 3, energy: 3, soreAreas: ['Chest'],
+    }).score;
+    const threeAreas = calculateReadiness(histories, [], {
+      sleep: 3, soreness: 3, energy: 3, soreAreas: ['Chest', 'Back', 'Legs'],
+    }).score;
+    expect(plain - oneArea).toBe(3);
+    expect(plain - threeAreas).toBe(6); // cap, not 9
+  });
+});
+
+describe('readiness check-in — poor days stack', () => {
+  const histories = baseHistory();
+  const POOR: ManualCheckin = { sleep: 2, soreness: 2, energy: 2 }; // own delta: −11
+  const GOOD: ManualCheckin = { sleep: 4, soreness: 4, energy: 4 };
+
+  it('three prior poor check-ins stack −12 on top of today', () => {
+    const isolated = calculateReadiness(histories, [], POOR).score;
+    const stacked = calculateReadiness(histories, [], POOR, undefined, [POOR, POOR, POOR]).score;
+    expect(isolated - stacked).toBe(12);
+  });
+
+  it('prior good check-ins stack nothing', () => {
+    const isolated = calculateReadiness(histories, [], POOR).score;
+    const withGood = calculateReadiness(histories, [], POOR, undefined, [GOOD, GOOD, GOOD]).score;
+    expect(withGood).toBe(isolated);
+  });
+
+  it('recentCheckinsBefore returns prior days only, most recent first', () => {
+    const record: Record<string, ManualCheckin> = {
+      [daysAgo(3)]: { sleep: 1, soreness: 1 },
+      [daysAgo(1)]: { sleep: 2, soreness: 2 },
+      [daysAgo(0)]: { sleep: 5, soreness: 5 },
+      [daysAgo(-1)]: { sleep: 4, soreness: 4 },
+    };
+    const prior = recentCheckinsBefore(record, daysAgo(0));
+    expect(prior).toEqual([{ sleep: 2, soreness: 2 }, { sleep: 1, soreness: 1 }]);
   });
 });
 
