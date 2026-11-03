@@ -406,6 +406,128 @@ describe('adoption (deriveAdoptionSchemes)', () => {
   });
 });
 
+describe('managedPlanIdByExerciseKey — block plan ownership', () => {
+  const planA: PlannedWorkout = {
+    id: 'pa',
+    name: 'Upper A',
+    createdAt: '2026-01-01',
+    exercises: [
+      { name: 'Bench Press', targetSets: 4, targetReps: 6, targetWeight: 80, targetUnit: 'kg' },
+      { name: 'Barbell Row', targetSets: 4, targetReps: 8, targetWeight: 60, targetUnit: 'kg' },
+    ],
+  };
+  const planB: PlannedWorkout = {
+    id: 'pb',
+    name: 'Lower A',
+    createdAt: '2026-01-01',
+    exercises: [
+      { name: 'Squat', targetSets: 4, targetReps: 5, targetWeight: 100, targetUnit: 'kg' },
+    ],
+  };
+
+  function blockWith(plans: PlannedWorkout[], extraSchemeNames: string[] = []) {
+    const schemes = plans
+      .flatMap((p) => deriveAdoptionSchemes(p, null))
+      .concat(
+        extraSchemeNames.map((name) =>
+          deriveAdoptionSchemes(
+            {
+              id: 'ghost',
+              name: 'Ghost',
+              createdAt: '2026-01-01',
+              exercises: [{ name, targetSets: 3, targetReps: 8 }],
+            },
+            null
+          )
+        ).flat()
+      );
+    const blocks: CoachBlocksState = {
+      ...getInitialCoachBlocksState(),
+      activeBlock: {
+        proposalId: 'prop-1',
+        name: 'Test Block',
+        focus: 'hypertrophy',
+        planIds: plans.map((p) => p.id),
+        startMonday: '2026-01-05',
+        weeks: [{ index: 1, type: 'build' }],
+        schemes,
+        intake: baseIntake(),
+        status: 'active',
+        createdOn: TODAY,
+      },
+    };
+    return blocks;
+  }
+
+  it('maps each block lift to the plan that actually contains it — not the last plan', () => {
+    const map = managedPlanIdByExerciseKey(blockWith([planA, planB]), [planA, planB]);
+    expect(map['bench press']).toBe('pa');
+    expect(map['barbell row']).toBe('pa');
+    expect(map['squat']).toBe('pb');
+  });
+
+  it('a lift appearing in two block plans maps to the first plan in planIds order', () => {
+    const planB2: PlannedWorkout = {
+      ...planB,
+      exercises: [
+        ...planB.exercises,
+        { name: 'Bench Press', targetSets: 3, targetReps: 8, targetWeight: 70, targetUnit: 'kg' },
+      ],
+    };
+    const map = managedPlanIdByExerciseKey(blockWith([planA, planB2]), [planA, planB2]);
+    expect(map['bench press']).toBe('pa');
+    expect(map['squat']).toBe('pb');
+  });
+
+  it('a managed scheme whose lift is in no block plan is left unmapped (unmanaged, not misrouted)', () => {
+    const map = managedPlanIdByExerciseKey(blockWith([planA, planB], ['Deadlift']), [
+      planA,
+      planB,
+    ]);
+    expect(map['deadlift']).toBeUndefined();
+  });
+
+  it('block ownership wins over an adopted plan for the same lift; adopted fills the gaps', () => {
+    const adopted: PlannedWorkout = {
+      id: 'mine',
+      name: 'My Plan',
+      createdAt: '2026-01-01',
+      exercises: [
+        { name: 'Bench Press', targetSets: 4, targetReps: 6, targetWeight: 75, targetUnit: 'kg' },
+        { name: 'Leg Extension', targetSets: 3, targetReps: 12, targetWeight: 40, targetUnit: 'kg' },
+      ],
+    };
+    const blocks: CoachBlocksState = {
+      ...blockWith([planA, planB]),
+      adoptedPlans: {
+        mine: { planId: 'mine', adoptedOn: TODAY, schemes: deriveAdoptionSchemes(adopted, null) },
+      },
+    };
+    const map = managedPlanIdByExerciseKey(blocks, [planA, planB, adopted]);
+    expect(map['bench press']).toBe('pa'); // block plan, not the adopted one
+    expect(map['leg extension']).toBe('mine'); // adopted fills what the block lacks
+    expect(map['squat']).toBe('pb');
+  });
+
+  it('on a real generated block, every scheme key maps to a plan containing that lift', () => {
+    const p = generateBlockProposal(input());
+    const { plans, activeBlock } = materializeProposal(p, [], EMPTY_SCHEDULE, TODAY);
+    const blocks: CoachBlocksState = { ...getInitialCoachBlocksState(), activeBlock };
+    const map = managedPlanIdByExerciseKey(blocks, plans);
+    const planById = new Map(plans.map((pl) => [pl.id, pl]));
+    for (const s of activeBlock.schemes) {
+      const owner = planById.get(map[s.exerciseKey]);
+      expect(owner, `scheme ${s.exerciseKey} mapped`).toBeDefined();
+      expect(
+        owner!.exercises.some((e) => canonicalizeExerciseName(e.name) === s.exerciseKey)
+      ).toBe(true);
+    }
+    // Regression guard for the original bug: keys must NOT all collapse
+    // onto the last plan of the block.
+    expect(new Set(Object.values(map)).size).toBeGreaterThan(1);
+  });
+});
+
 describe('plateau proposals', () => {
   const flag: StallFlag = {
     exercise: 'Bench Press',

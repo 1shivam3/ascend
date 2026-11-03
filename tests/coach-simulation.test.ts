@@ -289,18 +289,46 @@ describe('persona: staller — plateau observation', () => {
     expect(flag!.suggestion).toBe('deload');
   });
 
-  it('[CHARACTERIZATION] the bench plateau proposal is silently dismissed on apply — wrong-plan mapping', () => {
-    // Root cause (engine): managedPlanIdByExerciseKey assigns every scheme
-    // key to the LAST plan of the block, so plateau proposals for lifts in
-    // any other plan carry a planId that does not contain the exercise and
-    // applyPlateauProposal retires them as 'dismissed' (exercise_not_found).
+  it('the bench plateau proposal APPLIES — its planId names the plan that contains bench', () => {
+    // Was [CHARACTERIZATION] before the planId-mapping fix:
+    // managedPlanIdByExerciseKey assigned every scheme key to the LAST
+    // plan of the block, so this deload_lift proposal carried a planId
+    // that did not contain Bench Press and applyPlateauProposal retired
+    // it as 'dismissed' (exercise_not_found). The mapping now resolves
+    // each lift to the plan whose exercises contain it.
     const t = traceFor(stallerPersona);
     const benchProposals = t.weeks.flatMap((w) =>
       w.plateauProposalsCreated.filter((p) => p.exercise === 'Bench Press')
     );
     expect(benchProposals.length).toBeGreaterThanOrEqual(1);
     expect(benchProposals[0].changeType).toBe('deload_lift');
-    expect(benchProposals[0].outcome).toBe('dismissed');
+    expect(benchProposals[0].outcome).toBe('applied');
+  });
+
+  it('plateau proposals land across every persona — the wrong-plan dismissal path is gone', () => {
+    // Before the mapping fix: 70 of 103 proposals (68%) were dismissed,
+    // almost all exercise_not_found under the wrong planId — the applied
+    // minority were lifts in the LAST plan of each block. After the fix
+    // (probed at the store's apply site): 0 exercise_not_found dismissals
+    // remain. The only residual dismissals are the stale-guard retiring a
+    // proposal whose target moved under a same-pass variation rename —
+    // the guard working as designed ("retire rather than edit blind").
+    let created = 0;
+    let applied = 0;
+    let dismissed = 0;
+    for (const p of ALL_PERSONAS) {
+      const t = traceFor(p);
+      const mine = t.weeks.flatMap((w) => w.plateauProposalsCreated);
+      // Proposals must actually land for every persona, not just the ones
+      // whose stalled lifts happened to sit in a block's last plan.
+      expect(mine.filter((x) => x.outcome === 'applied').length).toBeGreaterThanOrEqual(20);
+      created += mine.length;
+      applied += mine.filter((x) => x.outcome === 'applied').length;
+      dismissed += mine.filter((x) => x.outcome === 'dismissed').length;
+    }
+    expect(created).toBeGreaterThanOrEqual(100);
+    expect(applied / created).toBeGreaterThanOrEqual(0.95);
+    expect(dismissed).toBeLessThanOrEqual(5);
   });
 
   it('[CHARACTERIZATION] block 2 restarts bench 10 kg below where block 1 left it', () => {
