@@ -2518,7 +2518,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'coachBlock.exp_intermediate': 'मध्यम',
   'coachBlock.exp_advanced': 'उन्नत',
   'coachBlock.limitations': 'दर्द, तकलीफ़, या जिन मूवमेंट से बचना है',
-  'coachBlock.limitationsHint': 'यहाँ जो भी चुना जाएगा, वह ब्लॉक से बाहर रहेगा — सुरक्षित पैटर्न से बदला जाएगा या पूरी तरह हटा दिया जाएगा।',
+  'coachBlock.limitationsHint': 'नाम वाले हिस्से ब्लॉक से बाहर रखे जाते हैं — सुरक्षित पैटर्न से बदले जाते हैं या पूरी तरह हटा दिए जाते हैं। "अन्य" अपने-आप लागू नहीं हो सकता; समीक्षा में यह दिखा दिया जाएगा ताकि आप खुद दिन जाँच सकें।',
   'coachBlock.topLifts': 'आपकी मौजूदा ताक़त (अनुमानित 1RM)',
   'coachBlock.est1rm': 'अनुमानित 1RM',
   'coachBlock.topLiftsHint': 'आपकी लॉग की गई लिफ़्ट से अनुमानित — जो नंबर ग़लत लगे, बदल दें। शुरुआती वज़न इन्हीं से तय होते हैं।',

@@ -2513,7 +2513,7 @@ export const en = {
   'coachBlock.exp_intermediate': 'Intermediate',
   'coachBlock.exp_advanced': 'Advanced',
   'coachBlock.limitations': 'Aches, pains, or movements to avoid',
-  'coachBlock.limitationsHint': 'Anything ticked here is kept out of the block — swapped for a safer pattern or left out entirely.',
+  'coachBlock.limitationsHint': 'The named areas are kept out of the block — swapped for a safer pattern or left out entirely. "Other" can\'t be applied automatically; the review flags it so you can check the days yourself.',
   'coachBlock.topLifts': 'Your current strength (estimated 1RM)',
   'coachBlock.est1rm': 'est. 1RM',
   'coachBlock.topLiftsHint': 'Estimated from your logged lifts — edit any number that looks off. Starting loads are set from these.',
