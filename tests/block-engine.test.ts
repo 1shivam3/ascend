@@ -330,6 +330,129 @@ describe('materializeProposal + week types', () => {
   });
 });
 
+describe('continuity (Fix D)', () => {
+  it('cold-start hypertrophy copy never claims logged progress; with history it may', () => {
+    const cold = generateBlockProposal(input());
+    expect(cold.summary).not.toContain('where your logged progress has come from');
+    expect(cold.summary).toContain('conservative defaults that calibrate');
+    const warm = generateBlockProposal(
+      input({ workouts: [{ id: 'w1', date: TODAY, exercises: [] }] })
+    );
+    expect(warm.summary).toContain('where your logged progress has come from');
+  });
+
+  it('generation unifies one starting load per lift across the block\'s days', () => {
+    // Was: per-template skeleton defaults disagreed (Lat Pulldown
+    // 30 kg on one day, 0 kg on another in the same cold-start block).
+    // The beginner 3-day split is where lifts repeat across days
+    // (Lat Pulldown on both Full Body and Upper B).
+    const p = generateBlockProposal(
+      input({ intake: baseIntake({ daysPerWeek: 3, experience: 'beginner' }) })
+    );
+    const pulldowns = p.days.flatMap((d) =>
+      d.exercises.filter((e) => e.name === 'Lat Pulldown').map((e) => e.targetWeight)
+    );
+    expect(pulldowns.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(pulldowns).size).toBe(1);
+    expect(pulldowns[0]).toBeGreaterThan(0);
+    const byKey = new Map<string, (number | undefined)[]>();
+    for (const day of p.days) {
+      for (const ex of day.exercises) {
+        const k = canonicalizeExerciseName(ex.name);
+        byKey.set(k, [...(byKey.get(k) ?? []), ex.targetWeight]);
+      }
+    }
+    let repeated = 0;
+    for (const [, weights] of byKey) {
+      if (weights.length < 2) continue;
+      repeated++;
+      const positives = new Set(weights.filter((w) => typeof w === 'number' && w > 0));
+      expect(positives.size).toBeLessThanOrEqual(1);
+      if (positives.size === 1) {
+        // A real load somewhere means no zero prescription anywhere.
+        expect(weights).not.toContain(0);
+      }
+    }
+    expect(repeated).toBeGreaterThan(0);
+  });
+
+  it('generation preserves supplied current weekdays when the day count matches', () => {
+    const current: BlockEngineInput['currentWeekdays'] = [
+      'tuesday',
+      'thursday',
+      'saturday',
+      'sunday',
+    ];
+    const p = generateBlockProposal(input({ currentWeekdays: current }));
+    expect(p.days.map((d) => d.weekday)).toEqual(current);
+    expect(p.summary).toContain('training days stay');
+    // Day-count change re-opens the choice (no preservation claim).
+    const changed = generateBlockProposal(input({ currentWeekdays: ['monday', 'wednesday', 'friday'] }));
+    expect(changed.days).toHaveLength(4);
+    expect(changed.summary).not.toContain('training days stay');
+  });
+
+  it('pain-flagged pressing is excluded at generation, and returns when the flags clear', () => {
+    // The athlete model's pain window is 28 days (aging pinned in
+    // athlete-model.test.ts): once episodes age out, flaggedFamilies
+    // and recentPainExerciseKeys come back empty — the cleared model
+    // below — and generation must treat pressing as eligible again.
+    const flagged = generateBlockProposal(
+      input({
+        athleteModel: athleteModel({
+          pain: {
+            episodes: [],
+            episodesLast28dByFamily: { horizontal_push: 2 },
+            flaggedFamilies: ['horizontal_push'],
+            recentPainExerciseKeys: [canonicalizeExerciseName('Bench Press')],
+          },
+        }),
+      })
+    );
+    const flaggedNames = flagged.days.flatMap((d) => d.exercises.map((e) => e.name));
+    expect(flaggedNames).not.toContain('Bench Press');
+
+    const cleared = generateBlockProposal(input({ athleteModel: athleteModel() }));
+    const clearedNames = cleared.days.flatMap((d) => d.exercises.map((e) => e.name));
+    expect(clearedNames).toContain('Bench Press');
+  });
+
+  it('materializeProposal retires the superseded block\'s schedule days to rest', () => {
+    const p = generateBlockProposal(input());
+    const used = new Set(p.days.map((d) => d.weekday));
+    const spare = (['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const).filter(
+      (d) => !used.has(d)
+    );
+    expect(spare.length).toBeGreaterThanOrEqual(2);
+    const oldBlockPlan: PlannedWorkout = {
+      id: 'old-plan',
+      name: 'Old Block · Upper A',
+      createdAt: '2026-01-01',
+      exercises: [],
+      coachBlockId: 'block_old',
+    };
+    const userPlan: PlannedWorkout = {
+      id: 'user-plan',
+      name: 'My own plan',
+      createdAt: '2026-01-01',
+      exercises: [],
+    };
+    const scheduleIn: WeeklySchedule = {
+      ...EMPTY_SCHEDULE,
+      [spare[0]]: { workoutPlanId: 'old-plan' },
+      [spare[1]]: { workoutPlanId: 'user-plan' },
+    };
+    const { schedule } = materializeProposal(p, [oldBlockPlan, userPlan], scheduleIn, TODAY);
+    // Stale coach-block day → rest; the lifter's own plan is untouched.
+    expect(schedule[spare[0]].workoutPlanId).toBe('rest');
+    expect(schedule[spare[1]].workoutPlanId).toBe('user-plan');
+    // And the new block's own days are set as before.
+    for (const day of p.days) {
+      expect(schedule[day.weekday]?.workoutPlanId).toBe(day.planId);
+    }
+  });
+});
+
 describe('resolveManagedPolicy', () => {
   function blocksWithBlock(): { blocks: CoachBlocksState; planId: string } {
     const p = generateBlockProposal(input());
