@@ -16,6 +16,13 @@ export interface PlanVsActualReviewProps {
   workout: WorkoutEntry;
   defaultExpanded?: boolean;
   className?: string;
+  /**
+   * Declutter PR 2: when the review is rendered inside a surface that
+   * already expands (the History workout card), a second nested
+   * "View details" toggle is a duplicate affordance — details render
+   * open and no toggle is shown. One details affordance per workout.
+   */
+  hideToggle?: boolean;
 }
 
 /**
@@ -29,9 +36,11 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
   workout,
   defaultExpanded = false,
   className = '',
+  hideToggle = false,
 }) => {
   const { t } = useTranslation();
-  const [isDetailsOpen, setIsDetailsOpen] = useState(defaultExpanded);
+  const [detailsOpenState, setIsDetailsOpen] = useState(defaultExpanded);
+  const isDetailsOpen = hideToggle ? true : detailsOpenState;
 
   const adherence = calculateWorkoutAdherence(workout);
   const completionSummary = formatSetCompletionSummary(adherence);
@@ -76,6 +85,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
               {t('pva.setCompletion', { rate: completionSummary.completionRateFormatted ?? '' })}
             </span>
 
+            {!hideToggle && (
             <button
               type="button"
               onClick={() => setIsDetailsOpen((prev) => !prev)}
@@ -92,6 +102,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
                 <ChevronDown className="w-3.5 h-3.5" />
               )}
             </button>
+            )}
           </div>
         </div>
 

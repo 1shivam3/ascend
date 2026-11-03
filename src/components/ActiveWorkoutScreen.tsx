@@ -2285,8 +2285,14 @@ export default function ActiveWorkoutScreen({
 
       {/* ── Crowded-gym toggle (per session) ──────────────────────────── */}
       <div className="bg-bg-card border-b border-border/80 px-4 py-1.5 shrink-0">
-        <div className="max-w-[480px] mx-auto flex items-center justify-between">
-          <span className="text-xs font-semibold text-text-secondary">{t('packed.toggle')}</span>
+        <div className="max-w-[480px] mx-auto flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <span className="text-xs font-semibold text-text-secondary block">{t('packed.toggle')}</span>
+            {/* Micro-gloss (declutter PR 2): the plan-detail toggle
+                explains what this swaps; the in-workout row was a bare
+                label. Same explainer string, no new copy. */}
+            <span className="text-2xs text-text-muted block truncate">{t('packed.previewHint')}</span>
+          </div>
           <button
             type="button"
             role="switch"
