@@ -26,7 +26,7 @@
  * inside Train, next to Plans and History.
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useCoachDigest } from '@/lib/use-coach-digest';
@@ -157,6 +157,19 @@ export default function CoachChatTab({
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(
     () => todayEntry?.planId ?? plannedWorkouts[0]?.id ?? null
   );
+  // F-10: the seed above runs once at mount. Approving a block
+  // rewrites today's schedule entry, but the selection stayed on the
+  // pre-approval plan, so the session card coached a plan that was no
+  // longer scheduled today. Re-sync when today's SCHEDULED plan
+  // changes — a manual chip pick never changes the schedule, so the
+  // user's own selection is never fought.
+  const todayPlanId = todayEntry?.planId ?? null;
+  const prevTodayPlanId = useRef(todayPlanId);
+  useEffect(() => {
+    if (todayPlanId === prevTodayPlanId.current) return;
+    prevTodayPlanId.current = todayPlanId;
+    if (todayPlanId) setSelectedPlanId(todayPlanId);
+  }, [todayPlanId]);
   const selectedPlan =
     plannedWorkouts.find((p) => p.id === selectedPlanId) ?? plannedWorkouts[0] ?? null;
 

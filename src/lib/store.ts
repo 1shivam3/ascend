@@ -538,6 +538,11 @@ export interface AppState {
   proposeCoachBlock: (intake: BlockIntake) => BlockProposal;
   /** Discard the pending proposal without touching any plan (D3). */
   dismissBlockProposal: () => void;
+  /** Persist review-step edits onto the pending proposal itself
+   *  (F-05): closing the modal must not silently discard them. Only
+   *  an edit OF the pending proposal (same id) is honoured — the same
+   *  trust rule approveBlockProposal applies. */
+  updatePendingProposal: (edited: BlockProposal) => boolean;
   /** Approve the pending proposal (or an edited copy of it from the
    *  review step): materialize plans + schedule + block state atomically. */
   approveBlockProposal: (editedProposal?: BlockProposal) => boolean;
@@ -2864,6 +2869,15 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           coachBlocks: { ...state.coachBlocks, pendingProposal: null },
         }));
+      },
+
+      updatePendingProposal: (edited) => {
+        const pending = get().coachBlocks.pendingProposal;
+        if (!pending || !edited || edited.id !== pending.id) return false;
+        set((state) => ({
+          coachBlocks: { ...state.coachBlocks, pendingProposal: edited },
+        }));
+        return true;
       },
 
       approveBlockProposal: (editedProposal) => {
