@@ -526,7 +526,9 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
                     aria-expanded={expandedDay === di}
                   >
                     <span className="text-xs font-bold text-text-primary">
-                      {day.label} · {WEEKDAY_LABEL[day.weekday]} · ~{day.estimatedMinutes}m
+                      {day.label} · {WEEKDAY_LABEL[day.weekday]}
+                      {/* F-08: an empty day is not a session — no duration. */}
+                      {day.exercises.length > 0 ? ` · ~${day.estimatedMinutes}m` : ''}
                     </span>
                     <ChevronRight
                       className={`w-4 h-4 text-text-muted transition-transform ${expandedDay === di ? 'rotate-90' : ''}`}

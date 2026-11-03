@@ -1196,7 +1196,11 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
       planName: '',
       exercises,
       whyByExercise,
-      estimatedMinutes: estimateSessionMinutes({ exercises }),
+      // F-08: estimateSessionMinutes returns a hardcoded 45 for an
+      // empty exercise list (a default for OTHER features' planning
+      // math). A block day with no exercises is not a 45-minute
+      // session — its duration is 0, and the review shows none.
+      estimatedMinutes: exercises.length > 0 ? estimateSessionMinutes({ exercises }) : 0,
     };
   });
 
@@ -1253,8 +1257,13 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
   }
 
   const weekWord = weekTypes.length;
+  // F-08: the summary counts the days that actually materialized,
+  // not the days the intake asked for — under heavy limitations some
+  // requested days come out empty, and the summary must not claim
+  // training days that don't exist.
+  const liveDayCount = days.filter((d) => d.exercises.length > 0).length;
   const summary =
-    `${weekWord}-week ${FOCUS_LABEL[focus].toLowerCase()} block, ${intake.daysPerWeek} days a week. ` +
+    `${weekWord}-week ${FOCUS_LABEL[focus].toLowerCase()} block, ${liveDayCount} days a week. ` +
     `${focusReason} ${weekdayReason} ` +
     `Weeks 1–${weekTypes.indexOf('deload')} build, week ${weekTypes.indexOf('deload') + 1} is a deload, and the final week tests your main lifts. ` +
     (weak.length > 0 ? `Extra attention goes to your ${weak[0].muscle.toLowerCase()} — ${weak[0].why}.` : '');
