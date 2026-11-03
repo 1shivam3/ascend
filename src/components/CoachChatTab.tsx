@@ -892,7 +892,7 @@ export default function CoachChatTab({
                   · {se.exercise.targetSets} × {se.exercise.targetReps}
                   {typeof se.exercise.targetWeight === 'number' &&
                     se.exercise.targetWeight > 0 &&
-                    ` · ${se.exercise.targetWeight}${se.exercise.targetUnit ?? ''}`}
+                    ` · ${se.exercise.targetWeight}${se.exercise.targetUnit ? ` ${se.exercise.targetUnit}` : ''}`}
                 </span>
                 {se.needsGym && se.substitutes.length > 0 && (
                   <span className="block text-xs text-text-secondary mt-1">

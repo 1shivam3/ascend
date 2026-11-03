@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -13,6 +13,7 @@ import {
   Flame,
 } from 'lucide-react';
 import { PlannedWorkout } from '@/lib/types';
+import FormCuesSheet, { hasExerciseFormSurface } from '@/components/FormCuesSheet';
 import { useStore } from '@/lib/store';
 import { getLastExercisePerformance, estimateSessionMinutes } from '@/lib/workout-engine';
 import { buildPercentSuggestions } from '@/lib/percent-1rm';
@@ -40,8 +41,13 @@ export default function WorkoutDetailsView({
   const { profile, workouts } = useStore();
   const prs = useStore((state) => state.prs);
   const trainingProfile = useStore((state) => state.trainingProfile);
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const userUnit = profile?.unit || 'kg';
+
+  // Plan-detail rows open the shared Form cues sheet (declutter PR 1:
+  // the rows' chevrons used to be dead affordances). Only exercises
+  // that actually have cues/a demo are tappable — no fake affordance.
+  const [formCuesExercise, setFormCuesExercise] = useState<string | null>(null);
 
   // Crowded-gym pre-swap: a single toggle swaps the WHOLE session to
   // dumbbell/bodyweight equivalents on a copy — the saved plan is never
@@ -136,7 +142,10 @@ export default function WorkoutDetailsView({
         </div>
       </div>
 
-      <div className="px-4 py-4 space-y-5 flex-1">
+      {/* pb-40 on the scrolling content itself: the fixed Start CTA
+          below must never cover the last exercise row (declutter PR 1 —
+          bottom padding on the outer scroller alone did not hold). */}
+      <div className="px-4 pt-4 pb-40 space-y-5 flex-1">
         {/* ── Hero Photograph (Reference Screen 11) ───────────────────────── */}
         <div className="relative w-full h-44 rounded-2xl overflow-hidden bg-[#212420] border border-[#2C302B] shadow-md">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -173,9 +182,9 @@ export default function WorkoutDetailsView({
                 {tag}
               </span>
             ))}
-            <span className="text-xs text-[#A5A096]">
-              {estimatedDuration} min · {exerciseCount} exercises
-            </span>
+            {/* Declutter PR 1: duration + exercise count live in the
+                hero chips above — the meta line used to repeat them
+                verbatim a second time. */}
           </div>
 
           <p className="text-sm text-[#A5A096] leading-relaxed pt-1">
@@ -189,9 +198,6 @@ export default function WorkoutDetailsView({
             <h2 className="text-base font-bold text-[#F3F0E7] tracking-tight">
               {t('train.exercises')}
             </h2>
-            <span className="text-xs text-[#A5A096]">
-              {exerciseCount} total
-            </span>
           </div>
 
           {/* Crowded-gym pre-swap toggle */}
@@ -229,11 +235,9 @@ export default function WorkoutDetailsView({
               const targetReps = ex.targetReps || 8;
               const targetW = ex.targetWeight;
 
-              return (
-                <div
-                  key={idx}
-                  className="p-3.5 rounded-xl bg-[#212420] border border-[#2C302B] flex items-center justify-between gap-3 shadow-xs hover:border-[#858076]/40 transition-colors"
-                >
+              const canShowForm = hasExerciseFormSurface(ex.name, language);
+              const rowInner = (
+                <>
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-lg bg-[#2A2E29] border border-[#2C302B] flex items-center justify-center shrink-0 text-[#A5A096]">
                       <Dumbbell className="w-4 h-4 text-accent" />
@@ -272,13 +276,37 @@ export default function WorkoutDetailsView({
                     </div>
                   </div>
 
-                  <ChevronRight className="w-4 h-4 text-[#A5A096] shrink-0" />
+                  {canShowForm && <ChevronRight className="w-4 h-4 text-[#A5A096] shrink-0" />}
+                </>
+              );
+              const rowClassName =
+                'p-3.5 rounded-xl bg-[#212420] border border-[#2C302B] flex items-center justify-between gap-3 shadow-xs hover:border-[#858076]/40 transition-colors w-full text-left';
+              return canShowForm ? (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setFormCuesExercise(ex.name)}
+                  className={`${rowClassName} cursor-pointer`}
+                  aria-label={`${ex.name} — ${t('workout.formCuesHeading')}`}
+                >
+                  {rowInner}
+                </button>
+              ) : (
+                <div key={idx} className={rowClassName}>
+                  {rowInner}
                 </div>
               );
             })}
           </div>
         </div>
       </div>
+
+      {formCuesExercise && (
+        <FormCuesSheet
+          exerciseName={formCuesExercise}
+          onClose={() => setFormCuesExercise(null)}
+        />
+      )}
 
       {/* ── Fixed Bottom CTA ──────────────────────────────────────────────── */}
       <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-gradient-to-t from-[#171916] via-[#171916]/95 to-transparent z-[70]">
