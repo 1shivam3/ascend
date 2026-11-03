@@ -511,17 +511,20 @@ export interface ManualCheckin {
   energy?: number;
   /**
    * Body areas the user flagged as sore. Optional, added for the Coach
-   * tab (2026-10-26): the readiness SCORE ignores areas (a single
-   * freshness number drives it), but the session builder uses them to
-   * skip still-fatigued muscles when soreness is low (≤ 2). Absent on
-   * older entries — treated as [].
+   * tab (2026-10-26): the session builder uses them to skip
+   * still-fatigued muscles when soreness is low (≤ 2), and the
+   * readiness score counts the areas themselves on top of the freshness
+   * number (see checkinAreaAdjustment). Absent on older entries —
+   * treated as [].
    */
   soreAreas?: MuscleGroup[];
   /**
    * Body areas with sharp, joint, or one-sided pain. Optional, added
    * for the Coach tab (2026-10-26): any entry triggers the deterministic
    * pain screen (stop + refer, never diagnose) and blocks the session
-   * unless the user explicitly chooses to train around it.
+   * unless the user explicitly chooses to train around it. The
+   * readiness score also treats any entry as a material penalty and a
+   * hard cap below 'primed' (see checkinAreaAdjustment).
    */
   painAreas?: MuscleGroup[];
   /**
@@ -632,15 +635,115 @@ function manualCheckinAdjustment(checkin: ManualCheckin): { delta: number; facto
 }
 
 /**
+ * Area points — the score used to read only the freshness NUMBER and
+ * ignore WHERE it hurts, so a lifter could report shoulder pain and
+ * still score 96/100 "primed" (coach sim, pain-flare persona). Areas
+ * now count on top of the number:
+ *
+ *   painAreas: −15 flat for any entry. Pain is a stop-and-refer signal
+ *              everywhere else in the app; the score also caps the day
+ *              below 'primed' while any pain area is flagged (the cap
+ *              lives in calculateReadiness, next to the band).
+ *   soreAreas: −3 per flagged area, capped at −6. The freshness number
+ *              already prices overall soreness; the areas add the
+ *              location information the number cannot carry.
+ */
+const PAIN_AREA_POINTS = -15;
+const SORE_AREA_POINTS = -3;
+const SORE_AREA_CAP = -6;
+
+function checkinAreaAdjustment(checkin: ManualCheckin): {
+  delta: number;
+  factor: string | null;
+  hasPain: boolean;
+} {
+  const pain = checkin.painAreas ?? [];
+  const sore = checkin.soreAreas ?? [];
+  let delta = 0;
+  const lines: string[] = [];
+  if (pain.length > 0) {
+    delta += PAIN_AREA_POINTS;
+    lines.push(
+      `You flagged pain in your ${pain.join(' and ')}. Pain is not ordinary soreness — ` +
+        `readiness stays below 'primed' until it clears, and today's work should train around it or stop. ` +
+        `If it keeps happening, get it checked by a professional.`
+    );
+  }
+  if (sore.length > 0) {
+    delta += Math.max(SORE_AREA_CAP, sore.length * SORE_AREA_POINTS);
+    lines.push(
+      `You flagged soreness in your ${sore.join(' and ')} — the score counts the areas themselves, ` +
+        `not just the freshness number, so those muscles get the benefit of the doubt today.`
+    );
+  }
+  return { delta, factor: lines.length > 0 ? lines.join(' ') : null, hasPain: pain.length > 0 };
+}
+
+/**
+ * Stacking points — one bad check-in used to cost the same whether it
+ * was a one-off or the fifth rough day in a row (coach sim: the staller
+ * sat at 89 'primed' through seven weeks of 2/2/2 check-ins, because
+ * each day was scored in isolation). Prior poor days now stack:
+ *
+ *   −4 for each of the up-to-3 most recent PRIOR check-ins whose own
+ *   per-input delta was ≤ −8 (a genuinely poor day: roughly two inputs
+ *   at 2, or worse). Cap −12. Today is never double-counted — today's
+ *   check-in is priced by manualCheckinAdjustment itself.
+ */
+const STACKED_POOR_DAY_POINTS = -4;
+const STACKED_POOR_DAY_THRESHOLD = -8;
+const STACKED_MAX_DAYS = 3;
+
+function checkinStackingAdjustment(
+  recentCheckins: ManualCheckin[] | undefined
+): { delta: number; factor: string | null } {
+  if (!recentCheckins || recentCheckins.length === 0) return { delta: 0, factor: null };
+  let poorDays = 0;
+  for (const prior of recentCheckins.slice(0, STACKED_MAX_DAYS)) {
+    if (manualCheckinAdjustment(prior).delta <= STACKED_POOR_DAY_THRESHOLD) poorDays++;
+  }
+  if (poorDays === 0) return { delta: 0, factor: null };
+  return {
+    delta: poorDays * STACKED_POOR_DAY_POINTS,
+    factor:
+      `Recovery has been rough several days running — ${poorDays} of your recent check-ins before today were poor. ` +
+      `One bad day is noise; a run of them is accumulated fatigue, so the score stacks them instead of forgetting yesterday.`,
+  };
+}
+
+/**
+ * The check-ins recorded BEFORE today, most recent first — the history
+ * calculateReadiness needs for the stacking adjustment. Callers pass
+ * the store's dailyCheckins record; days without a check-in simply do
+ * not appear (the stacking rule reads recorded days, not calendar
+ * gaps).
+ */
+export function recentCheckinsBefore(
+  checkinsByDate: Record<string, ManualCheckin> | undefined | null,
+  todayStr: string,
+  count = STACKED_MAX_DAYS
+): ManualCheckin[] {
+  if (!checkinsByDate) return [];
+  return Object.keys(checkinsByDate)
+    .filter((d) => d < todayStr)
+    .sort((a, b) => (a < b ? 1 : -1))
+    .slice(0, count)
+    .map((d) => checkinsByDate[d]);
+}
+
+/**
  * Readiness 1–100 from acute:chronic training load, RPE trend, consecutive
- * training days without rest, optional manual check-in, and rapid weight loss.
+ * training days without rest, optional manual check-in (its per-input
+ * values, its flagged pain/sore AREAS, and the stacking of recent prior
+ * poor check-ins), and rapid weight loss.
  * Conservative by design: thin data or conflicting signals push toward caution.
  */
 export function calculateReadiness(
   workouts: WorkoutEntry[],
   bodyMetrics: BodyMetricEntry[],
   manualCheckin?: ManualCheckin,
-  healthSignals?: HealthReadinessSignals
+  healthSignals?: HealthReadinessSignals,
+  recentCheckins?: ManualCheckin[]
 ): ReadinessResult {
   const factors: string[] = [];
   const today = getLocalTodayStr();
@@ -698,6 +801,12 @@ export function calculateReadiness(
       const adj = manualCheckinAdjustment(manualCheckin);
       score += adj.delta;
       if (adj.factor) factors.push(adj.factor);
+      const area = checkinAreaAdjustment(manualCheckin);
+      score += area.delta;
+      if (area.factor) factors.push(area.factor);
+      const stack = checkinStackingAdjustment(recentCheckins);
+      score += stack.delta;
+      if (stack.factor) factors.push(stack.factor);
     }
     score = applyHealthSignals(score);
     score = Math.max(1, Math.min(79, Math.round(score)));
@@ -811,13 +920,24 @@ export function calculateReadiness(
   }
 
   // (d) Manual check-in — per-input adjustment on top of the load factors
-  // (weights documented at CHECKIN_STEP_POINTS / manualCheckinAdjustment).
-  // A saved check-in is authoritative for the inputs it covers: nothing
-  // later in this function re-derives or overwrites its contribution.
+  // (weights documented at CHECKIN_STEP_POINTS / manualCheckinAdjustment),
+  // plus the flagged AREAS the bare numbers cannot express
+  // (checkinAreaAdjustment) and the stacking of prior poor days
+  // (checkinStackingAdjustment). A saved check-in is authoritative for
+  // the inputs it covers: nothing later in this function re-derives or
+  // overwrites its contribution.
+  let checkinHasPain = false;
   if (manualCheckin) {
     const adj = manualCheckinAdjustment(manualCheckin);
     score += adj.delta;
     if (adj.factor) factors.push(adj.factor);
+    const area = checkinAreaAdjustment(manualCheckin);
+    score += area.delta;
+    checkinHasPain = area.hasPain;
+    if (area.factor) factors.push(area.factor);
+    const stack = checkinStackingAdjustment(recentCheckins);
+    score += stack.delta;
+    if (stack.factor) factors.push(stack.factor);
   }
 
   // (e) Health Connect signals — optional, device-measured.
@@ -834,6 +954,11 @@ export function calculateReadiness(
   }
 
   score = Math.max(1, Math.min(100, Math.round(score)));
+
+  // Flagged pain caps the day below 'primed' no matter how fresh the
+  // numbers look: a pain report next to a "primed, push hard" verdict
+  // would be an incoherent coach (see checkinAreaAdjustment).
+  if (checkinHasPain) score = Math.min(score, 79);
 
   let band: ReadinessResult['band'];
   if (score >= 80) band = 'primed';

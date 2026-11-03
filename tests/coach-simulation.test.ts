@@ -246,11 +246,25 @@ describe('persona: pain flare (weeks 5-7)', () => {
     expect(t.blocks[1].warnings.every((w) => /pain/i.test(w))).toBe(true);
   });
 
-  it('[CHARACTERIZATION] readiness stays >= 90 ("primed") through the pain weeks — painAreas move the score by 0', () => {
+  it('readiness drops materially through the pain weeks — flagged areas move the score', () => {
+    // Was [CHARACTERIZATION]: readiness stayed >= 90 ('primed')
+    // through weeks 5-7 because calculateReadiness read only the
+    // freshness NUMBER and ignored painAreas/soreAreas entirely —
+    // a shoulder-pain report moved the score by 0 (observed 96/100
+    // mid-flare). The score now prices the areas (pain −15 and a cap
+    // below 'primed'; sore areas −3 each, capped −6), so every
+    // pain-week session lands materially below this persona's own
+    // pain-free floor and never reads 'primed'.
     const t = traceFor(painFlarePersona);
     const painWeeks = t.sessions.filter((s) => s.week >= 5 && s.week <= 7);
+    const baselineWeeks = t.sessions.filter((s) => s.week <= 4);
     expect(painWeeks.length).toBeGreaterThan(0);
-    for (const s of painWeeks) expect(s.readiness.score).toBeGreaterThanOrEqual(90);
+    const baselineFloor = Math.min(...baselineWeeks.map((s) => s.readiness.score));
+    for (const s of painWeeks) {
+      expect(s.readiness.score).toBeLessThanOrEqual(79);
+      expect(s.readiness.band).not.toBe('primed');
+      expect(s.readiness.score).toBeLessThanOrEqual(baselineFloor - 10);
+    }
   });
 
   it('the weekly review escalates the pain pattern while it is active', () => {
@@ -434,14 +448,26 @@ describe('persona: staller — plateau observation', () => {
     }
   });
 
-  it('[CHARACTERIZATION] readiness never leaves "primed" through 7 weeks of worst-case check-ins', () => {
+  it('readiness leaves "primed" once poor check-ins stack up (weeks 7+)', () => {
+    // Was [CHARACTERIZATION]: readiness never left 'primed' through
+    // seven weeks of sleep/soreness/energy = 2/2/2 check-ins — every
+    // day was scored in isolation, so a sustained grind cost the same
+    // −11 forever and the score sat at 89. Prior poor check-ins now
+    // stack (−4 per poor day among the last 3, cap −12): by week 7
+    // every prior check-in is a poor one, and the score settles at 77
+    // ('ready') for the rest of the run instead of declaring a wrecked
+    // lifter 'primed'.
     const t = traceFor(stallerPersona);
-    const fatigueWeeks = t.sessions.filter((s) => s.week >= 6);
-    expect(fatigueWeeks.length).toBeGreaterThan(0);
-    for (const s of fatigueWeeks) {
-      expect(s.readiness.score).toBeGreaterThanOrEqual(80);
-      expect(s.readiness.band).toBe('primed');
+    const grind = t.sessions.filter((s) => s.week >= 7);
+    expect(grind.length).toBeGreaterThan(0);
+    for (const s of grind) {
+      expect(s.readiness.score).toBeLessThan(80);
+      expect(s.readiness.band).not.toBe('primed');
     }
+    // And the drop is material against his own fresh baseline.
+    const fresh = t.sessions.filter((s) => s.week <= 3);
+    const freshFloor = Math.min(...fresh.map((s) => s.readiness.score));
+    for (const s of grind) expect(s.readiness.score).toBeLessThanOrEqual(freshFloor - 10);
   });
 
   it('the deload-week -10% proposal (BLOCK-DELOAD-01) fires and the confirmed cut applies', () => {
