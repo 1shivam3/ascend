@@ -21,6 +21,7 @@ function slice(overrides: Partial<SyncedStateSlice> = {}): SyncedStateSlice {
     meals: [{ id: 'm1', date: '2026-10-20', name: 'Lunch', foods: [{ name: 'Rice', calories: 200 }] }],
     bodyMetrics: [{ id: 'bm1', date: '2026-10-20', weightKg: 70 }],
     plannedWorkouts: [{ id: 'p1', name: 'Push Day', exercises: [] }],
+    coachBlocks: { pendingProposal: null, activeBlock: null, pastBlocks: [], adoptedPlans: {}, plateauProposals: [] },
     ...overrides,
   };
 }
@@ -86,6 +87,21 @@ describe('hasSyncedContentChanged (QA4-018)', () => {
     const prev = slice();
     const next = slice({ workouts: [...prev.workouts, { id: 'w2', date: '2026-10-21', exercises: [] }] });
     expect(hasSyncedContentChanged(prev, next)).toBe(true);
+  });
+
+  it('coachBlocks-only change schedules a push (F-11: propose/dismiss touch no collection)', () => {
+    const prev = slice();
+    const next = slice({
+      coachBlocks: {
+        pendingProposal: { id: 'block_x' },
+        activeBlock: null,
+        pastBlocks: [],
+        adoptedPlans: {},
+        plateauProposals: [],
+      },
+    });
+    expect(hasSyncedContentChanged(prev, next)).toBe(true);
+    expect(syncedStateSignature(prev)).not.toBe(syncedStateSignature(next));
   });
 
   it('no change → no push (identical references fast path)', () => {

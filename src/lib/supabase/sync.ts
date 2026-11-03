@@ -20,6 +20,7 @@ import {
 } from './reconcile';
 import { isCrossAccountSwitch as isCrossAccountSwitchFn, decideStartFreshGate } from '../start-fresh-guard';
 import { DEFAULT_BODYWEIGHT_KG } from '../defaults';
+import { getInitialCoachBlocksState, type CoachBlocksState } from '../block-engine';
 
 /** Page size for sync reads — equal to the PostgREST row cap. */
 export const SYNC_READ_PAGE_SIZE = 1000;
@@ -159,6 +160,106 @@ export function bodyMetricFromRemoteRow(r: any): BodyMetricEntry {
   };
 }
 
+/**
+ * F-11 (Build-my-block audit): coach block state sync.
+ *
+ * The coach_blocks table (schema.sql §16; migration
+ * 2026102701_add_coach_tables_and_plan_extras.sql) is a per-user
+ * JSONB document: one row per user, id = the user's id (the profiles
+ * pattern), the whole CoachBlocksState in `payload`. Before F-11 the
+ * client never read or wrote it, so the active block, a pending
+ * proposal and the progression schemes lived only in local
+ * persistence — a device switch silently lost the block even though
+ * its plans synced.
+ */
+export function coachBlocksRowForPush(
+  state: CoachBlocksState,
+  userId: string,
+): Record<string, unknown> {
+  return {
+    id: userId,
+    user_id: userId,
+    payload: state,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+/**
+ * Parse a remote payload back into a CoachBlocksState, field by
+ * field against the initial state, so a malformed or older payload
+ * can never produce a half-shaped slice. Returns null when the
+ * payload is not an object at all.
+ */
+export function coachBlocksStateFromPayload(payload: unknown): CoachBlocksState | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  const p = payload as Partial<CoachBlocksState>;
+  const initial = getInitialCoachBlocksState();
+  return {
+    pendingProposal: p.pendingProposal ?? initial.pendingProposal,
+    activeBlock: p.activeBlock ?? initial.activeBlock,
+    pastBlocks: Array.isArray(p.pastBlocks) ? p.pastBlocks : initial.pastBlocks,
+    adoptedPlans:
+      p.adoptedPlans && typeof p.adoptedPlans === 'object' && !Array.isArray(p.adoptedPlans)
+        ? p.adoptedPlans
+        : initial.adoptedPlans,
+    plateauProposals: Array.isArray(p.plateauProposals)
+      ? p.plateauProposals
+      : initial.plateauProposals,
+  };
+}
+
+/** True when there is nothing worth syncing or adopting. */
+export function isCoachBlocksStateEmpty(
+  state: CoachBlocksState | null | undefined,
+): boolean {
+  if (!state) return true;
+  return (
+    !state.activeBlock &&
+    !state.pendingProposal &&
+    (state.pastBlocks?.length ?? 0) === 0 &&
+    (state.plateauProposals?.length ?? 0) === 0 &&
+    Object.keys(state.adoptedPlans ?? {}).length === 0
+  );
+}
+
+/**
+ * Adoption decision for the singleton coach-blocks row:
+ *  - no usable remote state -> never adopt;
+ *  - cross-account switch -> adopt (the reset already zeroed local;
+ *    the row is the NEW account's own state);
+ *  - same account -> adopt only into an EMPTY local state (the
+ *    fresh-device recovery case F-11 exists for). When both sides
+ *    have a block, the local one wins and the push below overwrites
+ *    the row — the local state carries no updated_at stamp, so
+ *    content-level last-sync-wins is the honest rule here.
+ */
+export function shouldAdoptCoachBlocks(args: {
+  isCrossAccountSwitch: boolean;
+  local: CoachBlocksState | null | undefined;
+  remote: CoachBlocksState | null;
+}): boolean {
+  const { isCrossAccountSwitch, local, remote } = args;
+  if (!remote || isCoachBlocksStateEmpty(remote)) return false;
+  if (isCrossAccountSwitch) return true;
+  return isCoachBlocksStateEmpty(local);
+}
+
+/**
+ * The coach tables exist only after the §16 migration is applied to
+ * a deployment; until then PostgREST answers with a table-not-found
+ * error. Tolerate exactly that (the DI-02 ship-before-migration
+ * pattern — the state simply stays local-only, as before F-11);
+ * every other error is real and recorded.
+ */
+export function isMissingCoachBlocksTable(
+  error: { code?: string; message?: string } | null | undefined,
+): boolean {
+  if (!error) return false;
+  if (error.code === 'PGRST205' || error.code === '42P01') return true;
+  const msg = error.message || '';
+  return /could not find the table/i.test(msg) || /relation .* does not exist/i.test(msg);
+}
+
 export type SyncStatus = 'unconfigured' | 'offline' | 'idle' | 'syncing' | 'synced' | 'error';
 
 export interface AuthUser {
@@ -274,6 +375,13 @@ export interface SyncedStateSlice {
   meals: readonly unknown[];
   bodyMetrics: readonly unknown[];
   plannedWorkouts: readonly unknown[];
+  /** F-11: the coach-blocks singleton, signed like the profile
+   *  (wrapped in an array) so a coachBlocks-only change (propose /
+   *  dismiss / adopt / plateau) also schedules a push. Signatures
+   *  persisted before F-11 have one fewer component and simply never
+   *  match — adoption stays off until the next push, the fail-safe
+   *  direction. */
+  coachBlocks: unknown;
 }
 
 export function syncedStateSignature(state: SyncedStateSlice): string {
@@ -284,6 +392,7 @@ export function syncedStateSignature(state: SyncedStateSlice): string {
     collectionSignature(state.meals),
     collectionSignature(state.bodyMetrics),
     collectionSignature(state.plannedWorkouts),
+    collectionSignature([state.coachBlocks]),
   ].join('|');
 }
 
@@ -302,7 +411,8 @@ export function hasSyncedContentChanged(
     prev.workouts === next.workouts &&
     prev.meals === next.meals &&
     prev.bodyMetrics === next.bodyMetrics &&
-    prev.plannedWorkouts === next.plannedWorkouts
+    prev.plannedWorkouts === next.plannedWorkouts &&
+    prev.coachBlocks === next.coachBlocks
   ) {
     return false;
   }
@@ -474,7 +584,7 @@ class SupabaseSyncEngine {
     });
 
     // Listen to local store changes for debounced push.
-    // QA4-018: content-aware — ANY change to the 6 synced collections
+    // QA4-018: content-aware — ANY change to the synced collections
     // (including same-length edits like updateMeal / updatePR /
     // updatePlannedWorkout / same-day metric replacement) schedules
     // the push, not just length changes. hasSyncedContentChanged has
@@ -997,6 +1107,24 @@ class SupabaseSyncEngine {
         fetchAllUserRowsPaged(supabase, 'body_metrics', '*', 'user_id', user.id),
         fetchAllUserRowsPaged(supabase, 'planned_workouts', '*', 'user_id', user.id),
       ]);
+      // F-11: the coach-blocks singleton row — fetched SEPARATELY
+      // from the Promise.all above, in its own try/catch: this slice
+      // is optional (the §16 table may not exist on a deployment) and
+      // must never be able to fail the whole sync. Any error or
+      // unexpected client behavior reads as "no remote state".
+      let remoteCoachBlocksState: CoachBlocksState | null = null;
+      try {
+        const remoteCoachBlocks = await supabase
+          .from('coach_blocks')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (remoteCoachBlocks && !remoteCoachBlocks.error) {
+          remoteCoachBlocksState = coachBlocksStateFromPayload(remoteCoachBlocks.data?.payload);
+        }
+      } catch {
+        remoteCoachBlocksState = null;
+      }
 
       const localState = useStore.getState();
 
@@ -1344,6 +1472,7 @@ class SupabaseSyncEngine {
               meals: freshState.meals || [],
               bodyMetrics: freshState.bodyMetrics || [],
               plannedWorkouts: freshState.plannedWorkouts || [],
+              coachBlocks: freshState.coachBlocks,
             }),
           );
         return recomputePullSlices(freshInput, pullRemote, isCrossAccountSwitch, adoptRemoteChanges);
@@ -1372,6 +1501,21 @@ class SupabaseSyncEngine {
         })
       ) {
         delete updates.profile;
+      }
+      // F-11: coach-blocks adoption, decided HERE against the fresh
+      // state (not the pre-round-trip capture), so a block approved
+      // or proposed mid-sync is never overwritten by the pull. On a
+      // cross-account switch this overrides the reset's initial
+      // coachBlocks with the new account's own row when one exists.
+      if (
+        remoteCoachBlocksState &&
+        shouldAdoptCoachBlocks({
+          isCrossAccountSwitch,
+          local: freshState.coachBlocks,
+          remote: remoteCoachBlocksState,
+        })
+      ) {
+        updates.coachBlocks = remoteCoachBlocksState;
       }
       // The captured needsLocalUpdate reflects pre-round-trip state;
       // the only thing that matters now is whether updates still has keys.
@@ -1704,6 +1848,37 @@ class SupabaseSyncEngine {
         }
       }
     }
+    // 6b. Coach blocks (F-11) — the singleton coach_blocks row. The
+    // local state carries no updated_at stamp, so the gate is
+    // content: read the row and upsert only when the payload differs.
+    // A missing-table error (the §16 migration not yet applied on
+    // this deployment) is tolerated silently — the state stays
+    // local-only, exactly as before F-11 — while every other error
+    // is recorded like the other slices (F29).
+    if (state.coachBlocks && !isCoachBlocksStateEmpty(state.coachBlocks)) {
+      try {
+        const { data: existingCb, error: cbReadError } = await supabase
+          .from('coach_blocks')
+          .select('payload')
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (cbReadError) {
+          if (!isMissingCoachBlocksTable(cbReadError)) record(cbReadError);
+        } else if (JSON.stringify(existingCb?.payload ?? null) !== JSON.stringify(state.coachBlocks)) {
+          const { error: cbUpsertError } = await supabase
+            .from('coach_blocks')
+            .upsert(coachBlocksRowForPush(state.coachBlocks, userId), { onConflict: 'id' });
+          if (cbUpsertError && !isMissingCoachBlocksTable(cbUpsertError)) {
+            record(cbUpsertError);
+          }
+        }
+      } catch (err: any) {
+        // Defensive (same fail-safe posture as the pull): an
+        // unexpected client-level throw on this optional slice is
+        // recorded, never allowed to abort the remaining steps.
+        record({ message: err?.message || 'coach_blocks push failed' });
+      }
+    }
     // 7. Deletion propagation: the push path historically only upserted,
     // so a locally deleted record stayed on the server forever and the
     // union pull-merge resurrected it on the next sync. Delete exactly the
@@ -1730,6 +1905,7 @@ class SupabaseSyncEngine {
         meals: state.meals || [],
         bodyMetrics: state.bodyMetrics || [],
         plannedWorkouts: state.plannedWorkouts || [],
+        coachBlocks: state.coachBlocks,
       }),
     );
   }
