@@ -10,7 +10,7 @@
  * updated with the fix, never silently.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
-import { isoAdd, runSimulation, type PersonaDef, type SimTrace } from './coach-sim-harness';
+import { runSimulation, type PersonaDef, type SimTrace } from './coach-sim-harness';
 import {
   ALL_PERSONAS,
   beginnerPersona,
@@ -22,7 +22,6 @@ import {
 } from './coach-sim-personas';
 import { detectStalls } from '@/lib/coach-engine';
 import { getExerciseHistorySessions } from '@/lib/lifter-twin';
-import { useAppStore } from '@/lib/store';
 import { getMovementFamily } from '@/lib/workout-engine';
 import type { WorkoutEntry } from '@/lib/types';
 
@@ -270,33 +269,22 @@ describe('persona: fast progresser', () => {
     expect(appliedDecisions(t).length).toBeGreaterThan(100);
   });
 
-  it('week-10 stall flags carry each lift\'s OWN numbers — Squat and Front Squat no longer share a series', () => {
-    // Was [CHARACTERIZATION] ("the stall detector still flags 8+ of his
-    // lifts"): the raw count was never the cleanest signal — substring
-    // history merging both manufactured identical flags (see the probe
-    // below) and masked real ones. What exact stall history guarantees
-    // is that every flag is computed from the flagged lift's own
-    // sessions. Re-run the persona fresh so the store holds his
-    // workouts, replay detection at week 10, and compare the two lifts
-    // the merge used to fuse into one series.
-    const t = runSimulation(fastProgresserPersona);
-    const sunday = isoAdd(t.weeks[9].monday, 6);
-    const workouts = useAppStore.getState().workouts.filter((w) => w.date <= sunday);
-    const flags = detectStalls(workouts);
-    const squat = flags.find((f) => f.exercise === 'Squat');
-    const front = flags.find((f) => f.exercise === 'Front Squat');
-    expect(squat).toBeDefined();
-    expect(front).toBeDefined();
-    // Merged, these were one series with identical e1RM evidence.
-    expect(squat!.lastE1rmKg).not.toBe(front!.lastE1rmKg);
-    expect(squat!.peakE1rmKg).toBeGreaterThan(front!.peakE1rmKg);
-    // The flags that remain (17 at week 10, audited session by session)
-    // are all readable from the lifts' own histories: the peak sits in
-    // block 1 and the block-2 restart (the block-boundary anchoring
-    // defect, characterized separately below) keeps the window below it.
-    // This count is expected to FALL when that anchoring is fixed.
-    expect(flags).toHaveLength(17);
-  }, 120000);
+  it('a lifter who progresses every week ends with (almost) no stall flags', () => {
+    // Joint proof of the exact-history fix and the block-boundary
+    // continuity fix. Pre-stack, this persona collected 12 stall flags
+    // at week 10: some carried another lift's numbers fused into the
+    // evidence (substring-merged histories — the separation probe below
+    // pins that fix directly), and the rest were manufactured by block
+    // restarts resetting his loads below his demonstrated level, so
+    // every detection window peaked in the previous block. With exact
+    // histories and continuous block loads, the detector — unchanged —
+    // finds almost nothing left to flag: he progresses every week, and
+    // now the record says so (weeks 10/11 carry a single flag each,
+    // week 12 none).
+    const t = traceFor(fastProgresserPersona);
+    expect(t.weeks[9].stallFlags.length).toBeLessThanOrEqual(1);
+    expect(t.weeks[11].stallFlags).toHaveLength(0);
+  });
 });
 
 describe('persona: staller — plateau observation', () => {
@@ -335,9 +323,11 @@ describe('persona: staller — plateau observation', () => {
     // almost all exercise_not_found under the wrong planId — the applied
     // minority were lifts in the LAST plan of each block. After the fix
     // (probed at the store's apply site): 0 exercise_not_found dismissals
-    // remain. The only residual dismissals are the stale-guard retiring a
-    // proposal whose target moved under a same-pass variation rename —
-    // the guard working as designed ("retire rather than edit blind").
+    // remain; the only dismissals ever seen since are the stale-guard
+    // retiring a proposal whose target moved under a same-pass variation
+    // rename — the guard working as designed ("retire rather than edit
+    // blind") — and with the full fix stack landed, the current runs
+    // produce zero dismissals at all.
     let created = 0;
     let applied = 0;
     let dismissed = 0;
@@ -346,26 +336,74 @@ describe('persona: staller — plateau observation', () => {
       const mine = t.weeks.flatMap((w) => w.plateauProposalsCreated);
       // Proposals must actually land for every persona, not just the ones
       // whose stalled lifts happened to sit in a block's last plan.
-      // (Floor recalibrated after the exact-stall-history fix: fewer,
-      // realer stall flags produce fewer proposals — 136 created across
-      // personas, every one applied, zero dismissed.)
-      expect(mine.filter((x) => x.outcome === 'applied').length).toBeGreaterThanOrEqual(10);
+      // (Floor recalibrated across the fix stack: as the exact-history
+      // and block-continuity fixes landed, the bogus-flag cascade dried
+      // up and proposal creation fell 157 -> 136 -> 45 across personas.
+      // The landing guarantee is what this test protects: of the 45 now
+      // created, every one applies and zero are dismissed.)
+      expect(mine.filter((x) => x.outcome === 'applied').length).toBeGreaterThanOrEqual(2);
       created += mine.length;
       applied += mine.filter((x) => x.outcome === 'applied').length;
       dismissed += mine.filter((x) => x.outcome === 'dismissed').length;
     }
-    expect(created).toBeGreaterThanOrEqual(100);
+    expect(created).toBeGreaterThanOrEqual(40);
     expect(applied / created).toBeGreaterThanOrEqual(0.95);
     expect(dismissed).toBeLessThanOrEqual(5);
   });
 
-  it('[CHARACTERIZATION] block 2 restarts bench 10 kg below where block 1 left it', () => {
+  it('block 2 starts bench at exactly the load block 1 ended on — no anchoring discount', () => {
+    // Was [CHARACTERIZATION]: block 2 restarted bench at 67.5 kg, 10 kg
+    // below block 1's final 77.5 kg, because generateBlockProposal
+    // re-anchored to estimated-e1RM x focus % (0.76) and ignored the
+    // demonstrated working load. The demonstrated-capacity floor now
+    // converts his best recent bench e1RM at the new block's reps —
+    // the restart discount is gone.
     const t = traceFor(stallerPersona);
     const bench = exerciseSeries(t, 'Bench Press');
     const lastBlock1 = bench.filter((r) => r.date < t.blocks[1].proposedOn).pop();
     const firstBlock2 = bench.find((r) => r.date >= t.blocks[1].proposedOn);
     expect(lastBlock1?.targetBefore.weight).toBe(77.5);
-    expect(firstBlock2?.targetBefore.weight).toBe(67.5);
+    expect(firstBlock2?.targetBefore.weight).toBe(77.5);
+  });
+
+  it('no lift in any persona restarts a block more than 7% below its previous block-end level (e1RM terms)', () => {
+    // The pre-fix measurement (raw loads) ran -3.2% to -20% on EVERY
+    // lift at EVERY boundary. Compared in e1RM terms — each side at its
+    // own reps, the honest comparison when rep schemes change between
+    // blocks — the post-floor residual is loadable-step rounding on
+    // light lifts plus two accessories whose block-1 target reps ran
+    // ahead of the reps ever demonstrated. The -7% bound leaves that
+    // room and no more: any return of the anchoring discount (a main
+    // lift restarting 10%+ below its demonstrated level) trips it.
+    const e1rm = (w: number, r: number) =>
+      r <= 10 ? w * (1 + r / 30) : w * (1 + 10 / 30 + (r - 10) / 45);
+    for (const p of ALL_PERSONAS) {
+      const t = traceFor(p);
+      for (let b = 1; b < t.blocks.length; b++) {
+        const boundary = t.blocks[b].proposedOn;
+        const names = new Set(t.sessions.flatMap((s) => s.exercises.map((e) => e.name)));
+        for (const name of names) {
+          const series = t.sessions.flatMap((s) =>
+            s.exercises
+              .filter(
+                (e) =>
+                  e.name === name &&
+                  typeof e.targetBefore.weight === 'number' &&
+                  e.targetBefore.weight > 0
+              )
+              .map((e) => ({ date: s.date, w: e.targetBefore.weight!, r: e.targetBefore.reps }))
+          );
+          const lastBefore = series.filter((x) => x.date < boundary).pop();
+          const firstAfter = series.find((x) => x.date >= boundary);
+          if (!lastBefore || !firstAfter) continue;
+          const pct =
+            ((e1rm(firstAfter.w, firstAfter.r) - e1rm(lastBefore.w, lastBefore.r)) /
+              e1rm(lastBefore.w, lastBefore.r)) *
+            100;
+          expect(pct, `${p.id} ${name} into block ${b + 1}`).toBeGreaterThanOrEqual(-7);
+        }
+      }
+    }
   });
 
   it('[CHARACTERIZATION] readiness never leaves "primed" through 7 weeks of worst-case check-ins', () => {
@@ -388,21 +426,23 @@ describe('persona: staller — plateau observation', () => {
   });
 
   it('[CHARACTERIZATION] a variation swap still serves a placeholder exercise name ("Dumbbell alternative") in a live plan', () => {
-    // Previously pinned as "variation swaps leave one plan containing
-    // Leg Press twice": the duplicate was driven by the bogus stall
-    // flags from merged exercise histories, and with exact stall
-    // history that swap sequence no longer occurs (Leg Press now
-    // appears once in this plan). The underlying swap-hygiene defect is
-    // still live in the very same snapshot: a plan exercise literally
-    // named "Dumbbell alternative" — a placeholder string from the swap
-    // table, served as a real exercise. The duplicate-name half of the
-    // defect is pinned at unit level in block-engine.test.ts
-    // (applyPlateauProposalToPlan performs no collision check).
+    // The swap-fallback defect outlives the three fixes in this stack:
+    // getStimulusPreservingSwaps' generic fallback returns targets
+    // literally named 'Dumbbell alternative' / 'Machine alternative',
+    // detectStalls offers swaps[0] as the variation for a stalled lift
+    // with no table entry, and an applied proposal writes the
+    // placeholder into the plan as an exercise. Earlier pins chased
+    // its symptoms through the bogus-flag cascade (a plan containing
+    // Leg Press twice — that shape is gone, Leg Press now appears
+    // once); the current live instance is the Upper B plan from
+    // week 9 on. The defect is pinned at its source in
+    // coach-engine.test.ts, and its duplicate-name half in
+    // block-engine.test.ts (no collision check on variation applies).
     const t = traceFor(stallerPersona);
     const lowerB = t.weeks[8].planSnapshot.find((p) => p.planName.includes('Lower B'));
-    const names = lowerB!.exercises.map((e) => e.name);
-    expect(names.filter((n) => n === 'Leg Press')).toHaveLength(1);
-    expect(names).toContain('Dumbbell alternative');
+    expect(lowerB!.exercises.filter((e) => e.name === 'Leg Press')).toHaveLength(1);
+    const upperB = t.weeks[8].planSnapshot.find((p) => p.planName.includes('Upper B'));
+    expect(upperB!.exercises.map((e) => e.name)).toContain('Dumbbell alternative');
   });
 
   it('[CHARACTERIZATION] Bulgarian Split Squat is prescribed like a main lift (>= 100 kg)', () => {

@@ -54,6 +54,7 @@ import {
 } from './exercise-library';
 import { estimateE1rmKg, mainCompoundKey, roundToLoadable } from './percent-1rm';
 import { canonicalizeExerciseName } from './workout-outcome-evidence';
+import { getExerciseHistorySessions } from './lifter-twin';
 import { getMondayOfWeek, parseLocalDate } from './formatters';
 import { getWorkoutBodyParts } from './workout-schedule';
 import type { AthleteModel } from './athlete-model';
@@ -537,6 +538,39 @@ function buildScheme(
   };
 }
 
+/**
+ * The lifter's current demonstrated level for one exercise, as an e1RM
+ * in the proposal unit: the best session e1RM across their 3 most
+ * recent sessions of this exact exercise. Returns null when there is
+ * no recent demonstration — the most recent session is more than
+ * 6 weeks before the proposal date, so it is not current capacity
+ * (a block proposed after a long layoff must not floor its starting
+ * loads at pre-layoff peaks).
+ */
+function demonstratedE1rm(
+  workouts: WorkoutEntry[],
+  exerciseName: string,
+  unit: Unit,
+  todayStr: string
+): number | null {
+  const sessions = getExerciseHistorySessions(exerciseName, workouts, unit, { exact: true });
+  if (sessions.length === 0) return null;
+  const lastDate = sessions[sessions.length - 1].date;
+  const ageDays =
+    (parseLocalDate(todayStr).getTime() - parseLocalDate(lastDate).getTime()) / 86400000;
+  if (!Number.isFinite(ageDays) || ageDays > 42) return null;
+  const best = Math.max(...sessions.slice(-3).map((s) => s.bestE1RM));
+  return best > 0 ? best : null;
+}
+
+/** Dampened-Epley rep factor — the divisor inverts calculateOneRepMax
+ *  exactly (same formula suggestLoad inverts): the load that, lifted
+ *  for `reps` reps, implies the given e1RM. */
+function e1rmRepDivisor(reps: number): number {
+  const r = Math.max(1, reps);
+  return r <= 10 ? 1 + r / 30 : 1 + 10 / 30 + (r - 10) / 45;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Weak points
 // ─────────────────────────────────────────────────────────────────────────────
@@ -919,12 +953,28 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
   // Entered top lifts (intake) outrank history estimates: they are the
   // athlete's own statement of current strength (§4.1).
   const topLiftByCompound = new Map<string, number>();
+  const enteredCompounds = new Set<string>();
   for (const tl of intake.topLifts) {
     const compound = mainCompoundKey(tl.name);
-    if (compound && tl.e1rmKg > 0) topLiftByCompound.set(compound, tl.e1rmKg);
+    if (compound && tl.e1rmKg > 0) {
+      topLiftByCompound.set(compound, tl.e1rmKg);
+      // Only an ENTERED top lift is the athlete's own statement (§4.1).
+      // Prefill-derived entries (source 'history' / 'pr') are estimates
+      // the app made from records — the load-continuity floor below
+      // governs them like any other history estimate.
+      if (tl.source === 'entered') enteredCompounds.add(compound);
+    }
   }
   const schemes: ProgressionScheme[] = [];
   const schemeByKey = new Map<string, ProgressionScheme>();
+  const demonstratedByKey = new Map<string, number | null>();
+  const demonstratedFor = (name: string): number | null => {
+    const k = canonicalizeExerciseName(name);
+    if (!demonstratedByKey.has(k)) {
+      demonstratedByKey.set(k, demonstratedE1rm(input.workouts, name, unit, todayStr));
+    }
+    return demonstratedByKey.get(k) ?? null;
+  };
   const days: BlockDayProposal[] = skeletons.map((day, i) => {
     const whyByExercise: Record<string, string> = {};
     const exercises = day.exercises.map((ex) => {
@@ -952,6 +1002,30 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
         targetWeight = roundToLoadable(unit === 'lbs' ? kg * 2.20462 : kg, unit);
       }
       const targetReps = Math.min(range.max, Math.max(range.min, ex.targetReps || range.min + 1));
+      // Load continuity across block boundaries: the %1RM anchor (and,
+      // for lifts it does not reach, the skeleton's library-default
+      // weight) restarts every block from a fixed fraction/default,
+      // silently discounting what the lifter demonstrably lifted at the
+      // end of the previous block — measured at −3% to −20% per lift
+      // across a boundary. Floor the starting load at the demonstrated
+      // level: the load that, at THIS prescription's reps, implies the
+      // same e1RM as their best recent working set. Reductions still
+      // happen where the block design calls for them (the deload
+      // week's policy adjustments operate on top of this base), never
+      // as an anchoring artifact. An ENTERED top lift (§4.1) is the
+      // athlete's own statement and outranks the floor; prefill-derived
+      // top lifts ('history' / 'pr') are estimates and do not.
+      if (
+        typeof targetWeight === 'number' &&
+        targetWeight >= 0 &&
+        !(compoundKey && enteredCompounds.has(compoundKey))
+      ) {
+        const demonstrated = demonstratedFor(ex.name);
+        if (demonstrated) {
+          const floor = roundToLoadable(demonstrated / e1rmRepDivisor(targetReps), unit);
+          if (floor > targetWeight) targetWeight = floor;
+        }
+      }
       // Strength blocks run mains at 5 sets — the old flat 4-set cap
       // undercut the one goal whose whole point is heavy main-lift
       // volume. Other focuses keep 4; accessories/secondary keep 3.

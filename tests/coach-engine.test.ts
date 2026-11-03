@@ -17,6 +17,7 @@ import {
   CalorieAdjustmentRecord,
   PlannedTarget,
 } from '../src/lib/coach-engine';
+import { getStimulusPreservingSwaps } from '../src/lib/lifter-twin';
 import {
   WorkoutEntry,
   WorkoutExercise,
@@ -853,5 +854,21 @@ describe('coach persisted state', () => {
 
   it('starts with no calorie adjustment recorded', () => {
     expect(getInitialCoachState().lastCalorieAdjustment).toBeUndefined();
+  });
+});
+
+// ── Swap-table placeholder names (pinned characterization) ────────────────
+
+describe('stimulus-preserving swap fallback (pinned defect)', () => {
+  it('[characterization] lifts with no table entry get placeholder targets served as exercise names', () => {
+    // getStimulusPreservingSwaps' generic fallback returns targets
+    // literally named 'Dumbbell alternative' / 'Machine alternative'.
+    // detectStalls takes swaps[0] as a plateau variation suggestion, so
+    // the placeholder can be written into a real plan as an exercise
+    // (observed end-to-end in the coach sim before the bogus-flag
+    // cascade was fixed). Pinned here at the source: the sim no longer
+    // drives a swap onto this lift, but the table still emits it.
+    const targets = getStimulusPreservingSwaps('Hamstring Curl').map((s) => s.target);
+    expect(targets).toEqual(['Dumbbell alternative', 'Machine alternative']);
   });
 });
