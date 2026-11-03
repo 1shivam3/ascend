@@ -325,6 +325,11 @@ export default function PolicyDecisionCard({
               {t('pdc.repsBadge', { delta: decision.proposedPrescription.deltaReps ?? 0 })}
             </Badge>
           )}
+          {decision.actionCategory === 'candidate_load_reduction' && (
+            <Badge variant="warning" size="sm">
+              {t('pdc.deloadBadge', { delta: decision.proposedPrescription.deltaWeight ?? 0, unit: userUnit })}
+            </Badge>
+          )}
           {decision.actionCategory === 'hold_current_target' && (
             <Badge variant="neutral" size="sm">
               {t('pdc.holdTarget')}

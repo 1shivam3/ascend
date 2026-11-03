@@ -98,6 +98,12 @@ describe('load progression bounds (all personas)', () => {
   it('no applied progression ever moves load by more than one 2.5 kg step, or reps by more than +1', () => {
     for (const p of ALL_PERSONAS) {
       for (const { decision } of appliedDecisions(traceFor(p))) {
+        if (
+          decision.actionCategory !== 'candidate_rep_progression' &&
+          decision.actionCategory !== 'candidate_load_progression'
+        ) {
+          continue; // deload reductions are bounded by their own test below
+        }
         expect(decision.deltaWeight).toBeGreaterThanOrEqual(0);
         expect(decision.deltaWeight).toBeLessThanOrEqual(2.5);
         expect(decision.deltaReps).toBeLessThanOrEqual(1);
@@ -126,16 +132,30 @@ describe('load progression bounds (all personas)', () => {
     for (const f of flags) expect(f.base).toBeLessThanOrEqual(22.5);
   });
 
-  it('no persona ever has a load REDUCTION applied in 12 weeks', () => {
-    // Deload proposals exist (see staller suite) but the athlete-confirmed
-    // application path can never execute one — reductions are proposals
-    // only. [CHARACTERIZATION]
+  it('load REDUCTIONS apply only as athlete-confirmed BLOCK-DELOAD-01 cuts', () => {
+    // Was [CHARACTERIZATION]: reductions could never apply at all —
+    // BLOCK-DELOAD-01 was emitted as review_required and the application
+    // validator rejected both that category and any negative delta, so
+    // 263 sessions produced zero applied reductions. The deload proposal
+    // is now a candidate_load_reduction that the validator admits only
+    // for BLOCK-DELOAD-01 and only after the athlete accepts it; the
+    // harness's engaged user confirms it through the same decision-card
+    // path as progressions.
+    let totalReductions = 0;
     for (const p of ALL_PERSONAS) {
       const reductions = appliedDecisions(traceFor(p)).filter(
         ({ decision }) => decision.deltaWeight < 0
       );
-      expect(reductions).toHaveLength(0);
+      for (const { decision } of reductions) {
+        expect(decision.ruleId).toBe('BLOCK-DELOAD-01');
+        expect(decision.actionCategory).toBe('candidate_load_reduction');
+        expect(decision.deltaReps).toBe(0);
+      }
+      totalReductions += reductions.length;
     }
+    // The staller's two deload weeks (see his suite) guarantee the path
+    // is genuinely exercised, not vacuously satisfied.
+    expect(totalReductions).toBeGreaterThanOrEqual(2);
   });
 });
 
@@ -291,8 +311,13 @@ describe('persona: staller — plateau observation', () => {
   it('bench is held (not progressed) once RPE climbs, from week 4', () => {
     const t = traceFor(stallerPersona);
     const bench = exerciseSeries(t, 'Bench Press');
-    const wk4to6 = bench.filter((r) => r.week >= 4 && r.week <= 6);
-    expect(wk4to6.every((r) => r.targetBefore.weight === 77.5)).toBe(true);
+    // Weeks 4-5 sit at 77.5; the week-5 deload session's confirmed
+    // BLOCK-DELOAD-01 cut lands on the plan, so the week-6 test session
+    // is prescribed the reduced 69.75 — a hold would read 77.5 here.
+    const wk4to5 = bench.filter((r) => r.week >= 4 && r.week <= 5);
+    expect(wk4to5.every((r) => r.targetBefore.weight === 77.5)).toBe(true);
+    const wk6 = bench.filter((r) => r.week === 6);
+    expect(wk6.every((r) => r.targetBefore.weight === 69.75)).toBe(true);
   });
 
   it('the stall detector flags bench with a deload suggestion at week 7', () => {
@@ -351,18 +376,21 @@ describe('persona: staller — plateau observation', () => {
     expect(dismissed).toBeLessThanOrEqual(5);
   });
 
-  it('block 2 starts bench at exactly the load block 1 ended on — no anchoring discount', () => {
+  it('block 2 starts bench at the demonstrated level — no anchoring discount', () => {
     // Was [CHARACTERIZATION]: block 2 restarted bench at 67.5 kg, 10 kg
     // below block 1's final 77.5 kg, because generateBlockProposal
     // re-anchored to estimated-e1RM x focus % (0.76) and ignored the
     // demonstrated working load. The demonstrated-capacity floor now
     // converts his best recent bench e1RM at the new block's reps —
-    // the restart discount is gone.
+    // the restart discount is gone. (Block 1's last working
+    // prescription is 69.75 because the athlete confirmed the week-5
+    // deload cut; the floor correctly anchors block 2 to what he
+    // demonstrated at 77.5, not to the deload week's reduced load.)
     const t = traceFor(stallerPersona);
     const bench = exerciseSeries(t, 'Bench Press');
     const lastBlock1 = bench.filter((r) => r.date < t.blocks[1].proposedOn).pop();
     const firstBlock2 = bench.find((r) => r.date >= t.blocks[1].proposedOn);
-    expect(lastBlock1?.targetBefore.weight).toBe(77.5);
+    expect(lastBlock1?.targetBefore.weight).toBe(69.75);
     expect(firstBlock2?.targetBefore.weight).toBe(77.5);
   });
 
@@ -416,13 +444,23 @@ describe('persona: staller — plateau observation', () => {
     }
   });
 
-  it('the deload-week -10% proposal (BLOCK-DELOAD-01) fires but can never be applied', () => {
+  it('the deload-week -10% proposal (BLOCK-DELOAD-01) fires and the confirmed cut applies', () => {
+    // Was a pinned defect: the proposal fired (weeks 5 and 11) but was
+    // emitted as review_required, which the application validator
+    // rejects by design — zero reductions could ever land. It is now a
+    // candidate_load_reduction; the harness's engaged user accepts and
+    // applies it through the real decision-card path, and each applied
+    // cut is exactly the proposed 10% of the session's target load.
     const t = traceFor(stallerPersona);
     const proposals = t.sessions.flatMap((s) =>
       s.exercises.filter((e) => e.decision?.ruleId === 'BLOCK-DELOAD-01')
     );
     expect(proposals.length).toBeGreaterThanOrEqual(2);
-    expect(proposals.every((e) => !e.decision!.applied)).toBe(true);
+    for (const e of proposals) {
+      expect(e.decision!.applied).toBe(true);
+      expect(e.decision!.actionCategory).toBe('candidate_load_reduction');
+      expect(Math.abs(e.decision!.deltaWeight + 0.1 * (e.targetBefore.weight ?? 0))).toBeLessThan(0.01);
+    }
   });
 
   it('[CHARACTERIZATION] a variation swap still serves a placeholder exercise name ("Dumbbell alternative") in a live plan', () => {

@@ -2700,6 +2700,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'pdc.overridden': 'बदला गया',
   'pdc.dismissed': 'खारिज',
   'pdc.load': '+{delta} {unit} वज़न',
+  'pdc.deloadBadge': '{delta} {unit} डीलोड',
   'pdc.repsBadge': '+{delta} रेप्स',
   'pdc.holdTarget': 'लक्ष्य बनाए रखें',
   'pdc.reviewRequired': 'समीक्षा ज़रूरी',

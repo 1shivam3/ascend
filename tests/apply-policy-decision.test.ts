@@ -784,6 +784,97 @@ describe('Apply Accepted Policy Decisions to Future Prescriptions (Task 3C-7)', 
     expect(resRpe.error).toBe('rpe_unrecorded');
   });
 
+  // ── Deload: athlete-confirmed load reduction (BLOCK-DELOAD-01) ─────────────
+  it('Deload: an accepted BLOCK-DELOAD-01 reduction applies the 10% cut; unaccepted or forged reductions are rejected', () => {
+    const plan = createSamplePlannedWorkout();
+
+    const deloadDec = createSampleAcceptedDecision({
+      id: 'dec_block_deload',
+      actionCategory: 'candidate_load_reduction',
+      ruleId: 'BLOCK-DELOAD-01',
+      status: 'accepted',
+      currentPrescription: { weight: 100, reps: 8, targetRpe: 8, sets: 3, unit: 'kg' },
+      proposedPrescription: {
+        weight: 90,
+        reps: 8,
+        targetRpe: 8,
+        sets: 3,
+        unit: 'kg',
+        deltaWeight: -10,
+        deltaReps: 0,
+      },
+    });
+
+    const forgedDec = createSampleAcceptedDecision({
+      id: 'dec_forged_reduction',
+      actionCategory: 'candidate_load_reduction',
+      ruleId: 'LOAD-PROG-01',
+      status: 'accepted',
+      proposedPrescription: {
+        weight: 90,
+        reps: 8,
+        targetRpe: 8,
+        sets: 3,
+        unit: 'kg',
+        deltaWeight: -10,
+        deltaReps: 0,
+      },
+    });
+
+    const pendingDec = createSampleAcceptedDecision({
+      id: 'dec_pending_deload',
+      actionCategory: 'candidate_load_reduction',
+      ruleId: 'BLOCK-DELOAD-01',
+      status: 'pending',
+      acceptedAt: undefined,
+      proposedPrescription: {
+        weight: 90,
+        reps: 8,
+        targetRpe: 8,
+        sets: 3,
+        unit: 'kg',
+        deltaWeight: -10,
+        deltaReps: 0,
+      },
+    });
+
+    useAppStore.setState({
+      plannedWorkouts: [plan],
+      policyDecisionRecords: {
+        [deloadDec.id]: deloadDec,
+        [forgedDec.id]: forgedDec,
+        [pendingDec.id]: pendingDec,
+      },
+    });
+
+    // Pending (never athlete-confirmed): rejected — a deload is never silent.
+    const resPending = useAppStore.getState().applyPolicyDecisionToFuturePrescription({
+      decisionId: pendingDec.id,
+      targetPlanId: plan.id,
+    });
+    expect(resPending.success).toBe(false);
+    expect(resPending.error).toBe('decision_not_accepted');
+
+    // Forged provenance (reduction category under a progression rule): rejected.
+    const resForged = useAppStore.getState().applyPolicyDecisionToFuturePrescription({
+      decisionId: forgedDec.id,
+      targetPlanId: plan.id,
+    });
+    expect(resForged.success).toBe(false);
+    expect(resForged.error).toBe('unauthorized_reduction');
+
+    // The genuine article: accepted BLOCK-DELOAD-01 applies the cut.
+    const res = useAppStore.getState().applyPolicyDecisionToFuturePrescription({
+      decisionId: deloadDec.id,
+      targetPlanId: plan.id,
+    });
+    expect(res.success).toBe(true);
+    const updated = useAppStore.getState().plannedWorkouts.find((p) => p.id === plan.id);
+    expect(updated?.exercises[0].targetWeight).toBe(90);
+    // The other exercise is untouched.
+    expect(updated?.exercises[1].targetWeight).toBe(80);
+  });
+
   // ── Criterion 14: Unit consistency ──────────────────────────────────────────
   it('Criterion 14: Rejects application on unit mismatch between decision and plan', () => {
     // Decision is in kg, plan is in lbs
