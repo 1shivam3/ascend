@@ -621,20 +621,29 @@ export default function CoachChatTab({
                 <>
                   <p className="text-xs font-bold text-text-primary">
                     {coachBlocks.activeBlock.name} ·{' '}
-                    {t('coachBlock.weekOf', {
-                      n: Math.min(
-                        coachBlocks.activeBlock.weeks.length,
-                        Math.max(
-                          1,
-                          Math.floor(
-                            (parseLocalDate(getLocalTodayStr()).getTime() -
-                              parseLocalDate(coachBlocks.activeBlock.startMonday).getTime()) /
-                              (7 * 86_400_000)
-                          ) + 1
-                        )
-                      ),
-                      total: coachBlocks.activeBlock.weeks.length,
-                    })}
+                    {/* F-09: before the first full week begins, the
+                        clamped "Week 1 of N" label claimed a week
+                        that hasn't started — the schedule already
+                        changed on approval, so say when week 1
+                        actually starts instead. */}
+                    {getLocalTodayStr() < coachBlocks.activeBlock.startMonday
+                      ? t('coachBlock.startsOnShort', {
+                          date: coachBlocks.activeBlock.startMonday,
+                        })
+                      : t('coachBlock.weekOf', {
+                          n: Math.min(
+                            coachBlocks.activeBlock.weeks.length,
+                            Math.max(
+                              1,
+                              Math.floor(
+                                (parseLocalDate(getLocalTodayStr()).getTime() -
+                                  parseLocalDate(coachBlocks.activeBlock.startMonday).getTime()) /
+                                  (7 * 86_400_000)
+                              ) + 1
+                            )
+                          ),
+                          total: coachBlocks.activeBlock.weeks.length,
+                        })}
                   </p>
                   <p className="text-2xs text-text-muted">
                     {t('coachBlock.activeHint', {
