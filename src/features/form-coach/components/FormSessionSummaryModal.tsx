@@ -171,7 +171,7 @@ export default function FormSessionSummaryModal({
                     <div className="flex items-center space-x-2">
                       <span className="font-semibold text-text-primary">{obs.title}</span>
                       {obs.count > 1 && (
-                        <span className="px-1.5 py-0.2 rounded text-2xs bg-surface-highlight font-mono text-text-muted">
+                        <span className="px-1.5 py-0.5 rounded text-2xs bg-surface-highlight font-mono text-text-muted">
                           x{obs.count}
                         </span>
                       )}

@@ -915,7 +915,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'workout.quickTips': 'जिम के आसान टिप्स',
   'workout.gotIt': 'समझ गया',
   'workout.tip1': 'वज़न और रेप्स आपके लिए पहले से भरे हैं',
-  'workout.tip2': 'हर सेट पूरा करने के बाद बड़ा बटन दबाएं',
+  'workout.tip2': 'हर सेट पूरा करने के बाद बड़ा "सेट पूरा करें" बटन दबाएं',
   'workout.tip3': 'आपका रेस्ट टाइमर अपने आप शुरू हो जाता है',
   'workout.exerciseOf': '{total} में से एक्सरसाइज़ {current}',
   'workout.renamePlaceholder': 'खोजने या नाम बदलने के लिए लिखें...',

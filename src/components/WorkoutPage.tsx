@@ -3711,6 +3711,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               <button
                 type="button"
                 onClick={() => setIsToolsMenuOpen(false)}
+                aria-label={t('common.close')}
                 className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />

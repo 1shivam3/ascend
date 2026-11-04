@@ -2348,8 +2348,11 @@ export default function ActiveWorkoutScreen({
             <span className="text-xs font-semibold text-text-secondary block">{t('packed.toggle')}</span>
             {/* Micro-gloss (declutter PR 2): the plan-detail toggle
                 explains what this swaps; the in-workout row was a bare
-                label. Same explainer string, no new copy. */}
-            <span className="text-2xs text-text-muted block truncate">{t('packed.previewHint')}</span>
+                label. Same explainer string, no new copy.
+                DEV-1 (final certification): no `truncate` — the 363px
+                sentence was ellipsized at every phone width. Like the
+                plan-detail sibling (WorkoutDetailsView), it wraps. */}
+            <span className="text-2xs text-text-muted block leading-relaxed">{t('packed.previewHint')}</span>
           </div>
           <button
             type="button"
@@ -3311,11 +3314,19 @@ export default function ActiveWorkoutScreen({
           countdown the user never started. */}
       {(isRestRunning || isRestFinished || restSecondsLeft > 0) && (
       <div className="fixed bottom-5 right-4 z-40 flex flex-col items-end gap-1.5 select-none pointer-events-auto">
+        {/* A11Y-06 (final certification): screen-reader rest-end
+            announcement. The countdown readouts carry role="timer"
+            (implicit aria-live="off", so no per-second spam); this
+            polite region speaks exactly once, when rest completes —
+            the chime/notification alone carried that signal before. */}
+        <span aria-live="polite" className="sr-only">
+          {isRestFinished ? `${t('workout.restTimer')}: ${t('workout.ready')}` : ''}
+        </span>
         {isRestPopoverOpen && (
           <div className="bg-bg-card/95 backdrop-blur-md border border-border shadow-2xl rounded-2xl p-2 flex items-center gap-1.5 animate-scale-in">
             {/* Micro-fix L4 (round 2): the popover carries the countdown
                 itself, so hiding the pill while it is open loses nothing. */}
-            <span className="px-1 font-mono text-xs font-bold text-text-primary tabular-nums">
+            <span role="timer" className="px-1 font-mono text-xs font-bold text-text-primary tabular-nums">
               {isRestFinished
                 ? t('workout.ready')
                 : formatTime(restSecondsLeft > 0 ? restSecondsLeft : defaultRestDuration)}
@@ -3402,7 +3413,7 @@ export default function ActiveWorkoutScreen({
           {/* Live-fix L4: idle shows the preset that WILL start
               (defaultRestDuration, per current lift/reps) — not the stale
               goal rest total — so pill and overlay always agree. */}
-          <span>
+          <span role="timer">
             {isRestFinished
               ? t('workout.ready')
               : formatTime(restSecondsLeft > 0 ? restSecondsLeft : defaultRestDuration)}
@@ -4272,7 +4283,7 @@ export default function ActiveWorkoutScreen({
               <span className="text-2xs font-bold uppercase tracking-wider text-[#A5A096] font-mono block">
                 {t('workout.restTimer')}
               </span>
-              <div className="text-5xl sm:text-6xl font-black font-mono text-[#F3F0E7] tabular-nums tracking-tight">
+              <div role="timer" aria-label={t('workout.restTimer')} className="text-5xl sm:text-6xl font-black font-mono text-[#F3F0E7] tabular-nums tracking-tight">
                 {isRestFinished
                   ? t('workout.ready')
                   : formatTime(restSecondsLeft > 0 ? restSecondsLeft : defaultRestDuration)}

@@ -908,7 +908,7 @@ export const en = {
   'workout.quickTips': 'Quick gym tips',
   'workout.gotIt': 'Got it',
   'workout.tip1': 'Weights and reps are pre-filled for you',
-  'workout.tip2': 'Tap the big Done button after completing each set',
+  'workout.tip2': 'Tap the big Complete Set button after completing each set',
   'workout.tip3': 'Your rest timer starts automatically',
   'workout.exerciseOf': 'Exercise {current} of {total}',
   'workout.renamePlaceholder': 'Type to search or rename...',

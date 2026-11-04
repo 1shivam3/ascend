@@ -13,6 +13,11 @@ module.exports = {
           chalk: '#F3F0E7',
           vermilion: '#E44427',
           sage: '#858076',
+          // UI-1b-08: WhatsApp share green — third-party brand colour,
+          // tokenized as a documented exception (globals.css
+          // --brand-whatsapp / --brand-whatsapp-hover).
+          whatsapp: 'rgb(var(--brand-whatsapp) / <alpha-value>)',
+          whatsappHover: 'rgb(var(--brand-whatsapp-hover) / <alpha-value>)',
         },
         graphite: {
           DEFAULT: '#171916',

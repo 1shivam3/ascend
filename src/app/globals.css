@@ -25,6 +25,11 @@
   --brand-chalk: #F3F0E7;
   --brand-vermilion: #E44427;
   --brand-sage: #858076;
+  --brand-whatsapp: 5 150 105;    /* #059669 — WhatsApp share green: the
+    app's shade of the WhatsApp brand colour (#25D366 darkened so white
+    button text stays legible). Third-party brand exception to the token
+    palette — WhatsApp share actions only (UI-1b-08). */
+  --brand-whatsapp-hover: 16 185 129; /* #10B981 */
 
   --bg: #F3F0E7;
   --surface: #FFFFFF;
@@ -80,6 +85,9 @@
   --brand-chalk: #F3F0E7;
   --brand-vermilion: #E44427;
   --brand-sage: #858076;
+  --brand-whatsapp: 5 150 105;    /* #059669 — see :root (brand exception,
+    identical in dark: third-party brand colour does not theme). */
+  --brand-whatsapp-hover: 16 185 129; /* #10B981 */
 
   --bg: #171916;
   --surface: #212420;
@@ -350,8 +358,19 @@
     min-width: 0;
   }
 
+  /* A11Y-01 (final certification): the active label is 12px text — raw
+     --accent on the light bar is 3.57:1 (fails AA for small text), so
+     light mode uses --accent-text, the AA text shade (4.66:1 on
+     #F3F0E7). Dark mode keeps raw --accent: at 5.00:1 on #121411 it
+     already passes and is the shipped dark look. The icon keeps
+     text-accent in both modes (non-text, 3:1 bar). */
   .native-tab-item.active {
-    @apply text-accent font-semibold;
+    @apply font-semibold;
+    color: var(--accent-text);
+  }
+
+  .dark .native-tab-item.active {
+    color: rgb(var(--accent));
   }
 
   .native-tab-indicator {
