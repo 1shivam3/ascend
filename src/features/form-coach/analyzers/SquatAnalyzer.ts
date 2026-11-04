@@ -144,8 +144,14 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
         priority: 'medium',
         cooldownMs: 4000,
         limitation: 'Hip joint landmark is an approximation of the external hip crease.',
+        // Judged at ASCENT, not at the bottom crossing: shallowness is a
+        // property of the rep's FINAL minimum, which does not exist until
+        // the descent ends. At the first bottom-threshold frame the
+        // running minimum can still be ~103° on a rep that goes on to
+        // bottom out at 46° — judging there flagged deep reps as shallow
+        // (and contradicted the good-depth observation on the same rep).
         evaluate: (ctx) =>
-          ctx.phase === 'bottom' &&
+          ctx.phase === 'ascending' &&
           ctx.minKneeAngleDeg !== null &&
           ctx.minKneeAngleDeg > ctx.depthTargetDeg + 12,
         formatEvidence: (ctx) => `Estimated bottom knee angle ${Math.round(ctx.minKneeAngleDeg ?? 0)}° (target ≤ ${ctx.depthTargetDeg}°).`,
@@ -273,10 +279,12 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
   ): AnalyzerFrameResult {
     this.framesProcessed += 1;
     if (!landmarks || landmarks.length < 33) {
-      // No pose this frame: feet/ankles count as absent, but the alert
-      // still requires the absence to be sustained (D2).
-      const feetOut = this.sustainedOut(this.feetVisibilityWindow, false, timestampMs);
-      const anklesOut = this.sustainedOut(this.anklesVisibilityWindow, false, timestampMs);
+      // No pose at all on this frame. That is a TRACKING state, not feet
+      // evidence: "feet out of frame" is a claim about a tracked person,
+      // so no-pose frames never enter the visibility windows and never
+      // raise the alert. (On the owner's video the only bad feet samples
+      // were post-set — feet leaving the frame as he walked to the
+      // camera, then no-pose frames; the set itself was clean.)
       const activeCue = this.feedbackEngine.evaluate({
         exerciseId: this.exerciseId,
         phase: 'tracking_lost',
@@ -286,8 +294,8 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
         trackingConfidence: 0,
         feetVisible: false,
         anklesVisible: false,
-        feetSustainedOut: feetOut,
-        anklesSustainedOut: anklesOut,
+        feetSustainedOut: false,
+        anklesSustainedOut: false,
         sideViewDetected: !this.currentRepConfidentlyFront(),
         depthTargetDeg: this.depthTargetDeg,
         currentRepNumber: this.completedReps.length,

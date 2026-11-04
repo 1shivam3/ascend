@@ -183,6 +183,57 @@ describe('SquatAnalyzer — correctness fixes (D1/D2/D3)', () => {
     expect(summary.observations.map((o) => o.ruleId)).toContain('rule-feet-out-of-frame');
   });
 
+  it('D2: post-set tracking loss (no-pose frames) never raises the feet alert', () => {
+    let t = 1000;
+    t = feedRep(analyzer, t);
+    // The lifter walks to the camera and tracking is lost entirely for
+    // 1.5 s. No pose is not feet evidence — the set itself was clean.
+    for (let i = 0; i < 15; i++) {
+      analyzer.processFrame(null, t);
+      t += 100;
+    }
+
+    const summary = analyzer.finishSet();
+    expect(summary.totalValidReps).toBe(1);
+    expect(summary.observations.map((o) => o.ruleId)).not.toContain('rule-feet-out-of-frame');
+  });
+
+  it('D3: a deep rep whose first bottom-crossing frame is ~103° is not flagged shallow', () => {
+    // The sampled angle lands at 103° on the frame that first crosses
+    // the bottom threshold, then the rep continues to ~50°. Judging
+    // shallowness at the crossing (the old behavior) flagged this deep
+    // rep "above target" alongside its good-depth observation.
+    const angles = [170, 170, 150, 130, 110, 103, 90, 70, 55, 50, 50, 70, 90, 110, 130, 150, 160, 170];
+    let t = 1000;
+    for (const a of angles) {
+      analyzer.processFrame(landmarksForKneeAngle(a), t);
+      t += 100;
+    }
+
+    const summary = analyzer.finishSet();
+    expect(summary.totalValidReps).toBe(1);
+    expect(summary.observations.map((o) => o.ruleId)).not.toContain('rule-depth-shallow');
+    expect(summary.observations.map((o) => o.ruleId)).toContain('rule-depth-good');
+  });
+
+  it('D3: a genuinely shallow rep is flagged at ascent with its final minimum as evidence', () => {
+    // Bottoms out at ~104° — a valid rep (≤110°) that never reaches the
+    // 90° depth target. The flag must cite 104°, the rep's true minimum.
+    const angles = [170, 170, 150, 130, 108, 104, 104, 115, 130, 150, 165];
+    let t = 1000;
+    for (const a of angles) {
+      analyzer.processFrame(landmarksForKneeAngle(a), t);
+      t += 100;
+    }
+
+    const summary = analyzer.finishSet();
+    expect(summary.totalValidReps).toBe(1);
+    expect(summary.reps[0].estimatedDepth).toBe('above_parallel');
+    const shallow = summary.observations.find((o) => o.ruleId === 'rule-depth-shallow');
+    expect(shallow).toBeDefined();
+    expect(shallow?.evidence).toContain('104°');
+  });
+
   it('D3: the good-depth evidence cites the measured rep minimum, not the threshold', () => {
     let t = 1000;
     t = feedRep(analyzer, t);
