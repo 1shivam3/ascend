@@ -15,7 +15,27 @@ import { FormCue, MovementPhase } from '../models/form-feedback.types';
 import { FormSessionSummary, FormCoachConfig } from '../models/form-session.types';
 import { FormSessionRepository } from '../repositories/FormSessionRepository';
 
-export type FormCoachState = 'select' | 'analyzing' | 'report' | 'error';
+export type FormCoachState = 'select' | 'analyzing' | 'report' | 'no-tracking' | 'error';
+
+/**
+ * D4: decides what the end of an analysis means. When pose tracking
+ * never found the lifter — zero tracked frames, or tracking present on
+ * a negligible share of a long stream — there is no honest summary to
+ * show: the UI must say tracking failed and how to refilm, instead of
+ * sitting in the analyzing state or rendering an empty report. When
+ * tracking worked but no rep was valid, the summary (0 valid reps) IS
+ * the honest result and renders as a report.
+ */
+export function resolveAnalysisOutcome(stats: {
+  framesProcessed: number;
+  framesTracked: number;
+}): 'report' | 'no-tracking' {
+  if (stats.framesTracked === 0) return 'no-tracking';
+  if (stats.framesProcessed >= 30 && stats.framesTracked / stats.framesProcessed < 0.02) {
+    return 'no-tracking';
+  }
+  return 'report';
+}
 
 export interface UseFormCoachOptions {
   exerciseId?: string;
@@ -257,6 +277,27 @@ export function useFormCoach({
     };
   }, [onRepCompleted]);
 
+  /**
+   * Shared finish path for playback end and "View Report Now": builds
+   * the summary when tracking actually saw the lifter, and routes to
+   * the no-tracking state — saving nothing — when it never did (D4).
+   */
+  const finishAnalysis = useCallback(() => {
+    const stats = analyzerRef.current.getTrackingStats?.() ?? {
+      framesProcessed: 1,
+      framesTracked: 1,
+    };
+    if (resolveAnalysisOutcome(stats) === 'no-tracking') {
+      setSummary(null);
+      setState('no-tracking');
+      return;
+    }
+    const sessionSummary = analyzerRef.current.finishSet(workoutId, setIndex);
+    FormSessionRepository.saveSession(sessionSummary);
+    setSummary(sessionSummary);
+    setState('report');
+  }, [workoutId, setIndex]);
+
   // Video completion listener
   useEffect(() => {
     const video = videoRef.current;
@@ -266,13 +307,7 @@ export function useFormCoach({
       if (isAnalyzingRef.current) {
         isAnalyzingRef.current = false;
         setProgressPercent(100);
-
-        // Generate and save report
-        const sessionSummary = analyzerRef.current.finishSet(workoutId, setIndex);
-        FormSessionRepository.saveSession(sessionSummary);
-
-        setSummary(sessionSummary);
-        setState('report');
+        finishAnalysis();
       }
     };
 
@@ -294,7 +329,7 @@ export function useFormCoach({
       video.removeEventListener('ended', handleEnded);
       video.removeEventListener('timeupdate', handleTimeUpdate);
     };
-  }, [workoutId, setIndex]);
+  }, [finishAnalysis]);
 
   /**
    * Immediately finishes analysis and generates report on frames processed so far.
@@ -307,12 +342,9 @@ export function useFormCoach({
         video.pause();
       }
       setProgressPercent(100);
-      const sessionSummary = analyzerRef.current.finishSet(workoutId, setIndex);
-      FormSessionRepository.saveSession(sessionSummary);
-      setSummary(sessionSummary);
-      setState('report');
+      finishAnalysis();
     }
-  }, [workoutId, setIndex]);
+  }, [finishAnalysis]);
 
   // Teardown on unmount
   useEffect(() => {

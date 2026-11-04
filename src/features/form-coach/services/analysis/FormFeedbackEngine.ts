@@ -28,6 +28,14 @@ export interface RuleEvaluationContext {
   trackingConfidence: number;
   feetVisible: boolean;
   anklesVisible: boolean;
+  /**
+   * Sustained-dropout flags (D2): true only when the feet/ankles have been
+   * out of frame for a substantial share of a recent window — a momentary
+   * visibility dip must not raise the out-of-frame alert. Optional so
+   * older contexts keep compiling; the squat rules read these.
+   */
+  feetSustainedOut?: boolean;
+  anklesSustainedOut?: boolean;
   sideViewDetected: boolean;
   depthTargetDeg: number;
   currentRepNumber: number;
@@ -85,6 +93,17 @@ export class FormFeedbackEngine {
       const lastTriggered = this.lastTriggeredTimes.get(rule.id) ?? 0;
       // Cooldown applies only if the rule was previously triggered
       if (lastTriggered > 0 && now - lastTriggered < rule.cooldownMs) {
+        // Evidence freshness (D3 fix): a rule already on the observation
+        // ledger keeps its EVIDENCE current while it still matches, even
+        // though the cue itself stays on cooldown. Depth rules used to
+        // freeze their evidence at the trigger frame — the first frame
+        // the running rep minimum crossed the threshold (≈95°) — while
+        // the rep went on to bottom out far deeper (≈46–50°), so the
+        // report cited the threshold as if it were the measurement.
+        const existing = this.observationCounts.get(rule.id);
+        if (existing && rule.formatEvidence && rule.evaluate(ctx)) {
+          existing.evidence = rule.formatEvidence(ctx);
+        }
         continue;
       }
 

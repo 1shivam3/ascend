@@ -57,6 +57,15 @@ export interface ExerciseAnalyzer {
   ): FormSessionSummary;
 
   /**
+   * Optional frame accounting: how many frames were offered to the
+   * analyzer vs how many carried a detected pose. Lets the UI tell
+   * "tracking never found a person" apart from "tracked fine, no valid
+   * reps" (D4). Analyzers that do not implement it are treated as
+   * having tracked normally.
+   */
+  getTrackingStats?: () => { framesProcessed: number; framesTracked: number };
+
+  /**
    * Releases resources if necessary.
    */
   cleanup(): void;

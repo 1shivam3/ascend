@@ -21,6 +21,45 @@ import { safeRandomId } from '@/lib/formatters';
 
 export const SQUAT_ANALYZER_VERSION = '1.0.0';
 
+/**
+ * D2: the feet-out-of-frame alert requires a SUSTAINED dropout — the feet
+ * or ankles must be missing for at least this share of the samples inside
+ * the trailing window, and the window must span at least the minimum
+ * duration, before the absence counts as real.
+ */
+const VISIBILITY_WINDOW_MS = 1200;
+const VISIBILITY_MIN_SPAN_MS = 700;
+const VISIBILITY_BAD_SHARE = 0.6;
+
+/**
+ * D1: a rep counts as confidently FRONT only when front classifications
+ * are at least this share of the rep's classified frames (and there are
+ * enough of them to judge at all).
+ */
+const FRONT_CONFIDENT_MIN_VOTES = 4;
+const FRONT_CONFIDENT_SHARE = 0.6;
+
+/** Majority view over classified votes; 'front' must win outright — a tie
+ * resolves to a side view, so the front-view guidance never fires on
+ * ambiguous evidence. 'unknown' votes carry no information and are ignored. */
+function majorityView(votes: DetectedSide[]): DetectedSide {
+  const counts = { left: 0, right: 0, front: 0 };
+  for (const v of votes) {
+    if (v === 'left' || v === 'right' || v === 'front') counts[v] += 1;
+  }
+  const sideBest = counts.left >= counts.right ? 'left' : 'right';
+  const sideCount = Math.max(counts.left, counts.right);
+  if (counts.front > sideCount) return 'front';
+  if (sideCount > 0) return sideBest as DetectedSide;
+  if (counts.front > 0) return 'front';
+  return 'unknown';
+}
+
+interface VisibilitySample {
+  t: number;
+  ok: boolean;
+}
+
 export class SquatAnalyzer implements ExerciseAnalyzer {
   readonly exerciseId = 'squat';
   readonly exerciseName = 'Barbell Back Squat';
@@ -45,6 +84,21 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
   private detectedSide: DetectedSide = 'unknown';
   private trackingConfidences: number[] = [];
   private depthTargetDeg: number = 90;
+  // D1: camera-view votes, accumulated ONLY over frames that belong to a
+  // rep (descending/bottom/ascending), and the decided view per completed
+  // rep. The session view and the front-view guidance are judged from
+  // these — never from the final frame, which may be the lifter turning
+  // to face the camera and walking toward it after the set.
+  private currentRepViewVotes: DetectedSide[] = [];
+  private completedRepViews: DetectedSide[] = [];
+  // D2: trailing visibility windows for the feet/ankles sustained-dropout
+  // test.
+  private feetVisibilityWindow: VisibilitySample[] = [];
+  private anklesVisibilityWindow: VisibilitySample[] = [];
+  // D4: frame accounting so the UI can distinguish "never tracked at all"
+  // from "tracked, but no valid reps".
+  private framesProcessed = 0;
+  private framesTracked = 0;
 
   constructor(config: Partial<RepStateMachineConfig> = {}) {
     this.depthTargetDeg = config.depthTargetDeg ?? DEFAULT_SQUAT_CONFIG.depthTargetDeg;
@@ -65,7 +119,10 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
         priority: 'critical',
         cooldownMs: 4000,
         limitation: 'Pose model cannot verify squat depth without ankle and foot tracking.',
-        evaluate: (ctx) => !ctx.feetVisible || !ctx.anklesVisible,
+        // D2: only a SUSTAINED dropout alerts. A single frame's visibility
+        // dip (the owner's rep 3: pose found on every frame, one ankle
+        // landmark briefly under threshold) must not raise this.
+        evaluate: (ctx) => ctx.feetSustainedOut === true || ctx.anklesSustainedOut === true,
         formatEvidence: (ctx) => 'Feet or ankle landmarks dropped below visibility threshold.',
       },
       {
@@ -104,7 +161,10 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
           ctx.phase === 'bottom' &&
           ctx.minKneeAngleDeg !== null &&
           ctx.minKneeAngleDeg <= ctx.depthTargetDeg + 5,
-        formatEvidence: (ctx) => `Estimated bottom knee angle ${Math.round(ctx.minKneeAngleDeg ?? 0)}° achieved.`,
+        // Evidence cites the MEASURED rep minimum (kept current by the
+        // engine's evidence refresh); the target is named separately as
+        // a target, never as the achieved angle (D3 fix).
+        formatEvidence: (ctx) => `Estimated bottom knee angle ${Math.round(ctx.minKneeAngleDeg ?? 0)}° (target ≤ ${ctx.depthTargetDeg}°).`,
       },
       {
         id: 'rule-torso-inclination',
@@ -137,6 +197,45 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
     this.sessionStartTimeMs = Date.now();
     this.detectedSide = 'unknown';
     this.trackingConfidences = [];
+    this.currentRepViewVotes = [];
+    this.completedRepViews = [];
+    this.feetVisibilityWindow = [];
+    this.anklesVisibilityWindow = [];
+    this.framesProcessed = 0;
+    this.framesTracked = 0;
+  }
+
+  /** D4: how many frames were offered vs how many carried a detected pose. */
+  getTrackingStats(): { framesProcessed: number; framesTracked: number } {
+    return { framesProcessed: this.framesProcessed, framesTracked: this.framesTracked };
+  }
+
+  /**
+   * D2: push one visibility sample into a trailing window and report
+   * whether the absence is SUSTAINED — window spans at least
+   * VISIBILITY_MIN_SPAN_MS and at least VISIBILITY_BAD_SHARE of its
+   * samples are not-ok. A brief dip inside an otherwise visible window
+   * returns false.
+   */
+  private sustainedOut(window: VisibilitySample[], ok: boolean, timestampMs: number): boolean {
+    window.push({ t: timestampMs, ok });
+    const cutoff = timestampMs - VISIBILITY_WINDOW_MS;
+    while (window.length > 1 && window[0].t < cutoff) {
+      window.shift();
+    }
+    if (window.length === 0) return false;
+    const span = timestampMs - window[0].t;
+    if (span < VISIBILITY_MIN_SPAN_MS) return false;
+    const bad = window.reduce((acc, s) => acc + (s.ok ? 0 : 1), 0);
+    return bad / window.length >= VISIBILITY_BAD_SHARE;
+  }
+
+  /** D1: is the CURRENT rep confidently front-view across its frames so far? */
+  private currentRepConfidentlyFront(): boolean {
+    const classified = this.currentRepViewVotes.filter((v) => v !== 'unknown');
+    if (classified.length < FRONT_CONFIDENT_MIN_VOTES) return false;
+    const front = classified.filter((v) => v === 'front').length;
+    return front / classified.length >= FRONT_CONFIDENT_SHARE && majorityView(classified) === 'front';
   }
 
   /**
@@ -172,7 +271,12 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
     timestampMs: number,
     aspectRatio = 1.0
   ): AnalyzerFrameResult {
+    this.framesProcessed += 1;
     if (!landmarks || landmarks.length < 33) {
+      // No pose this frame: feet/ankles count as absent, but the alert
+      // still requires the absence to be sustained (D2).
+      const feetOut = this.sustainedOut(this.feetVisibilityWindow, false, timestampMs);
+      const anklesOut = this.sustainedOut(this.anklesVisibilityWindow, false, timestampMs);
       const activeCue = this.feedbackEngine.evaluate({
         exerciseId: this.exerciseId,
         phase: 'tracking_lost',
@@ -182,7 +286,9 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
         trackingConfidence: 0,
         feetVisible: false,
         anklesVisible: false,
-        sideViewDetected: false,
+        feetSustainedOut: feetOut,
+        anklesSustainedOut: anklesOut,
+        sideViewDetected: !this.currentRepConfidentlyFront(),
         depthTargetDeg: this.depthTargetDeg,
         currentRepNumber: this.completedReps.length,
         timestampMs,
@@ -207,6 +313,7 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
     // Determine side profile
     const side = this.determineSide(landmarks);
     this.detectedSide = side;
+    this.framesTracked += 1;
 
     // Pick primary side landmarks (fallback to opposite side if primary is occluded)
     const preferLeft = side === 'left' || side === 'unknown' || side === 'front';
@@ -274,11 +381,34 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
       timestampMs
     );
 
+    const currentPhase = this.stateMachine.getCurrentPhase();
+
+    // D1: camera-view votes accumulate ONLY over frames that belong to a
+    // rep. The frame that completes a rep is that rep's last frame; its
+    // vote counts before the rep's view is decided by majority. Frames
+    // outside reps — setup, standing between reps, and the post-set
+    // turn/walk toward the camera — never vote, so they can neither
+    // relabel the session nor trigger the front-view guidance.
     if (completedRep) {
+      this.currentRepViewVotes.push(side);
+      this.completedRepViews.push(majorityView(this.currentRepViewVotes));
+      this.currentRepViewVotes = [];
       this.completedReps.push(completedRep);
+    } else if (
+      currentPhase === 'descending' ||
+      currentPhase === 'bottom' ||
+      currentPhase === 'ascending'
+    ) {
+      this.currentRepViewVotes.push(side);
     }
 
-    const currentPhase = this.stateMachine.getCurrentPhase();
+    // D2: sustained-dropout tracking for the feet/ankles alert.
+    const feetSustainedOut = this.sustainedOut(this.feetVisibilityWindow, feetInFrame, timestampMs);
+    const anklesSustainedOut = this.sustainedOut(
+      this.anklesVisibilityWindow,
+      anklesInFrame,
+      timestampMs
+    );
 
     // The feedback engine judges depth against the rep's running minimum
     // knee angle (the same minimum stamped onto the completed rep), not the
@@ -295,7 +425,13 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
       trackingConfidence,
       feetVisible: feetInFrame,
       anklesVisible: anklesInFrame,
-      sideViewDetected: side === 'left' || side === 'right',
+      feetSustainedOut,
+      anklesSustainedOut,
+      // D1: the front-view guidance fires only when the CURRENT REP is
+      // confidently front across most of its frames so far — a per-frame
+      // side classification (which flickers, and flips entirely during
+      // the post-set walk-off) no longer drives it.
+      sideViewDetected: !this.currentRepConfidentlyFront(),
       depthTargetDeg: this.depthTargetDeg,
       currentRepNumber: this.completedReps.length,
       timestampMs,
@@ -337,6 +473,19 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
 
     const observations: FormObservation[] = this.feedbackEngine.getAggregatedObservations();
 
+    // D1: the session's camera view is the majority of the views decided
+    // per rep — the view DURING the work. It used to be whatever the very
+    // last frame classified as, which is the lifter turning to face the
+    // camera after the set, so side-filmed sets were summarized as
+    // "front". Falls back to the in-progress rep's votes, then to the
+    // last frame classification when no rep was ever in progress.
+    const sessionView: DetectedSide =
+      this.completedRepViews.length > 0
+        ? majorityView(this.completedRepViews)
+        : this.currentRepViewVotes.length > 0
+          ? majorityView(this.currentRepViewVotes)
+          : this.detectedSide;
+
     return {
       id: safeRandomId(),
       workoutId,
@@ -344,7 +493,7 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
       exerciseId: this.exerciseId,
       exerciseName: this.exerciseName,
       analyzerVersion: SQUAT_ANALYZER_VERSION,
-      cameraView: this.detectedSide,
+      cameraView: sessionView,
       startedAt: this.sessionStartTimeMs,
       endedAt: now,
       durationSeconds,

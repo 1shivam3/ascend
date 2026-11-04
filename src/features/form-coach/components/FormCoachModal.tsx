@@ -18,6 +18,7 @@ import FormSessionSummaryModal from './FormSessionSummaryModal';
 import {
   Upload,
   Video,
+  VideoOff,
   ShieldCheck,
   AlertCircle,
   X,
@@ -367,7 +368,49 @@ export default function FormCoachModal({
           />
         )}
 
-        {/* ── State 4: Error State ─────────────────────────────────────────── */}
+        {/* ── State 4: No Tracking (D4) ─────────────────────────────────── */}
+        {state === 'no-tracking' && (
+          <div className="p-6 space-y-4">
+            <div className="text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mx-auto">
+                <VideoOff className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-text-primary">Couldn’t Track Your Movement</h3>
+                <p className="text-xs text-text-secondary max-w-sm mx-auto leading-relaxed">
+                  Form Coach never found a trackable body position in this video, so there is no report to show. Refilming with the setup below usually fixes it:
+                </p>
+              </div>
+            </div>
+
+            <ul className="space-y-1.5 text-xs text-text-secondary max-w-sm mx-auto list-disc list-inside">
+              <li>Keep your whole body in frame, head to feet, for the entire set</li>
+              <li>Film from the side at about hip height</li>
+              <li>Use good, even light — avoid a bright window behind you</li>
+              <li>Prop the phone steady and keep your feet visible the whole time</li>
+            </ul>
+
+            <div className="pt-2 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={handleSafeClose}
+                className="py-2.5 px-5 rounded-xl border border-border-subtle bg-surface-elevated hover:bg-surface-base text-text-secondary text-xs font-medium cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={reset}
+                className="py-2.5 px-5 rounded-xl bg-accent-primary text-text-on-accent text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Try Another Video</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── State 5: Error State ─────────────────────────────────────────── */}
         {state === 'error' && (
           <div className="p-6 text-center space-y-4">
             <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mx-auto">
