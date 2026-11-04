@@ -54,7 +54,7 @@ const ImportProgramModal = dynamic(() => import('@/components/ImportProgramModal
 import { decodeProgramFromHash, DecodedProgram } from '@/lib/program-sharing';
 import { PlannedWorkout } from '@/lib/types';
 import { useAppNavigation, TabId } from '@/lib/navigation';
-import { useTranslation } from '@/lib/i18n';
+import { useTranslation, useLanguageReady } from '@/lib/i18n';
 import type { StringKey } from '@/lib/i18n/en';
 
 const tabs = [
@@ -77,7 +77,11 @@ export default function AppPage() {
     registerBackHandler,
   } = useAppNavigation();
 
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  // PERF-2: the Hindi dictionary is lazy-loaded. Hold the splash for a
+  // stored Hindi preference until that load settles, so a cold start in
+  // Hindi paints Hindi — never an English flash that flips afterwards.
+  const languageReady = useLanguageReady(language);
 
   const [sharedProgram, setSharedProgram] = useState<DecodedProgram | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -345,7 +349,7 @@ export default function AppPage() {
   }
 
   // Branded splash/skeleton during SSR & storage hydration to prevent flashing the login screen to existing athletes
-  if (!mounted || !_hasHydrated) {
+  if (!mounted || !_hasHydrated || !languageReady) {
     return (
       <main id="main-content" className="w-full min-h-[100dvh]">
         <SplashScreen isHydrating />
