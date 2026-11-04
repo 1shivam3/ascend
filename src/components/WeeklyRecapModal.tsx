@@ -427,7 +427,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
           <button
             type="button"
             onClick={handleShareWhatsApp}
-            className="py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95"
+            className="py-2.5 rounded-xl bg-brand-whatsapp hover:bg-brand-whatsappHover text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95"
           >
             <MessageCircle className="w-4 h-4" />
             <span>{t('recap.shareWhatsapp')}</span>
