@@ -120,7 +120,21 @@ describe('gauntlet Cycle 3 R-01: SESSIONS DONE is schedule-scoped by contract', 
 
   it('scheduled week + ONLY unscheduled Sunday training: adherence stays 0/3, tonnage still counts', () => {
     const review = buildWeeklyReview(
-      input({ workouts: [sundaySession()], weeklySchedule: THREE_DAY })
+      // UI-1b-02 fixture note: the scenario is an established user
+      // whose plan (p1, referenced by THREE_DAY) long predates this
+      // week, so the plan record is part of the input — as it always
+      // is in production, where the store passes every plan. Without
+      // it, the input describes a user whose only data in existence
+      // is the Sunday session itself, i.e. a first-week user, whose
+      // Mon/Wed/Fri were never due and must not be scored (that case
+      // is pinned in tests/weekly-review.test.ts, UI-1b-02 personas).
+      input({
+        workouts: [sundaySession()],
+        weeklySchedule: THREE_DAY,
+        plannedWorkouts: [
+          { id: 'p1', name: 'Plan p1', exercises: [], createdAt: '2026-01-01' },
+        ],
+      })
     );
     expect(review.sessionsPlanned).toBe(3);
     // Sunday was never scheduled, so no planned session was done —

@@ -583,6 +583,68 @@ describe('accountability', () => {
     expect(missed.map((m) => m.date)).not.toContain(at(2));
   });
 
+  // UI-1b-02: a session can only be missed on or after the date its
+  // plan was created (PlannedSession.startsOn). Persona fixtures,
+  // seeded-history style (cf. tests/coach-sim-personas).
+  it('startsOn: sessions dated before the plan existed are never flagged', () => {
+    // Day-2 persona: the plan was created on Wednesday of last week.
+    // Monday's session predates the plan — not missed, never due.
+    // Wednesday's own session is eligible (boundary: startsOn == date)
+    // and Friday's is a genuine miss.
+    const monday = (() => {
+      const d = new Date();
+      const wd = (d.getDay() + 6) % 7;
+      d.setDate(d.getDate() - wd - 7);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+    const at = (offset: number) => {
+      const d = new Date(monday + 'T00:00:00');
+      d.setDate(d.getDate() + offset);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const gated = [
+      { weekday: 0, name: 'Upper A', startsOn: at(2) },
+      { weekday: 2, name: 'Lower A', startsOn: at(2) },
+      { weekday: 4, name: 'Upper B', startsOn: at(2) },
+    ];
+    const missed = detectMissedSessions(gated, [], { start: monday, end: at(6) });
+    expect(missed.map((m) => m.date).sort()).toEqual([at(2), at(4)].sort());
+    expect(missed.map((m) => m.name)).not.toContain('Upper A');
+  });
+
+  it('startsOn: a plan created today flags nothing earlier this week', () => {
+    // Day-0 persona — the audit case: account and plan created today;
+    // the check-in must not say a session "didn't get logged
+    // yesterday". Only today's own scheduled session may be flagged.
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const mondayDate = new Date(today);
+    mondayDate.setDate(mondayDate.getDate() - ((today.getDay() + 6) % 7));
+    const mondayStr = `${mondayDate.getFullYear()}-${String(mondayDate.getMonth() + 1).padStart(2, '0')}-${String(mondayDate.getDate()).padStart(2, '0')}`;
+    const todayWeekday = (today.getDay() + 6) % 7;
+    const gated = [
+      { weekday: 0, name: 'Upper A', startsOn: todayStr },
+      { weekday: todayWeekday, name: 'Today Session', startsOn: todayStr },
+    ];
+    const missed = detectMissedSessions(gated, [], { start: mondayStr, end: todayStr });
+    expect(missed.length).toBe(1);
+    expect(missed[0].date).toBe(todayStr);
+    expect(missed[0].name).toBe(todayWeekday === 0 ? 'Upper A' : 'Today Session');
+  });
+
+  it('startsOn: an established plan (created long ago) still flags genuine misses', () => {
+    const monday = (() => {
+      const d = new Date();
+      const wd = (d.getDay() + 6) % 7;
+      d.setDate(d.getDate() - wd - 7);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+    const gated = [{ weekday: 0, name: 'Push Day', startsOn: '2020-01-01' }];
+    const missed = detectMissedSessions(gated, [], { start: monday, end: monday });
+    expect(missed.length).toBe(1);
+    expect(missed[0].date).toBe(monday);
+  });
+
   it('detects skipped legs across weeks', () => {
     // 4 weeks of training, only upper body in the last 3
     const workouts: WorkoutEntry[] = [];
