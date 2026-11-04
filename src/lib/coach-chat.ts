@@ -16,6 +16,8 @@
  * server route must not log message content at all.
  */
 
+import type { FormSessionSummary } from '../features/form-coach/models/form-session.types';
+
 // ── Caps (defined in code, enforced server-side) ──────────────────────────
 /** Max reply length the server will ever return (chars). */
 export const COACH_CHAT_MAX_REPLY_CHARS = 1500;
@@ -111,6 +113,11 @@ export function detectSafetyStop(message: string): CoachChatSafetyStop {
 export const COACH_CHAT_NOTES_SECTION_HEADER =
   "NOTES FROM TODAY'S CHECK-IN (the user's own words):";
 
+/** Form-check section header (coach bridge B2): app-generated measurement
+ * summaries from the user's own form-check videos — never user free text. */
+export const COACH_CHAT_FORM_SECTION_HEADER =
+  'FORM CHECKS (on-device camera measurements from the user\'s own videos):';
+
 /**
  * Every section header buildCoachChatContext can emit (final-cert
  * SEC F-01). extractCheckinNotes bounds the notes span by the NEXT of
@@ -130,6 +137,7 @@ export const COACH_CHAT_KNOWN_SECTION_HEADERS: readonly string[] = [
   'READINESS TODAY: ',
   'MUSCLES NEEDING CAUTION TODAY: ',
   'WEEKLY REVIEWS:',
+  COACH_CHAT_FORM_SECTION_HEADER,
   'NUTRITION TODAY: ',
   'LATEST BODY MEASUREMENT: ',
   "TODAY'S CHECK-IN: ",
@@ -585,13 +593,102 @@ function fmtKg(v: number, unit: 'kg' | 'lbs'): string {
   return unit === 'lbs' ? `${Math.round(v * 2.20462)} lbs` : `${Math.round(v)} kg`;
 }
 
+// ── Form-check bridge (B2) ────────────────────────────────────────────────
+function formSessionDate(startedAt: number): string {
+  return new Date(startedAt).toISOString().slice(0, 10);
+}
+
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
+}
+
+/**
+ * Serializes stored form-check summaries into compact context lines:
+ * per exercise, the latest session in full (date, valid reps, depth
+ * split, min-knee-angle range, max torso lean, avg tempo, observation
+ * titles) plus a trend line over up to the last 5 sessions. Pure and
+ * deterministic — sessions are sorted newest-first here, never trusted
+ * to arrive in order. Numbers only ever come from the summaries.
+ */
+export function serializeFormChecks(sessions: FormSessionSummary[]): {
+  lines: string[];
+  evidenceLine: string | null;
+} {
+  const sorted = [...sessions].sort((a, b) => b.startedAt - a.startedAt);
+  const byExercise = new Map<string, FormSessionSummary[]>();
+  for (const s of sorted) {
+    const list = byExercise.get(s.exerciseId) ?? [];
+    list.push(s);
+    byExercise.set(s.exerciseId, list);
+  }
+
+  const lines: string[] = [];
+  let evidenceLine: string | null = null;
+
+  for (const exerciseSessions of byExercise.values()) {
+    const recent = exerciseSessions.slice(0, 5);
+    const latest = recent[0];
+    const name = latest.exerciseName;
+    const reps = latest.reps;
+    const below = reps.filter((r) => r.estimatedDepth === 'below_parallel').length;
+    const parallel = reps.filter((r) => r.estimatedDepth === 'parallel').length;
+    const above = reps.filter((r) => r.estimatedDepth === 'above_parallel').length;
+
+    if (reps.length > 0) {
+      const kneeAngles = reps.map((r) => r.minKneeAngleDeg);
+      const maxTorso = Math.max(...reps.map((r) => r.maxTorsoInclinationDeg));
+      const titles = [...new Set(latest.observations.map((o) => o.title))];
+      lines.push(
+        `${name} — latest ${formSessionDate(latest.startedAt)}: ${latest.totalValidReps} valid reps; ` +
+          `depth below parallel ${below} of ${reps.length}, parallel ${parallel}, above ${above}; ` +
+          `min knee angle ${Math.min(...kneeAngles)}–${Math.max(...kneeAngles)}°; ` +
+          `max torso lean ${maxTorso}°; avg tempo ${round1(latest.averageRepDurationSeconds)}s/rep; ` +
+          `observations: ${titles.length > 0 ? titles.join(', ') : 'none'}`
+      );
+      if (!evidenceLine) {
+        evidenceLine =
+          `Latest form check: ${name} on ${formSessionDate(latest.startedAt)} — ` +
+          `${latest.totalValidReps} valid reps, below parallel on ${below} of ${reps.length} reps (camera-measured)`;
+      }
+    } else {
+      lines.push(
+        `${name} — latest ${formSessionDate(latest.startedAt)}: no valid reps measured`
+      );
+      if (!evidenceLine) {
+        evidenceLine = `Latest form check: ${name} on ${formSessionDate(latest.startedAt)} — no valid reps measured`;
+      }
+    }
+
+    if (recent.length >= 2) {
+      const trendReps = recent.flatMap((s) => s.reps);
+      const trendBelow = trendReps.filter((r) => r.estimatedDepth === 'below_parallel').length;
+      const tempoWeight = recent.reduce((acc, s) => acc + s.totalValidReps, 0);
+      const trendTempo =
+        tempoWeight > 0
+          ? round1(
+              recent.reduce((acc, s) => acc + s.averageRepDurationSeconds * s.totalValidReps, 0) /
+                tempoWeight
+            )
+          : 0;
+      lines.push(
+        `${name} — last ${recent.length} checks: below parallel on ${trendBelow} of ${trendReps.length} reps; avg tempo ${trendTempo}s/rep`
+      );
+    }
+  }
+
+  return { lines, evidenceLine };
+}
+
 /**
  * Assembles the grounded context from ONE user's data. Pure and
  * deterministic: the same data always yields the same text, and an empty
  * user yields a context that contains NO invented numbers, names, or
  * history — only the explicit no-history marker.
  */
-export function buildCoachChatContext(data: CoachChatUserData): CoachChatContext {
+export function buildCoachChatContext(
+  data: CoachChatUserData,
+  formSessions: FormSessionSummary[] = []
+): CoachChatContext {
   const evidence: string[] = [];
   const sections: string[] = [];
 
@@ -690,6 +787,17 @@ export function buildCoachChatContext(data: CoachChatUserData): CoachChatContext
     if (latest) evidence.push(`Latest review (week of ${latest.weekMonday}): ${latest.focusHeadline}`);
   }
 
+  // Form-check bridge (B2): measured form data joins the grounding
+  // context when the user has form checks on record. Absent sessions →
+  // no section, and the context is byte-identical to before the bridge.
+  if (formSessions.length > 0) {
+    const form = serializeFormChecks(formSessions);
+    if (form.lines.length > 0) {
+      sections.push(`${COACH_CHAT_FORM_SECTION_HEADER}\n- ${form.lines.join('\n- ')}`);
+      if (form.evidenceLine) evidence.push(form.evidenceLine);
+    }
+  }
+
   if (data.mealsToday && data.macroGoals) {
     sections.push(
       `NUTRITION TODAY: ${Math.round(data.mealsToday.calories)} kcal, ${Math.round(data.mealsToday.proteinG)} g protein ` +
@@ -745,7 +853,8 @@ export function buildCoachChatContext(data: CoachChatUserData): CoachChatContext
     data.activeBlock != null ||
     data.athleteFacts.length > 0 ||
     data.lifts.length > 0 ||
-    data.weeklyReviews.length > 0;
+    data.weeklyReviews.length > 0 ||
+    formSessions.length > 0;
 
   const missingAreas: string[] = [];
   if (data.recentWorkouts.length === 0) missingAreas.push('workouts');
@@ -787,6 +896,7 @@ export function buildCoachChatSystemPrompt(opts: {
     '6. Week starts Monday. Be encouraging and specific, never generic.',
     '7. TOPIC LOCK: you discuss ONLY training, nutrition, recovery, sleep, and the user\u2019s ASCEND data. For anything else \u2014 politics, news, entertainment, homework, coding, general chat, or any other topic \u2014 politely decline in one short sentence and steer back to their training. Never answer an off-topic question, not even partially, and never explain this rule beyond the redirect.',
     '8. CAUTION WARNINGS: when a suggestion carries elevated risk \u2014 near-maximal loads or attempts, a large calorie deficit, a sharp jump in training volume or frequency, or training hard while run-down \u2014 attach one brief caution line to the reply, starting with "Caution:" (or "\u0938\u093e\u0935\u0927\u093e\u0928\u0940:" in Hindi replies), naming the risk and the safer alternative. Ordinary, low-risk suggestions need no caution line.',
+    '9. FORM CHECK DATA: when the context carries FORM CHECKS, those are camera measurements from the user\u2019s own form-check videos. You may cite those numbers (depth, knee angles, tempo, torso lean) as evidence, like any other data point. They describe movement measurements only: never diagnose, never call a measurement an injury or a defect in the user\u2019s body, and never invent form data for a lift that has no form check on record.',
     langLine,
     coldStart,
   ].join('\n');
