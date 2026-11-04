@@ -38,9 +38,10 @@ describe('open-items SEC F-06: CSP tightening', () => {
     expect(directive('default-src')).toContain("'self'");
   });
 
-  it("script-src: no 'unsafe-eval', ever; 'unsafe-inline' stays per the documented SEC-16 verdict", () => {
+  it("script-src: no 'unsafe-eval', ever; 'wasm-unsafe-eval' scoped for MediaPipe; 'unsafe-inline' stays per the documented SEC-16 verdict", () => {
     const scriptSrc = directive('script-src');
-    expect(scriptSrc).not.toContain('unsafe-eval');
+    expect(scriptSrc).not.toMatch(/(^|\s)'unsafe-eval'(\s|$)/);
+    expect(scriptSrc).toContain("'wasm-unsafe-eval'");
     expect(scriptSrc).toContain('unsafe-inline');
     // The reason must stay documented next to the policy.
     expect(cfg).toContain('SEC-16');

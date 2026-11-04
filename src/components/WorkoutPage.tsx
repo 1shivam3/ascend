@@ -16,6 +16,7 @@ import { generateTrainingDecision, calculateSetEffortDrift } from '@/lib/lifter-
 import TrainingDecisionCard from '@/components/TrainingDecisionCard';
 import PolicyDecisionCard from '@/components/PolicyDecisionCard';
 import {
+  Camera,
   Plus,
   X,
   ChevronDown,
@@ -87,6 +88,7 @@ import {
   isNativePlatform,
 } from '@/lib/voice-logger';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
+import FormCoachModal from '@/features/form-coach/components/FormCoachModal';
 import ExerciseLibraryModal from '@/components/ExerciseLibraryModal';
 import PostWorkoutTakeModal from '@/components/PostWorkoutTakeModal';
 import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
@@ -1029,6 +1031,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLogPastModalOpen, setIsLogPastModalOpen] = useState(false);
   const [isGoalSelectorOpen, setIsGoalSelectorOpen] = useState(false);
+  const [isFormCoachOpen, setIsFormCoachOpen] = useState(false);
   const [isPlateModalOpen, setIsPlateModalOpen] = useState(false);
   const [expandedWorkouts, setExpandedWorkouts] = useState<Set<string>>(new Set());
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -3212,6 +3215,11 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       </datalist>
 
       {/* Barbell Plate Loading & Warmup Sets Calculator Modal */}
+      <FormCoachModal
+        isOpen={isFormCoachOpen}
+        onClose={() => setIsFormCoachOpen(false)}
+      />
+
       <PlateCalculatorModal
         isOpen={isPlateModalOpen}
         onClose={() => setIsPlateModalOpen(false)}
@@ -3471,6 +3479,26 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             </div>
 
             <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsMenuOpen(false);
+                  setIsFormCoachOpen(true);
+                }}
+                className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center text-accent">
+                    <Camera className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-text-primary">ASCEND Form Coach</div>
+                    <div className="text-2xs text-text-muted">Upload a squat video for pose analysis & repetition counter</div>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-text-primary transition-colors" />
+              </button>
+
               <button
                 type="button"
                 onClick={() => {

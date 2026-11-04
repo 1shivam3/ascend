@@ -152,7 +152,7 @@ describe('i18n wiring coverage (pinned)', () => {
       }
     };
     roots.forEach(walk);
-    const unwired = files
+    const unwired = files.map((f) => f.replace(/\\/g, '/'))
       .filter((f) => {
         const src = readFileSync(f, 'utf8');
         return !src.includes('useTranslation') && !src.includes('translate(');

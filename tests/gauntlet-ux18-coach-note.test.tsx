@@ -85,7 +85,7 @@ describe('UX-18 — typing box wiring (source contract)', () => {
     expect(SRC).toContain('[currentStep]: text');
     // saveCheckin's base record carries notes, so chip answers saved
     // afterwards never wipe a note (and vice versa).
-    expect(SRC).toContain('painAreas,\n      notes,\n      ...patch,');
+    expect(SRC.replace(/\r\n/g, '\n')).toContain('painAreas,\n      notes,\n      ...patch,');
   });
 
   it('notes render as user bubbles in the thread (completed pairs and current question)', () => {

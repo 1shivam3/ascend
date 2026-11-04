@@ -59,6 +59,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Development on localhost / 127.0.0.1: bypass service worker cache completely
+  // so hot reloads, worker changes, and CSP headers are never masked by stale caches.
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+    return;
+  }
+
   // API calls are network-only to prevent stale response caching
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
@@ -77,6 +83,10 @@ self.addEventListener('fetch', (event) => {
   // (not failing) connection previously left users on a blank screen
   // forever even though a cached shell was available.
   if (request.mode === 'navigate') {
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+      event.respondWith(fetch(request));
+      return;
+    }
     event.respondWith(
       (async () => {
         const cache = await caches.open(CACHE_NAME);

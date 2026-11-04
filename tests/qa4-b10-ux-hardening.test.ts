@@ -9,7 +9,7 @@ import path from 'node:path';
  * silently shrink a target or reintroduce jargon.
  */
 const read = (rel: string) =>
-  readFileSync(path.resolve(__dirname, '..', rel), 'utf8');
+  readFileSync(path.resolve(__dirname, '..', rel), 'utf8').replace(/\r\n/g, '\n');
 
 describe('QA4-015 touch targets ≥40px in workout flows', () => {
   it('shared Button sm is 44px tall (was 36px)', () => {
@@ -203,7 +203,8 @@ describe('QA4-035(b) CSP hardening', () => {
   it("script-src allows no 'unsafe-eval'; 'unsafe-inline' stays per the SEC-16 verdict", () => {
     const cfg = read('next.config.js');
     const scriptSrc = cfg.match(/"script-src[^"]*"/)?.[0] ?? '';
-    expect(scriptSrc).not.toContain('unsafe-eval');
+    expect(scriptSrc).not.toMatch(/(^|\s)'unsafe-eval'(\s|$)/);
+    expect(scriptSrc).toContain("'wasm-unsafe-eval'");
     // Gauntlet SEC-16 (2026-10-29): a middleware nonce CSP was
     // built and live-tested, then reverted — the pages are
     // statically generated, so prerendered inline scripts never

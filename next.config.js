@@ -67,7 +67,11 @@ const nextConfig = {
             // then this token stays, compensated by the SEC-17 sink
             // scan (no dangerouslySetInnerHTML/eval anywhere in src)
             // and the violation reporting wired below.
-            "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms https://*.clarity.ms https://js.sentry-cdn.com",
+            // FORM COACH RUNTIME (2026-11-03): 'wasm-unsafe-eval' is
+            // required for WebAssembly.instantiateStreaming / compileStreaming
+            // used by MediaPipe Pose Landmarker in workers and main thread.
+            // Narrowly scoped to WebAssembly only — does NOT allow JS eval().
+            "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms https://*.clarity.ms https://js.sentry-cdn.com https://va.vercel-scripts.com",
             // OPEN-ITEMS SEC F-06 (2026-11-01): the nonce/hash routes
             // were re-attempted for this batch and remain impossible
             // for the same reason — the prerendered pages carry 4–6

@@ -99,7 +99,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" data-theme="dark">
       <head>
         {/* P2-4: the theme bootstrap used to be an inline script here
             (the app's only dangerouslySetInnerHTML). It now lives in

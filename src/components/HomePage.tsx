@@ -22,6 +22,7 @@ import {
   MessageCircleHeart,
   TrendingUp,
   Leaf,
+  Video,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useStore } from '@/lib/store';
@@ -82,6 +83,7 @@ const ScanMealModal = dynamic(() => import('@/components/ScanMealModal'), { ssr:
 const PostWorkoutTakeModal = dynamic(() => import('@/components/PostWorkoutTakeModal'), { ssr: false });
 const BarcodeScannerModal = dynamic(() => import('@/components/BarcodeScannerModal'), { ssr: false });
 const BodyMetricsModal = dynamic(() => import('@/components/BodyMetricsModal'), { ssr: false });
+const FormCoachModal = dynamic(() => import('@/features/form-coach/components/FormCoachModal'), { ssr: false });
 
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import { calculateMealMacros, scaleMacroGoalsToCalories } from '@/lib/macros';
@@ -355,6 +357,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const [isScanMealModalOpen, setIsScanMealModalOpen] = useState(false);
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
+  const [isFormCoachOpen, setIsFormCoachOpen] = useState(false);
   const [isChangeWorkoutOpen, setIsChangeWorkoutOpen] = useState(false);
   const changeWorkoutRef = useRef<HTMLDivElement>(null); const { dialogProps: changeWorkoutDialogProps } = useModalA11y(changeWorkoutRef, isChangeWorkoutOpen, () => setIsChangeWorkoutOpen(false));
   const [isCompletedWorkoutModalOpen, setIsCompletedWorkoutModalOpen] = useState(false);
@@ -394,6 +397,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       return registerBackHandler(() => { setIsWeightModalOpen(false); return true; }, 100);
     }
   }, [isWeightModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isFormCoachOpen) {
+      return registerBackHandler(() => { setIsFormCoachOpen(false); return true; }, 100);
+    }
+  }, [isFormCoachOpen, registerBackHandler]);
 
   useEffect(() => {
     if (isScanMealModalOpen) {
@@ -1047,36 +1056,46 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       {/* ── 5. QUICK ACTIONS ─────────────────────────────────────────────── */}
       <div style={{ order: orderOf('quick-actions') }} className={shown('quick-actions') ? 'space-y-3' : 'hidden'}>
         <h2 className="section-heading px-1">{t('home.quickActions')}</h2>
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-4 gap-2">
         <button
           type="button"
           onClick={() => setIsScanMealModalOpen(true)}
-          className="bg-bg-card border border-border/80 rounded-2xl p-3 shadow-xs flex flex-col items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+          className="bg-bg-card border border-border/80 rounded-2xl p-2.5 sm:p-3 shadow-xs flex flex-col items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
         >
-          <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
+          <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
             <Camera className="w-4 h-4" />
           </span>
-          <span className="text-2xs font-semibold text-text-secondary">{t('home.mealScan')}</span>
+          <span className="text-2xs font-semibold text-text-secondary truncate">{t('home.mealScan')}</span>
         </button>
         <button
           type="button"
           onClick={() => setIsBarcodeModalOpen(true)}
-          className="bg-bg-card border border-border/80 rounded-2xl p-3 shadow-xs flex flex-col items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+          className="bg-bg-card border border-border/80 rounded-2xl p-2.5 sm:p-3 shadow-xs flex flex-col items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
         >
-          <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
+          <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
             <Barcode className="w-4 h-4" />
           </span>
-          <span className="text-2xs font-semibold text-text-secondary">{t('home.scan')}</span>
+          <span className="text-2xs font-semibold text-text-secondary truncate">{t('home.scan')}</span>
         </button>
         <button
           type="button"
           onClick={() => setIsWeightModalOpen(true)}
-          className="bg-bg-card border border-border/80 rounded-2xl p-3 shadow-xs flex flex-col items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+          className="bg-bg-card border border-border/80 rounded-2xl p-2.5 sm:p-3 shadow-xs flex flex-col items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
         >
-          <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
+          <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
             <Scale className="w-4 h-4" />
           </span>
-          <span className="text-2xs font-semibold text-text-secondary">{t('home.weight')}</span>
+          <span className="text-2xs font-semibold text-text-secondary truncate">{t('home.weight')}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsFormCoachOpen(true)}
+          className="bg-bg-card border border-border/80 rounded-2xl p-2.5 sm:p-3 shadow-xs flex flex-col items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+        >
+          <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
+            <Video className="w-4 h-4" />
+          </span>
+          <span className="text-2xs font-semibold text-text-secondary truncate">{t('home.formCheck')}</span>
         </button>
       </div>
 
@@ -1503,6 +1522,14 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         isOpen={isWeightModalOpen}
         onClose={() => setIsWeightModalOpen(false)}
       />
+
+      {/* ── FORM COACH MODAL (Quick Action) ─────────────────────────────────── */}
+      {isFormCoachOpen && (
+        <FormCoachModal
+          isOpen={isFormCoachOpen}
+          onClose={() => setIsFormCoachOpen(false)}
+        />
+      )}
 
       {/* ── COMPLETED WORKOUT DETAIL MODAL (Coach's Take surface) ────────── */}
       {uiPreferences.coachEnabled && isCompletedWorkoutModalOpen && completedWorkoutForToday && (
