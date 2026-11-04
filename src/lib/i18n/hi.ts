@@ -93,6 +93,10 @@ export const hi: Partial<Record<StringKey, string>> = {
   'train.history': 'इतिहास',
   'train.startWorkout': 'वर्कआउट शुरू करें',
   'train.startEmptyWorkout': 'खाली वर्कआउट शुरू करें',
+  'train.discardDraftTitle': 'वर्कआउट ड्राफ़्ट हटाएं?',
+  'train.discardDraftMsg': 'इससे रुका हुआ वर्कआउट हट जाएगा। ड्राफ़्ट में लॉग किए गए सेट खो जाएंगे।',
+  'train.discardDraftConfirm': 'ड्राफ़्ट हटाएं',
+  'train.keepDraft': 'ड्राफ़्ट रखें',
   'train.yourPlans': 'आपके वर्कआउट प्लान',
   'train.exercises': 'एक्सरसाइज़',
 
@@ -1716,6 +1720,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'meals.suggKcalCustom': '{kcal} kcal (आपकी मात्रा)',
   'meals.qtyHint': 'मैक्रो अपने आप गिनने के लिए ऊपर मात्रा दर्ज करें।',
   'meals.zeroNutritionHint': '“{name}” में अभी कोई कैलोरी या मैक्रो नहीं है — मात्रा दर्ज करें या ऊपर मान भरें, या सेव करने के लिए इसे हटा दें।',
+  'meals.mealNameRequiredHint': 'सेव करने के लिए ऊपर इस खाने को नाम दें।',
   'meals.gheeOilHeading': 'इसमें घी/तेल?',
   'meals.noPinnedFoods': 'कोई पिन किया खाना नहीं। अपना पहला पिन किया खाना बनाने के लिए नीचे "कस्टम खाना जोड़ें" दबाएं!',
   'meals.clearPinnedWarn': 'इससे आपकी पिन किए खानों की सूची के सभी आइटम हट जाएंगे। यह वापस नहीं होगा।',

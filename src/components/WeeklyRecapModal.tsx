@@ -8,6 +8,7 @@ import { calculateDOTS, getDOTSClassification } from '@/lib/dots';
 import { X, Share2, Download, MessageCircle, Trophy, Flame, Dumbbell, Sparkles } from 'lucide-react';
 import { useToast } from './ui/Toast';
 import { getWeekRange, parseLocalDate } from '@/lib/formatters';
+import { selectWeeklyRecapPRs } from '@/lib/weekly-recap';
 import { calculateWorkoutVolumeKg } from '@/lib/volume';
 import { useTranslation } from '@/lib/i18n';
 
@@ -62,13 +63,17 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
     }
     const totalVolume = profile?.unit === 'lbs' ? totalVolumeKg * 2.20462 : totalVolumeKg;
 
-    // Recent PRs this calendar week (Mon–Sun)
-    const recentPRs = prs
-      .filter((p) => {
-        const dStr = (p.date || '').split('T')[0];
-        return dStr >= weekStartStr && dStr <= weekEndStr && !p.isBaseline;
-      })
-      .slice(0, 3);
+    // Recent PRs this calendar week (Mon–Sun). F8 (certification):
+    // selection lives in lib/weekly-recap — baselines excluded by the
+    // PR page's own rule (flag OR 'Baseline' notes; the finish flow
+    // never sets the flag), the headline count is the true number of
+    // new records, and highlights are the best record per exercise so
+    // a superseding all-time PR replaces the set it beat.
+    const { count: newPRsCount, highlights: recentPRs } = selectWeeklyRecapPRs(
+      prs,
+      weekStartStr,
+      weekEndStr
+    );
 
     // Big 3 lifts for DOTS
     const squatPR = prs.find((p) => p.exercise.toLowerCase().includes('squat'))?.weightKg || 0;
@@ -89,6 +94,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
       totalVolume: Math.round(totalVolume),
       totalSets,
       recentPRs,
+      newPRsCount,
       totalBig3: Math.round(totalBig3),
       dotsScore: Math.round(dotsScore),
       tier: classification.tier,
@@ -237,7 +243,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
     const tiles = [
       { value: `${weeklyStats.workoutsCount}`, label: weeklyStats.workoutsCount === 1 ? t('recap.session') : t('recap.sessions') },
       { value: `${weeklyStats.totalSets}`, label: weeklyStats.totalSets === 1 ? t('recap.set') : t('recap.sets') },
-      { value: `${weeklyStats.recentPRs.length}`, label: weeklyStats.recentPRs.length === 1 ? t('recap.newPr') : t('recap.newPrs') },
+      { value: `${weeklyStats.newPRsCount}`, label: weeklyStats.newPRsCount === 1 ? t('recap.newPr') : t('recap.newPrs') },
     ];
     const tileW = 300;
     const tileH = 150;

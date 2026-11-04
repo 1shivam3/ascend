@@ -1341,6 +1341,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const [isPlanPrefsOpen, setIsPlanPrefsOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlannedWorkout | null>(null);
   const [planToDelete, setPlanToDelete] = useState<PlannedWorkout | null>(null);
+  // F5 (certification): the resume banner's Discard asks first (see
+  // the ConfirmationModal by the plan-delete one below).
+  const [isDraftDiscardConfirmOpen, setIsDraftDiscardConfirmOpen] = useState(false);
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
   const [isCoachBlockOpen, setIsCoachBlockOpen] = useState(false);
   const [coachBlockAtReview, setCoachBlockAtReview] = useState(false);
@@ -1575,6 +1578,10 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     // tap erased an in-progress workout draft. Now the toast carries
     // Undo (6s lifetime, same pattern as plan deletion): the captured
     // draft + plan linkage are restored exactly.
+    // F5 (certification): the banner's Discard no longer calls this
+    // directly — it opens a ConfirmationModal first, the same
+    // confirm-then-undo standard meal deletion already follows. This
+    // runs only after the user confirms.
     const capturedDraft = activeWorkoutDraft;
     const capturedPlan = startedFromPlan;
     const capturedPlanId = startedFromPlanId;
@@ -2637,7 +2644,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={handleDiscardDraft}
+              onClick={() => setIsDraftDiscardConfirmOpen(true)}
               className="text-xs text-text-muted hover:text-danger px-2 py-1 transition-colors"
             >
               Discard
@@ -3389,6 +3396,22 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         confirmText={t('workout.deletePlanConfirm')}
         cancelText={t('workout.keepPlan')}
         variant="danger"
+      />
+
+      {/* ── Draft Discard Confirmation (F5) ─────────────────────────────── */}
+      <ConfirmationModal
+        isOpen={isDraftDiscardConfirmOpen}
+        onClose={() => setIsDraftDiscardConfirmOpen(false)}
+        onConfirm={() => {
+          setIsDraftDiscardConfirmOpen(false);
+          handleDiscardDraft();
+        }}
+        title={t('train.discardDraftTitle')}
+        message={t('train.discardDraftMsg')}
+        confirmText={t('train.discardDraftConfirm')}
+        cancelText={t('train.keepDraft')}
+        variant="danger"
+        icon="trash"
       />
 
       {/* ── First-plan progressive prompt (simplified onboarding) ──────── */}
