@@ -1841,7 +1841,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     {displayGoals.calorieDelta < 0 && (
                       <> · ≈{(Math.abs(displayGoals.calorieDelta * 7) / 7000).toFixed(2)} {t('meals.perWeek')}</>
                     )}
-                    <span className="block text-4xs opacity-80">
+                    <span className="block text-2xs opacity-80">
                       {displayGoals.calorieDelta < 0
                         ? t('meals.deficitNote', { floor: getSafeMinCalories(profile?.gender || 'male').toLocaleString() })
                         : t('meals.surplusNote')}

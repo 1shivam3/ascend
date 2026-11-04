@@ -978,7 +978,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                   <button
                     type="button"
                     onClick={handleOfflineEstimate}
-                    className="text-accent underline font-semibold hover:text-accent-hover flex items-center gap-1"
+                    className="text-accent underline font-semibold hover:text-accent-text flex items-center gap-1"
                   >
                     <Zap className="w-3 h-3 text-amber-400" />
                     <span>{t('scan.estimateOfflineDb')}</span>
