@@ -30,14 +30,14 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useCoachDigest } from '@/lib/use-coach-digest';
-import { getScheduledPlanEntries } from '@/lib/scheduled-days';
+import { earliestDataDate, getScheduledPlanEntries } from '@/lib/scheduled-days';
 import { getLocalTodayStr, getWeekDateStrings, getWeekRange, parseLocalDate } from '@/lib/formatters';
 import { useToday } from '@/lib/use-today';
 import {
   adjustSession,
   checkinSteps,
   proteinTargetG,
-  weeklySuggestion,
+  weekAdherenceSummary,
 } from '@/lib/coach-session';
 import type { CheckinStep } from '@/lib/coach-session';
 import type { ManualCheckin } from '@/lib/coach-engine';
@@ -316,25 +316,33 @@ export default function CoachChatTab({
   const weekAdherence = useMemo(() => {
     const week = getWeekRange(new Date());
     const weekDates = getWeekDateStrings(new Date());
-    const planned = scheduled.length;
     const doneDates = new Set(
       (workouts || [])
         .map((w) => (w.date || '').split('T')[0])
         .filter((d) => d >= week.start && d <= todayStr)
     );
-    const doneCount = doneDates.size;
-    // FE-02 (audit-3): the verdict judges only the elapsed part of
-    // the week — scheduled days strictly before today (a session is
-    // not "missed" until its day is over) — and the displayed count
-    // is capped at the plan, so extra unscheduled sessions can no
-    // longer render as "7 of 4 sessions done".
-    const dueCount = scheduled.filter((e) => weekDates[e.weekday] < todayStr).length;
-    return {
-      planned,
-      done: Math.min(doneCount, planned),
-      suggestion: weeklySuggestion(planned, doneCount, dueCount),
-    };
-  }, [scheduled, workouts, todayStr]);
+    // FE-02 (audit-3) judged only the elapsed part of the week;
+    // R3-01 (certification follow-up to UI-1b-02 / PR #97) adds the
+    // plan-start anchor the weekly review, athlete model, and
+    // check-in already use: scheduled days of this week that fall
+    // before the user's data began were never due and cannot be
+    // missed — without it a day-one user read "0 of 4 / more than
+    // half the week was missed" for pre-plan days. weekAdherenceSummary
+    // (coach-session.ts) owns the anchored counts + suggestion.
+    const dataStart = earliestDataDate({
+      plannedWorkouts,
+      workouts,
+      dailyCheckins,
+      profileCreatedAt: profile?.createdAt ?? null,
+    });
+    return weekAdherenceSummary({
+      entries: scheduled,
+      weekDates,
+      doneDates,
+      todayStr,
+      dataStart,
+    });
+  }, [scheduled, workouts, todayStr, plannedWorkouts, dailyCheckins, profile]);
 
   const reasonKey: StringKey =
     digest.readiness.band === 'primed'
