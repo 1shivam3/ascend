@@ -28,7 +28,7 @@ its own PR only.
 | ID | Sev | Finding | Status |
 |---|---|---|---|
 | UI-1b-01 | P2 | Form Coach modal: transparent root below 640px, ignores accent themes | **FIXED** — PR #95; *(stack)* S1: panel rgb(255,255,255), follows Cobalt, zero vermilion remnants |
-| UI-1b-02 | P2 | Pre-account periods presented as the user's own missed history | **FIXED-PARTIALLY** — PR #97 fixed the weekly-review modal, the check-in missed-session surface, and the athlete-model facts at generator level (*(stack)* S3: predates framing, PLANNED 0/0, no missed-yesterday card, no "0 of 32"). **Residual: R3-01** (below) |
+| UI-1b-02 | P2 | Pre-account periods presented as the user's own missed history | **FIXED** — PR #97 fixed the weekly-review modal, the check-in missed-session surface, and the athlete-model facts at generator level (*(stack)* S3: predates framing, PLANNED 0/0, no missed-yesterday card, no "0 of 32"). The one residual surface (R3-01, below) was fixed by PR #101; #97 and #101 both merged 2026-11-04. |
 | UI-1b-03 | P3 | Weekly review contradicts itself ("the revision below can move it" + "No changes proposed") | **FIXED** — PR #97 (the promise line renders only when a revision exists); *(stack)* S3 modal shows no contradictory pair |
 | UI-1b-04 | P3 | Training Tools sheet close button has no accessible name | **FIXED** — PR #100; *(stack)* S7: name is "Close", all sheet buttons named |
 | UI-1b-05 | P3 | First-run tip says "Tap the big Done button"; the button is "Complete Set" | **FIXED** — PR #100; also observed corrected during the *(stack)* S2 drive |
@@ -101,7 +101,7 @@ its own PR only.
 
 | ID | Sev | Finding | Status |
 |---|---|---|---|
-| R3-01 | P2 | Coach tab "This week" adherence card scores pre-plan days as missed for a mid-week plan start ("0 of 4 sessions done so far / More than half the week was missed" on day one) — residual of UI-1b-02 on a surface PR #97 did not cover (`CoachChatTab.tsx` `weekAdherence` + `coach-session.ts` `weeklySuggestion` lack the plan-start anchor) | **OPEN** — full evidence + fix sketch in `regression-results.md` §6. Reproduced identically in Pass A and Pass B |
+| R3-01 | P2 | Coach tab "This week" adherence card scores pre-plan days as missed for a mid-week plan start ("0 of 4 sessions done so far / More than half the week was missed" on day one) — residual of UI-1b-02 on a surface PR #97 did not cover (`CoachChatTab.tsx` `weekAdherence` + `coach-session.ts` `weeklySuggestion` lack the plan-start anchor) | **FIXED** — PR #101 (stacked on PR #97, merged immediately after it on 2026-11-04): `weekAdherenceSummary()` in `coach-session.ts` takes the shared `earliestDataDate()` anchor; browser-verified before/after ("0 of 4… more than half the week was missed — fewer training days next week" → "0 of 2… steady week — keep the plan"); 7 new persona tests; mid-history behavior pinned identical |
 
 ## Merge-sequence summary
 
@@ -109,3 +109,12 @@ Merging the six PRs in number order produces exactly **one** conflict:
 #95 × #100 in `GoalSelectorModal.tsx` and `FormSessionSummaryModal.tsx`,
 both mechanical class-string compositions. Full map in
 `regression-results.md` §2.
+
+**Outcome (2026-11-04):** the owner ordered the merge. All seven PRs
+merged in the recorded order (#95, #96, #97, #101, #98, #99, #100). The
+single predicted conflict occurred exactly as mapped and was resolved by
+composition (both token changes kept; fix-branch commit `1384b4f`;
+design-token guard + a11y tests 12/12 and tsc clean on the resolved
+tree) before #100 merged. New master: `37c00f41`. Production verified
+serving `ascend-37c00f4-cache`. All seven fix branches deleted after
+merge.

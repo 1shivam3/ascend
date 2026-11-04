@@ -66,3 +66,48 @@ classes (P0/P1) were never found in three rounds; the security and
 data-integrity gates are met; every remaining item is a disclosed P3
 residual or an explicitly untestable-here surface with its risk stated
 above.
+
+---
+
+## Post-merge addendum — 2026-11-04: verdict updated
+
+## READY FOR RELEASE
+
+The owner ordered the merge, and all three flip conditions above are
+met:
+
+1. **Merged in the recorded order** — #95 (`e842586f`), #96
+   (`6d8d7f56`), #97 (`8a33e14e`), #98 (`700e5d32`), #99 (`0ef551af`),
+   and #100 last. The single predicted #95 × #100 conflict occurred
+   exactly as mapped (`GoalSelectorModal.tsx`,
+   `FormSessionSummaryModal.tsx`) and was resolved by the recorded
+   composition — both token changes kept (fix-branch commit `1384b4f`;
+   design-token guard + a11y tests 12/12, tsc clean on the resolved
+   tree) — before #100 merged (`37c00f41`).
+2. **R3-01 fixed, not merely accepted** — by PR #101
+   (`fix/coach-week-adherence-anchor`, stacked on #97, merged
+   immediately after it, `5b713667`): the Coach tab week-adherence card
+   now takes the shared plan-start anchor; browser-verified
+   before/after in its PR.
+3. **Production identity verified** — `/sw.js` serves
+   `ascend-37c00f4-cache`, matching current master `37c00f41`, so the
+   merged build is what users receive. The S1/S3 scenarios were
+   verified against this exact code in the Round 2–3 local builds and
+   in each PR's own verification; a live in-browser spot-check of
+   production from the audit sandbox was not possible (egress proxy)
+   and remains a two-minute owner-side confirmation in the app itself.
+
+All seven fix branches were deleted after merge. Post-merge gate,
+re-run by the auditor on a pristine clone of master `37c00f41`:
+**2,888 passed / 20 failed (2,908)** — the 20 are exactly the known
+Docker-baseline file (`tests/security-integration-gate.test.ts`,
+unchanged signature from the pre-merge baseline), and `tsc --noEmit`
+is clean. The residual-risk
+register above stands as accepted: the design-system unification
+program (F-01/F-03/F-05–F-09/F-11), the remaining P3 cosmetics, the
+NOT-TESTED hardware surfaces (Form Coach phone runtime, rest-timer
+audibility, notch safe areas, production offline behavior), the
+outstanding Hindi native review, and human usability testing (protocol
+ready, not run). None of these are §14 release-blocking classes, and
+each carries its risk note in the register.
+above.
