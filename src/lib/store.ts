@@ -80,6 +80,7 @@ import {
   lastCompletedWeekMonday,
   type WeeklyReview,
 } from './weekly-review';
+import { readFormSessions } from '../features/form-coach/repositories/form-session-storage';
 import { buildDefaultWeeklySchedule, getTodayDayOfWeek, getWorkoutBodyParts, DAYS_OF_WEEK } from './workout-schedule';
 import { safeRandomId, sanitizeAthleteName, isValidEntryDate, normalizeDateToLocalDay, normalizeRowDates, normalizeAndDedupeBodyMetricDates } from './formatters';
 import { calculateRecommendedMacroGoals } from './macros';
@@ -3093,6 +3094,10 @@ export const useAppStore = create<AppState>()(
             unit: state.profile?.unit ?? 'kg',
             bodyweightKg: state.profile?.bodyweightKg,
             todayStr,
+            // Coach bridge (B3): form-check sessions live in localStorage;
+            // read them through the cycle-free storage leaf (the full
+            // repository imports this store, so it cannot be imported here).
+            formSessions: readFormSessions(),
           });
           // Gauntlet Cycle 2 (B-01): the review is a live aggregation, not
           // a write-once snapshot. The old guard returned early once a

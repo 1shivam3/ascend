@@ -7,33 +7,15 @@
 
 import { FormSessionSummary } from '../models/form-session.types';
 import { useStore } from '@/lib/store';
-
-const FORM_SESSIONS_STORAGE_KEY = 'ascend_form_coach_sessions';
-const MAX_STORED_SESSIONS = 50;
-
-function getStorage(): Storage | null {
-  if (typeof window !== 'undefined' && window.localStorage) {
-    return window.localStorage;
-  }
-  if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
-    return (globalThis as any).localStorage;
-  }
-  return null;
-}
+import {
+  getFormSessionStorage,
+  readFormSessions,
+  writeFormSessions,
+} from './form-session-storage';
 
 export class FormSessionRepository {
   static getAllSessions(): FormSessionSummary[] {
-    const storage = getStorage();
-    if (!storage) return [];
-    try {
-      const raw = storage.getItem(FORM_SESSIONS_STORAGE_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (err) {
-      console.error('[FormSessionRepository] Failed to read sessions:', err);
-      return [];
-    }
+    return readFormSessions();
   }
 
   static getSessionById(id: string): FormSessionSummary | null {
@@ -46,9 +28,30 @@ export class FormSessionRepository {
     return sessions.filter((s) => s.workoutId === workoutId);
   }
 
+  /**
+   * Coach bridge (B1): the most recent sessions, newest first — the read
+   * the coach-chat context and the weekly review consume. Sessions are
+   * stored newest-first, so this is a bounded slice, not a sort.
+   */
+  static getRecentSessions(limit = 5): FormSessionSummary[] {
+    return this.getAllSessions().slice(0, Math.max(0, limit));
+  }
+
+  /**
+   * Coach bridge (B1): the latest session per exercise id, keyed by
+   * exerciseId — "where is this lift's form right now" for the coach.
+   */
+  static getLatestSessionPerExercise(): Map<string, FormSessionSummary> {
+    const latest = new Map<string, FormSessionSummary>();
+    for (const session of this.getAllSessions()) {
+      if (!latest.has(session.exerciseId)) {
+        latest.set(session.exerciseId, session);
+      }
+    }
+    return latest;
+  }
+
   static saveSession(session: FormSessionSummary): void {
-    const storage = getStorage();
-    if (!storage) return;
     try {
       const sessions = this.getAllSessions();
       const existingIdx = sessions.findIndex((s) => s.id === session.id);
@@ -57,23 +60,15 @@ export class FormSessionRepository {
       } else {
         sessions.unshift(session);
       }
-
-      const trimmed = sessions.slice(0, MAX_STORED_SESSIONS);
-      storage.setItem(FORM_SESSIONS_STORAGE_KEY, JSON.stringify(trimmed));
+      writeFormSessions(sessions);
     } catch (err) {
       console.error('[FormSessionRepository] Failed to save session:', err);
     }
   }
 
   static deleteSession(id: string): void {
-    const storage = getStorage();
-    if (!storage) return;
-    try {
-      const sessions = this.getAllSessions().filter((s) => s.id !== id);
-      storage.setItem(FORM_SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
-    } catch (err) {
-      console.error('[FormSessionRepository] Failed to delete session:', err);
-    }
+    if (!getFormSessionStorage()) return;
+    writeFormSessions(this.getAllSessions().filter((s) => s.id !== id));
   }
 
   /**

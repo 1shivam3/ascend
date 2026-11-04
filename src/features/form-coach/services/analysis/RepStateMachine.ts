@@ -39,6 +39,15 @@ export class RepStateMachine {
   private bottomTimeMs: number | null = null;
   private ascentStartTimeMs: number | null = null;
   private phaseEnterTimeMs: number = 0;
+  /**
+   * Timestamp of the most recent frame at (or above) the standing/lockout
+   * knee angle. A rep's descent begins when the lifter LEAVES that locked-out
+   * position — not when the angle later crosses the descent trigger — so the
+   * descent trigger anchors repStartTimeMs to this moment (D5 fix: descent
+   * durations used to be timed only between the 142° trigger and the 105°
+   * bottom threshold, understating a ~1.2–1.5 s descent as ~0.3 s).
+   */
+  private lastLockoutTimeMs: number | null = null;
 
   private minKneeAngle: number = 180;
   private maxTorsoInclination: number = 0;
@@ -54,6 +63,7 @@ export class RepStateMachine {
     this.bottomTimeMs = null;
     this.ascentStartTimeMs = null;
     this.phaseEnterTimeMs = 0;
+    this.lastLockoutTimeMs = null;
     this.minKneeAngle = 180;
     this.maxTorsoInclination = 0;
     this.repObservations.clear();
@@ -115,6 +125,12 @@ export class RepStateMachine {
       this.maxTorsoInclination = torsoInclinationDeg;
     }
 
+    // Remember the last moment the lifter was at the standing/lockout
+    // position — the next descent is timed from here (see lastLockoutTimeMs).
+    if (kneeAngleDeg >= this.config.standingKneeAngleDeg) {
+      this.lastLockoutTimeMs = timestampMs;
+    }
+
     let completedRep: FormRep | null = null;
 
     switch (this.phase) {
@@ -128,7 +144,9 @@ export class RepStateMachine {
       case 'standing':
         // Transition from Standing -> Descending
         if (kneeAngleDeg < this.config.descentTriggerAngleDeg) {
-          this.repStartTimeMs = timestampMs;
+          // The descent started when the lifter left the locked-out
+          // standing position, which precedes this trigger crossing.
+          this.repStartTimeMs = this.lastLockoutTimeMs ?? timestampMs;
           this.minKneeAngle = kneeAngleDeg;
           this.maxTorsoInclination = torsoInclinationDeg ?? 0;
           this.repObservations.clear();
@@ -167,8 +185,16 @@ export class RepStateMachine {
           const bottomTime = this.bottomTimeMs ?? (repStart + 750);
           const ascentStart = this.ascentStartTimeMs ?? bottomTime;
           const totalDurationMs = timestampMs - repStart;
-          const descentDurationMs = bottomTime - repStart;
+          // Phase accounting (D5 fix): the descent runs from leaving the
+          // locked-out position until the detected inflection (ascent
+          // start) — the bottom dwell is inside the descent, so descent +
+          // ascent sums exactly to the rep duration instead of timing only
+          // the trigger-to-threshold slice and leaving the bottom
+          // unaccounted. bottomHoldDurationSeconds is still exposed from
+          // the threshold crossing to the inflection for detail views.
+          const descentDurationMs = ascentStart - repStart;
           const ascentDurationMs = timestampMs - ascentStart;
+          const bottomHoldMs = Math.max(0, ascentStart - bottomTime);
 
           // Rep validation criteria
           const isValid =
@@ -200,6 +226,7 @@ export class RepStateMachine {
               durationSeconds: Math.round((totalDurationMs / 1000) * 10) / 10,
               descentDurationSeconds: Math.max(0.2, Math.round((descentDurationMs / 1000) * 10) / 10),
               ascentDurationSeconds: Math.max(0.2, Math.round((ascentDurationMs / 1000) * 10) / 10),
+              bottomHoldDurationSeconds: Math.round((bottomHoldMs / 1000) * 10) / 10,
               minKneeAngleDeg: Math.round(this.minKneeAngle),
               estimatedDepth: depth,
               maxTorsoInclinationDeg: Math.round(this.maxTorsoInclination),

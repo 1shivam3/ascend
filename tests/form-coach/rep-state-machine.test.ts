@@ -107,4 +107,41 @@ describe('RepStateMachine', () => {
     sm.update(162, 6, 0.9, t);
     expect(sm.getCurrentPhase()).toBe('standing');
   });
+
+  it('D5: times the descent from leaving lockout, and phases sum to the rep duration', () => {
+    // Standing locked out for ~1 s (170°), then a SLOW ~1.3 s descent to
+    // 46°, a brief bottom, then a ~0.5 s ascent. The old accounting timed
+    // the descent only between the 142° trigger and the 105° bottom
+    // threshold and reported ~0.3–0.4 s for a descent like this.
+    let t = 0;
+    for (let i = 0; i < 10; i++) {
+      sm.update(170, 5, 0.95, t);
+      t += 100;
+    }
+    // Descent: 160 still counts as locked out; the trigger crosses at 140.
+    const descentAngles = [160, 150, 140, 130, 120, 110, 100, 90, 80, 70, 60, 50, 46];
+    for (const a of descentAngles) {
+      sm.update(a, 20, 0.95, t);
+      t += 100;
+    }
+    // Bottom dwell, then ascent.
+    sm.update(48, 34, 0.95, t);
+    t += 100;
+    let rep = null;
+    for (const a of [60, 80, 100, 120, 140, 158]) {
+      rep = sm.update(a, 15, 0.95, t) ?? rep;
+      t += 100;
+    }
+
+    expect(rep).not.toBeNull();
+    expect(rep?.isValid).toBe(true);
+    // Descent ≈ from the last locked-out frame to the inflection (~1.4 s),
+    // not the ~0.3 s trigger-to-threshold slice.
+    expect(rep?.descentDurationSeconds).toBeGreaterThanOrEqual(1.2);
+    // Descent + ascent accounts for the whole rep (bottom hold is exposed
+    // separately, inside the descent).
+    const phasesSum = (rep?.descentDurationSeconds ?? 0) + (rep?.ascentDurationSeconds ?? 0);
+    expect(Math.abs(phasesSum - (rep?.durationSeconds ?? 0))).toBeLessThanOrEqual(0.2);
+    expect(rep?.bottomHoldDurationSeconds).toBeGreaterThanOrEqual(0);
+  });
 });

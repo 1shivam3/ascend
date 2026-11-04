@@ -11,8 +11,8 @@ describe('Form Coach — Streamlined Video Upload Architecture & Isolation', () 
   const homeSrc = readSrc('src/components/HomePage.tsx');
 
   it('useFormCoach provides focused video analysis state machine without camera streams', () => {
-    // 4 simple states
-    expect(useFormCoachSrc).toContain("export type FormCoachState = 'select' | 'analyzing' | 'report' | 'error';");
+    // 5 simple states (D4 added the terminal 'no-tracking' state)
+    expect(useFormCoachSrc).toContain("export type FormCoachState = 'select' | 'analyzing' | 'report' | 'no-tracking' | 'error';");
 
     // Video analysis actions
     expect(useFormCoachSrc).toContain('const analyzeVideo = useCallback');

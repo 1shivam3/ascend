@@ -13,6 +13,7 @@ import {
   currentDailyLeft,
   type CoachChatMessage,
 } from '@/lib/coach-chat-store';
+import { FormSessionRepository } from '@/features/form-coach/repositories/FormSessionRepository';
 
 function weekIndexOf(startMonday: string, todayStr: string, weekCount: number): number {
   const parse = (s: string) => {
@@ -235,7 +236,15 @@ export default function CoachChatSection() {
     readinessHistory,
   ]);
 
-  const context = useMemo(() => buildCoachChatContext(userData), [userData]);
+  // Form-check bridge (B2): stored form sessions live in localStorage,
+  // not the zustand store, so they are read on mount. This section
+  // remounts on every tab switch (see FE-06 note above), which is also
+  // when a just-finished form analysis would first be asked about.
+  const formSessions = useMemo(() => FormSessionRepository.getRecentSessions(25), []);
+  const context = useMemo(
+    () => buildCoachChatContext(userData, formSessions),
+    [userData, formSessions]
+  );
 
   const send = async () => {
     const text = input.trim();

@@ -45,6 +45,7 @@ import {
 } from './block-engine';
 import { mainCompoundKey } from './percent-1rm';
 import { calculateWorkoutVolumeKg } from './volume';
+import type { FormSessionSummary } from '../features/form-coach/models/form-session.types';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shapes
@@ -106,6 +107,13 @@ export interface WeeklyReviewInput {
   unit: Unit;
   bodyweightKg?: number;
   todayStr: string;
+  /**
+   * Coach bridge (B3): form-check sessions on record. Optional — when
+   * sessions fall inside the review week, ONE measured line joins the
+   * review body. Informational only: form data never feeds the focus,
+   * the revisions, or any block decision in this pass.
+   */
+  formSessions?: FormSessionSummary[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -320,6 +328,44 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
   for (const p of input.coachBlocks.plateauProposals ?? []) {
     if (p.status === 'applied' && inWeek(p.createdOn, monday)) {
       coachLines.push(`Plateau change applied: ${p.changeText}`);
+    }
+  }
+
+  // Form-check bridge (B3): one measured line when form checks were
+  // recorded inside this week. Body content only — it never becomes the
+  // focus headline and never feeds a revision (informational bridge).
+  const weekFormSessions = (input.formSessions ?? []).filter((s) =>
+    inWeek(dateStrOf(new Date(s.startedAt)), monday)
+  );
+  if (weekFormSessions.length > 0) {
+    const formReps = weekFormSessions.flatMap((s) => s.reps);
+    const sessionWord = weekFormSessions.length === 1 ? 'session' : 'sessions';
+    const sameExercise = weekFormSessions.every(
+      (s) => s.exerciseId === weekFormSessions[0].exerciseId
+    );
+    const label = sameExercise ? `${weekFormSessions[0].exerciseId} ` : '';
+    if (formReps.length > 0) {
+      const below = formReps.filter((r) => r.estimatedDepth === 'below_parallel').length;
+      const tempoWeight = weekFormSessions.reduce((acc, s) => acc + s.totalValidReps, 0);
+      const avgTempo =
+        tempoWeight > 0
+          ? round1(
+              weekFormSessions.reduce(
+                (acc, s) => acc + s.averageRepDurationSeconds * s.totalValidReps,
+                0
+              ) / tempoWeight
+            )
+          : round1(
+              weekFormSessions.reduce((acc, s) => acc + s.averageRepDurationSeconds, 0) /
+                weekFormSessions.length
+            );
+      coachLines.push(
+        `Form checks: ${weekFormSessions.length} ${label}${sessionWord} · depth below parallel on ${below} of ${formReps.length} reps · avg tempo ${avgTempo}s/rep`
+      );
+    } else {
+      coachLines.push(
+        `Form checks: ${weekFormSessions.length} ${label}${sessionWord} · no valid reps measured`
+      );
     }
   }
 
