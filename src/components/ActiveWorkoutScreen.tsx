@@ -1276,11 +1276,15 @@ export default function ActiveWorkoutScreen({
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
         const oldWeight = ex.sets[setIdx]?.weight;
+        // F3: correcting a COMPLETED set edits the record only — the
+        // pre-fill sync to later pending sets must not fire, or fixing
+        // a mis-log silently rewrites the next set's prescription.
+        const sourceCompleted = isActiveSetCompleted(ex.sets[setIdx]);
         return {
           ...ex,
           sets: ex.sets.map((s, j) => {
             if (j === setIdx) return { ...s, weight: numericWeight };
-            if (j > setIdx && !isActiveSetCompleted(s) && s.weight === oldWeight) {
+            if (j > setIdx && !sourceCompleted && !isActiveSetCompleted(s) && s.weight === oldWeight) {
               return { ...s, weight: numericWeight };
             }
             return s;
@@ -1301,11 +1305,13 @@ export default function ActiveWorkoutScreen({
           : (typeof editedSet?.prescribedWeight === 'number' && !isNaN(editedSet.prescribedWeight) ? editedSet.prescribedWeight : 0);
         const newW = clampWorkoutWeight(Math.round((baseW + step) * 10) / 10, userUnit);
         const oldWeight = editedSet?.weight;
+        // F3: no pre-fill sync when the stepped set is already completed.
+        const sourceCompleted = editedSet ? isActiveSetCompleted(editedSet) : false;
         return {
           ...ex,
           sets: ex.sets.map((s, j) => {
             if (j === setIdx) return { ...s, weight: newW };
-            if (j > setIdx && !isActiveSetCompleted(s) && s.weight === oldWeight) {
+            if (j > setIdx && !sourceCompleted && !isActiveSetCompleted(s) && s.weight === oldWeight) {
               return { ...s, weight: newW };
             }
             return s;
@@ -1331,11 +1337,13 @@ export default function ActiveWorkoutScreen({
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
         const oldReps = ex.sets[setIdx]?.reps;
+        // F3: no pre-fill sync when the edited set is already completed.
+        const sourceCompleted = isActiveSetCompleted(ex.sets[setIdx]);
         return {
           ...ex,
           sets: ex.sets.map((s, j) => {
             if (j === setIdx) return { ...s, reps: cleanReps as any };
-            if (j > setIdx && !isActiveSetCompleted(s) && s.reps === oldReps) {
+            if (j > setIdx && !sourceCompleted && !isActiveSetCompleted(s) && s.reps === oldReps) {
               return { ...s, reps: cleanReps as any };
             }
             return s;
@@ -1353,11 +1361,13 @@ export default function ActiveWorkoutScreen({
         const currentR = parseInt(String(editedSet?.reps), 10) || 0;
         const newR = Math.max(1, currentR + step);
         const oldReps = editedSet?.reps;
+        // F3: no pre-fill sync when the stepped set is already completed.
+        const sourceCompleted = editedSet ? isActiveSetCompleted(editedSet) : false;
         return {
           ...ex,
           sets: ex.sets.map((s, j) => {
             if (j === setIdx) return { ...s, reps: newR };
-            if (j > setIdx && !isActiveSetCompleted(s) && s.reps === oldReps) {
+            if (j > setIdx && !sourceCompleted && !isActiveSetCompleted(s) && s.reps === oldReps) {
               return { ...s, reps: newR };
             }
             return s;
@@ -2694,7 +2704,8 @@ export default function ActiveWorkoutScreen({
                         ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
                         : 'bg-bg-secondary text-text-muted border border-border/60 hover:text-text-primary'
                     }`}
-                    title={s.status === 'skipped' ? t('workout.skippedSet', { n: idx + 1 }) : s.isWarmup ? t('workout.warmupSet', { n: idx + 1 }) : t('workout.setN', { n: idx + 1 })}
+                    title={isActiveSetCompleted(s) ? t('workout.loggedSetTitle', { n: idx + 1 }) : s.status === 'skipped' ? t('workout.skippedSet', { n: idx + 1 }) : s.isWarmup ? t('workout.warmupSet', { n: idx + 1 }) : t('workout.setN', { n: idx + 1 })}
+                    aria-label={isActiveSetCompleted(s) ? t('workout.loggedSetTitle', { n: idx + 1 }) : undefined}
                   >
                     {isActiveSetCompleted(s) ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : s.status === 'skipped' ? 'S' : s.isWarmup ? 'W' : idx + 1}
                   </button>
@@ -2820,6 +2831,18 @@ export default function ActiveWorkoutScreen({
               /* The One Set Focus Card */
               <div className="card p-5 sm:p-6 bg-bg-card border border-border/80 shadow-md space-y-6 animate-fade-in">
                 <div className="space-y-4">
+                  {/* F3: a completed set selected via its pill is being
+                      EDITED, not logged anew — say so, or the athlete
+                      cannot tell the values below are the saved record
+                      (changes write through to the draft as they type). */}
+                  {isActiveSetCompleted(currentExercise.sets[activeSetIdx]) && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                      <Edit2 className="w-3.5 h-3.5 shrink-0" />
+                      <p className="text-2xs font-semibold">
+                        {t('workout.editingLoggedSet', { n: activeSetIdx + 1 })}
+                      </p>
+                    </div>
+                  )}
                   {/* Weight Stepper Row (Reference: Screen 12 & Screen 6) */}
                   <div className="p-4 sm:p-5 rounded-2xl bg-bg-secondary/40 border border-border/70 flex flex-col items-center gap-2">
                     <span className="text-2xs font-bold uppercase tracking-wider text-text-muted">
@@ -3045,6 +3068,7 @@ export default function ActiveWorkoutScreen({
               {currentExercise.sets.map((set, sIdx) => (
                 <div
                   key={sIdx}
+                  title={isActiveSetCompleted(set) ? t('workout.loggedSetTitle', { n: sIdx + 1 }) : undefined}
                   className="py-3 flex items-center justify-between gap-1.5 sm:gap-2"
                 >
                   {/* Set number */}

@@ -13,7 +13,8 @@
 import { isValidEntryDate } from './formatters';
 import { MAX_PR_WEIGHT_KG } from './strength-standards';
 import { normalizeRunDistanceKm } from './run-program';
-import type { FoodItem, MealEntry, PersonalRecord, PlannedWorkout, WorkoutEntry } from './types';
+import { clampWorkoutReps, clampWorkoutWeight } from './workout-engine';
+import type { FoodItem, MealEntry, PersonalRecord, PlannedWorkout, WorkoutEntry, WorkoutSet } from './types';
 
 const MAX_WEIGHT_LBS = Math.ceil(MAX_PR_WEIGHT_KG * 2.20462);
 const MAX_FOOD_CALORIES = 10000;
@@ -70,6 +71,57 @@ export function sanitizeMealUpdate(
   return next;
 }
 
+/**
+ * Set-level sanitization for workout updates (Certification F3).
+ *
+ * updateWorkout used to pass `exercises` through verbatim — acceptable
+ * while its only caller edited a run's distance, but the History
+ * completed-set editor writes whole exercise lists through it. The
+ * numeric rules are the SAME ones the save path applies
+ * (finalizeWorkoutSet in workout-engine): weight parsed then clamped
+ * unit-aware (0–500 kg ceiling), reps integer-clamped (0–100), RPE
+ * clamped 1–10. Everything else on the set (status, completed flag,
+ * prescription fields, warmup/PR flags) passes through untouched —
+ * this boundary validates numbers, it does not re-derive execution
+ * state. Fallback philosophy matches the rest of this file: a
+ * non-finite number keeps the existing value; `weight: undefined`
+ * stays undefined (that is how bodyweight sets are represented).
+ */
+export function sanitizeWorkoutSetUpdate(
+  existing: WorkoutSet | undefined,
+  updated: WorkoutSet,
+): WorkoutSet {
+  const next: WorkoutSet = { ...updated };
+
+  let w: number | undefined;
+  if (typeof updated.weight === 'number') {
+    w = Number.isNaN(updated.weight) ? existing?.weight : updated.weight;
+  } else if (typeof updated.weight === 'string' && (updated.weight as string).trim() !== '') {
+    const parsed = parseFloat(updated.weight as string);
+    w = Number.isNaN(parsed) ? existing?.weight : parsed;
+  } else if (updated.weight === undefined) {
+    w = undefined;
+  } else {
+    w = existing?.weight;
+  }
+  next.weight = w === undefined ? undefined : clampWorkoutWeight(w, updated.unit || 'kg');
+
+  next.reps = clampWorkoutReps(parseInt(String(updated.reps), 10) || 0);
+
+  if ('rpe' in updated) {
+    if (typeof updated.rpe === 'number' && Number.isFinite(updated.rpe)) {
+      next.rpe = Math.min(10, Math.max(1, updated.rpe));
+    } else if (updated.rpe === undefined) {
+      delete next.rpe;
+    } else if (existing && existing.rpe !== undefined) {
+      next.rpe = existing.rpe;
+    } else {
+      delete next.rpe;
+    }
+  }
+  return next;
+}
+
 export function sanitizeWorkoutUpdate(
   existing: WorkoutEntry,
   updated: Partial<WorkoutEntry>,
@@ -77,6 +129,14 @@ export function sanitizeWorkoutUpdate(
   const next: WorkoutEntry = { ...existing, ...updated };
   if (typeof updated.date === 'string' && !isValidEntryDate(updated.date)) {
     next.date = existing.date;
+  }
+  if (Array.isArray(updated.exercises)) {
+    next.exercises = updated.exercises.map((ex, exIdx) => ({
+      ...ex,
+      sets: (ex.sets || []).map((s, setIdx) =>
+        sanitizeWorkoutSetUpdate(existing.exercises?.[exIdx]?.sets?.[setIdx], s)
+      ),
+    }));
   }
   if ('distanceKm' in updated) {
     if (updated.distanceKm === undefined) {
