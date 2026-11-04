@@ -216,10 +216,10 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
 
                   {/* Impact preview pills */}
                   <div className="mt-1.5 flex flex-wrap gap-1">
-                    <span className="text-4xs font-mono px-1.5 py-0.2 rounded bg-bg-secondary/80 text-text-muted border border-border/60">
+                    <span className="text-2xs font-mono px-1.5 py-0.2 rounded bg-bg-secondary/80 text-text-muted border border-border/60">
                       {t('goals.reps')} {config.defaultRepRange.min}–{config.defaultRepRange.max}
                     </span>
-                    <span className="text-4xs font-mono px-1.5 py-0.2 rounded bg-bg-secondary/80 text-text-muted border border-border/60">
+                    <span className="text-2xs font-mono px-1.5 py-0.2 rounded bg-bg-secondary/80 text-text-muted border border-border/60">
                       {t('goals.rest')} {config.defaultRestSeconds}s
                     </span>
                   </div>

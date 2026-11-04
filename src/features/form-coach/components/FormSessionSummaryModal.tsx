@@ -70,7 +70,7 @@ export default function FormSessionSummaryModal({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border-subtle pb-3">
           <div>
-            <span className="text-2xs font-mono uppercase tracking-wider text-accent-primary">
+            <span className="text-2xs font-mono uppercase tracking-wider text-accent-text">
               Post-Set Analysis
             </span>
             <h2 className="text-xl font-bold tracking-tight">{summary.exerciseName}</h2>
@@ -98,7 +98,7 @@ export default function FormSessionSummaryModal({
                   max="100"
                   value={correctedReps}
                   onChange={(e) => setCorrectedReps(Math.max(0, parseInt(e.target.value) || 0))}
-                  className="w-14 text-center font-bold text-xl bg-surface-base border border-accent-primary rounded-lg text-text-primary py-0.5"
+                  className="w-14 text-center font-bold text-xl bg-surface border-accent rounded-lg text-text-primary py-0.5"
                 />
               </div>
             ) : (
@@ -108,7 +108,7 @@ export default function FormSessionSummaryModal({
                   type="button"
                   onClick={() => setIsEditingReps(true)}
                   aria-label="Edit rep count"
-                  className="text-text-muted hover:text-accent-primary p-0.5"
+                  className="text-text-muted hover:text-accent p-0.5"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
                 </button>
@@ -171,14 +171,14 @@ export default function FormSessionSummaryModal({
                     <div className="flex items-center space-x-2">
                       <span className="font-semibold text-text-primary">{obs.title}</span>
                       {obs.count > 1 && (
-                        <span className="px-1.5 py-0.2 rounded text-2xs bg-surface-base font-mono text-text-muted">
+                        <span className="px-1.5 py-0.2 rounded text-2xs bg-surface-highlight font-mono text-text-muted">
                           x{obs.count}
                         </span>
                       )}
                     </div>
                     <p className="text-text-secondary text-2xs leading-relaxed">{obs.message}</p>
                     {obs.evidence && (
-                      <p className="text-text-muted text-2xs font-mono bg-surface-base/60 px-2 py-1 rounded">
+                      <p className="text-text-muted text-2xs font-mono bg-surface-highlight/60 px-2 py-1 rounded">
                         Evidence: {obs.evidence}
                       </p>
                     )}
@@ -198,11 +198,11 @@ export default function FormSessionSummaryModal({
             <button
               type="button"
               onClick={() => setShowRepDetails((prev) => !prev)}
-              className="w-full p-3.5 flex items-center justify-between text-left hover:bg-surface-base/50 transition-colors"
+              className="w-full p-3.5 flex items-center justify-between text-left hover:bg-surface-highlight/50 transition-colors"
             >
               <div className="flex items-center space-x-2">
                 <span className="text-xs font-bold text-text-primary">Rep-by-Rep Data</span>
-                <span className="text-2xs font-mono px-1.5 py-0.5 rounded bg-surface-base text-text-muted">
+                <span className="text-2xs font-mono px-1.5 py-0.5 rounded bg-surface-highlight text-text-muted">
                   {summary.reps.length} reps
                 </span>
               </div>
@@ -218,10 +218,10 @@ export default function FormSessionSummaryModal({
                 {summary.reps.map((rep) => (
                   <div
                     key={rep.repNumber}
-                    className="p-2.5 rounded-xl bg-surface-base flex items-center justify-between text-xs"
+                    className="p-2.5 rounded-xl bg-surface-highlight flex items-center justify-between text-xs"
                   >
                     <div className="flex items-center space-x-2.5">
-                      <span className="font-mono font-bold text-accent-primary w-5">
+                      <span className="font-mono font-bold text-accent-text w-5">
                         #{rep.repNumber}
                       </span>
                       <div>
@@ -263,7 +263,7 @@ export default function FormSessionSummaryModal({
           <button
             type="button"
             onClick={onAnalyzeAnother}
-            className="flex-1 py-3 px-3 rounded-xl border border-border-subtle bg-surface-elevated text-text-secondary font-medium text-xs sm:text-sm hover:bg-surface-base transition-colors text-center"
+            className="flex-1 py-3 px-3 rounded-xl border border-border-subtle bg-surface-elevated text-text-secondary font-medium text-xs sm:text-sm hover:bg-surface transition-colors text-center"
           >
             Another Video
           </button>
@@ -271,14 +271,14 @@ export default function FormSessionSummaryModal({
         <button
           type="button"
           onClick={onClose}
-          className="flex-1 py-3 px-3 rounded-xl border border-border-subtle bg-surface-elevated text-text-secondary font-medium text-xs sm:text-sm hover:bg-surface-base transition-colors text-center"
+          className="flex-1 py-3 px-3 rounded-xl border border-border-subtle bg-surface-elevated text-text-secondary font-medium text-xs sm:text-sm hover:bg-surface transition-colors text-center"
         >
           Close
         </button>
         <button
           type="button"
           onClick={handleSaveToWorkout}
-          className="flex-1 py-3 px-3 rounded-xl bg-accent-primary text-text-on-accent font-semibold text-xs sm:text-sm flex items-center justify-center space-x-1.5 shadow-lg shadow-accent-primary/20 hover:opacity-95 transition-opacity"
+          className="flex-1 py-3 px-3 rounded-xl bg-accent text-accent-on font-semibold text-xs sm:text-sm flex items-center justify-center space-x-1.5 shadow-lg shadow-accent/20 hover:opacity-95 transition-opacity"
         >
           <Save className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
           <span className="truncate">{isSaved ? 'Saved' : 'Save'}</span>

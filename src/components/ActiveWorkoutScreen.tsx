@@ -3225,7 +3225,7 @@ export default function ActiveWorkoutScreen({
                   <button
                     type="button"
                     onClick={() => setActiveExerciseIdx((prev) => prev + 1)}
-                    className="px-3.5 py-2 rounded-xl bg-accent hover:bg-accent-hover text-accent-on text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all shrink-0"
+                    className="px-3.5 py-2 rounded-xl bg-accent hover:bg-accent-dim text-accent-on text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all shrink-0"
                   >
                     <span>{t('workout.nextWithName', { name: exercises[activeExerciseIdx + 1]?.name })}</span>
                     <ArrowRight className="w-3.5 h-3.5" />

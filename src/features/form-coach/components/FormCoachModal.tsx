@@ -151,9 +151,9 @@ export default function FormCoachModal({
       {...dialogProps}
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md overflow-hidden animate-fade-in"
     >
-      <div className="bg-surface-base sm:bg-surface-elevated border border-border-subtle rounded-3xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl relative max-h-[92vh]">
+      <div className="bg-surface sm:bg-surface-elevated border border-border-subtle rounded-2xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl relative max-h-[92vh]">
         {/* Hidden persistent video element for reliable MediaPipe frame pipeline */}
-        <div className={state === 'analyzing' ? 'relative w-full aspect-video bg-black rounded-t-2xl sm:rounded-t-3xl overflow-hidden' : 'hidden'}>
+        <div className={state === 'analyzing' ? 'relative w-full aspect-video bg-black rounded-t-2xl overflow-hidden' : 'hidden'}>
           <video
             ref={videoRef}
             playsInline
@@ -170,8 +170,8 @@ export default function FormCoachModal({
 
           {/* Floating Live Telemetry Badges during analysis */}
           <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
-            <span className="px-2.5 py-1 rounded-full text-2xs font-mono font-bold bg-black/70 backdrop-blur-md text-accent-primary border border-accent-primary/30 flex items-center gap-1.5">
-              <Activity className="w-3 h-3 text-accent-primary" />
+            <span className="px-2.5 py-1 rounded-full text-2xs font-mono font-bold bg-black/70 backdrop-blur-md text-accent border border-accent/30 flex items-center gap-1.5">
+              <Activity className="w-3 h-3 text-accent" />
               <span>{repCount} Reps</span>
             </span>
             {currentKneeAngleDeg !== null && (
@@ -191,7 +191,7 @@ export default function FormCoachModal({
             {/* Header */}
             <div className="flex items-center justify-between pb-2 border-b border-border-subtle">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center text-accent-primary">
+                <div className="w-10 h-10 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent">
                   <Video className="w-5 h-5" />
                 </div>
                 <div>
@@ -202,7 +202,7 @@ export default function FormCoachModal({
               <button
                 type="button"
                 onClick={handleSafeClose}
-                className="w-8 h-8 rounded-full bg-surface-elevated hover:bg-surface-base flex items-center justify-center text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full bg-surface-elevated hover:bg-surface flex items-center justify-center text-text-muted hover:text-text-primary transition-colors cursor-pointer"
                 aria-label={t('common.close')}
               >
                 <X className="w-4 h-4" />
@@ -212,13 +212,13 @@ export default function FormCoachModal({
             {/* Exercise Selection Card */}
             <div className="p-3.5 rounded-2xl bg-surface-elevated border border-border-subtle flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-accent-primary/15 text-accent-primary flex items-center justify-center font-bold text-xs font-mono">
+                <div className="w-8 h-8 rounded-xl bg-accent/15 text-accent flex items-center justify-center font-bold text-xs font-mono">
                   SQ
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-text-primary">Barbell Back Squat</span>
-                    <span className="px-1.5 py-0.5 rounded text-3xs font-mono uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                    <span className="px-1.5 py-0.5 rounded text-2xs font-mono uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                       Active
                     </span>
                   </div>
@@ -235,8 +235,8 @@ export default function FormCoachModal({
               onClick={() => fileInputRef.current?.click()}
               className={`p-7 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center text-center cursor-pointer group ${
                 isDragOver
-                  ? 'border-accent-primary bg-accent-primary/10 scale-[1.01]'
-                  : 'border-border-subtle hover:border-accent-primary/60 bg-surface-base/60 hover:bg-surface-elevated/80'
+                  ? 'border-accent bg-accent/10 scale-[1.01]'
+                  : 'border-border-subtle hover:border-accent/60 bg-surface/60 hover:bg-surface-elevated/80'
               }`}
             >
               <input
@@ -246,12 +246,12 @@ export default function FormCoachModal({
                 onChange={handleInputChange}
                 className="hidden"
               />
-              <div className="w-14 h-14 rounded-2xl bg-accent-primary/15 group-hover:bg-accent-primary/25 text-accent-primary flex items-center justify-center mb-3 transition-colors">
+              <div className="w-14 h-14 rounded-2xl bg-accent/15 group-hover:bg-accent/25 text-accent flex items-center justify-center mb-3 transition-colors">
                 <Upload className="w-6 h-6 group-hover:-translate-y-0.5 transition-transform" />
               </div>
               <h3 className="text-sm font-bold text-text-primary">Upload Workout Video</h3>
               <p className="text-xs text-text-secondary mt-1 max-w-xs">
-                Drag and drop your exercise video here, or <span className="text-accent-primary font-medium underline">browse files</span>
+                Drag and drop your exercise video here, or <span className="text-accent-text font-medium underline">browse files</span>
               </p>
               <span className="text-2xs text-text-muted mt-2 font-mono">
                 Supports MP4, MOV, or WebM
@@ -291,7 +291,7 @@ export default function FormCoachModal({
         {state === 'analyzing' && (
           <div className="p-5 sm:p-6 space-y-4">
             <div className="space-y-1.5 text-center">
-              <span className="text-2xs font-mono uppercase tracking-wider text-accent-primary">
+              <span className="text-2xs font-mono uppercase tracking-wider text-accent-text">
                 Biomechanics Processing
               </span>
               <h3 className="text-base font-bold text-text-primary">
@@ -306,11 +306,11 @@ export default function FormCoachModal({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-2xs font-mono">
                 <span className="text-text-muted">{videoFileName || 'Processing video…'}</span>
-                <span className="font-bold text-accent-primary">{progressPercent}%</span>
+                <span className="font-bold text-accent-text">{progressPercent}%</span>
               </div>
-              <div className="w-full h-2.5 rounded-full bg-surface-base border border-border-subtle overflow-hidden">
+              <div className="w-full h-2.5 rounded-full bg-surface-highlight border border-border-subtle overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-accent-primary to-sky-400 transition-all duration-150 rounded-full"
+                  className="h-full bg-gradient-to-r from-accent to-sky-400 transition-all duration-150 rounded-full"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
@@ -319,17 +319,17 @@ export default function FormCoachModal({
             {/* Telemetry Preview Card */}
             <div className="grid grid-cols-3 gap-2 pt-1 text-center">
               <div className="p-2.5 rounded-xl bg-surface-elevated border border-border-subtle">
-                <span className="text-3xs uppercase font-mono text-text-muted block">Reps Found</span>
+                <span className="text-2xs uppercase font-mono text-text-muted block">Reps Found</span>
                 <span className="text-xl font-bold font-mono text-text-primary">{repCount}</span>
               </div>
               <div className="p-2.5 rounded-xl bg-surface-elevated border border-border-subtle">
-                <span className="text-3xs uppercase font-mono text-text-muted block">Min Knee Angle</span>
+                <span className="text-2xs uppercase font-mono text-text-muted block">Min Knee Angle</span>
                 <span className="text-xl font-bold font-mono text-text-primary">
                   {minKneeAngleDeg !== null ? `${Math.round(minKneeAngleDeg)}°` : '--'}
                 </span>
               </div>
               <div className="p-2.5 rounded-xl bg-surface-elevated border border-border-subtle">
-                <span className="text-3xs uppercase font-mono text-text-muted block">Tracking</span>
+                <span className="text-2xs uppercase font-mono text-text-muted block">Tracking</span>
                 <span className="text-xs font-semibold text-emerald-400 flex items-center justify-center gap-1 mt-1">
                   <CheckCircle className="w-3.5 h-3.5" />
                   Active
@@ -342,14 +342,14 @@ export default function FormCoachModal({
               <button
                 type="button"
                 onClick={reset}
-                className="flex-1 py-2.5 px-4 rounded-xl border border-border-subtle bg-surface-elevated hover:bg-surface-base text-text-secondary text-xs font-medium transition-colors cursor-pointer"
+                className="flex-1 py-2.5 px-4 rounded-xl border border-border-subtle bg-surface-elevated hover:bg-surface text-text-secondary text-xs font-medium transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={completeAnalysis}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-accent-primary text-text-on-accent text-xs font-semibold hover:opacity-95 transition-opacity cursor-pointer shadow-md shadow-accent-primary/20"
+                className="flex-1 py-2.5 px-4 rounded-xl bg-accent text-accent-on text-xs font-semibold hover:opacity-95 transition-opacity cursor-pointer shadow-md shadow-accent/20"
               >
                 View Report Now
               </button>
@@ -394,14 +394,14 @@ export default function FormCoachModal({
               <button
                 type="button"
                 onClick={handleSafeClose}
-                className="py-2.5 px-5 rounded-xl border border-border-subtle bg-surface-elevated hover:bg-surface-base text-text-secondary text-xs font-medium cursor-pointer"
+                className="py-2.5 px-5 rounded-xl border border-border-subtle bg-surface-elevated hover:bg-surface text-text-secondary text-xs font-medium cursor-pointer"
               >
                 Close
               </button>
               <button
                 type="button"
                 onClick={reset}
-                className="py-2.5 px-5 rounded-xl bg-accent-primary text-text-on-accent text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                className="py-2.5 px-5 rounded-xl bg-accent text-accent-on text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Try Another Video</span>
@@ -427,14 +427,14 @@ export default function FormCoachModal({
               <button
                 type="button"
                 onClick={handleSafeClose}
-                className="py-2.5 px-5 rounded-xl border border-border-subtle bg-surface-elevated hover:bg-surface-base text-text-secondary text-xs font-medium cursor-pointer"
+                className="py-2.5 px-5 rounded-xl border border-border-subtle bg-surface-elevated hover:bg-surface text-text-secondary text-xs font-medium cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={reset}
-                className="py-2.5 px-5 rounded-xl bg-accent-primary text-text-on-accent text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                className="py-2.5 px-5 rounded-xl bg-accent text-accent-on text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Try Another Video</span>
