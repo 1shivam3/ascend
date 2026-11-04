@@ -1,4 +1,5 @@
 import type { DayOfWeek, PlannedWorkout, WeeklySchedule } from './types';
+import { getLocalTodayStr, normalizeDateToLocalDay } from './formatters';
 
 /**
  * FND-02 — the ONE definition of "a scheduled training day", pinned here
@@ -47,4 +48,65 @@ export function getScheduledPlanEntries(
     }
   });
   return entries;
+}
+
+/**
+ * UI-1b-02 — cold-start eligibility: the first local date on which the
+ * user demonstrably existed in the app — the earliest of (a) any
+ * plan's creation date, (b) the first logged workout, and (c) the
+ * first daily check-in.
+ *
+ * Missed-session scoring (adherence here, the weekly review, the
+ * coach check-in) may only count days on or after this date. A day
+ * that ended before the user's plan — or any of their data — began
+ * cannot have been "missed": projecting the current schedule
+ * backwards over pre-account weeks is how a minutes-old user was
+ * told they had completed "0 of 32 planned sessions" and missed
+ * named days in a week that ended before they signed up.
+ *
+ * Returns null when the user has no data at all — in that case
+ * nothing is scorable either.
+ *
+ * Plan createdAt stamps are ISO timestamps and are read by LOCAL
+ * parts (getLocalTodayStr on the parsed instant — the same
+ * conversion the store uses for profile.createdAt), never by UTC
+ * date slice, which would move the boundary a day early for users
+ * east of UTC and excuse nothing while accusing a day that predates
+ * the account locally.
+ *
+ * Plan dates are CLAMPED to the profile's creation day when a
+ * profile stamp is supplied: nothing in a user's state can predate
+ * their profile, yet built-in split templates carry a placeholder
+ * createdAt ('2026-01-01') that lands verbatim in state when a new
+ * user accepts the onboarding plan offer (verified live 2026-11-04:
+ * a minutes-old guest profile held four templates stamped
+ * 2026-01-01). Without the clamp the placeholder would poison this
+ * anchor for exactly the new users the rule protects.
+ */
+export function earliestDataDate(input: {
+  plannedWorkouts?: PlannedWorkout[] | null;
+  workouts?: { date: string }[] | null;
+  dailyCheckins?: Record<string, unknown> | null;
+  profileCreatedAt?: string | null;
+}): string | null {
+  let best: string | null = null;
+  const consider = (d: string | null | undefined) => {
+    if (d && /^\d{4}-\d{2}-\d{2}$/.test(d) && (best === null || d < best)) best = d;
+  };
+  const profileMs = input.profileCreatedAt ? Date.parse(input.profileCreatedAt) : NaN;
+  const profileDay = Number.isNaN(profileMs) ? null : getLocalTodayStr(new Date(profileMs));
+  consider(profileDay);
+  for (const p of input.plannedWorkouts ?? []) {
+    if (!p?.createdAt) continue;
+    const ms = Date.parse(p.createdAt);
+    if (Number.isNaN(ms)) continue;
+    const day = getLocalTodayStr(new Date(ms));
+    // Clamp template fiction: a plan cannot predate its owner's profile.
+    consider(profileDay && day < profileDay ? profileDay : day);
+  }
+  for (const w of input.workouts ?? []) {
+    if (w?.date) consider(normalizeDateToLocalDay(w.date));
+  }
+  for (const key of Object.keys(input.dailyCheckins ?? {})) consider(key);
+  return best;
 }

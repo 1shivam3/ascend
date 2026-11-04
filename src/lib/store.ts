@@ -2827,6 +2827,7 @@ export const useAppStore = create<AppState>()(
               weeklySchedule: state.weeklySchedule,
               plannedWorkouts: state.plannedWorkouts,
               readinessHistory: state.coach?.readinessHistory || [],
+              profileCreatedAt: state.profile?.createdAt ?? null,
             },
             getLocalTodayStr()
           ),
@@ -3093,6 +3094,7 @@ export const useAppStore = create<AppState>()(
             stalls: detectStalls(state.workouts),
             unit: state.profile?.unit ?? 'kg',
             bodyweightKg: state.profile?.bodyweightKg,
+            profileCreatedAt: state.profile?.createdAt ?? null,
             todayStr,
             // Coach bridge (B3): form-check sessions live in localStorage;
             // read them through the cycle-free storage leaf (the full

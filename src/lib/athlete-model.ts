@@ -34,7 +34,7 @@ import {
 } from './workout-engine';
 import { resolveExerciseMuscle, type MuscleGroup } from './exercise-library';
 import { parseLocalDate } from './formatters';
-import { getScheduledPlanEntries } from './scheduled-days';
+import { getScheduledPlanEntries, earliestDataDate } from './scheduled-days';
 import type { LocalizedSentence } from './coach-i18n';
 
 /**
@@ -165,6 +165,8 @@ export interface AthleteModelInput {
   weeklySchedule: WeeklySchedule;
   plannedWorkouts: PlannedWorkout[];
   readinessHistory: ReadinessHistoryEntry[];
+  /** Profile creation stamp (ISO) — the cold-start anchor's clamp floor. */
+  profileCreatedAt?: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -619,7 +621,8 @@ function buildRecovery(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Adherence (last 8 complete Mon–Sun weeks; current schedule = the plan proxy)
+// Adherence (last 8 complete Mon–Sun weeks; current schedule = the plan
+// proxy; days before the user's data began are never scored — UI-1b-02)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function buildAdherence(
@@ -654,6 +657,16 @@ function buildAdherence(
     (input.workouts || []).filter((w) => w && workoutHasCompletedSets(w)).map((w) => w.date)
   );
 
+  // UI-1b-02 (cold-start eligibility): the window may only score days
+  // on or after the first date the user demonstrably existed in the
+  // app (earliestDataDate). Before this gate, the CURRENT schedule
+  // was projected backwards over the full 8 weeks for everyone, so a
+  // minutes-old account on a 4-day schedule "completed 0 of 32
+  // planned sessions" in weeks that predated the account itself.
+  const dataStart = earliestDataDate(input);
+  const windowStart = addDays(thisMonday, -56);
+  const clipped = dataStart !== null && dataStart > windowStart;
+
   let planned = 0;
   let completed = 0;
   let unscheduled = 0;
@@ -664,6 +677,9 @@ function buildAdherence(
     const monday = addDays(thisMonday, -7 * wk);
     for (let off = 0; off < 7; off++) {
       const date = addDays(monday, off);
+      // Pre-data days are not scorable (UI-1b-02): the plan did not
+      // exist on them, so they are neither planned nor missed.
+      if (dataStart !== null && date < dataStart) continue;
       const day = DAY_KEYS[off];
       const rec = perDay.get(day) as { planned: number; done: number; trained: number };
       const trained = workoutDates.has(date);
@@ -703,6 +719,10 @@ function buildAdherence(
     }
   }
 
+  const unscheduledSuffix =
+    unscheduled > 0
+      ? ` Plus ${unscheduled} extra session${unscheduled === 1 ? '' : 's'} trained on unscheduled days.`
+      : '';
   const rate: ModelEstimate<number> =
     planned === 0
       ? {
@@ -710,19 +730,27 @@ function buildAdherence(
           n: 0,
           tier: 'prior',
           evidence:
-            rawScheduledDays.length > 0
-              ? 'Your schedule points at a plan that no longer exists, so adherence can\u2019t be measured until the schedule is fixed.'
-              : 'No weekly schedule is set, so there is no plan to measure adherence against yet.',
+            clipped && scheduledDays.length > 0
+              ? // UI-1b-02: the schedule is real, it is simply new —
+                // never tell this user their plan "no longer exists".
+                'Your plan is new — adherence counts from the day it began, and not one complete scheduled day has passed yet, so there is nothing to score.'
+              : rawScheduledDays.length > 0
+                ? 'Your schedule points at a plan that no longer exists, so adherence can\u2019t be measured until the schedule is fixed.'
+                : 'No weekly schedule is set, so there is no plan to measure adherence against yet.',
         }
       : {
           value: roundTo(planned ? completed / planned : 0, 0.01),
           n: planned,
           tier: tierFor(planned, 8, 24),
           evidence:
-            `You completed ${completed} of ${planned} planned sessions over the last 8 complete weeks (the current week isn't counted yet), measured against your current weekly schedule.` +
-            (unscheduled > 0
-              ? ` Plus ${unscheduled} extra session${unscheduled === 1 ? '' : 's'} trained on unscheduled days.`
-              : ''),
+            (clipped
+              ? // UI-1b-02: count only what the user has lived —
+                // the weeks before the plan began are not evidence
+                // about this athlete, and saying "8 complete weeks"
+                // here would claim history they do not have.
+                `You completed ${completed} of ${planned} planned sessions since your plan began on ${dataStart} (the weeks before it aren't counted — there was no plan to miss), measured against your current weekly schedule.`
+              : `You completed ${completed} of ${planned} planned sessions over the last 8 complete weeks (the current week isn't counted yet), measured against your current weekly schedule.`) +
+            unscheduledSuffix,
         };
 
   return {
@@ -930,6 +958,7 @@ export function buildAthleteModel(input: AthleteModelInput, todayStr: string): A
     weeklySchedule: input?.weeklySchedule,
     plannedWorkouts: Array.isArray(input?.plannedWorkouts) ? input.plannedWorkouts : [],
     readinessHistory: Array.isArray(input?.readinessHistory) ? input.readinessHistory : [],
+    profileCreatedAt: typeof input?.profileCreatedAt === 'string' ? input.profileCreatedAt : null,
   };
   const byLift = buildLiftSessions(workouts);
   const lifts = buildLiftResponses(byLift);

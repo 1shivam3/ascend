@@ -392,6 +392,14 @@ export default function Onboarding() {
       // Offer exactly the days the user will train (a 2-day user was
       // being offered 3 full-body workouts).
       generatedSplit = limitPlansToDays(generatedSplit, daysPerWeek);
+      // UI-1b-02: stamp the real creation instant on every generated
+      // plan. The split templates carry a placeholder createdAt
+      // ('2026-01-01'); landed verbatim in state it backdates the
+      // plan by months, and cold-start scoring (weekly review,
+      // adherence, coach check-in) then treats pre-account days as
+      // missed sessions.
+      const generatedAt = new Date().toISOString();
+      generatedSplit = generatedSplit.map((plan) => ({ ...plan, createdAt: generatedAt }));
     }
 
     setTrainingProfile({

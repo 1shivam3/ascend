@@ -307,6 +307,111 @@ describe('athlete model — adherence (Mon–Sun)', () => {
   });
 });
 
+describe('athlete model — adherence cold-start eligibility (UI-1b-02)', () => {
+  // Persona fixtures, seeded-history style (cf. tests/coach-sim-personas).
+  // TODAY is Thu 2026-10-22; the 8-complete-week window is Aug 24 → Oct 18.
+  const planOn = (id: string, createdAt: string): PlannedWorkout => ({
+    id,
+    name: `Plan ${id}`,
+    exercises: [],
+    createdAt,
+  });
+  const fourDaySchedule = scheduleWith({
+    monday: { workoutPlanId: 'p1' },
+    wednesday: { workoutPlanId: 'p1' },
+    friday: { workoutPlanId: 'p1' },
+    sunday: { workoutPlanId: 'p1' },
+  });
+
+  it('day-0 persona: a plan created today scores nothing — no "0 of 32"', () => {
+    // The audit case: account minutes old, 4-day schedule → the
+    // pre-fix model claimed 0 of 32 over 8 pre-account weeks.
+    const m = buildAthleteModel(
+      baseInput({
+        weeklySchedule: fourDaySchedule,
+        plannedWorkouts: [planOn('p1', '2026-10-22T12:00:00')],
+      }),
+      TODAY
+    );
+    expect(m.adherence.plannedSessions).toBe(0);
+    expect(m.adherence.completedSessions).toBe(0);
+    expect(m.adherence.mostSkippedDay).toBeNull();
+    expect(m.adherence.adherenceRate.tier).toBe('prior');
+    expect(m.adherence.adherenceRate.evidence).toContain('plan is new');
+    expect(JSON.stringify(m.adherence)).not.toContain('of 32');
+    // The adherence fact must not surface at all — the model falls
+    // back to the honest "still learning you" line.
+    expect(m.topFacts.some((f) => f.kind === 'adherence')).toBe(false);
+    expect(m.topFacts[0].kind).toBe('learning');
+  });
+
+  it('template-poison persona: placeholder plan dates clamp to the profile day', () => {
+    // The live geometry (2026-11-04): the plan record is an adopted
+    // built-in template stamped '2026-01-01'; the profile was created
+    // today. Without the profile clamp the anchor is January and the
+    // model again claims 0 of 32.
+    const m = buildAthleteModel(
+      baseInput({
+        weeklySchedule: fourDaySchedule,
+        plannedWorkouts: [planOn('p1', '2026-01-01')],
+        profileCreatedAt: '2026-10-22T06:00:00.000Z',
+      }),
+      TODAY
+    );
+    expect(m.adherence.plannedSessions).toBe(0);
+    expect(m.adherence.mostSkippedDay).toBeNull();
+    expect(m.adherence.adherenceRate.evidence).toContain('plan is new');
+    expect(JSON.stringify(m.adherence)).not.toContain('of 32');
+  });
+
+  it('two-weeks-in persona: the denominator counts only days since the plan began', () => {
+    // Plan began Mon 2026-10-05; schedule Mon/Wed/Fri. Eligible
+    // scheduled days inside the window: Oct 5, 7, 9, 12, 14, 16 (6).
+    // Trained all but Fri Oct 16.
+    const trained = ['2026-10-05', '2026-10-07', '2026-10-09', '2026-10-12', '2026-10-14'];
+    const m = buildAthleteModel(
+      baseInput({
+        workouts: trained.map((d) => wentry(d, [wex('Squat', [wset(100, 1)])])),
+        weeklySchedule: scheduleWith({
+          monday: { workoutPlanId: 'p1' },
+          wednesday: { workoutPlanId: 'p1' },
+          friday: { workoutPlanId: 'p1' },
+        }),
+        plannedWorkouts: [planOn('p1', '2026-10-05T12:00:00')],
+      }),
+      TODAY
+    );
+    expect(m.adherence.plannedSessions).toBe(6);
+    expect(m.adherence.completedSessions).toBe(5);
+    expect(m.adherence.adherenceRate.value).toBeCloseTo(0.83, 2);
+    expect(m.adherence.adherenceRate.evidence).toContain('since your plan began on 2026-10-05');
+    expect(m.adherence.adherenceRate.evidence).not.toContain('over the last 8 complete weeks');
+    // Two samples per weekday is far too few to crown a most-skipped day.
+    expect(m.adherence.mostSkippedDay).toBeNull();
+  });
+
+  it('mid-history persona: a long-lived plan keeps the full-window wording', () => {
+    const mondays = ['2026-08-24', '2026-08-31', '2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28', '2026-10-05', '2026-10-12'];
+    const wednesdaysDone = ['2026-08-26', '2026-09-02', '2026-09-09', '2026-09-16'];
+    const m = buildAthleteModel(
+      baseInput({
+        workouts: [...mondays, ...wednesdaysDone].map((d) => wentry(d, [wex('Squat', [wset(100, 1)])])),
+        weeklySchedule: scheduleWith({
+          monday: { workoutPlanId: 'p1' },
+          wednesday: { workoutPlanId: 'p1' },
+        }),
+        plannedWorkouts: [plan('p1')],
+      }),
+      TODAY
+    );
+    expect(m.adherence.plannedSessions).toBe(16);
+    expect(m.adherence.completedSessions).toBe(12);
+    expect(m.adherence.mostSkippedDay).toBe('wednesday');
+    expect(m.adherence.adherenceRate.evidence).toContain('over the last 8 complete weeks');
+    expect(m.adherence.adherenceRate.evidence).not.toContain('since your plan began');
+  });
+});
+
 // ── Pain episodes ────────────────────────────────────────────────────────────
 
 describe('athlete model — pain episodes', () => {
