@@ -10,6 +10,7 @@ import { useTranslation } from '@/lib/i18n';
 import type { StringKey } from '@/lib/i18n/en';
 import { renderLocalizedSentence } from '@/lib/coach-i18n';
 import { mergeEditedMealFoods } from '@/lib/meal-edit';
+import { addFoodToBuilderRows, builderCountableFoods } from '@/lib/meal-builder';
 import {
   estimateMacros,
   calculateMealMacros,
@@ -721,8 +722,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
    */
   const handleAddScannedFood = (scannedItem: FoodItem) => {
     if (isModalOpen) {
-      // Append to currently editing meal
-      setFoods((prev) => [...prev, scannedItem]);
+      // Append to currently editing meal — F7: fills the blank
+      // template row when one is present instead of stacking a second
+      // block behind it.
+      setFoods((prev) => addFoodToBuilderRows(prev, scannedItem));
       toast.success(t('toast.scannedAddedToMeal', { name: scannedItem.name, kcal: scannedItem.calories }), t('toast.titleScannedAdded'));
     } else {
       // User confirmed in barcode modal: save directly to today's meals.
@@ -764,7 +767,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     };
 
     if (isModalOpen) {
-      setFoods((prev) => [...prev, item]);
+      // F7: fill the blank template row when one is present.
+      setFoods((prev) => addFoodToBuilderRows(prev, item));
       toast.success(t('toast.favAdded', { name: fav.name }), t('toast.titleFavoriteAdded'));
     } else {
       setMealName('Quick Meal');
@@ -905,7 +909,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       ? { ...food, oilAssumedTsp: oil.assumedTsp, oilLevel: food.oilLevel ?? oil.level }
       : food;
     if (isModalOpen) {
-      setFoods((prev) => [...prev, item]);
+      // F7: fill the blank template row when one is present.
+      setFoods((prev) => addFoodToBuilderRows(prev, item));
       toast.success(t('toast.addedToMeal', { name: item.name }));
     } else {
       setMealName('Quick Meal');
@@ -1668,7 +1673,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     return list;
   }, [meals]);
 
-  const currentMealMacros = calculateMealMacros(foods);
+  // F7: the builder total is computed over named rows only — a blank
+  // template row (no food chosen) never contributes quantity or totals.
+  const currentMealMacros = calculateMealMacros(builderCountableFoods(foods));
 
   // ─── Render ──────────────────────────────────────────────────────────────
 
@@ -1841,7 +1848,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     {displayGoals.calorieDelta < 0 && (
                       <> · ≈{(Math.abs(displayGoals.calorieDelta * 7) / 7000).toFixed(2)} {t('meals.perWeek')}</>
                     )}
-                    <span className="block text-4xs opacity-80">
+                    <span className="block text-2xs opacity-80">
                       {displayGoals.calorieDelta < 0
                         ? t('meals.deficitNote', { floor: getSafeMinCalories(profile?.gender || 'male').toLocaleString() })
                         : t('meals.surplusNote')}
@@ -2836,7 +2843,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
               {/* ── Meal Name + Quick Templates ── */}
               <div>
-                <label htmlFor="meal-builder-name" className="section-title mb-1.5 block">{t('meals.mealName')}</label>
+                {/* F6 (certification): the name is REQUIRED (Save blocks
+                    without one) — say so on the field itself instead of
+                    letting the requirement surface only as a toast after
+                    a Save tap that looked like it did nothing. */}
+                <label htmlFor="meal-builder-name" className="section-title mb-1.5 block">{t('meals.mealName')} <span className="text-danger" aria-hidden="true">*</span></label>
 
                 {/* Quick-log template buttons */}
                 <div className="flex flex-wrap gap-1.5 mb-2">
@@ -2859,6 +2870,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 <input
                   id="meal-builder-name"
                   type="text"
+                  aria-required="true"
                   placeholder={`e.g. ${getDefaultMealName()}, Post-Workout Shake`}
                   value={mealName}
                   onChange={(e) => setMealName(e.target.value)}
@@ -3275,11 +3287,25 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     !(f.carbsG > 0) &&
                     !(f.fatG > 0),
                 );
+                // F6 (certification): a meal cannot be saved without a
+                // name, but that used to be enforced invisibly — Save
+                // stayed enabled and a tap produced only a transient
+                // toast, so the sheet read as broken. Same pattern as
+                // the zero-nutrition case above: a persistent hint next
+                // to the button and an honest disabled state, visible
+                // BEFORE the save attempt.
+                const nameMissing = mealName.trim().length === 0;
+                const hasNamedFood = foods.some((f) => f.name.trim());
                 return (
                   <>
                     {zeroFood && (
                       <p className="text-2xs text-warning font-medium mb-3">
                         {t('meals.zeroNutritionHint', { name: zeroFood.name.trim() })}
+                      </p>
+                    )}
+                    {nameMissing && hasNamedFood && !zeroFood && (
+                      <p className="text-2xs text-warning font-medium mb-3">
+                        {t('meals.mealNameRequiredHint')}
                       </p>
                     )}
                     <div className="flex gap-3">
@@ -3293,7 +3319,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       <button
                         type="button"
                         onClick={handleSaveMeal}
-                        disabled={foods.length === 0 || !foods.some((f) => f.name.trim()) || !!zeroFood}
+                        disabled={nameMissing || foods.length === 0 || !hasNamedFood || !!zeroFood}
                         className="btn-primary flex-1 disabled:opacity-40 text-xs"
                       >
                         {t('meals.saveMeal')}

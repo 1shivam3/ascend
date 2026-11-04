@@ -84,19 +84,40 @@ export function useCoachDigest() {
     // FND-02: planned sessions come from the pinned scheduled-day
     // definition — a day whose plan no longer exists is not scheduled,
     // matching the adherence denominator exactly.
-    const planned: { weekday: number; name: string; planId?: string }[] =
-      getScheduledPlanEntries(weeklySchedule, plannedWorkouts).map((e) => ({
-        weekday: e.weekday,
-        name: e.customTitle || `Workout`,
-        planId: e.planId,
-      }));
+    const planned: { weekday: number; name: string; planId?: string; startsOn?: string }[] =
+      getScheduledPlanEntries(weeklySchedule, plannedWorkouts).map((e) => {
+        // UI-1b-02: gate missed-session scoring at the plan's creation
+        // date — a session dated before its plan existed is never
+        // flagged as missed. The ISO stamp is read by local parts
+        // (same conversion the store applies to profile.createdAt);
+        // an unparseable stamp leaves the session ungated rather than
+        // suppressing a real miss. The gate is clamped to the
+        // profile's creation day: built-in templates carry a
+        // placeholder createdAt ('2026-01-01') that lands verbatim in
+        // state on onboarding, and a plan cannot predate its owner's
+        // profile.
+        const plan = e.planId ? plannedWorkouts.find((p) => p.id === e.planId) : undefined;
+        const createdMs = plan?.createdAt ? Date.parse(plan.createdAt) : NaN;
+        let startsOn = Number.isNaN(createdMs) ? undefined : getLocalTodayStr(new Date(createdMs));
+        const profileMs = profile?.createdAt ? Date.parse(profile.createdAt) : NaN;
+        if (!Number.isNaN(profileMs)) {
+          const profileDay = getLocalTodayStr(new Date(profileMs));
+          if (!startsOn || startsOn < profileDay) startsOn = profileDay;
+        }
+        return {
+          weekday: e.weekday,
+          name: e.customTitle || `Workout`,
+          planId: e.planId,
+          startsOn,
+        };
+      });
     const missed = detectMissedSessions(planned, workouts, week);
     const active = missed.filter(
       (m) => !coach.dismissedCheckIns.includes(`missed:${m.date}:${m.name}`)
     );
     if (active.length === 0) return null;
     return { message: generateCheckIn(active), details: generateCheckInDetails(active), sessions: active };
-  }, [weeklySchedule, plannedWorkouts, workouts, coach.dismissedCheckIns]);
+  }, [weeklySchedule, plannedWorkouts, workouts, coach.dismissedCheckIns, profile?.createdAt]);
 
   const patterns = useMemo(
     () => detectPatterns(workouts),

@@ -18,7 +18,11 @@
  * Honesty rules: an empty week produces a short, truthful review —
  * never filler; bodyweight tonnage uses the profile's bodyweight and
  * is skipped entirely without one (never a silent default); every
- * number quoted is computed from the inputs.
+ * number quoted is computed from the inputs. Cold-start eligibility
+ * (UI-1b-02): scheduled days are scored only on or after the first
+ * date the user demonstrably existed in the app (earliestDataDate) —
+ * a week that predates the plan gets a "nothing was due" review,
+ * never a 0-of-N verdict over days the user never had.
  */
 import type {
   DayOfWeek,
@@ -45,6 +49,7 @@ import {
 } from './block-engine';
 import { mainCompoundKey } from './percent-1rm';
 import { calculateWorkoutVolumeKg } from './volume';
+import { earliestDataDate } from './scheduled-days';
 import type { FormSessionSummary } from '../features/form-coach/models/form-session.types';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -114,6 +119,8 @@ export interface WeeklyReviewInput {
    * the revisions, or any block decision in this pass.
    */
   formSessions?: FormSessionSummary[];
+  /** Profile creation stamp (ISO) — the cold-start anchor's clamp floor. */
+  profileCreatedAt?: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -237,8 +244,31 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
   const trainedDays = new Set(
     workouts.filter((w) => inWeek(w.date, monday)).map((w) => weekdayOf(w.date))
   );
-  const missedDays = scheduledDays.filter((d) => !trainedDays.has(d));
-  const sessionsCompleted = scheduledDays.filter((d) => trainedDays.has(d)).length;
+  // UI-1b-02 (cold-start eligibility): a scheduled day may only be
+  // scored — planned, completed, or missed — when it fell on or after
+  // the first date the user demonstrably existed in the app
+  // (earliestDataDate: plan creation, first workout, or first
+  // check-in, whichever is earliest). Before this gate, the CURRENT
+  // schedule was projected backwards over any week handed to the
+  // builder, so a brand-new user opening the review of the week that
+  // ended before they signed up was told "You completed 0 of 4
+  // planned sessions" with four named missed days. Days before the
+  // data began were never due, so they are never missed.
+  const dataStart = earliestDataDate({
+    plannedWorkouts: input.plannedWorkouts,
+    workouts,
+    dailyCheckins: input.dailyCheckins,
+    profileCreatedAt: input.profileCreatedAt,
+  });
+  const dateOfDay = (d: DayOfWeek) => addDaysStr(monday, WEEKDAYS.indexOf(d));
+  const eligibleDays = scheduledDays.filter(
+    (d) => dataStart !== null && dateOfDay(d) >= dataStart
+  );
+  const missedDays = eligibleDays.filter((d) => !trainedDays.has(d));
+  const sessionsCompleted = eligibleDays.filter((d) => trainedDays.has(d)).length;
+  // True when the whole week ended before the user's data began (or
+  // there is no data at all): nothing in it was ever due.
+  const weekPredatesData = dataStart === null || sunday < dataStart;
 
   // Tonnage vs prior week.
   const tonnageKg = weekTonnageKg(workouts, monday, input.bodyweightKg);
@@ -379,7 +409,8 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
     painEscalationI18n = { key: 'weeklyReview.painEscalation', params: { fams: model.pain.flaggedFamilies.join(', ') } };
   }
 
-  // ONE focus, by rule priority.
+  // Managed lifts (block + adopted plans) — feeds the stall checks in
+  // both the revisions and the focus below.
   const managedKeys = new Set<string>();
   const active = input.coachBlocks.activeBlock;
   if (active && active.status === 'active') {
@@ -392,6 +423,62 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
     managedKeys.has(canonicalizeExerciseName(s.exercise))
   );
 
+  // Revision proposals for next week (proposals only — D3).
+  const revisions: RevisionProposal[] = [];
+  const nextMonday = addDaysStr(monday, 7);
+  if (active && active.status === 'active') {
+    const nextType = weekTypeForDate(active, nextMonday);
+    const weekNo = Math.floor(
+      (parseLocalDate(nextMonday).getTime() - parseLocalDate(active.startMonday).getTime()) /
+        (7 * 86_400_000)
+    ) + 1;
+    if (weekNo >= 1 && weekNo <= active.weeks.length) {
+      revisions.push({
+        kind: 'next_week_type',
+        text:
+          nextType === 'deload'
+            ? `Next week is week ${weekNo} of your block — a deload. Loads hold or ease; that is the block working, not a step back.`
+            : nextType === 'test'
+              ? `Next week is week ${weekNo} — test week. Main lifts get measured; progressions pause so the numbers are honest.`
+              : `Next week is week ${weekNo} of your block — a build week. Same plan, progression rules live.`,
+      });
+    }
+  }
+  if (managedStall) {
+    revisions.push({
+      kind: 'stall_change',
+      exerciseKey: canonicalizeExerciseName(managedStall.exercise),
+      text: `A plateau change for ${managedStall.exercise} is waiting in Train → Your Coach.`,
+    });
+  }
+  // Schedule realism: the athlete-model's most-skipped day was ALSO
+  // missed this week → propose moving that day to the nearest free day.
+  const mostSkipped = model?.adherence.mostSkippedDay ?? null;
+  if (
+    mostSkipped &&
+    missedDays.includes(mostSkipped) &&
+    (model?.adherence.plannedSessions ?? 0) >= 8
+  ) {
+    const fromIdx = WEEKDAYS.indexOf(mostSkipped);
+    const planId = weeklySchedule[mostSkipped]?.workoutPlanId;
+    const freeDay = WEEKDAYS.find(
+      (d, i) =>
+        Math.abs(i - fromIdx) === 1 &&
+        (!weeklySchedule[d] || weeklySchedule[d].workoutPlanId === 'rest')
+    );
+    if (planId && planId !== 'rest' && freeDay) {
+      revisions.push({
+        kind: 'schedule_move',
+        fromDay: mostSkipped,
+        toDay: freeDay,
+        planId,
+        text: `${mostSkipped} keeps getting skipped — it is your most-missed day across the last 8 weeks too. Move this session to ${freeDay}? The plan itself does not change.`,
+      });
+    }
+  }
+
+  // ONE focus, by rule priority. (Revisions are computed above so the
+  // focus copy can see them — see the adherence branch.)
   let focus: WeeklyReview['focus'];
   if (painEscalation) {
     focus = {
@@ -401,16 +488,40 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
       headlineI18n: { key: 'weeklyReview.focusSafetyHeadline' },
       detailI18n: painEscalationI18n ?? undefined,
     };
-  } else if (scheduledDays.length > 0 && sessionsCompleted / scheduledDays.length < 0.75 && missedDays.length > 0) {
+  } else if (weekPredatesData && scheduledDays.length > 0) {
+    // UI-1b-02: the week ended before the user's plan (or any data)
+    // existed. Nothing was due, so nothing was missed — say exactly
+    // that, in the same spirit as the athlete model's "Still learning
+    // you", instead of scoring a 0-of-N the user never had a chance at.
+    focus = {
+      kind: 'consistency',
+      headline: 'This week predates your plan',
+      detail:
+        'Your plan did not exist yet this week, so there is nothing to score — no sessions were due, and none were missed. Weekly reviews count from the day your plan began.',
+      headlineI18n: { key: 'weeklyReview.focusColdStartHeadline' },
+      detailI18n: { key: 'weeklyReview.focusColdStartDetail' },
+    };
+  } else if (eligibleDays.length > 0 && sessionsCompleted / eligibleDays.length < 0.75 && missedDays.length > 0) {
     const day = missedDays[0];
+    // UI-1b-03: "the revision below can move it" is a promise — it may
+    // only be made when a schedule-move revision actually exists in
+    // THIS review. Otherwise the proposals area of the same view says
+    // "No changes proposed — the plan is working as it is", and the
+    // two sentences contradict each other over a week in which
+    // nothing was done.
+    const moveProposed = revisions.some((r) => r.kind === 'schedule_move');
     focus = {
       kind: 'adherence',
       headline: `Protect your ${day} session`,
-      detail: `You completed ${sessionsCompleted} of ${scheduledDays.length} planned sessions, and ${day} was missed. One protected session beats a perfect plan that keeps slipping — the revision below can move it.`,
+      detail: moveProposed
+        ? `You completed ${sessionsCompleted} of ${eligibleDays.length} planned sessions, and ${day} was missed. One protected session beats a perfect plan that keeps slipping — the revision below can move it.`
+        : `You completed ${sessionsCompleted} of ${eligibleDays.length} planned sessions, and ${day} was missed. One protected session beats a perfect plan that keeps slipping.`,
       headlineI18n: { key: 'weeklyReview.focusAdherenceHeadline', params: { day } },
       detailI18n: {
-        key: 'weeklyReview.focusAdherenceDetail',
-        params: { day, completed: sessionsCompleted, planned: scheduledDays.length },
+        key: moveProposed
+          ? 'weeklyReview.focusAdherenceDetail'
+          : 'weeklyReview.focusAdherenceDetailNoRevision',
+        params: { day, completed: sessionsCompleted, planned: eligibleDays.length },
       },
     };
   } else if (managedStall) {
@@ -471,64 +582,12 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
     };
   }
 
-  // Revision proposals for next week (proposals only — D3).
-  const revisions: RevisionProposal[] = [];
-  const nextMonday = addDaysStr(monday, 7);
-  if (active && active.status === 'active') {
-    const nextType = weekTypeForDate(active, nextMonday);
-    const weekNo = Math.floor(
-      (parseLocalDate(nextMonday).getTime() - parseLocalDate(active.startMonday).getTime()) /
-        (7 * 86_400_000)
-    ) + 1;
-    if (weekNo >= 1 && weekNo <= active.weeks.length) {
-      revisions.push({
-        kind: 'next_week_type',
-        text:
-          nextType === 'deload'
-            ? `Next week is week ${weekNo} of your block — a deload. Loads hold or ease; that is the block working, not a step back.`
-            : nextType === 'test'
-              ? `Next week is week ${weekNo} — test week. Main lifts get measured; progressions pause so the numbers are honest.`
-              : `Next week is week ${weekNo} of your block — a build week. Same plan, progression rules live.`,
-      });
-    }
-  }
-  if (managedStall) {
-    revisions.push({
-      kind: 'stall_change',
-      exerciseKey: canonicalizeExerciseName(managedStall.exercise),
-      text: `A plateau change for ${managedStall.exercise} is waiting in Train → Your Coach.`,
-    });
-  }
-  // Schedule realism: the athlete-model's most-skipped day was ALSO
-  // missed this week → propose moving that day to the nearest free day.
-  const mostSkipped = model?.adherence.mostSkippedDay ?? null;
-  if (
-    mostSkipped &&
-    missedDays.includes(mostSkipped) &&
-    (model?.adherence.plannedSessions ?? 0) >= 8
-  ) {
-    const fromIdx = WEEKDAYS.indexOf(mostSkipped);
-    const planId = weeklySchedule[mostSkipped]?.workoutPlanId;
-    const freeDay = WEEKDAYS.find(
-      (d, i) =>
-        Math.abs(i - fromIdx) === 1 &&
-        (!weeklySchedule[d] || weeklySchedule[d].workoutPlanId === 'rest')
-    );
-    if (planId && planId !== 'rest' && freeDay) {
-      revisions.push({
-        kind: 'schedule_move',
-        fromDay: mostSkipped,
-        toDay: freeDay,
-        planId,
-        text: `${mostSkipped} keeps getting skipped — it is your most-missed day across the last 8 weeks too. Move this session to ${freeDay}? The plan itself does not change.`,
-      });
-    }
-  }
-
   return {
     weekMonday: monday,
     weekSunday: sunday,
-    sessionsPlanned: scheduledDays.length,
+    // Eligible days only (UI-1b-02): days before the user's data
+    // began are not "planned" — the plan did not exist on them.
+    sessionsPlanned: eligibleDays.length,
     sessionsCompleted,
     missedDays,
     tonnageKg,

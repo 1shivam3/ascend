@@ -291,6 +291,142 @@ describe('buildWeeklyReview — revisions', () => {
   });
 });
 
+describe('buildWeeklyReview — cold-start eligibility (UI-1b-02)', () => {
+  // Persona fixtures, seeded-history style (cf. tests/coach-sim-personas):
+  // each persona is a plan-creation moment relative to the review week
+  // Mon 2026-10-12 → Sun 2026-10-18 (SCHEDULE = Mon/Wed/Fri on plan p1).
+  const planCreatedOn = (iso: string): PlannedWorkout => ({
+    id: 'p1',
+    name: 'Upper',
+    createdAt: iso,
+    exercises: [{ name: 'Bench Press', targetSets: 4, targetReps: 6, targetWeight: 80, targetUnit: 'kg' }],
+  });
+
+  it('day-0 persona: a week that ended before the plan began is never scored', () => {
+    // The audit case: the account (and its plan) was created minutes
+    // ago; the review week ended three days before that.
+    const review = buildWeeklyReview(
+      input({ plannedWorkouts: [planCreatedOn('2026-10-21T12:00:00')] })
+    );
+    expect(review.sessionsPlanned).toBe(0);
+    expect(review.sessionsCompleted).toBe(0);
+    expect(review.missedDays).toEqual([]);
+    expect(review.focus.kind).toBe('consistency');
+    expect(review.focus.headline).toBe('This week predates your plan');
+    expect(review.focus.detail).toContain('no sessions were due, and none were missed');
+    expect(review.focus.headlineI18n?.key).toBe('weeklyReview.focusColdStartHeadline');
+    expect(review.focus.detailI18n?.key).toBe('weeklyReview.focusColdStartDetail');
+    expect(JSON.stringify(review)).not.toContain('was missed');
+    expect(JSON.stringify(review)).not.toContain('revision below');
+  });
+
+  it('template-poison persona: placeholder plan dates clamp to the profile day', () => {
+    // The live geometry (2026-11-04): adopted built-in templates carry
+    // createdAt '2026-01-01'; the profile was created after the review
+    // week ended. The clamp must produce the day-0 result, not January
+    // eligibility.
+    const review = buildWeeklyReview(
+      input({
+        plannedWorkouts: [planCreatedOn('2026-01-01')],
+        profileCreatedAt: '2026-10-21T12:00:00',
+      })
+    );
+    expect(review.sessionsPlanned).toBe(0);
+    expect(review.missedDays).toEqual([]);
+    expect(review.focus.headline).toBe('This week predates your plan');
+  });
+
+  it('day-2 persona: only days on/after the plan start are eligible', () => {
+    // Plan created Friday of the review week: Mon/Wed were never due.
+    const review = buildWeeklyReview(
+      input({ plannedWorkouts: [planCreatedOn('2026-10-16T12:00:00')] })
+    );
+    expect(review.sessionsPlanned).toBe(1);
+    expect(review.sessionsCompleted).toBe(0);
+    expect(review.missedDays).toEqual(['friday']);
+    // The Friday miss is real — and with no revision proposed, the
+    // focus must not promise one (UI-1b-03).
+    expect(review.focus.kind).toBe('adherence');
+    expect(review.focus.headline).toMatch(/friday/i);
+    expect(review.focus.detail).toContain('0 of 1');
+    expect(review.focus.detail).not.toContain('revision below');
+    expect(review.focus.detailI18n?.key).toBe('weeklyReview.focusAdherenceDetailNoRevision');
+    expect(review.revisions.some((r) => r.kind === 'schedule_move')).toBe(false);
+  });
+
+  it('no plan record: the earliest data the user actually has is the anchor', () => {
+    // A lone check-in on Wednesday of the review week (the plan record
+    // itself is gone): Wed/Fri are eligible, Monday predates the data.
+    const review = buildWeeklyReview(
+      input({ dailyCheckins: { '2026-10-14': { sleep: 3, soreness: 3 } } })
+    );
+    expect(review.sessionsPlanned).toBe(2);
+    expect(review.missedDays).toEqual(['wednesday', 'friday']);
+  });
+
+  it('first-full-week persona: a plan from the prior week scores the whole week', () => {
+    const review = buildWeeklyReview(
+      input({
+        plannedWorkouts: [planCreatedOn('2026-10-05T12:00:00')],
+        workouts: [
+          went('a', '2026-10-12', 'Bench Press', [wset(100, 5)]),
+          went('c', '2026-10-16', 'Bench Press', [wset(100, 5)]),
+        ],
+      })
+    );
+    expect(review.sessionsPlanned).toBe(3);
+    expect(review.sessionsCompleted).toBe(2);
+    expect(review.missedDays).toEqual(['wednesday']);
+    expect(review.focus.kind).toBe('adherence');
+    expect(review.focus.headline).toMatch(/wednesday/i);
+    expect(review.focus.detail).toContain('2 of 3');
+  });
+
+  it('mid-history persona: numbers identical to the pre-fix behaviour', () => {
+    const review = buildWeeklyReview(
+      input({
+        plannedWorkouts: [planCreatedOn('2026-01-01T12:00:00')],
+        workouts: [went('a', '2026-10-12', 'Bench Press', [wset(100, 5)])],
+      })
+    );
+    expect(review.sessionsPlanned).toBe(3);
+    expect(review.sessionsCompleted).toBe(1);
+    expect(review.missedDays).toEqual(['wednesday', 'friday']);
+    expect(review.focus.kind).toBe('adherence');
+  });
+
+  it('UI-1b-03: "the revision below" is promised only when a move is proposed', () => {
+    // Same shape as the schedule-move fixture in the revisions suite:
+    // the model agrees Friday is the most-skipped day and Friday was
+    // missed again → a schedule_move revision exists → the promise is
+    // honest and stays.
+    const review = buildWeeklyReview(
+      input({
+        plannedWorkouts: [planCreatedOn('2026-01-01T12:00:00')],
+        workouts: [
+          went('a', '2026-10-12', 'Bench Press', [wset(100, 5)]),
+          went('b', '2026-10-14', 'Bench Press', [wset(100, 5)]),
+        ],
+        athleteModel: athleteModel({
+          adherence: {
+            windowWeeks: 8,
+            plannedSessions: 24,
+            completedSessions: 18,
+            unscheduledSessions: 0,
+            adherenceRate: estimate(0.75),
+            mostSkippedDay: 'friday',
+            mostTrainedDay: 'monday',
+          },
+        }),
+      })
+    );
+    expect(review.revisions.some((r) => r.kind === 'schedule_move')).toBe(true);
+    expect(review.focus.kind).toBe('adherence');
+    expect(review.focus.detail).toContain('the revision below can move it');
+    expect(review.focus.detailI18n?.key).toBe('weeklyReview.focusAdherenceDetail');
+  });
+});
+
 describe('lastCompletedWeekMonday', () => {
   it('on a Monday, the completed week is the one that just ended', () => {
     expect(lastCompletedWeekMonday('2026-10-19')).toBe('2026-10-12'); // Monday

@@ -5,6 +5,7 @@ import {
   swapSessionExercise,
   proteinTargetG,
   weeklySuggestion,
+  weekAdherenceSummary,
 } from '../src/lib/coach-session';
 import type { PlannedWorkout } from '../src/lib/types';
 
@@ -230,5 +231,103 @@ describe('proteinTargetG and weeklySuggestion', () => {
     // sessions change nothing.
     expect(weeklySuggestion(4, 4, 4)).toEqual({ kind: 'progress', missed: 0 });
     expect(weeklySuggestion(4, 7, 4)).toEqual({ kind: 'progress', missed: 0 });
+  });
+});
+
+describe('weekAdherenceSummary — R3-01 plan-start anchor (Coach "This week" card)', () => {
+  // The R3-01 scenario week: Mon 2026-11-02 … Sun 2026-11-08, plan
+  // scheduled Mon/Tue/Thu/Fri (weekday 0/1/3/4).
+  const WEEK_DATES = [
+    '2026-11-02',
+    '2026-11-03',
+    '2026-11-04',
+    '2026-11-05',
+    '2026-11-06',
+    '2026-11-07',
+    '2026-11-08',
+  ];
+  const ENTRIES = [{ weekday: 0 }, { weekday: 1 }, { weekday: 3 }, { weekday: 4 }];
+  const none = new Set<string>();
+
+  it('day-one user (plan created Wednesday): pre-plan Mon/Tue are neither planned nor due — no shrink verdict', () => {
+    // Before the anchor this exact state fed weeklySuggestion(4, 0, 2)
+    // → shrink: "0 of 4 / more than half the week was missed".
+    const s = weekAdherenceSummary({
+      entries: ENTRIES,
+      weekDates: WEEK_DATES,
+      doneDates: none,
+      todayStr: '2026-11-04',
+      dataStart: '2026-11-04',
+    });
+    expect(s).toEqual({ planned: 2, done: 0, due: 0, suggestion: { kind: 'hold', missed: 0 } });
+  });
+
+  it('first partial week: a genuinely missed ELIGIBLE day still counts (Thu missed by Friday)', () => {
+    const s = weekAdherenceSummary({
+      entries: ENTRIES,
+      weekDates: WEEK_DATES,
+      doneDates: none,
+      todayStr: '2026-11-06',
+      dataStart: '2026-11-04',
+    });
+    expect(s.planned).toBe(2);
+    expect(s.due).toBe(1); // Thu only — Fri is today, not yet over
+    expect(s.suggestion).toEqual({ kind: 'shrink', missed: 1 });
+  });
+
+  it('first partial week: the eligible session done → hold, done shows against the eligible denominator', () => {
+    const s = weekAdherenceSummary({
+      entries: ENTRIES,
+      weekDates: WEEK_DATES,
+      doneDates: new Set(['2026-11-05']),
+      todayStr: '2026-11-06',
+      dataStart: '2026-11-04',
+    });
+    expect(s).toEqual({ planned: 2, done: 1, due: 1, suggestion: { kind: 'hold', missed: 0 } });
+  });
+
+  it('anchor lands exactly on a scheduled day: that day is eligible and due the next morning', () => {
+    const s = weekAdherenceSummary({
+      entries: ENTRIES,
+      weekDates: WEEK_DATES,
+      doneDates: none,
+      todayStr: '2026-11-06',
+      dataStart: '2026-11-05',
+    });
+    expect(s.planned).toBe(2); // Thu + Fri
+    expect(s.due).toBe(1); // Thu
+  });
+
+  it('mid-history user: anchor weeks before Monday changes NOTHING — a genuine under-run still earns shrink with the original numbers', () => {
+    const s = weekAdherenceSummary({
+      entries: ENTRIES,
+      weekDates: WEEK_DATES,
+      doneDates: none,
+      todayStr: '2026-11-04',
+      dataStart: '2026-10-12',
+    });
+    expect(s).toEqual({ planned: 4, done: 0, due: 2, suggestion: { kind: 'shrink', missed: 2 } });
+  });
+
+  it('mid-history user: full week done → progress, identical to the unanchored computation', () => {
+    const s = weekAdherenceSummary({
+      entries: ENTRIES,
+      weekDates: WEEK_DATES,
+      doneDates: new Set(['2026-11-02', '2026-11-03', '2026-11-05', '2026-11-06']),
+      todayStr: '2026-11-08',
+      dataStart: '2026-10-12',
+    });
+    expect(s).toEqual({ planned: 4, done: 4, due: 4, suggestion: { kind: 'progress', missed: 0 } });
+  });
+
+  it('no data at all (null anchor): nothing is scorable — 0 of 0 and hold, never a missed verdict', () => {
+    const s = weekAdherenceSummary({
+      entries: ENTRIES,
+      weekDates: WEEK_DATES,
+      doneDates: none,
+      todayStr: '2026-11-04',
+      dataStart: null,
+    });
+    expect(s).toEqual({ planned: 0, done: 0, due: 0, suggestion: { kind: 'hold', missed: 0 } });
   });
 });

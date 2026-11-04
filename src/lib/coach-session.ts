@@ -257,6 +257,64 @@ export function weeklySuggestion(
   return { kind: 'hold', missed };
 }
 
+export interface WeekAdherenceSummary {
+  /** Sessions of this week that can be scored (on/after the anchor). */
+  planned: number;
+  /** Done count for display — capped at `planned` (FE-02 rule). */
+  done: number;
+  /** Scorable sessions whose day is already over. */
+  due: number;
+  suggestion: { kind: WeeklySuggestionKind; missed: number };
+}
+
+/**
+ * R3-01 (Final Certification, follow-up to UI-1b-02 / PR #97) — the
+ * Coach tab "This week" card's arithmetic, anchored to plan start.
+ *
+ * PR #97 anchored the weekly review, the athlete model, and the
+ * check-in to `earliestDataDate()`: a day that ended before the
+ * user's data began was never due and cannot be missed. This card
+ * was missed by that pass — it counted every scheduled day of the
+ * current week, so a user whose plan was created on Wednesday was
+ * told on day one "0 of 4 sessions done so far / more than half the
+ * week was missed — fewer training days next week", with Monday and
+ * Tuesday (pre-plan) counted as due and missed.
+ *
+ * Here only scheduled days falling on or after `dataStart` are
+ * scorable: they form the displayed `planned` denominator and the
+ * `due` count fed to weeklySuggestion, so pre-plan days can neither
+ * dilute the score nor trigger the 'shrink' suggestion. For any
+ * week that starts on/after the anchor (every week from the second
+ * onward, and all established users) the result is identical to the
+ * unanchored FE-02 computation. A null anchor means the user has no
+ * data at all — nothing is scorable, the card shows 0 of 0 and the
+ * suggestion holds, matching the sibling surfaces' doctrine.
+ */
+export function weekAdherenceSummary(input: {
+  entries: readonly { weekday: number }[];
+  /** Local date strings for this week, indexed by weekday (0 = Mon). */
+  weekDates: readonly string[];
+  /** Local date strings of this week's logged workouts (≤ today). */
+  doneDates: ReadonlySet<string>;
+  todayStr: string;
+  dataStart: string | null;
+}): WeekAdherenceSummary {
+  const { dataStart } = input;
+  const eligible =
+    dataStart === null
+      ? []
+      : input.entries.filter((e) => (input.weekDates[e.weekday] ?? '') >= dataStart);
+  const planned = eligible.length;
+  const due = eligible.filter((e) => (input.weekDates[e.weekday] ?? '') < input.todayStr).length;
+  const doneCount = input.doneDates.size;
+  return {
+    planned,
+    done: Math.min(doneCount, planned),
+    due,
+    suggestion: weeklySuggestion(planned, doneCount, due),
+  };
+}
+
 /**
  * Open-items UX F-03: which Coach-tab segment to open on. The
  * check-in's answers persist immediately as today's ManualCheckin

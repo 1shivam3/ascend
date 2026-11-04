@@ -624,7 +624,11 @@ const DEFAULT_CREATINE_CONFIG: CreatineConfig = {
 const DEFAULT_CREATINE_SUPPLY: CreatineSupply = {
   containerG: 500,
   currentAmountG: 450,
-  lastUpdated: new Date().toISOString().split('T')[0],
+  // Certification DB-02: was new Date().toISOString().split('T')[0] —
+  // a UTC day key, the exact pattern formatters.ts bans (it records
+  // the previous day in early-morning hours for UTC+ users). Use the
+  // local-day helper like every other day key in this file.
+  lastUpdated: getLocalTodayStr(),
 };
 
 
@@ -2827,6 +2831,7 @@ export const useAppStore = create<AppState>()(
               weeklySchedule: state.weeklySchedule,
               plannedWorkouts: state.plannedWorkouts,
               readinessHistory: state.coach?.readinessHistory || [],
+              profileCreatedAt: state.profile?.createdAt ?? null,
             },
             getLocalTodayStr()
           ),
@@ -3093,6 +3098,7 @@ export const useAppStore = create<AppState>()(
             stalls: detectStalls(state.workouts),
             unit: state.profile?.unit ?? 'kg',
             bodyweightKg: state.profile?.bodyweightKg,
+            profileCreatedAt: state.profile?.createdAt ?? null,
             todayStr,
             // Coach bridge (B3): form-check sessions live in localStorage;
             // read them through the cycle-free storage leaf (the full

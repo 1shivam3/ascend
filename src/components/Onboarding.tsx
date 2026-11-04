@@ -70,7 +70,12 @@ export default function Onboarding() {
     diet: 'non_vegetarian' as DietPreference,
   };
   const experienceLevel = ONBOARDING_DEFAULTS.experienceLevel;
-  const gender = ONBOARDING_DEFAULTS.gender;
+  // F1 (certification): gender is STATE seeded from the default, not a
+  // render-time read of the constant — the details screen remounts on
+  // back-navigation and must re-seed from what the user actually
+  // picked (handleFinishCalibration writes it here), or a non-default
+  // choice silently reset to 'male'.
+  const [detailsGender, setDetailsGender] = useState<Gender>(ONBOARDING_DEFAULTS.gender);
   const unit = ONBOARDING_DEFAULTS.unit;
   const weight = ONBOARDING_DEFAULTS.weight;
   const heightCm = ONBOARDING_DEFAULTS.heightCm;
@@ -287,6 +292,14 @@ export default function Onboarding() {
     // validation return — backing into the details screen remounts it,
     // and without this the date was lost while name/gender survived.
     setDob(details.dateOfBirth);
+    // F1 (certification): same hold for the name and gender. The name
+    // was never written back to athleteName here, so a guest stepping
+    // back from the plan offer remounted the details screen with
+    // initialName='' and lost what they typed; gender was read from
+    // the ONBOARDING_DEFAULTS constant, so a non-default choice reset
+    // the same way.
+    setAthleteName(details.name);
+    setDetailsGender(details.gender);
     // Never silently fall back to a default goal: the athlete must choose.
     if (selectedGoals.length === 0) {
       toast.error(t('toast.chooseGoal'), t('toast.titleGoalRequired'));
@@ -392,6 +405,14 @@ export default function Onboarding() {
       // Offer exactly the days the user will train (a 2-day user was
       // being offered 3 full-body workouts).
       generatedSplit = limitPlansToDays(generatedSplit, daysPerWeek);
+      // UI-1b-02: stamp the real creation instant on every generated
+      // plan. The split templates carry a placeholder createdAt
+      // ('2026-01-01'); landed verbatim in state it backdates the
+      // plan by months, and cold-start scoring (weekly review,
+      // adherence, coach check-in) then treats pre-account days as
+      // missed sessions.
+      const generatedAt = new Date().toISOString();
+      generatedSplit = generatedSplit.map((plan) => ({ ...plan, createdAt: generatedAt }));
     }
 
     setTrainingProfile({
@@ -727,7 +748,7 @@ export default function Onboarding() {
     return (
       <PersonalDetailsScreen
         initialName={athleteName}
-        initialGender={gender}
+        initialGender={detailsGender}
         initialDob={dob}
         initialLimitations={trainingProfile?.injuriesOrLimitations || []}
         onContinue={handleFinishCalibration}

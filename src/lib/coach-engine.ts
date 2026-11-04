@@ -1273,6 +1273,14 @@ export interface PlannedSession {
   /** The plan behind this scheduled session, when known — lets the
    *  check-in offer a real "do it today" action instead of advice. */
   planId?: string;
+  /**
+   * UI-1b-02: the first local date (YYYY-MM-DD) on which this session
+   * can be scored as missed — the date its plan was created. A
+   * session dated before its plan existed is never flagged: the
+   * user cannot have missed a workout that was not yet planned.
+   * Absent = no gate (legacy callers and fixtures).
+   */
+  startsOn?: string;
 }
 
 export interface MissedSession {
@@ -1288,7 +1296,8 @@ const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', '
  * A session counts as done if any workout is logged on its exact date.
  * Only past days are flagged — a check-in must never nag about a session
  * that hasn't happened yet (e.g. telling Monday's user that Thursday "didn't
- * get logged").
+ * get logged"). A session is likewise never flagged for a date before
+ * its plan existed (PlannedSession.startsOn, UI-1b-02).
  */
 export function detectMissedSessions(
   plannedSchedule: PlannedSession[],
@@ -1308,6 +1317,10 @@ export function detectMissedSessions(
     const weekday = (cursor.getDay() + 6) % 7; // Monday = 0
     const planned = plannedSchedule.filter((p) => p.weekday === weekday);
     for (const p of planned) {
+      // UI-1b-02: never flag a session dated before its plan existed
+      // (a brand-new user's Monday session, created Wednesday, was
+      // not "missed" on Monday — there was no plan, and no account).
+      if (p.startsOn && ds < p.startsOn) continue;
       if (!loggedDates.has(ds)) missed.push({ date: ds, name: p.name, planId: p.planId });
     }
     cursor.setDate(cursor.getDate() + 1);

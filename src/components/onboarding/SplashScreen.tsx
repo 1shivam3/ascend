@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { useTranslation } from '@/lib/i18n';
+import React, { useSyncExternalStore } from 'react';
+import { useTranslation, useLanguageReady } from '@/lib/i18n';
 
 interface SplashScreenProps {
   onContinue?: () => void;
@@ -11,7 +11,21 @@ interface SplashScreenProps {
 // Clean splash: wordmark only — no photo, no mascot, no logo mark,
 // no animation, no auto-advance timer. Tap-only, static.
 export default function SplashScreen({ onContinue, isHydrating = false }: SplashScreenProps) {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  // PERF-2: the server cannot read the persisted language, and the
+  // Hindi dictionary now loads lazily — so keep the translated lines
+  // invisible (layout-stable) until the client has mounted AND the
+  // active language's copy is ready. Otherwise a Hindi cold start
+  // would paint the English tagline from the SSR frame. The wordmark
+  // and rule are language-neutral and always visible; for English the
+  // lines appear on the first client frame, as before.
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+  const languageReady = useLanguageReady(language);
+  const fadeCls = mounted && languageReady ? '' : ' opacity-0';
 
   return (
     <div
@@ -36,13 +50,13 @@ export default function SplashScreen({ onContinue, isHydrating = false }: Splash
         <div className="w-7 h-0.5 bg-accent" aria-hidden="true" />
 
         {/* Tagline */}
-        <p className="text-xs sm:text-sm font-medium tracking-widest text-brand-chalk/80 uppercase">
+        <p className={`text-xs sm:text-sm font-medium tracking-widest text-brand-chalk/80 uppercase${fadeCls}`}>
           {t('auth.tagline')}
         </p>
       </div>
 
       {/* Bottom Indicator */}
-      <div className="relative z-10 pb-8 flex flex-col items-center text-center">
+      <div className={`relative z-10 pb-8 flex flex-col items-center text-center${fadeCls}`}>
         {isHydrating ? (
           <div className="flex items-center gap-2 text-xs text-brand-chalk/70 font-mono">
             <span className="w-2 h-2 rounded-full bg-accent mr-1" />

@@ -139,7 +139,13 @@ export default function PersonalDetailsScreen({
           </div>
         )}
 
-        <form id="personal-details-form" onSubmit={handleSubmit} className="space-y-4">
+        {/* F2 (certification): noValidate — the native `required` on the
+            name input used to pre-empt this submit handler, so the
+            designed errNameRequired banner never rendered and the user
+            got the browser's bubble instead. All validation lives in
+            handleSubmit; nothing in this form relies on native checks
+            (the DOB selects carry no required attribute). */}
+        <form id="personal-details-form" onSubmit={handleSubmit} className="space-y-4" noValidate>
           {/* Athlete Name */}
           <div className="p-4 rounded-2xl bg-bg-card border border-border shadow-2xs space-y-1.5">
             <label htmlFor="details-name" className="block text-xs font-semibold text-text-primary">
@@ -151,7 +157,7 @@ export default function PersonalDetailsScreen({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t('onboarding.namePlaceholder')}
-              required
+              aria-required="true"
               maxLength={MAX_ATHLETE_NAME_LENGTH}
               className="w-full px-3 py-2 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary outline-none transition"
             />

@@ -12,6 +12,7 @@ export default defineConfig({
     globals: true,
     testTimeout: 15000,
     include: ['tests/**/*.test.{ts,tsx}', 'src/**/*.test.{ts,tsx}'],
+    setupFiles: ['./tests/setup-i18n.ts'],
   },
   resolve: {
     alias: {
