@@ -129,6 +129,7 @@ import {
   getScheduledWorkoutForDay,
 } from '@/lib/workout-schedule';
 import { plural, safeRandomId, getLocalTodayStr, formatLocalDate, parseLocalDate } from '@/lib/formatters';
+import { planPRChangesAfterSetEdit } from '@/lib/pr-reevaluation';
 import { getSessionDuration } from '@/lib/workout-elapsed';
 import { useAppNavigation } from '@/lib/navigation';
 
@@ -698,6 +699,269 @@ function RunDistanceRow({ workout }: { workout: WorkoutEntry }) {
         </button>
       </div>
     </div>
+  );
+}
+
+// ─── History Set Chip + Editor (Certification F3) ────────────────────────────
+
+/**
+ * One logged set in the History expansion. Completed sets are tappable:
+ * the chip opens an inline editor (weight / reps / RPE) modelled on
+ * RunDistanceRow above — same surface, same Save/Cancel pattern, same
+ * store write path (updateWorkout, whose boundary now sanitizes set
+ * numbers). Saving also re-evaluates the PR records this session
+ * minted (lib/pr-reevaluation): a corrected-down set updates or
+ * removes its stale PR, a corrected-up set can earn one. Skipped and
+ * not-attempted sets stay read-only — there is no performance to
+ * correct.
+ */
+function HistorySetChip({
+  workout,
+  exerciseIndex,
+  setIndex,
+  set,
+  displayNumber,
+}: {
+  workout: WorkoutEntry;
+  exerciseIndex: number;
+  setIndex: number;
+  set: WorkoutSet;
+  displayNumber: number;
+}) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const [isEditing, setIsEditing] = useState(false);
+  const [weightDraft, setWeightDraft] = useState('');
+  const [repsDraft, setRepsDraft] = useState('');
+  const [rpeDraft, setRpeDraft] = useState<number | undefined>(undefined);
+
+  const exercise = workout.exercises[exerciseIndex];
+  const isBW = exercise ? isBodyweightExercise(exercise.name) : false;
+  const isSkipped = set.status === 'skipped';
+  const isNotAttempted = set.status === 'not_attempted';
+  const isDone = isSetCompleted(set);
+  const rpeVal = set.rpe;
+  const rirVal = rpeVal !== undefined ? Math.max(0, Math.round((10 - rpeVal) * 10) / 10) : undefined;
+
+  const startEdit = () => {
+    setWeightDraft(set.weight !== undefined ? String(set.weight) : '');
+    setRepsDraft(String(set.reps ?? ''));
+    setRpeDraft(set.rpe);
+    setIsEditing(true);
+  };
+
+  const parsedReps = parseInt(repsDraft, 10);
+  const trimmedWeight = weightDraft.trim();
+  const parsedWeight = trimmedWeight === '' ? undefined : parseFloat(trimmedWeight);
+  const isValidDraft =
+    Number.isFinite(parsedReps) && parsedReps >= 1 &&
+    (trimmedWeight === '' ? isBW : Number.isFinite(parsedWeight) && (parsedWeight as number) >= 0);
+
+  const handleSave = () => {
+    if (!isValidDraft) return;
+    const st = useStore.getState();
+    const fresh = st.workouts.find((w) => w.id === workout.id);
+    if (!fresh || !fresh.exercises[exerciseIndex]?.sets[setIndex]) return;
+
+    const editedSet: WorkoutSet = {
+      ...fresh.exercises[exerciseIndex].sets[setIndex],
+      weight: parsedWeight,
+      reps: parsedReps,
+    };
+    if (rpeDraft === undefined) delete editedSet.rpe;
+    else editedSet.rpe = rpeDraft;
+
+    const oldExercises = fresh.exercises;
+    const newExercises = oldExercises.map((e, ei) =>
+      ei !== exerciseIndex
+        ? e
+        : { ...e, sets: e.sets.map((s, si) => (si === setIndex ? editedSet : s)) },
+    );
+    st.updateWorkout(fresh.id, { exercises: newExercises });
+
+    // PR re-evaluation for this exercise (all blocks of it in the
+    // session, as finish detection sees the whole session).
+    const name = fresh.exercises[exerciseIndex].name;
+    const aggregate = (exs: WorkoutExercise[]) =>
+      exs
+        .filter((e) => e.name.trim().toLowerCase() === name.trim().toLowerCase())
+        .flatMap((e) => e.sets);
+    const plan = planPRChangesAfterSetEdit({
+      exerciseName: name,
+      workoutDate: fresh.date,
+      editedWorkoutId: fresh.id,
+      oldSets: aggregate(oldExercises),
+      newSets: aggregate(newExercises),
+      prs: st.prs,
+      allWorkouts: st.workouts,
+      bodyweightKg: st.profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG,
+      userUnit: st.profile?.unit || 'kg',
+    });
+    if (plan.deleteId) st.deletePR(plan.deleteId);
+    if (plan.update) st.updatePR(plan.update.id, plan.update.fields);
+    if (plan.create) st.addPR({ id: safeRandomId('pr'), ...plan.create });
+
+    setIsEditing(false);
+    toast.success(t('history.setUpdated'));
+  };
+
+  if (isEditing) {
+    return (
+      <div className="col-span-2 sm:col-span-3 bg-bg-primary border border-accent/40 rounded-lg p-3 space-y-3">
+        <p className="text-xs font-bold text-text-primary">
+          {t('history.editSetHeading', { n: displayNumber })} — {exercise?.name}
+        </p>
+        <div className="flex gap-2">
+          <label className="flex-1 block">
+            <span className="text-2xs font-semibold text-text-secondary">
+              {t('workout.weight', { unit: set.unit })}
+            </span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={weightDraft}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === '' || /^\d*\.?\d*$/.test(val)) setWeightDraft(val);
+              }}
+              placeholder={isBW ? '0' : undefined}
+              autoFocus
+              className="mt-1 w-full bg-bg-secondary border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:border-accent outline-none"
+            />
+          </label>
+          <label className="flex-1 block">
+            <span className="text-2xs font-semibold text-text-secondary">{t('workout.reps')}</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={repsDraft}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === '' || /^\d*$/.test(val)) setRepsDraft(val);
+              }}
+              className="mt-1 w-full bg-bg-secondary border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:border-accent outline-none"
+            />
+          </label>
+        </div>
+        {set.rpe !== undefined && (
+          <div>
+            <span className="text-2xs font-semibold text-text-secondary">{t('workout.effortRpe')}</span>
+            <div className="flex flex-wrap gap-1.5 mt-1">
+              <button
+                type="button"
+                onClick={() => setRpeDraft(undefined)}
+                className={`px-2.5 py-1.5 rounded-lg text-2xs font-bold border cursor-pointer ${
+                  rpeDraft === undefined
+                    ? 'bg-accent/15 border-accent/50 text-accent-text'
+                    : 'bg-bg-secondary border-border text-text-muted'
+                }`}
+              >
+                {t('history.rpeClear')}
+              </button>
+              {[6, 7, 8, 9, 10].map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRpeDraft(r)}
+                  className={`px-2.5 py-1.5 rounded-lg text-2xs font-mono font-bold border cursor-pointer ${
+                    rpeDraft === r
+                      ? 'bg-accent/15 border-accent/50 text-accent-text'
+                      : 'bg-bg-secondary border-border text-text-secondary'
+                  }`}
+                >
+                  @{r}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setIsEditing(false)}
+            className="py-2 px-4 rounded-xl bg-bg-secondary border border-border text-xs font-bold text-text-secondary flex-1 cursor-pointer"
+          >
+            {t('common.cancel')}
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!isValidDraft}
+            className="py-2 px-4 rounded-xl bg-accent text-accent-on text-xs font-bold flex-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {t('common.save')}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const chipInner = (
+    <>
+      <div className="flex-1 min-w-0">
+        Set {displayNumber}:{' '}
+        <span className={`tabular-nums ${isDone ? 'text-text-primary font-medium' : 'text-text-muted line-through'}`}>
+          {set.weight} {set.unit}
+        </span>{' '}
+        × {set.reps}
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        {isSkipped && (
+          <span
+            className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold"
+            title="Skipped Set"
+          >
+            SKIPPED
+          </span>
+        )}
+        {isNotAttempted && (
+          <span
+            className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-bg-secondary text-text-muted border border-border/60 font-bold"
+            title="Not Attempted"
+          >
+            NOT ATTEMPTED
+          </span>
+        )}
+        {isDone && rpeVal !== undefined && (
+          <span
+            className="text-2xs font-mono px-1.5 py-0.5 rounded bg-accent/15 text-accent-text font-bold"
+            title={`RPE @${rpeVal} (${rirVal} RIR - Reps in Reserve)`}
+          >
+            @{rpeVal}
+          </span>
+        )}
+        {isDone && set.isPR && (
+          <span
+            className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold"
+            title="Personal Record Set"
+          >
+            PR
+          </span>
+        )}
+        {isDone && <Edit2 className="w-3 h-3 text-text-muted" />}
+      </div>
+    </>
+  );
+  const chipClassName = `px-2.5 py-1.5 rounded border flex items-center justify-between gap-1.5 ${
+    isSkipped
+      ? 'bg-rose-500/5 border-rose-500/20 opacity-75'
+      : isNotAttempted
+      ? 'bg-bg-primary/50 border-border/60 opacity-60'
+      : 'bg-bg-primary border-border'
+  }`;
+
+  if (!isDone) {
+    return <div className={chipClassName}>{chipInner}</div>;
+  }
+  return (
+    <button
+      type="button"
+      onClick={startEdit}
+      aria-label={t('history.editSetAria', { n: displayNumber })}
+      className={`${chipClassName} cursor-pointer text-left hover:border-accent/50 transition-colors`}
+    >
+      {chipInner}
+    </button>
   );
 }
 
@@ -2880,75 +3144,27 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                             </div>
 
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-text-secondary">
-                              {(ex.sets.filter((s) => isSetCompleted(s) || s.status === 'skipped').length > 0
-                                ? ex.sets.filter((s) => isSetCompleted(s) || s.status === 'skipped')
-                                : ex.sets
-                              ).map((set, j) => {
-                                const rpeVal = set.rpe;
-                                const rirVal =
-                                  rpeVal !== undefined
-                                    ? Math.max(0, Math.round((10 - rpeVal) * 10) / 10)
-                                    : undefined;
-
-                                const isSkipped = set.status === 'skipped';
-                                const isNotAttempted = set.status === 'not_attempted';
-                                const isDone = isSetCompleted(set);
-
-                                return (
-                                  <div
-                                    key={j}
-                                    className={`px-2.5 py-1.5 rounded border flex items-center justify-between gap-1.5 ${
-                                      isSkipped
-                                        ? 'bg-rose-500/5 border-rose-500/20 opacity-75'
-                                        : isNotAttempted
-                                        ? 'bg-bg-primary/50 border-border/60 opacity-60'
-                                        : 'bg-bg-primary border-border'
-                                    }`}
-                                  >
-                                    <div className="flex-1 min-w-0">
-                                      Set {j + 1}:{' '}
-                                      <span className={`tabular-nums ${isDone ? 'text-text-primary font-medium' : 'text-text-muted line-through'}`}>
-                                        {set.weight} {set.unit}
-                                      </span>{' '}
-                                      × {set.reps}
-                                    </div>
-                                    <div className="flex items-center gap-1 shrink-0">
-                                      {isSkipped && (
-                                        <span
-                                          className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold"
-                                          title="Skipped Set"
-                                        >
-                                          SKIPPED
-                                        </span>
-                                      )}
-                                      {isNotAttempted && (
-                                        <span
-                                          className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-bg-secondary text-text-muted border border-border/60 font-bold"
-                                          title="Not Attempted"
-                                        >
-                                          NOT ATTEMPTED
-                                        </span>
-                                      )}
-                                      {isDone && rpeVal !== undefined && (
-                                        <span
-                                          className="text-2xs font-mono px-1.5 py-0.5 rounded bg-accent/15 text-accent-text font-bold"
-                                          title={`RPE @${rpeVal} (${rirVal} RIR - Reps in Reserve)`}
-                                        >
-                                          @{rpeVal}
-                                        </span>
-                                      )}
-                                      {isDone && set.isPR && (
-                                        <span
-                                          className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold"
-                                          title="Personal Record Set"
-                                        >
-                                          PR
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
+                              {(() => {
+                                // Keep the ORIGINAL set indices alongside
+                                // the visible ones: the display filter can
+                                // drop not-attempted sets, but a set edit
+                                // must write the set the user tapped
+                                // (Certification F3 — HistorySetChip).
+                                const pairs = ex.sets.map((s, setIdx) => ({ set: s, setIdx }));
+                                const visible = pairs.some((p) => isSetCompleted(p.set) || p.set.status === 'skipped')
+                                  ? pairs.filter((p) => isSetCompleted(p.set) || p.set.status === 'skipped')
+                                  : pairs;
+                                return visible.map((p, j) => (
+                                  <HistorySetChip
+                                    key={p.setIdx}
+                                    workout={workout}
+                                    exerciseIndex={i}
+                                    setIndex={p.setIdx}
+                                    set={p.set}
+                                    displayNumber={j + 1}
+                                  />
+                                ));
+                              })()}
                             </div>
                           </div>
                         );
