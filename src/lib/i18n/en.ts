@@ -94,6 +94,10 @@ export const en = {
   'train.history': 'History',
   'train.startWorkout': 'Start Workout',
   'train.startEmptyWorkout': 'Start empty workout',
+  'train.discardDraftTitle': 'Discard workout draft?',
+  'train.discardDraftMsg': 'This deletes the paused workout in progress. The sets logged in the draft will be lost.',
+  'train.discardDraftConfirm': 'Discard draft',
+  'train.keepDraft': 'Keep draft',
   'train.yourPlans': 'Your Workout Plans',
   'train.exercises': 'Exercises',
 
@@ -1706,6 +1710,7 @@ export const en = {
   'meals.suggKcalCustom': '{kcal} kcal (your portion)',
   'meals.qtyHint': 'Enter quantity above to calculate macros automatically.',
   'meals.zeroNutritionHint': '“{name}” has no calories or macros yet — enter a quantity or fill in the values above, or remove it to save.',
+  'meals.mealNameRequiredHint': 'Give this meal a name above to save it.',
   'meals.gheeOilHeading': 'GHEE/OIL IN THIS?',
   'meals.noPinnedFoods': 'No pinned foods. Tap "Add Custom Food" below to create your first pinned food!',
   'meals.clearPinnedWarn': 'This will remove all items from your pinned foods list. This action cannot be undone.',

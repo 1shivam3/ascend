@@ -624,7 +624,11 @@ const DEFAULT_CREATINE_CONFIG: CreatineConfig = {
 const DEFAULT_CREATINE_SUPPLY: CreatineSupply = {
   containerG: 500,
   currentAmountG: 450,
-  lastUpdated: new Date().toISOString().split('T')[0],
+  // Certification DB-02: was new Date().toISOString().split('T')[0] —
+  // a UTC day key, the exact pattern formatters.ts bans (it records
+  // the previous day in early-morning hours for UTC+ users). Use the
+  // local-day helper like every other day key in this file.
+  lastUpdated: getLocalTodayStr(),
 };
 
 
