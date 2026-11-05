@@ -89,6 +89,18 @@ export function toUserMessage(
     return 'Cancelled.';
   }
 
+  // AI daily quota / fleet cap (server codes AI_QUOTA_EXCEEDED /
+  // AI_DAILY_CAP). Must precede the storage branch below: its generic
+  // 'quota' match is about DEVICE storage, while the remedy here is
+  // waiting for the window reset (and, for guests, signing in raises
+  // the limit). Before Task 2.3 these codes fell through to the
+  // generic fallback and the remedy was lost.
+  if (code === 'AI_QUOTA_EXCEEDED' || code === 'AI_DAILY_CAP') {
+    return context === 'scan'
+      ? "You've reached today's AI scan limit — it resets tomorrow, and signing in raises the limit. Manual food search and the offline estimate still work."
+      : "You've reached today's AI limit — it resets tomorrow, and signing in raises the limit.";
+  }
+
   // Device memory / storage pressure (image pipeline).
   if (
     name === 'QuotaExceededError' ||

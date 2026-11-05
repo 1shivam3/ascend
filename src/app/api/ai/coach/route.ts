@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { executeMultiProviderText } from '@/lib/ai-provider';
+import { AiGlobalCapExceededError, executeMultiProviderText } from '@/lib/ai-provider';
 
 export const runtime = 'nodejs';
 
@@ -89,7 +89,7 @@ import { RateLimitUnavailableError, checkRateLimit } from '@/lib/rate-limit';
 import { validateCoachOutput } from '@/lib/coach-output';
 import { detectSafetyStop, COACH_CHAT_REFER_OUT } from '@/lib/coach-chat';
 import { checkAiDailyQuota, aiQuotaExceededResponse, AiActorAuthError } from '@/lib/ai-quota';
-import { getServerGeminiApiKey, rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
+import { rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
 
 export async function POST(req: Request) {
   // 1. Rate limiting: 25 requests per minute per client IP
@@ -153,6 +153,24 @@ export async function POST(req: Request) {
     if (body.substitution?.exerciseToReplace && body.substitution.exerciseToReplace.length > 150) {
       body.substitution.exerciseToReplace = body.substitution.exerciseToReplace.slice(0, 150);
     }
+    // Task 2.3: cap the nested arrays that are JSON.stringify'd into
+    // the prompt (command.activeWorkout, completedWorkout). They were
+    // bounded only by the 64 KB body cap, so a max-size body could
+    // stuff hundreds of exercises/sets into the prompt (provider cost
+    // + latency). 50 matches parse-meal's MAX_MEAL_ITEMS precedent;
+    // real client payloads are far smaller. (body.recentWorkouts,
+    // body.topPRs and substitution.currentWorkoutExercises are
+    // declared in CoachRequestBody but never read by this route, so
+    // they cannot reach the prompt and are left alone.)
+    const capWorkoutArrays = (w: { exercises?: Array<{ sets?: unknown[] }> }) => {
+      if (!w.exercises) return;
+      w.exercises = w.exercises.slice(0, 50);
+      for (const e of w.exercises) {
+        if (e.sets) e.sets = e.sets.slice(0, 50);
+      }
+    };
+    if (body.command?.activeWorkout) capWorkoutArrays(body.command.activeWorkout);
+    if (body.completedWorkout) capWorkoutArrays(body.completedWorkout);
 
     // Audit-3 SEC2-4: deterministic pre-provider safety stop — the same
     // standard the coach-chat route got in PR #62. The only free-text
@@ -330,6 +348,12 @@ Schema:
   } catch (error: any) {
     if (error instanceof RequestBodyTooLargeError) {
       return requestBodyTooLargeResponse();
+    }
+    // Task 2.3: the fleet-wide daily cap gets the same shape
+    // coach-chat returns (429 AI_DAILY_CAP), not a generic 500 —
+    // clients and monitoring can tell a cap from a crash.
+    if (error instanceof AiGlobalCapExceededError) {
+      return NextResponse.json({ error: 'AI_DAILY_CAP' }, { status: 429 });
     }
     const rawMsg = error?.message || 'Failed to process AI Coach request.';
     console.error('Gemini Coach API Error:', redactSecrets(rawMsg));

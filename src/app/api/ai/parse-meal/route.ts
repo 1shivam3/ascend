@@ -167,7 +167,9 @@ RULES FOR PRECISION:
         });
       }
     } catch (modelErr) {
-      console.warn('Multi-provider parse-meal failed, falling back to calibrated offline heuristics:', modelErr);
+      // Task 2.3: log the redacted message only — this was the one AI
+      // route passing the raw provider Error object to the log.
+      console.warn('Multi-provider parse-meal failed, falling back to calibrated offline heuristics:', redactSecrets(modelErr instanceof Error ? modelErr.message : String(modelErr)));
     }
 
     // Fallback if all Gemini models fail or rate limit
