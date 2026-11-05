@@ -1852,7 +1852,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </div>
               {dayTargets && (
                 <p className="text-2xs text-text-muted text-center leading-relaxed px-2">
-                  {dayTargets.note}
+                  {renderLocalizedSentence(t, language, dayTargets.noteI18n, dayTargets.note)}
                 </p>
               )}
             </div>
@@ -2016,7 +2016,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     {t('meals.dinnerHint', { kcal: dayAdaptation.suggestedDinnerKcal.toLocaleString() })}
                   </p>
                   <CollapsibleDetails label={t('meals.why')} className="mt-0.5">
-                    {dayAdaptation.reason}
+                    {renderLocalizedSentence(t, language, dayAdaptation.reasonI18n, dayAdaptation.reason)}
                   </CollapsibleDetails>
                 </div>
                 <button
@@ -2123,13 +2123,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           {lastAiMealParse && (
             <div className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl bg-accent/10 border border-accent/25">
               <span className="text-2xs text-text-secondary truncate">
-                <strong className="text-text-primary">AI logged:</strong> {lastAiMealParse.mealName} — {lastAiMealParse.snippet}
+                <strong className="text-text-primary">{t('meals.aiLogged')}</strong> {lastAiMealParse.mealName} — {lastAiMealParse.snippet}
               </span>
               <button
                 type="button"
                 onClick={() => setShowReportAI(true)}
                 aria-label={t('common.reportAiContent')}
-                title="Report AI content"
+                title={t('common.reportAiContent')}
                 data-testid="report-ai-meal-parse"
                 className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors shrink-0"
               >
@@ -3255,7 +3255,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                     onClick={() => handleSaveMyVersion(i)}
                                     className="text-2xs font-semibold text-accent-text hover:underline cursor-pointer"
                                   >
-                                    {food.customFoodId ? 'Update my version' : 'Save as my version'}
+                                    {food.customFoodId ? t('meals.updateMyVersion') : t('meals.saveAsMyVersion')}
                                   </button>
                                 </div>
                               )}
@@ -3263,11 +3263,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                               {/* Ghee/oil honesty prompt — one tap, adjusts
                                   fat/calories against the DB assumption. */}
                               {food.oilAssumedTsp !== undefined && (
-                                <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-border/40">
+                                <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t border-border/40">
                                   <span className="text-2xs text-text-muted font-mono shrink-0">
                                     {t('meals.gheeOilHeading')}
                                   </span>
-                                  <div className="flex gap-1">
+                                  <div className="flex flex-wrap justify-end gap-1">
                                     {OIL_LEVELS.map((level) => (
                                       <button
                                         key={level.id}

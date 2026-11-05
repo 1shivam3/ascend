@@ -176,6 +176,8 @@ export interface WholeDayAdaptation {
   remainingKcal: number;
   suggestedDinnerKcal: number;
   reason: string;
+  /** Item-4: same reason as a localizable struct (LIVE-P1-03 pattern). */
+  reasonI18n?: LocalizedSentence;
 }
 
 /**
@@ -209,6 +211,16 @@ export function getWholeDayAdaptation(input: {
     remainingKcal,
     suggestedDinnerKcal: remainingKcal,
     reason: `You've logged about ${consumedPct}% of today's ${calorieTarget.toLocaleString()} kcal target by this afternoon. A dinner near ${remainingKcal.toLocaleString()} kcal lands the day right on target — this is just for today; your saved goals don't change.`,
+    // Numbers are pre-formatted (locale grouping) so the key-based
+    // render shows exactly what the English string shows.
+    reasonI18n: {
+      key: 'nutritionCoach.wholeDayReason',
+      params: {
+        pct: consumedPct,
+        target: calorieTarget.toLocaleString(),
+        remaining: remainingKcal.toLocaleString(),
+      },
+    },
   };
 }
 
@@ -218,6 +230,8 @@ export interface DayKindTargets {
   calories: number;
   proteinG: number;
   note: string;
+  /** Item-4: same note as a localizable struct (LIVE-P1-03 pattern). */
+  noteI18n?: LocalizedSentence;
 }
 
 /**
@@ -235,18 +249,21 @@ export function getDayKindTargets(
         calories: goals.calories,
         proteinG: goals.proteinG,
         note: 'Fasting day (no grains): protein can still come from paneer, curd, milk, nuts and sabudana/fruit meals. Targets stay the same — treat them as guidance, not rules. If you have diabetes or take glucose-lowering medication, check with your doctor before fasting days.',
+        noteI18n: { key: 'nutritionCoach.dayKindNoGrainFast' },
       };
     case 'one_meal_fast':
       return {
         calories: Math.round(goals.calories * 0.7),
         proteinG: goals.proteinG,
         note: 'One-meal day: calories are guided ~30% lower and protein stays at target — try to get most of it into that one meal. If you have diabetes or take glucose-lowering medication, check with your doctor before one-meal days — long gaps between meals can be risky on that medication.',
+        noteI18n: { key: 'nutritionCoach.dayKindOneMealFast' },
       };
     case 'festival_feast':
       return {
         calories: goals.calories + 400,
         proteinG: goals.proteinG,
         note: 'Festival day: a +400 kcal buffer is built into today. Enjoy the food — one day never decides anything.',
+        noteI18n: { key: 'nutritionCoach.dayKindFestivalFeast' },
       };
   }
 }

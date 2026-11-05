@@ -37,6 +37,7 @@ import { MAX_WORKOUT_WEIGHT_KG } from './workout-engine';
 import { DEFAULT_BODYWEIGHT_KG } from './defaults';
 import { isSetCompleted } from './types';
 import type { PersonalRecord, Unit, WorkoutEntry, WorkoutSet } from './types';
+import { kgToLbs, lbsToKg } from './units';
 
 export interface SessionTopSet {
   weightKg: number;
@@ -93,7 +94,7 @@ export function computeSessionBest(
     const sWeight = parseFloat(String(s.weight)) || 0;
     const sReps = parseInt(String(s.reps), 10) || 0;
     if (!(sReps > 0 && (sWeight > 0 || isBW))) continue;
-    const wKg = s.unit === 'lbs' ? sWeight * 0.453592 : sWeight;
+    const wKg = s.unit === 'lbs' ? lbsToKg(sWeight) : sWeight;
     // SIM-P1-06: an above-cap load never feeds PR detection.
     if (!isBW && wKg > MAX_WORKOUT_WEIGHT_KG) continue;
     const e1rm = calculateOneRepMax(getEffectiveExerciseLoad(exerciseName, wKg, userBW), sReps);
@@ -110,7 +111,7 @@ export function computeSessionBest(
           if (pastSet.isWarmup || !isSetCompleted(pastSet)) continue;
           const pw = parseFloat(String(pastSet.weight)) || 0;
           const pr = parseInt(String(pastSet.reps), 10) || 0;
-          const pwKg = pastSet.unit === 'lbs' ? pw * 0.453592 : pw;
+          const pwKg = pastSet.unit === 'lbs' ? lbsToKg(pw) : pw;
           if (Math.abs(pwKg - wKg) < 1.0 && pr > maxPrevRepsAtWeight) {
             maxPrevRepsAtWeight = pr;
           }
@@ -122,7 +123,7 @@ export function computeSessionBest(
       if (!bestRepPR || sReps - maxPrevRepsAtWeight > bestRepPR.reps - bestRepPR.prevReps) {
         bestRepPR = {
           weightKg: round1(wKg),
-          weightLbs: round1(wKg * 2.20462),
+          weightLbs: round1(kgToLbs(wKg)),
           reps: sReps,
           prevReps: maxPrevRepsAtWeight,
           e1RMKg: round1(e1rm),
@@ -144,7 +145,7 @@ export function gateSessionOutcome(best: SessionBest, priorBest1RMKg: number): S
     return {
       kind: '1rm',
       weightKg: best.topSet.weightKg,
-      weightLbs: round1(best.topSet.weightKg * 2.20462),
+      weightLbs: round1(kgToLbs(best.topSet.weightKg)),
       reps: best.topSet.reps,
       oneRepMax: best.topSet.e1RMKg,
     };
@@ -207,7 +208,7 @@ export function findAttributablePR(
     candidates.push({
       kind: '1rm',
       weightKg: oldBest.topSet.weightKg,
-      weightLbs: round1(oldBest.topSet.weightKg * 2.20462),
+      weightLbs: round1(kgToLbs(oldBest.topSet.weightKg)),
       reps: oldBest.topSet.reps,
       oneRepMax: oldBest.topSet.e1RMKg,
     });

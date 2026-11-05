@@ -32,6 +32,7 @@ import { useTranslation } from '@/lib/i18n';
 import type { StringKey } from '@/lib/i18n/en';
 import { safeRandomId, getLocalTodayStr } from '@/lib/formatters';
 import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
+import { kgToLbs, lbsToKg } from '@/lib/units';
 
 interface LogPastWorkoutModalProps {
   isOpen: boolean;
@@ -434,7 +435,7 @@ export default function LogPastWorkoutModal({
         if (r <= 0) return;
         if (!isBW && w <= 0) return;
 
-        const wKg = userUnit === 'lbs' ? w * 0.453592 : w;
+        const wKg = userUnit === 'lbs' ? lbsToKg(w) : w;
         const effectiveLoadKg = getEffectiveExerciseLoad(ex.name, wKg, userBW);
         const current1RM = calculateOneRepMax(effectiveLoadKg, r);
         // SIM-P1-06: above-cap loads never mint PRs (typo guard, same
@@ -445,7 +446,7 @@ export default function LogPastWorkoutModal({
           .reduce((max, p) => Math.max(max, p.oneRepMax), 0);
 
         if (current1RM > existingBest && current1RM > 0 && wKg <= MAX_WORKOUT_WEIGHT_KG) {
-          const wLbs = userUnit === 'kg' ? w * 2.20462 : w;
+          const wLbs = userUnit === 'kg' ? kgToLbs(w) : w;
           const prRecord: PersonalRecord = {
             id: safeRandomId('pr'),
             exercise: ex.name,

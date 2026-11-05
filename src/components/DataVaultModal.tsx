@@ -6,7 +6,7 @@ import { useStore, getStorageWriteFailed, getLastImportNormalizedCount } from '@
 import { useToast } from '@/components/ui/Toast';
 import { ensureDeleteWillPersist } from '@/lib/delete-persist-guard';
 import { parseWorkoutCSV } from '@/lib/workout-import';
-import { toUserMessage } from '@/lib/user-error';
+import { localizedUserMessage } from '@/lib/user-error';
 import { getLocalTodayStr } from '@/lib/formatters';
 import { buildFullBackup, getCustomBarcodes } from '@/lib/storage';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
@@ -240,7 +240,7 @@ export default function DataVaultModal({ isOpen, onClose, startAtDeleteConfirm }
       } catch (err: any) {
         // QA4-016: route through the central sanitizer — parser errors
         // can embed file internals that don't belong in the UI.
-        const safe = toUserMessage(err, 'generic');
+        const safe = localizedUserMessage(t, language, err, 'generic');
         toast.error(safe, t('vault.csvFailTitle'));
         setMessage({ text: safe, type: 'error' });
       } finally {

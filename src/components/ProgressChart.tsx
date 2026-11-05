@@ -110,9 +110,13 @@ export default function ProgressChart() {
     });
   }, [filteredPRs, userUnit]);
 
-  // Volume load & RPE fatigue data derived from workouts
+  // Volume load & RPE fatigue data derived from workouts.
+  // Sessions must be normalized into userUnit: every value below
+  // (totalVolume, bestWeight, bestE1RM) is rendered with a userUnit
+  // label. This previously hardcoded 'kg', so lbs users saw kg
+  // magnitudes labelled lbs.
   const volumeData = useMemo(() => {
-    const rawSessions = getExerciseHistorySessions(selectedExercise, workouts || [], 'kg', { exact: true });
+    const rawSessions = getExerciseHistorySessions(selectedExercise, workouts || [], userUnit, { exact: true });
     let filtered = rawSessions;
 
     if (timeframe !== 'all') {

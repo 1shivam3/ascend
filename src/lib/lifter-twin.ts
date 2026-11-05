@@ -22,6 +22,7 @@ import {
   isBodyweightExercise,
   isDumbbellExercise,
 } from './strength-standards';
+import { kgToLbs, lbsToKg } from './units';
 
 /**
  * Calculates within-session effort drift and rep drop across comparable working sets.
@@ -148,9 +149,9 @@ export function getExerciseHistorySessions(
           let normalizedWeight = s.weight;
           if (typeof s.weight === 'number' && !isNaN(s.weight) && s.unit && s.unit !== userUnit) {
             if (userUnit === 'lbs' && s.unit === 'kg') {
-              normalizedWeight = Math.round(s.weight * 2.20462 * 10) / 10;
+              normalizedWeight = Math.round(kgToLbs(s.weight) * 10) / 10;
             } else if (userUnit === 'kg' && s.unit === 'lbs') {
-              normalizedWeight = Math.round(s.weight * 0.453592 * 10) / 10;
+              normalizedWeight = Math.round(lbsToKg(s.weight) * 10) / 10;
             }
           }
           return {

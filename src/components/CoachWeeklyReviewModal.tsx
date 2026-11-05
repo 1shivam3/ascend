@@ -12,7 +12,7 @@ import React, { useEffect, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { useTranslation } from '@/lib/i18n';
-import { renderLocalizedSentence } from '@/lib/coach-i18n';
+import { localizeDay, renderLocalizedSentence } from '@/lib/coach-i18n';
 import type { WeeklyReview } from '@/lib/weekly-review';
 import { CalendarRange, Check, TrendingUp, X } from 'lucide-react';
 
@@ -96,7 +96,7 @@ export default function CoachWeeklyReviewModal({ isOpen, onClose, review }: Coac
             </p>
             {review.missedDays.length > 0 && (
               <p className="text-2xs text-text-muted">
-                {t('weeklyReview.missed', { days: review.missedDays.join(', ') })}
+                {t('weeklyReview.missed', { days: review.missedDays.map((d) => localizeDay(d, language)).join(', ') })}
               </p>
             )}
           </div>
@@ -148,7 +148,7 @@ export default function CoachWeeklyReviewModal({ isOpen, onClose, review }: Coac
             <div className="space-y-1">
               {review.prs.map((pr, i) => (
                 <p key={i} className="text-xs text-text-secondary">
-                  <strong className="text-text-primary">{pr.exercise}</strong> — {pr.detail}
+                  <strong className="text-text-primary">{pr.exercise}</strong> — {renderLocalizedSentence(t, language, pr.detailI18n, pr.detail)}
                 </p>
               ))}
             </div>
@@ -163,7 +163,7 @@ export default function CoachWeeklyReviewModal({ isOpen, onClose, review }: Coac
             <div className="space-y-1">
               {review.recoveryLines.map((line, i) => (
                 <p key={i} className="text-xs text-text-secondary">
-                  {line}
+                  {renderLocalizedSentence(t, language, review.recoveryLinesI18n?.[i], line)}
                 </p>
               ))}
             </div>
@@ -178,7 +178,7 @@ export default function CoachWeeklyReviewModal({ isOpen, onClose, review }: Coac
             <div className="space-y-1">
               {review.coachLines.map((line, i) => (
                 <p key={i} className="text-xs text-text-secondary">
-                  {line}
+                  {renderLocalizedSentence(t, language, review.coachLinesI18n?.[i], line)}
                 </p>
               ))}
             </div>
@@ -193,7 +193,7 @@ export default function CoachWeeklyReviewModal({ isOpen, onClose, review }: Coac
             <div className="space-y-2">
               {review.revisions.map((rev, i) => (
                 <div key={i} className="p-3 rounded-xl bg-bg-secondary border border-border/70">
-                  <p className="text-xs text-text-secondary">{rev.text}</p>
+                  <p className="text-xs text-text-secondary">{renderLocalizedSentence(t, language, rev.textI18n, rev.text)}</p>
                   {rev.kind === 'schedule_move' &&
                     (rev.applied ? (
                       <p className="text-2xs text-accent-text font-semibold mt-1.5 flex items-center gap-1">

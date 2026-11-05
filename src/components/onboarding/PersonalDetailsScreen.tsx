@@ -8,6 +8,7 @@ import DobPicker from '@/components/DobPicker';
 import { useTranslation } from '@/lib/i18n';
 import { calculateAgeFromDob, dobPickerBounds, dobPreviewAge, isValidDob } from '@/lib/age';
 import { validateBodyStats, toStoredBodyStats } from '@/lib/body-stats';
+import { kgToLbs, lbsToKg } from '@/lib/units';
 
 /**
  * Details-lite (simplified onboarding, step 2 of 2).
@@ -175,7 +176,7 @@ export default function PersonalDetailsScreen({
     const w = parseFloat(weightInput);
     const h = parseFloat(heightInput);
     if (!Number.isNaN(w)) {
-      setWeightInput(String(Math.round((next === 'lbs' ? w * 2.20462 : w * 0.453592) * 10) / 10));
+      setWeightInput(String(Math.round((next === 'lbs' ? kgToLbs(w) : lbsToKg(w)) * 10) / 10));
     }
     if (!Number.isNaN(h)) {
       setHeightInput(String(Math.round((next === 'lbs' ? h / 2.54 : h * 2.54) * 10) / 10));

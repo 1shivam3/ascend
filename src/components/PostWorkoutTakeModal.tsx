@@ -25,6 +25,7 @@ import {
   Target,
   Flag
 } from 'lucide-react';
+import { kgToLbs } from '@/lib/units';
 
 interface PostWorkoutTakeModalProps {
   isOpen: boolean;
@@ -179,7 +180,7 @@ export default function PostWorkoutTakeModal({
       completedWorkout as unknown as WorkoutEntry,
       store.profile?.bodyweightKg,
     );
-    const displayVal = userUnit === 'lbs' ? Math.round(volKg * 2.20462) : Math.round(volKg);
+    const displayVal = userUnit === 'lbs' ? Math.round(kgToLbs(volKg)) : Math.round(volKg);
     return `${displayVal.toLocaleString()} ${userUnit}`;
   }, [completedWorkout, store.profile?.bodyweightKg, userUnit]);
 
@@ -289,7 +290,7 @@ export default function PostWorkoutTakeModal({
                       <div>
                         <span className="font-bold text-text-primary block">{pr.exercise}</span>
                         <span className="text-2xs text-text-muted font-mono">
-                          {isRepPR ? (pr.notes || t('take.repMilestone')) : `1RM: ${userUnit === 'lbs' ? Math.round(pr.oneRepMax * 2.20462) : pr.oneRepMax} ${userUnit}`}
+                          {isRepPR ? (pr.notes || t('take.repMilestone')) : `1RM: ${userUnit === 'lbs' ? Math.round(kgToLbs(pr.oneRepMax)) : pr.oneRepMax} ${userUnit}`}
                         </span>
                       </div>
                     </div>

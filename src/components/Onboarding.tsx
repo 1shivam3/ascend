@@ -22,6 +22,7 @@ import FitnessGoalsScreen from './onboarding/FitnessGoalsScreen';
 import PersonalDetailsScreen from './onboarding/PersonalDetailsScreen';
 import SummaryScreen from './onboarding/SummaryScreen';
 import StepProgressBar from './onboarding/StepProgressBar';
+import { kgToLbs, lbsToKg } from '@/lib/units';
 
 type OnboardingScreenId =
   | 'splash'
@@ -338,12 +339,12 @@ export default function Onboarding() {
     const bodyweightKg = details.bodyStats
       ? details.bodyStats.bodyweightKg
       : unit === 'lbs'
-        ? weight * 0.453592
+        ? lbsToKg(weight)
         : weight;
     const bodyweightLbs = details.bodyStats
-      ? Math.round(details.bodyStats.bodyweightKg * 2.20462 * 10) / 10
+      ? Math.round(kgToLbs(details.bodyStats.bodyweightKg) * 10) / 10
       : unit === 'kg'
-        ? weight * 2.20462
+        ? kgToLbs(weight)
         : weight;
 
     const finalGoals = [...selectedGoals];
@@ -793,7 +794,7 @@ export default function Onboarding() {
           entered
             ? String(
                 Math.round(
-                  (entered.unit === 'lbs' ? entered.bodyweightKg * 2.20462 : entered.bodyweightKg) * 10
+                  (entered.unit === 'lbs' ? kgToLbs(entered.bodyweightKg) : entered.bodyweightKg) * 10
                 ) / 10
               )
             : ''

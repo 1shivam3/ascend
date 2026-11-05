@@ -20,7 +20,7 @@ import {
 import { getSupabase } from '@/lib/supabase/client';
 import { parseDeletionUrl } from '@/lib/deletion-url';
 import { SUPPORT_EMAIL } from '@/lib/legal';
-import { toUserMessage } from '@/lib/user-error';
+import { localizedUserMessage } from '@/lib/user-error';
 import { useTranslation } from '@/lib/i18n';
 
 export type DeletionStatus =
@@ -43,7 +43,7 @@ export interface DeleteAccountViewProps {
 }
 
 export function DeleteAccountView(props: DeleteAccountViewProps) {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const [email, setEmail] = useState<string>(props.initialEmail || '');
   const [verificationToken, setVerificationToken] = useState<string>(props.initialVerificationToken || '');
   const [confirmText, setConfirmText] = useState<string>('');
@@ -155,7 +155,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
     } catch (err: any) {
       setStatus('error');
       // QA4-016: sanitize — raw fetch errors don't belong in the UI.
-      setErrorMessage(toUserMessage(err, 'generic'));
+      setErrorMessage(localizedUserMessage(t, language, err, 'generic'));
     }
   };
 
@@ -242,7 +242,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
       setStatus('error');
       // QA4-016: sanitize raw errors; keep the support path in the copy.
       setErrorMessage(
-        `${toUserMessage(err, 'generic')} If it keeps happening, contact ${SUPPORT_EMAIL} for manual processing.`
+        `${localizedUserMessage(t, language, err, 'generic')} If it keeps happening, contact ${SUPPORT_EMAIL} for manual processing.`
       );
     }
   };

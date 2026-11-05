@@ -22,8 +22,7 @@
 
 import { isSetCompleted, type WorkoutEntry, type WorkoutExercise } from './types';
 import { isBodyweightExercise } from './strength-standards';
-
-const LBS_TO_KG = 0.453592;
+import { LBS_TO_KG } from './units';
 
 function setLoadKg(
   exerciseName: string,

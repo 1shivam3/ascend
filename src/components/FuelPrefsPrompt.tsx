@@ -6,6 +6,7 @@ import { useTranslation } from '@/lib/i18n';
 import { useStore } from '@/lib/store';
 import { calculateRecommendedMacroGoals, normalizeCalorieDelta } from '@/lib/macros';
 import { resolvePrimaryGoal } from '@/lib/types';
+import { kgToLbs, lbsToKg } from '@/lib/units';
 
 /**
  * Progressive prompt (simplified onboarding, track A).
@@ -77,8 +78,8 @@ export default function FuelPrefsPrompt({ onDone }: FuelPrefsPromptProps) {
       onDone();
       return;
     }
-    const weightKg = unit === 'lbs' ? Math.round(w * 0.453592 * 10) / 10 : Math.round(w * 10) / 10;
-    const weightLbs = unit === 'lbs' ? Math.round(w * 10) / 10 : Math.round(w * 2.20462 * 10) / 10;
+    const weightKg = unit === 'lbs' ? Math.round(lbsToKg(w) * 10) / 10 : Math.round(w * 10) / 10;
+    const weightLbs = unit === 'lbs' ? Math.round(w * 10) / 10 : Math.round(kgToLbs(w) * 10) / 10;
     const heightCm = Math.round(unit === 'lbs' ? h * 2.54 : h);
 
     // Task 1.1: values typed here are the user's real stats — record

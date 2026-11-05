@@ -1114,7 +1114,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             <span className="text-xs font-bold text-text-primary block">
               {t('health.stepsToday')}
             </span>
-            <span className="text-2xs text-text-muted block">Health Connect</span>
+            <span className="text-2xs text-text-muted block">{t('health.sourceLabel')}</span>
           </div>
           <span className="ml-auto text-sm font-black font-mono text-text-primary tabular-nums">
             {healthSummary.stepsToday.toLocaleString()}

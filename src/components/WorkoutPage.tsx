@@ -60,7 +60,6 @@ import {
   getLastExercisePerformance,
   getProgressionRecommendation,
   getTodaySessionState,
-  getGoalAdaptiveSplitTemplates,
   isSetCompleted,
   finalizeWorkoutExercises,
   getExecutedExercises,
@@ -125,6 +124,7 @@ import { plural, safeRandomId, getLocalTodayStr, formatLocalDate, parseLocalDate
 import { planPRChangesAfterSetEdit } from '@/lib/pr-reevaluation';
 import { getSessionDuration } from '@/lib/workout-elapsed';
 import { useAppNavigation } from '@/lib/navigation';
+import { kgToLbs, lbsToKg } from '@/lib/units';
 
 interface WorkoutPageProps {
   onNavigate?: (tab: 'home' | 'prs' | 'workout' | 'meals') => void;
@@ -151,8 +151,6 @@ const emptyPlanExercise = (unit: 'kg' | 'lbs', targetReps = 8): PlannedExercise 
   targetUnit: unit,
   notes: '',
 });
-
-export const BUILTIN_SPLIT_TEMPLATES: PlannedWorkout[] = getGoalAdaptiveSplitTemplates('build_muscle', 'kg');
 
 function PlanModal({
   isOpen,
@@ -214,11 +212,11 @@ function PlanModal({
       if (selected.isBodyweight) {
         updateExercise(targetExerciseIndex, 'targetWeight', 0);
       } else if (selected.defaultWeightKg) {
-        updateExercise(targetExerciseIndex, 'targetWeight', userUnit === 'lbs' ? Math.round(selected.defaultWeightKg * 2.20462) : selected.defaultWeightKg);
+        updateExercise(targetExerciseIndex, 'targetWeight', userUnit === 'lbs' ? Math.round(kgToLbs(selected.defaultWeightKg)) : selected.defaultWeightKg);
       }
     } else {
       const isBW = selected.isBodyweight || isBodyweightExercise(selected.name);
-      const w = isBW ? 0 : (selected.defaultWeightKg ? (userUnit === 'lbs' ? Math.round(selected.defaultWeightKg * 2.20462) : selected.defaultWeightKg) : (userUnit === 'lbs' ? 115 : 50));
+      const w = isBW ? 0 : (selected.defaultWeightKg ? (userUnit === 'lbs' ? Math.round(kgToLbs(selected.defaultWeightKg)) : selected.defaultWeightKg) : (userUnit === 'lbs' ? 115 : 50));
       setPlanExercises(prev => [
         ...prev,
         {
@@ -519,7 +517,7 @@ function PlanModal({
                     if (!e1rmKg) return null;
                     const unit = (ex.targetUnit as 'kg' | 'lbs') || userUnit;
                     const weights = percentSetWeights(e1rmKg, ex.targetSets || 1, unit);
-                    const e1rmDisplay = unit === 'lbs' ? Math.round(e1rmKg * 2.20462) : Math.round(e1rmKg);
+                    const e1rmDisplay = unit === 'lbs' ? Math.round(kgToLbs(e1rmKg)) : Math.round(e1rmKg);
                     return (
                       <p className="mt-2 text-2xs font-mono text-accent-text">
                         {t('plan.suggestedFrom1rm', {
@@ -1961,8 +1959,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           const wNum = typeof s.weight === 'number' && !isNaN(s.weight) ? s.weight : 0;
           const rNum = s.reps;
           if (rNum > 0 && (wNum > 0 || isBW)) {
-            const wKg = s.unit === 'lbs' ? wNum * 0.453592 : wNum;
-            const wLbs = s.unit === 'lbs' ? wNum : wNum * 2.20462;
+            const wKg = s.unit === 'lbs' ? lbsToKg(wNum) : wNum;
+            const wLbs = s.unit === 'lbs' ? wNum : kgToLbs(wNum);
             const effectiveLoadKg = getEffectiveExerciseLoad(exName, wKg, userBW);
             const e1RM = calculateOneRepMax(effectiveLoadKg, rNum);
             if (e1RM > topSet.e1RMKg) {

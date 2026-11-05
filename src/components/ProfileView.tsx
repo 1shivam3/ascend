@@ -34,6 +34,7 @@ import FeedbackModal from '@/components/FeedbackModal';
 import WeeklyRecapModal from '@/components/WeeklyRecapModal';
 import ShareProgramModal from '@/components/ShareProgramModal';
 import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
+import { kgToLbs } from '@/lib/units';
 
 export interface ProfileViewProps {
   onBack?: () => void;
@@ -136,7 +137,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
   const displayWeight = () => {
     if (!profile?.bodyweightKg) return '—';
     if (userUnit === 'lbs') {
-      const lbs = profile.bodyweightLbs || Math.round(profile.bodyweightKg * 2.20462);
+      const lbs = profile.bodyweightLbs || Math.round(kgToLbs(profile.bodyweightKg));
       return `${lbs} lbs`;
     }
     return `${profile.bodyweightKg} kg`;

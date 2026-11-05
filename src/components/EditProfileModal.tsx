@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { X, User, Check, Scale, Ruler, Camera, Trash2 } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { toUserMessage } from '@/lib/user-error';
+import { localizedUserMessage } from '@/lib/user-error';
 import { useToast } from '@/components/ui/Toast';
 import { useTranslation } from '@/lib/i18n';
 import { Gender, Unit, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
@@ -13,6 +13,7 @@ import DobPicker from '@/components/DobPicker';
 import { round1, sanitizeAthleteName } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
 import { resizeAndCompressImage } from '@/lib/image-processing';
+import { kgToLbs, lbsToKg } from '@/lib/units';
 
 export interface EditProfileModalProps {
   isOpen: boolean;
@@ -22,7 +23,7 @@ export interface EditProfileModalProps {
 export default function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const storeProfile = useStore((state) => state.profile);
   const profile = storeProfile ?? useStore.getState().profile;
   const setProfile = useStore((state) => state.setProfile);
@@ -62,7 +63,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
       setUnit(profile.unit || 'kg'); // audit-3 FE-11: was 'lbs' — opening this editor on a unit-less profile and saving silently flipped the unit
 
       if (profile.unit === 'lbs') {
-        const lbsVal = profile.bodyweightLbs || Math.round(profile.bodyweightKg * 2.20462);
+        const lbsVal = profile.bodyweightLbs || Math.round(kgToLbs(profile.bodyweightKg));
         setWeight(String(round1(lbsVal)));
       } else {
         setWeight(String(round1(profile.bodyweightKg)));
@@ -110,7 +111,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
       setProfile({ ...profile, avatar: dataUrl });
       toast.success(t('editProfile.photoUpdated'), t('editProfile.photoSetTitle'));
     } catch (err) {
-      toast.error(toUserMessage(err, 'image'), t('progress.photoUploadFailedTitle'));
+      toast.error(localizedUserMessage(t, language, err, 'image'), t('progress.photoUploadFailedTitle'));
     } finally {
       setIsUploadingAvatar(false);
     }
@@ -121,9 +122,9 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
     const currentWeight = parseFloat(weight);
     if (!isNaN(currentWeight) && currentWeight > 0) {
       if (nextUnit === 'lbs') {
-        setWeight((currentWeight * 2.20462).toFixed(1));
+        setWeight((kgToLbs(currentWeight)).toFixed(1));
       } else {
-        setWeight((currentWeight / 2.20462).toFixed(1));
+        setWeight((lbsToKg(currentWeight)).toFixed(1));
       }
     }
 
@@ -150,7 +151,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
     }
 
     const parsedWeight = parseFloat(weight);
-    const parsedWeightKg = unit === 'lbs' ? parsedWeight * 0.453592 : parsedWeight;
+    const parsedWeightKg = unit === 'lbs' ? lbsToKg(parsedWeight) : parsedWeight;
     if (isNaN(parsedWeight) || parsedWeightKg < 30 || parsedWeightKg > 300) {
       newErrors.weight =
         unit === 'kg'
@@ -204,8 +205,8 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
       return;
     }
 
-    const weightKg = unit === 'lbs' ? Math.round((parsedWeight * 0.453592) * 10) / 10 : Math.round(parsedWeight * 10) / 10;
-    const weightLbs = unit === 'lbs' ? Math.round(parsedWeight * 10) / 10 : Math.round((parsedWeight * 2.20462) * 10) / 10;
+    const weightKg = unit === 'lbs' ? Math.round((lbsToKg(parsedWeight)) * 10) / 10 : Math.round(parsedWeight * 10) / 10;
+    const weightLbs = unit === 'lbs' ? Math.round(parsedWeight * 10) / 10 : Math.round((kgToLbs(parsedWeight)) * 10) / 10;
 
     setProfile({
       ...profile,

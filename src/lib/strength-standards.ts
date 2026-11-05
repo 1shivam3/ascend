@@ -2,6 +2,7 @@ import { LiftLevel, OverallLevel, Gender, ExerciseRank, OverallTitle, EquipmentT
 import { getAllExerciseNames, EXERCISE_LIBRARY, getExerciseMuscle } from './exercise-library';
 import type { StringKey } from './i18n/en';
 import { DEFAULT_BODYWEIGHT_KG } from './defaults';
+import { kgToLbs } from './units';
 
 /**
  * Sanity cap for manually logged PR weights. 500 kg exceeds every raw
@@ -38,7 +39,7 @@ export function suggestLoad(
   if (!e1rmKg || e1rmKg <= 0) return 0;
   const safeReps = Math.max(1, reps);
   const safeRpe = Math.min(10, Math.max(5, rpe));
-  const base1RM = unit === 'lbs' ? e1rmKg * 2.20462 : e1rmKg;
+  const base1RM = unit === 'lbs' ? kgToLbs(e1rmKg) : e1rmKg;
   // SIM-P3-05: invert the SAME dampened Epley calculateOneRepMax uses.
   // The old code inverted the undampened formula, so for 12–15 rep
   // sets (exactly where beginners live) the suggestion disagreed with

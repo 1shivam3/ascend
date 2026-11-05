@@ -15,8 +15,9 @@ import { MAX_PR_WEIGHT_KG } from './strength-standards';
 import { normalizeRunDistanceKm } from './run-program';
 import { clampWorkoutReps, clampWorkoutWeight } from './workout-engine';
 import type { FoodItem, MealEntry, PersonalRecord, PlannedWorkout, WorkoutEntry, WorkoutSet } from './types';
+import { kgToLbs } from './units';
 
-const MAX_WEIGHT_LBS = Math.ceil(MAX_PR_WEIGHT_KG * 2.20462);
+const MAX_WEIGHT_LBS = Math.ceil(kgToLbs(MAX_PR_WEIGHT_KG));
 const MAX_FOOD_CALORIES = 10000;
 const MAX_FOOD_MACRO_G = 2000;
 
