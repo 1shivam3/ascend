@@ -63,7 +63,7 @@ export class PoseLandmarkerService {
   constructor(config: PoseServiceConfig = {}) {
     this.config = {
       wasmPath: config.wasmPath ?? '/mediapipe/wasm',
-      modelPath: config.modelPath ?? '/mediapipe/models/pose_landmarker_lite.task',
+      modelPath: config.modelPath ?? '/mediapipe/models/pose_landmarker_full.task',
       targetFps: config.targetFps ?? 14,
       useWorker: config.useWorker ?? true,
     };
