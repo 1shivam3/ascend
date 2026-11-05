@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { MovementClassifier } from '@/features/form-coach/services/analysis/MovementClassifier';
+import { resolveDetectionOutcome } from '@/features/form-coach/hooks/useFormCoach';
 import { NormalizedLandmark, PoseLandmarkIndex } from '@/features/form-coach/models/pose.types';
 import fixture from './fixtures/ground-truth-squat-landmarks.json';
 
@@ -68,7 +69,7 @@ function play(
   let prevHand: Hand = 'high';
   for (const key of keys) {
     const from = prev ?? key.pose;
-    const hand = key.hand ?? prevHand;
+    const hand: Hand = key.hand ?? prevHand;
     for (let i = 0; i < key.frames; i++) {
       const f = key.frames === 1 ? 1 : i / (key.frames - 1 || 1);
       c.processFrame(
@@ -256,5 +257,92 @@ describe('movement classifier — honest non-verdicts', () => {
       deadliftFrames: 0,
       squatFrames: 0,
     });
+  });
+});
+
+describe('resolveDetectionOutcome — auto-detect routing', () => {
+  const tracked = { framesProcessed: 200, framesTracked: 190 };
+
+  it('auto: detected exercises route to their analyzer', () => {
+    expect(
+      resolveDetectionOutcome({ stats: tracked, mode: { type: 'auto' }, detection: 'deadlift' })
+    ).toEqual({ kind: 'report', exerciseId: 'deadlift' });
+    expect(
+      resolveDetectionOutcome({ stats: tracked, mode: { type: 'auto' }, detection: 'squat' })
+    ).toEqual({ kind: 'report', exerciseId: 'squat' });
+  });
+
+  it('auto: unknown and insufficient_evidence decline — no analyzer is forced', () => {
+    expect(
+      resolveDetectionOutcome({ stats: tracked, mode: { type: 'auto' }, detection: 'unknown' })
+    ).toEqual({ kind: 'unsupported', reason: 'unknown' });
+    expect(
+      resolveDetectionOutcome({
+        stats: tracked,
+        mode: { type: 'auto' },
+        detection: 'insufficient_evidence',
+      })
+    ).toEqual({ kind: 'unsupported', reason: 'insufficient_evidence' });
+  });
+
+  it('tracking failure takes precedence over any detection', () => {
+    expect(
+      resolveDetectionOutcome({
+        stats: { framesProcessed: 200, framesTracked: 0 },
+        mode: { type: 'auto' },
+        detection: 'deadlift',
+      })
+    ).toEqual({ kind: 'no-tracking' });
+    expect(
+      resolveDetectionOutcome({
+        stats: { framesProcessed: 300, framesTracked: 3 },
+        mode: { type: 'preset', exerciseId: 'squat' },
+        detection: 'squat',
+      })
+    ).toEqual({ kind: 'no-tracking' });
+  });
+
+  it('preset: agreement or no confident call reports as the preset', () => {
+    expect(
+      resolveDetectionOutcome({
+        stats: tracked,
+        mode: { type: 'preset', exerciseId: 'deadlift' },
+        detection: 'deadlift',
+      })
+    ).toEqual({ kind: 'report', exerciseId: 'deadlift' });
+    expect(
+      resolveDetectionOutcome({
+        stats: tracked,
+        mode: { type: 'preset', exerciseId: 'deadlift' },
+        detection: 'insufficient_evidence',
+      })
+    ).toEqual({ kind: 'report', exerciseId: 'deadlift' });
+  });
+
+  it('preset: a confident call for the OTHER lift is a mismatch, not a silent grade', () => {
+    expect(
+      resolveDetectionOutcome({
+        stats: tracked,
+        mode: { type: 'preset', exerciseId: 'squat' },
+        detection: 'deadlift',
+      })
+    ).toEqual({ kind: 'mismatch', detectedExerciseId: 'deadlift' });
+    expect(
+      resolveDetectionOutcome({
+        stats: tracked,
+        mode: { type: 'preset', exerciseId: 'deadlift' },
+        detection: 'squat',
+      })
+    ).toEqual({ kind: 'mismatch', detectedExerciseId: 'squat' });
+  });
+
+  it('forced (user correction) always reports as the chosen exercise', () => {
+    expect(
+      resolveDetectionOutcome({
+        stats: tracked,
+        mode: { type: 'forced', exerciseId: 'deadlift' },
+        detection: 'squat',
+      })
+    ).toEqual({ kind: 'report', exerciseId: 'deadlift' });
   });
 });

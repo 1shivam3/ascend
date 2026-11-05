@@ -133,6 +133,112 @@ function emptyUser(): CoachChatUserData {
   };
 }
 
+// ── B2/B3: deadlift sessions through the same bridges ────────────────────
+
+function deadliftRep(over: Partial<FormRep> = {}): FormRep {
+  return rep({
+    durationSeconds: 3.1,
+    descentDurationSeconds: 1.6,
+    ascentDurationSeconds: 1.5,
+    minKneeAngleDeg: 105,
+    estimatedDepth: 'unknown',
+    maxTorsoInclinationDeg: 52,
+    minHipAngleDeg: 64,
+    lockoutAchieved: true,
+    ...over,
+  });
+}
+
+function deadliftSession(over: Partial<FormSessionSummary> = {}): FormSessionSummary {
+  return session({
+    id: 'd1',
+    exerciseId: 'deadlift',
+    exerciseName: 'Conventional Deadlift',
+    startedAt: new Date('2026-10-14T12:00:00Z').getTime(),
+    endedAt: new Date('2026-10-14T12:01:00Z').getTime(),
+    durationSeconds: 26,
+    totalDetectedReps: 4,
+    totalValidReps: 3,
+    analysedRepCount: 4,
+    averageRepDurationSeconds: 3.1,
+    reps: [
+      deadliftRep({ repNumber: 1, minHipAngleDeg: 62 }),
+      deadliftRep({ repNumber: 2, minHipAngleDeg: 66 }),
+      deadliftRep({ repNumber: 3, minHipAngleDeg: 70 }),
+      deadliftRep({ repNumber: 4, minHipAngleDeg: 68, lockoutAchieved: false, isValid: false, invalidReason: 'Lockout not reached' }),
+    ],
+    observations: [
+      {
+        id: 'rule-deadlift-lockout',
+        ruleId: 'rule-deadlift-lockout',
+        title: 'Lockout Reached',
+        message: 'Full lockout',
+        severity: 'info',
+        count: 3,
+        repsTriggered: [1, 2, 3],
+      },
+    ],
+    depthTargetDeg: undefined,
+    ...over,
+  });
+}
+
+/** Older deadlift session: 2026-10-14, 3 lockouts of 4 attempts, tempo 3.1. */
+const deadliftA = deadliftSession();
+/** Newer deadlift session: 2026-10-16, 3 lockouts of 3, tempo 2.9. */
+const deadliftB = deadliftSession({
+  id: 'd2',
+  startedAt: new Date('2026-10-16T12:00:00Z').getTime(),
+  endedAt: new Date('2026-10-16T12:01:00Z').getTime(),
+  totalDetectedReps: 3,
+  totalValidReps: 3,
+  analysedRepCount: 3,
+  averageRepDurationSeconds: 2.9,
+  reps: [
+    deadliftRep({ repNumber: 1, minHipAngleDeg: 60 }),
+    deadliftRep({ repNumber: 2, minHipAngleDeg: 63 }),
+    deadliftRep({ repNumber: 3, minHipAngleDeg: 66 }),
+  ],
+});
+
+describe('B2 — deadlift form checks in the coach-chat context', () => {
+  it('serializes lockout and hip-angle metrics — never squat depth classes', () => {
+    const { lines, evidenceLine } = serializeFormChecks([deadliftA, deadliftB]);
+    expect(lines[0]).toBe(
+      'Conventional Deadlift — latest 2026-10-16: 3 valid reps; ' +
+        'full lockout on 3 of 3 reps; ' +
+        'min hip angle 60–66°; max torso lean 52°; avg tempo 2.9s/rep; ' +
+        'observations: Lockout Reached'
+    );
+    expect(lines[1]).toBe(
+      'Conventional Deadlift — last 2 checks: full lockout on 6 of 7 reps; avg tempo 3s/rep'
+    );
+    expect(evidenceLine).toBe(
+      'Latest form check: Conventional Deadlift on 2026-10-16 — 3 valid reps, full lockout on 3 of 3 reps (camera-measured)'
+    );
+    expect(lines.join(' ')).not.toContain('below parallel');
+    expect(lines.join(' ')).not.toContain('min knee angle');
+  });
+});
+
+describe('B3 — deadlift and mixed form-check lines in the weekly review', () => {
+  it('deadlift-only week: lockout wording with the deadlift scope label', () => {
+    const review = buildWeeklyReview(reviewInput({ formSessions: [deadliftA, deadliftB] }));
+    const formLines = review.coachLines.filter((l) => l.startsWith('Form checks:'));
+    expect(formLines).toEqual([
+      'Form checks: 2 deadlift sessions · full lockout on 6 of 7 reps · avg tempo 3s/rep',
+    ]);
+  });
+
+  it('mixed week: each exercise counted in its own metric only', () => {
+    const review = buildWeeklyReview(reviewInput({ formSessions: [sessionB, deadliftA] }));
+    const formLines = review.coachLines.filter((l) => l.startsWith('Form checks:'));
+    expect(formLines).toEqual([
+      'Form checks: 2 sessions · depth below parallel on 2 of 3 squat reps · full lockout on 3 of 4 deadlift reps · avg tempo 2.8s/rep',
+    ]);
+  });
+});
+
 // ── B1: repository read API ───────────────────────────────────────────────
 
 class MemoryStorage {
