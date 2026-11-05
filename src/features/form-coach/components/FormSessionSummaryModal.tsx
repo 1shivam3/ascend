@@ -27,10 +27,11 @@ interface FormSessionSummaryModalProps {
   /** How the exercise was chosen, e.g. "Detected: Conventional
    * Deadlift" — composed by the caller (already localized). */
   detectionNote?: string | null;
-  /** Label for the correction control ("Re-run as Barbell Back
-   * Squat"), present only when detection chose the exercise. */
-  rerunLabel?: string | null;
-  onRerunAsOther?: () => void;
+  /** Correction controls ("Re-run as Barbell Back Squat", …) — one
+   * per other supported exercise, present only when detection chose
+   * the exercise. */
+  rerunOptions?: { id: string; label: string }[];
+  onRerunAs?: (id: string) => void;
   onClose: () => void;
   onSavedToWorkout?: () => void;
   onAnalyzeAnother?: () => void;
@@ -39,8 +40,8 @@ interface FormSessionSummaryModalProps {
 export default function FormSessionSummaryModal({
   summary,
   detectionNote,
-  rerunLabel,
-  onRerunAsOther,
+  rerunOptions,
+  onRerunAs,
   onClose,
   onSavedToWorkout,
   onAnalyzeAnother,
@@ -85,16 +86,21 @@ export default function FormSessionSummaryModal({
             </span>
             <h2 className="text-xl font-bold tracking-tight">{summary.exerciseName}</h2>
             {detectionNote && (
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-2xs font-medium text-text-secondary">{detectionNote}</span>
-                {onRerunAsOther && rerunLabel && (
-                  <button
-                    type="button"
-                    onClick={onRerunAsOther}
-                    className="text-2xs font-semibold text-accent-text underline underline-offset-2 cursor-pointer"
-                  >
-                    {rerunLabel}
-                  </button>
+              <div className="mt-1 space-y-1">
+                <span className="text-2xs font-medium text-text-secondary block">{detectionNote}</span>
+                {onRerunAs && rerunOptions && rerunOptions.length > 0 && (
+                  <span className="flex flex-wrap gap-x-2.5 gap-y-0.5">
+                    {rerunOptions.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => onRerunAs(opt.id)}
+                        className="text-2xs font-semibold text-accent-text underline underline-offset-2 cursor-pointer"
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </span>
                 )}
               </div>
             )}
@@ -111,7 +117,20 @@ export default function FormSessionSummaryModal({
 
         {/* Rep & Timing Overview Grid */}
         <div className="grid grid-cols-3 gap-2.5">
-          {/* Reps */}
+          {/* Reps — or, for a plank session, the hold itself: a hold
+              has no reps, and showing "0 valid reps" for a good hold
+              would misreport what was measured. */}
+          {summary.holdDurationSeconds !== undefined ? (
+            <div className="p-3 rounded-2xl bg-surface-elevated border border-border-subtle flex flex-col items-center justify-center text-center">
+              <span className="text-2xs uppercase font-mono text-text-muted">Hold</span>
+              <span className="text-2xl font-black text-text-primary my-1">
+                {summary.holdDurationSeconds}s
+              </span>
+              <span className="text-2xs text-text-secondary">
+                In line {summary.alignedHoldPercent ?? 0}% of the hold
+              </span>
+            </div>
+          ) : (
           <div className="p-3 rounded-2xl bg-surface-elevated border border-border-subtle flex flex-col items-center justify-center text-center">
             <span className="text-2xs uppercase font-mono text-text-muted">Valid Reps</span>
             {isEditingReps ? (
@@ -140,6 +159,7 @@ export default function FormSessionSummaryModal({
             )}
             <span className="text-2xs text-text-secondary">Detected: {summary.totalDetectedReps}</span>
           </div>
+          )}
 
           {/* Set Duration */}
           <div className="p-3 rounded-2xl bg-surface-elevated border border-border-subtle flex flex-col items-center justify-center text-center">
@@ -175,7 +195,11 @@ export default function FormSessionSummaryModal({
                 <p className="text-text-secondary text-2xs mt-0.5">
                   {summary.exerciseId === 'deadlift'
                     ? 'Full body was tracked reliably with consistent lockouts throughout the set.'
-                    : 'Full body was tracked reliably with consistent depth throughout the set.'}
+                    : summary.exerciseId === 'squat'
+                      ? 'Full body was tracked reliably with consistent depth throughout the set.'
+                      : summary.exerciseId === 'plank'
+                        ? 'Your body was tracked reliably throughout the hold.'
+                        : 'Full body was tracked reliably throughout the set.'}
                 </p>
               </div>
             </div>
@@ -259,13 +283,49 @@ export default function FormSessionSummaryModal({
                             Lockout: {rep.lockoutAchieved ? 'Full' : 'Not reached'}
                           </span>
                         </div>
-                      ) : (
+                      ) : summary.exerciseId === 'squat' ? (
                         <div>
                           <span className="font-medium text-text-primary">
                             Knee: {rep.minKneeAngleDeg}°
                           </span>
                           <span className="text-2xs text-text-muted block">
                             Depth: {rep.estimatedDepth.replace('_', ' ')}
+                          </span>
+                        </div>
+                      ) : summary.exerciseId === 'lunge' ? (
+                        <div>
+                          <span className="font-medium text-text-primary">
+                            Knee: {rep.minKneeAngleDeg}°
+                          </span>
+                          <span className="text-2xs text-text-muted block">
+                            Torso lean: {rep.maxTorsoInclinationDeg}°
+                          </span>
+                        </div>
+                      ) : summary.exerciseId === 'lateral-raise' ? (
+                        <div>
+                          <span className="font-medium text-text-primary">
+                            Peak:{' '}
+                            {(rep.peakWristHeightRatio ?? -1) >= -0.15
+                              ? 'shoulder height'
+                              : (rep.peakWristHeightRatio ?? -1) >= -0.5
+                                ? 'near shoulder'
+                                : 'below shoulder'}
+                          </span>
+                          <span className="text-2xs text-text-muted block">
+                            {rep.isValid ? 'Complete' : (rep.invalidReason ?? 'Incomplete')}
+                          </span>
+                        </div>
+                      ) : (
+                        <div>
+                          <span className="font-medium text-text-primary">
+                            Elbow: {rep.minElbowAngleDeg ?? '—'}°
+                          </span>
+                          <span className="text-2xs text-text-muted block">
+                            {rep.lockoutAchieved !== undefined
+                              ? `Lockout: ${rep.lockoutAchieved ? 'Full' : 'Not reached'}`
+                              : rep.isValid
+                                ? 'Complete'
+                                : (rep.invalidReason ?? 'Incomplete')}
                           </span>
                         </div>
                       )}

@@ -31,6 +31,14 @@ export interface RuleEvaluationContext {
    */
   currentHipAngleDeg?: number | null;
   minHipAngleDeg?: number | null;
+  /**
+   * Batch-analyzer measurements (optional so squat/deadlift contexts
+   * keep compiling unchanged; the arm/floor analyzers fill these).
+   */
+  currentElbowAngleDeg?: number | null;
+  minElbowAngleDeg?: number | null;
+  wristHeightRatio?: number | null;
+  bodyLineDeviationDeg?: number | null;
   torsoInclinationDeg: number | null;
   trackingConfidence: number;
   feetVisible: boolean;

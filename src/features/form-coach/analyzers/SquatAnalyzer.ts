@@ -128,6 +128,21 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
   private signatureAssessedFrames = 0;
   private signatureHingeFrames = 0;
   private signatureDeepKneeFrames = 0;
+  /**
+   * Batch A+B: grip-variant identity stamp. The classifier can tell a
+   * goblet squat (hands together at the chest) and a front squat
+   * (front-rack grip) from a back squat on bent-frame grip evidence;
+   * when it does, the session is stamped with the variant's name. The
+   * analyzer and exerciseId stay 'squat' — only the identity differs.
+   * Set by the caller after classification, before finishSet.
+   */
+  private variantStamp: string | null = null;
+
+  /** Stamp a grip variant's identity ('goblet' | 'front'), or clear. */
+  setVariantStamp(variant: 'goblet' | 'front' | null): void {
+    this.variantStamp =
+      variant === 'goblet' ? 'Goblet Squat' : variant === 'front' ? 'Front Squat' : null;
+  }
 
   constructor(config: Partial<RepStateMachineConfig> = {}) {
     this.depthTargetDeg = config.depthTargetDeg ?? DEFAULT_SQUAT_CONFIG.depthTargetDeg;
@@ -241,6 +256,7 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
     this.signatureAssessedFrames = 0;
     this.signatureHingeFrames = 0;
     this.signatureDeepKneeFrames = 0;
+    this.variantStamp = null;
   }
 
   /** D4: how many frames were offered vs how many carried a detected pose. */
@@ -590,7 +606,7 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
       workoutId,
       setIndex,
       exerciseId: this.exerciseId,
-      exerciseName: this.exerciseName,
+      exerciseName: this.variantStamp ?? this.exerciseName,
       analyzerVersion: SQUAT_ANALYZER_VERSION,
       cameraView: sessionView,
       startedAt: this.sessionStartTimeMs,

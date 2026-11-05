@@ -33,6 +33,7 @@ import { useStore } from '@/lib/store';
 import { getDemoForExercise } from '@/lib/exercise-media';
 import FormCuesSheet from '@/components/FormCuesSheet';
 import FormCoachModal from '@/features/form-coach/components/FormCoachModal';
+import type { FormExerciseId } from '@/features/form-coach/analyzers/ExerciseAnalyzer';
 import { WorkoutExercise, WorkoutSet, WorkoutEntry, PersonalRecord, AthleteGoal, ATHLETE_GOAL_CONFIGS, SetExecutionStatus, isSetCompleted, DEFAULT_GOALS, resolvePrimaryGoal, Unit } from '@/lib/types';
 import { isMainCompoundLift, calculateOneRepMax, getEquipmentType, getExerciseList, isBodyweightExercise, isDumbbellExercise, getEffectiveExerciseLoad, suggestLoad } from '@/lib/strength-standards';
 import {
@@ -159,21 +160,52 @@ function PackedSwapBanner({
 }
 
 /**
- * Form Coach ships two analyzers — the bilateral squat pattern
- * (canonical session identity: "Barbell Back Squat") and the
- * conventional deadlift hinge ("Conventional Deadlift"). The
- * in-workout entry is offered only during exercises one of them
+ * Form Coach's analyzers and the library exercises each one grades.
+ * The in-workout entry is offered only during exercises an analyzer
  * grades, and presets that exercise so the analyzer is chosen by the
  * workout context (detection still runs and can flag a mismatch).
- * Single-leg split squats are excluded because side-view two-leg
- * depth analysis does not describe them. Standalone entries (Train
- * tools, Home) always open the modal in auto-detect mode.
+ * Matching is by library exercise NAME and stays deliberately narrow:
+ * only movements whose filmed pattern the analyzer actually measures
+ * are mapped. Notably NOT mapped: seated / chest-supported / inverted
+ * rows (not a held hinge), upright rows, leg curls and wrist curls
+ * (not bicep curls), incline/decline/smith/machine bench presses
+ * (not the flat supine pattern), front raises (indistinguishable
+ * from lateral raises in 2D — they auto-detect as raises instead),
+ * push press and Arnold press, side plank (a different hold), and
+ * single-leg split squats route to the LUNGE analyzer (the split
+ * stance is its pattern), never to the bilateral squat analyzer.
+ * Goblet and front squats preset 'squat'; the grip classifier stamps
+ * the variant identity when it is confident. Standalone entries
+ * (Train tools, Home) always open the modal in auto-detect mode.
  */
-function formCoachPresetForExercise(name?: string | null): 'squat' | 'deadlift' | null {
+function formCoachPresetForExercise(name?: string | null): FormExerciseId | null {
   if (!name) return null;
   const n = name.toLowerCase();
   if (n.includes('deadlift')) return 'deadlift';
-  if (n.includes('squat') && !n.includes('split') && !n.includes('bulgarian')) return 'squat';
+  if (
+    n.includes('bench press') &&
+    !n.includes('incline') &&
+    !n.includes('decline') &&
+    !n.includes('smith') &&
+    !n.includes('machine')
+  ) {
+    return 'bench-press';
+  }
+  if (
+    n.includes('bent-over row') ||
+    n.includes('pendlay') ||
+    n.includes('t-bar') ||
+    n.includes('single-arm dumbbell row')
+  ) {
+    return 'bent-over-row';
+  }
+  if (n.includes('curl') && !n.includes('leg') && !n.includes('wrist')) return 'bicep-curl';
+  if (n.includes('overhead press') || n.includes('shoulder press')) return 'overhead-press';
+  if (n.includes('lateral raise')) return 'lateral-raise';
+  if (n.includes('lunge') || n.includes('split squat')) return 'lunge';
+  if (n.includes('push-up') || n.includes('push up')) return 'push-up';
+  if (n.includes('front plank')) return 'plank';
+  if (n.includes('squat')) return 'squat';
   return null;
 }
 

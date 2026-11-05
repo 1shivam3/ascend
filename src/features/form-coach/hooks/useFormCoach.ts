@@ -7,12 +7,13 @@
  * Auto-detect: the tracked landmark stream feeds a MovementClassifier
  * alongside the exercise analyzers. A generic upload is routed at the
  * end of the stream to the analyzer the classifier positively
- * identified (squat or deadlift); when the movement matches neither —
- * or too little of it was measurable — the outcome is the honest
- * 'unsupported' state and nothing is saved. An in-workout entry may
- * preset the exercise; if detection confidently contradicts the
- * preset, the user chooses which lift to grade (mismatch), and any
- * report can be re-run as the other exercise (the correction path).
+ * identified (any of the supported exercises); when the movement
+ * matches none — or too little of it was measurable — the outcome is
+ * the honest 'unsupported' state and nothing is saved. An in-workout
+ * entry may preset the exercise; if detection confidently contradicts
+ * the preset, the user chooses which exercise to grade (mismatch),
+ * and any report can be re-run as another exercise (the correction
+ * path).
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -21,9 +22,19 @@ import { PoseLandmarksSmoother } from '../services/analysis/LandmarkSmoothing';
 import { PoseSubjectTracker } from '../services/pose/PoseSubjectTracker';
 import { SquatAnalyzer } from '../analyzers/SquatAnalyzer';
 import { DeadliftAnalyzer } from '../analyzers/DeadliftAnalyzer';
+import { OverheadPressAnalyzer } from '../analyzers/OverheadPressAnalyzer';
+import { BentOverRowAnalyzer } from '../analyzers/BentOverRowAnalyzer';
+import { BicepCurlAnalyzer } from '../analyzers/BicepCurlAnalyzer';
+import { LungeAnalyzer } from '../analyzers/LungeAnalyzer';
+import { PushUpAnalyzer } from '../analyzers/PushUpAnalyzer';
+import { LateralRaiseAnalyzer } from '../analyzers/LateralRaiseAnalyzer';
+import { PlankAnalyzer } from '../analyzers/PlankAnalyzer';
+import { BenchPressAnalyzer } from '../analyzers/BenchPressAnalyzer';
 import {
   ExerciseAnalyzer,
   FormExerciseId,
+  FORM_EXERCISE_IDS,
+  isFormExerciseId,
   MovementSignature,
 } from '../analyzers/ExerciseAnalyzer';
 import {
@@ -108,15 +119,12 @@ export function resolveDetectionOutcome(args: {
     return { kind: 'report', exerciseId: mode.exerciseId };
   }
   if (mode.type === 'preset') {
-    if (
-      (detection === 'squat' || detection === 'deadlift') &&
-      detection !== mode.exerciseId
-    ) {
+    if (isFormExerciseId(detection) && detection !== mode.exerciseId) {
       return { kind: 'mismatch', detectedExerciseId: detection };
     }
     return { kind: 'report', exerciseId: mode.exerciseId };
   }
-  if (detection === 'squat' || detection === 'deadlift') {
+  if (isFormExerciseId(detection)) {
     return { kind: 'report', exerciseId: detection };
   }
   return { kind: 'unsupported', reason: detection };
@@ -188,8 +196,29 @@ export function useFormCoach({
   // Deep audit: picks the lifter among detected people (a spotter standing
   // closer to the camera must not become the analyzed subject).
   const subjectTrackerRef = useRef<PoseSubjectTracker>(new PoseSubjectTracker());
-  const squatAnalyzerRef = useRef<ExerciseAnalyzer>(new SquatAnalyzer(initialConfig));
-  const deadliftAnalyzerRef = useRef<ExerciseAnalyzer>(new DeadliftAnalyzer());
+  const squatAnalyzerRef = useRef<SquatAnalyzer>(new SquatAnalyzer(initialConfig));
+  /** One analyzer per supported exercise, built once. In auto mode
+   * every analyzer tracks the stream (their per-frame math is cheap;
+   * pose inference is the expensive part and runs once) and routing
+   * keeps only the identified exercise's summary. */
+  const analyzersRef = useRef<Record<FormExerciseId, ExerciseAnalyzer> | null>(null);
+  const getAnalyzers = useCallback((): Record<FormExerciseId, ExerciseAnalyzer> => {
+    if (!analyzersRef.current) {
+      analyzersRef.current = {
+        squat: squatAnalyzerRef.current,
+        deadlift: new DeadliftAnalyzer(),
+        'overhead-press': new OverheadPressAnalyzer(),
+        'bent-over-row': new BentOverRowAnalyzer(),
+        'bicep-curl': new BicepCurlAnalyzer(),
+        lunge: new LungeAnalyzer(),
+        'push-up': new PushUpAnalyzer(),
+        'lateral-raise': new LateralRaiseAnalyzer(),
+        plank: new PlankAnalyzer(),
+        'bench-press': new BenchPressAnalyzer(),
+      };
+    }
+    return analyzersRef.current;
+  }, []);
   const classifierRef = useRef<MovementClassifier>(new MovementClassifier());
   /** The user's correction: re-run the same video as this exercise. */
   const forcedExerciseRef = useRef<FormExerciseId | null>(null);
@@ -203,9 +232,10 @@ export function useFormCoach({
   const latestLandmarksRef = useRef<NormalizedLandmark[] | null>(null);
   const isAnalyzingRef = useRef<boolean>(false);
 
-  const analyzerFor = useCallback((exerciseId: FormExerciseId): ExerciseAnalyzer => {
-    return exerciseId === 'deadlift' ? deadliftAnalyzerRef.current : squatAnalyzerRef.current;
-  }, []);
+  const analyzerFor = useCallback(
+    (exerciseId: FormExerciseId): ExerciseAnalyzer => getAnalyzers()[exerciseId],
+    [getAnalyzers]
+  );
 
   const getMode = useCallback((): AnalyzerMode => {
     if (forcedExerciseRef.current) {
@@ -311,8 +341,7 @@ export function useFormCoach({
         });
 
         // Reset analyzers for new set
-        squatAnalyzerRef.current.reset();
-        deadliftAnalyzerRef.current.reset();
+        for (const analyzer of Object.values(getAnalyzers())) analyzer.reset();
         classifierRef.current.reset();
         smootherRef.current.reset();
         subjectTrackerRef.current.reset();
@@ -327,7 +356,7 @@ export function useFormCoach({
         isAnalyzingRef.current = false;
       }
     },
-    []
+    [getAnalyzers]
   );
 
   /**
@@ -358,10 +387,9 @@ export function useFormCoach({
       uploadedVideoUrlRef.current = null;
     }
     poseServiceRef.current.destroy();
-    squatAnalyzerRef.current.cleanup();
-    deadliftAnalyzerRef.current.cleanup();
+    for (const analyzer of Object.values(getAnalyzers())) analyzer.cleanup();
     latestLandmarksRef.current = null;
-  }, []);
+  }, [getAnalyzers]);
 
   // Frame processing loop
   useEffect(() => {
@@ -414,21 +442,19 @@ export function useFormCoach({
             // stream the analyzers consume.
             classifierRef.current.processFrame(landmarks, aspectRatio);
             const leaning = classifierRef.current.classify().exercise;
-            const leaningId: FormExerciseId | null =
-              leaning === 'squat' || leaning === 'deadlift' ? leaning : null;
+            const leaningId: FormExerciseId | null = isFormExerciseId(leaning) ? leaning : null;
             setLeaningExerciseId(leaningId);
 
-            // Run movement analysis. In auto mode BOTH analyzers track
-            // the stream (their per-frame math is cheap; pose inference
-            // is the expensive part and runs once) and the classifier's
-            // verdict at the end decides whose summary is kept. In
-            // preset/forced mode only the chosen analyzer runs. The HUD
-            // follows the chosen — or currently leaning — analyzer.
+            // Run movement analysis. In auto mode EVERY analyzer
+            // tracks the stream and the classifier's verdict at the
+            // end decides whose summary is kept. In preset/forced mode
+            // only the chosen analyzer runs. The HUD follows the
+            // chosen — or currently leaning — analyzer.
             const mode = getMode();
             const sourceId: FormExerciseId =
               mode.type === 'auto' ? (leaningId ?? 'squat') : mode.exerciseId;
-            const feedIds: FormExerciseId[] =
-              mode.type === 'auto' ? ['squat', 'deadlift'] : [mode.exerciseId];
+            const feedIds: readonly FormExerciseId[] =
+              mode.type === 'auto' ? FORM_EXERCISE_IDS : [mode.exerciseId];
 
             let result: ReturnType<ExerciseAnalyzer['processFrame']> | null = null;
             for (const id of feedIds) {
@@ -516,6 +542,11 @@ export function useFormCoach({
       setState('unsupported');
       return;
     }
+    // A squat verdict with confident grip evidence stamps the variant
+    // identity (Goblet Squat / Front Squat) onto the session.
+    if (outcome.exerciseId === 'squat') {
+      squatAnalyzerRef.current.setVariantStamp(detectionResult.squatVariant);
+    }
     const sessionSummary = analyzerFor(outcome.exerciseId).finishSet(workoutId, setIndex);
     FormSessionRepository.saveSession(sessionSummary);
     setSummary(sessionSummary);
@@ -535,6 +566,9 @@ export function useFormCoach({
   const acceptPreset = useCallback(() => {
     if (unsupportedInfo?.reason !== 'mismatch') return;
     const presetId = unsupportedInfo.presetExerciseId;
+    if (presetId === 'squat') {
+      squatAnalyzerRef.current.setVariantStamp(classifierRef.current.classify().squatVariant);
+    }
     const sessionSummary = analyzerFor(presetId).finishSet(workoutId, setIndex);
     FormSessionRepository.saveSession(sessionSummary);
     setSummary(sessionSummary);

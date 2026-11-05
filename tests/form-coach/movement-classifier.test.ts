@@ -259,6 +259,25 @@ describe('movement classifier — honest non-verdicts', () => {
       flexedFrames: 0,
       handHighFrames: 0,
       handLowFrames: 0,
+      // Batch A+B evidence counters (2026-11-05): the classifier's
+      // evidence grew with the catalogue; the reset pin grows with it.
+      frontFrames: 0,
+      orientationFrames: 0,
+      horizontalFrames: 0,
+      horizontalStraightFrames: 0,
+      wristAboveFrames: 0,
+      splitStanceFrames: 0,
+      asymFlexFrames: 0,
+      hipExtensionFrames: 0,
+      armAssessedFrames: 0,
+      elbowFlexFrames: 0,
+      elbowExtFrames: 0,
+      overheadFrames: 0,
+      shoulderBandFrames: 0,
+      uprightArmFrames: 0,
+      gobletFrames: 0,
+      frontRackFrames: 0,
+      backGripFrames: 0,
     });
   });
 });

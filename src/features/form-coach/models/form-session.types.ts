@@ -32,6 +32,26 @@ export interface FormRep {
   minHipAngleDeg?: number;
   lockoutAchieved?: boolean;
   hipsRoseFirst?: boolean;
+  /**
+   * Batch-analyzer measurements (stamped only by the analyzers named;
+   * squat/deadlift reps leave these undefined).
+   * minElbowAngleDeg: deepest elbow flexion of the rep (overhead press,
+   * bent-over row, bicep curl, push-up, bench press).
+   * peakWristHeightRatio: highest the wrist reached during the rep, in
+   * torso lengths relative to shoulder height — 0 = wrist at shoulder
+   * height, negative = below it (lateral raise).
+   * swayDetected: the hips/shoulders swayed measurably during the rep
+   * (bicep curl, lateral raise swing check).
+   * bodyLineDeviationDeg: worst shoulder–hip–ankle deviation from a
+   * straight line during the rep (push-up sag/pike check).
+   * wristDriftRatio: horizontal wrist travel during the rep, in torso
+   * lengths — a side-view image-space proxy only (bench press).
+   */
+  minElbowAngleDeg?: number;
+  peakWristHeightRatio?: number;
+  swayDetected?: boolean;
+  bodyLineDeviationDeg?: number;
+  wristDriftRatio?: number;
 }
 
 export interface FormSessionSummary {
@@ -55,6 +75,15 @@ export interface FormSessionSummary {
   depthTargetDeg?: number;
   savedToWorkout: boolean;
   userCorrectedReps?: number;
+  /**
+   * Plank measurements (stamped by the plank analyzer only — a hold
+   * has no reps, so the session's numbers live here instead).
+   * holdDurationSeconds: how long the tracked horizontal hold lasted.
+   * alignedHoldPercent: share of the hold with the shoulder–hip–ankle
+   * line inside the alignment tolerance.
+   */
+  holdDurationSeconds?: number;
+  alignedHoldPercent?: number;
 }
 
 export interface FormCoachConfig {

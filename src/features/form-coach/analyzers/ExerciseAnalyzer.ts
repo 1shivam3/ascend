@@ -34,7 +34,49 @@ export interface AnalyzerFrameResult {
 }
 
 /** The exercises Form Coach can grade today. */
-export type FormExerciseId = 'squat' | 'deadlift';
+export type FormExerciseId =
+  | 'squat'
+  | 'deadlift'
+  | 'overhead-press'
+  | 'bent-over-row'
+  | 'bicep-curl'
+  | 'lunge'
+  | 'push-up'
+  | 'lateral-raise'
+  | 'plank'
+  | 'bench-press';
+
+/** Every supported exercise id, in picker/display order. */
+export const FORM_EXERCISE_IDS: readonly FormExerciseId[] = [
+  'squat',
+  'deadlift',
+  'overhead-press',
+  'bent-over-row',
+  'bicep-curl',
+  'lunge',
+  'push-up',
+  'lateral-raise',
+  'plank',
+  'bench-press',
+];
+
+/** Canonical session identity stamped by each exercise's analyzer. */
+export const FORM_EXERCISE_NAMES: Record<FormExerciseId, string> = {
+  squat: 'Barbell Back Squat',
+  deadlift: 'Conventional Deadlift',
+  'overhead-press': 'Overhead Press',
+  'bent-over-row': 'Bent-Over Row',
+  'bicep-curl': 'Bicep Curl',
+  lunge: 'Lunge',
+  'push-up': 'Push-Up',
+  'lateral-raise': 'Lateral Raise',
+  plank: 'Plank',
+  'bench-press': 'Bench Press',
+};
+
+export function isFormExerciseId(value: string): value is FormExerciseId {
+  return (FORM_EXERCISE_IDS as readonly string[]).includes(value);
+}
 
 /**
  * D6: what the tracked motion, taken as a whole, actually looks like.
