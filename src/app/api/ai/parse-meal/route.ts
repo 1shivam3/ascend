@@ -12,6 +12,8 @@ export const dynamic = 'force-dynamic';
 
 interface ParseMealRequestBody {
   query: string;
+  /** Task 2.5: UI language ('hi' | 'en'), coerced in the handler. */
+  language?: unknown;
 }
 
 export async function POST(req: Request) {
@@ -72,6 +74,8 @@ export async function POST(req: Request) {
 
     // 2. Bound query length to 500 characters
     const query = rawQuery.slice(0, 500);
+    // Task 2.5: reply language (absent = English, pre-2.5 clients).
+    const language: 'en' | 'hi' = body.language === 'hi' ? 'hi' : 'en';
 
 
     const systemPrompt = `You are ASCEND's precision Sports Nutritionist and Indian Food Database parser.
@@ -108,7 +112,11 @@ RULES FOR PRECISION:
   "totalProteinG": 6.4,
   "totalCarbsG": 44,
   "totalFatG": 3
-}`;
+}${
+      language === 'hi'
+        ? '\n\nREPLY LANGUAGE: Write "mealName" in Hindi (Devanagari). Keep every food "name" in English — food names are never translated in this app.'
+        : ''
+    }`;
 
     try {
       const execResult = await executeMultiProviderText<any>({
@@ -167,7 +175,9 @@ RULES FOR PRECISION:
         });
       }
     } catch (modelErr) {
-      console.warn('Multi-provider parse-meal failed, falling back to calibrated offline heuristics:', modelErr);
+      // Task 2.3: log the redacted message only — this was the one AI
+      // route passing the raw provider Error object to the log.
+      console.warn('Multi-provider parse-meal failed, falling back to calibrated offline heuristics:', redactSecrets(modelErr instanceof Error ? modelErr.message : String(modelErr)));
     }
 
     // Fallback if all Gemini models fail or rate limit

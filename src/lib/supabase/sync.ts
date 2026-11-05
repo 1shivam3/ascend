@@ -260,6 +260,41 @@ export function isMissingCoachBlocksTable(
   return /could not find the table/i.test(msg) || /relation .* does not exist/i.test(msg);
 }
 
+/**
+ * Task 2.2: verdict for the accountHasCloudData probe (Task 1.4's
+ * merge choice). Pure + exported so the decision is unit-testable
+ * without a Supabase client, in the style of shouldAdoptCoachBlocks.
+ *
+ * - 'has-data': at least one probed table returned a row.
+ * - 'no-data': every probe answered cleanly and found nothing.
+ * - 'unknown': a CORE table's query errored. The caller must treat
+ *   this as "offer the merge choice" (fail-closed): the pre-2.2 probe
+ *   read any failure as "no cloud data" and silently merged, which
+ *   could bury account data the probe simply failed to see.
+ * A response flagged `tolerateError` (the optional coach_blocks
+ * table, which may not exist on a deployment — same posture as its
+ * pull path) never makes the verdict 'unknown'.
+ */
+export interface CloudDataProbeResponse {
+  data: unknown;
+  error: unknown;
+  tolerateError?: boolean;
+}
+
+export function resolveCloudDataProbe(
+  responses: CloudDataProbeResponse[],
+): 'has-data' | 'no-data' | 'unknown' {
+  let sawRow = false;
+  for (const r of responses) {
+    if (r.error) {
+      if (!r.tolerateError) return 'unknown';
+      continue;
+    }
+    if (Array.isArray(r.data) ? r.data.length > 0 : r.data != null) sawRow = true;
+  }
+  return sawRow ? 'has-data' : 'no-data';
+}
+
 export type SyncStatus = 'unconfigured' | 'offline' | 'idle' | 'syncing' | 'synced' | 'error';
 
 export interface AuthUser {
@@ -769,24 +804,47 @@ class SupabaseSyncEngine {
    * Used by the post-login merge choice: the choice is offered only
    * when BOTH the device (guest data) and the account have something
    * to lose. RLS scopes every query to the signed-in user, so any
-   * row visible here is the account's own. Best-effort: a failed
-   * probe reads as "no cloud data" and the normal sync proceeds.
+   * row visible here is the account's own.
+   *
+   * Task 2.2 hardening: the probe now covers EVERY synced collection
+   * (the original probed only profiles/workouts/meals, so an account
+   * holding only PRs, plans, body metrics or coach blocks read as
+   * "no cloud data" and got no choice), and it FAILS CLOSED: if a
+   * core query errors, the answer is "offer the choice" — both
+   * choices preserve the data, while a silent merge might not. The
+   * optional coach_blocks table is probed tolerantly (it may not
+   * exist on a deployment; its own pull path takes the same stance).
    */
   public async accountHasCloudData(userId: string): Promise<boolean> {
     const supabase = getSupabase();
     if (!supabase) return false;
     try {
-      const [profileRes, workoutsRes, mealsRes] = await Promise.all([
-        supabase.from('profiles').select('id').eq('id', userId).maybeSingle(),
-        supabase.from('workouts').select('id').eq('user_id', userId).limit(1),
-        supabase.from('meals').select('id').eq('user_id', userId).limit(1),
+      const rowProbe = (table: string) =>
+        supabase.from(table).select('id').eq('user_id', userId).limit(1);
+      const [profileRes, workoutsRes, mealsRes, prsRes, plansRes, metricsRes, blocksRes] =
+        await Promise.all([
+          supabase.from('profiles').select('id').eq('id', userId).maybeSingle(),
+          rowProbe('workouts'),
+          rowProbe('meals'),
+          rowProbe('personal_records'),
+          rowProbe('planned_workouts'),
+          rowProbe('body_metrics'),
+          rowProbe('coach_blocks'),
+        ]);
+      const verdict = resolveCloudDataProbe([
+        { data: profileRes.data, error: profileRes.error },
+        { data: workoutsRes.data, error: workoutsRes.error },
+        { data: mealsRes.data, error: mealsRes.error },
+        { data: prsRes.data, error: prsRes.error },
+        { data: plansRes.data, error: plansRes.error },
+        { data: metricsRes.data, error: metricsRes.error },
+        { data: blocksRes.data, error: blocksRes.error, tolerateError: true },
       ]);
-      if (profileRes.data) return true;
-      if (workoutsRes.data && workoutsRes.data.length > 0) return true;
-      if (mealsRes.data && mealsRes.data.length > 0) return true;
-      return false;
+      return verdict !== 'no-data';
     } catch {
-      return false;
+      // Fail closed (Task 2.2): an unreadable probe offers the merge
+      // choice rather than silently merging over unseen cloud data.
+      return true;
     }
   }
 

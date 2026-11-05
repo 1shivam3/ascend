@@ -25,6 +25,10 @@ vi.mock('@/lib/ai-quota', () => ({
 }));
 
 vi.mock('@/lib/ai-provider', () => ({
+  // Task 2.3: the route also imports AiGlobalCapExceededError from
+  // this module — the mock must mirror the real export or the
+  // route's instanceof check throws.
+  AiGlobalCapExceededError: class AiGlobalCapExceededError extends Error {},
   executeMultiProviderText: vi.fn(async () => {
     throw new Error('provider failed with key sk-or-fake-test-key-1234567890abcdef');
   }),

@@ -85,6 +85,7 @@ const BodyMetricsModal = dynamic(() => import('@/components/BodyMetricsModal'), 
 const FormCoachModal = dynamic(() => import('@/features/form-coach/components/FormCoachModal'), { ssr: false });
 
 import ThemeToggle from '@/components/ui/ThemeToggle';
+import BackupNudge from '@/components/BackupNudge';
 import { calculateMealMacros, scaleMacroGoalsToCalories } from '@/lib/macros';
 import { effectiveMacroGoals, dayScaledGoals, fallbackMacroGoals, fallbackProteinTargetG } from '@/lib/effective-goals';
 import { hasRealBodyStats } from '@/lib/body-stats';
@@ -1242,6 +1243,10 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       </header>
       <p className="-mt-4 text-right text-2xs text-text-muted">{syncText}</p>
+
+      {/* Task 2.4: guest backup nudge — renders nothing unless a
+          milestone is due (see src/lib/backup-nudge.ts). */}
+      <BackupNudge />
 
       {/* ── 2. TODAY'S WORKOUT CARD (Screen 8 & Screen 9) ──────────────────── */}
       <div>

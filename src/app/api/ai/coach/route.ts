@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { executeMultiProviderText } from '@/lib/ai-provider';
+import { AiGlobalCapExceededError, executeMultiProviderText } from '@/lib/ai-provider';
 
 export const runtime = 'nodejs';
 
@@ -13,6 +13,9 @@ type AITaskType =
 
 interface CoachRequestBody {
   task?: AITaskType;
+  /** Task 2.5: UI language from the client ('hi' | 'en'); coerced
+   *  below — anything else is English. */
+  language?: unknown;
   userContext?: string; // High-signal compact context from buildCompactUserContext
 
   // Specific payloads depending on task
@@ -89,7 +92,7 @@ import { RateLimitUnavailableError, checkRateLimit } from '@/lib/rate-limit';
 import { validateCoachOutput } from '@/lib/coach-output';
 import { detectSafetyStop, COACH_CHAT_REFER_OUT } from '@/lib/coach-chat';
 import { checkAiDailyQuota, aiQuotaExceededResponse, AiActorAuthError } from '@/lib/ai-quota';
-import { getServerGeminiApiKey, rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
+import { rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
 
 export async function POST(req: Request) {
   // 1. Rate limiting: 25 requests per minute per client IP
@@ -142,6 +145,10 @@ export async function POST(req: Request) {
     // structured context, well under 64 KB.
     const body: CoachRequestBody = await readJsonBodyWithLimit(req, 64 * 1024);
     const task = body.task || 'COACH_INSIGHT';
+    // Task 2.5: reply language (coach-chat coercion pattern). Drives
+    // the safety refer-out copy and a guardrail line below; the
+    // client only started sending this in 2.5 — absent = English.
+    const language: 'en' | 'hi' = body.language === 'hi' ? 'hi' : 'en';
 
     // 2. Input size limits and sanitization
     if (body.userContext && body.userContext.length > 10000) {
@@ -153,6 +160,24 @@ export async function POST(req: Request) {
     if (body.substitution?.exerciseToReplace && body.substitution.exerciseToReplace.length > 150) {
       body.substitution.exerciseToReplace = body.substitution.exerciseToReplace.slice(0, 150);
     }
+    // Task 2.3: cap the nested arrays that are JSON.stringify'd into
+    // the prompt (command.activeWorkout, completedWorkout). They were
+    // bounded only by the 64 KB body cap, so a max-size body could
+    // stuff hundreds of exercises/sets into the prompt (provider cost
+    // + latency). 50 matches parse-meal's MAX_MEAL_ITEMS precedent;
+    // real client payloads are far smaller. (body.recentWorkouts,
+    // body.topPRs and substitution.currentWorkoutExercises are
+    // declared in CoachRequestBody but never read by this route, so
+    // they cannot reach the prompt and are left alone.)
+    const capWorkoutArrays = (w: { exercises?: Array<{ sets?: unknown[] }> }) => {
+      if (!w.exercises) return;
+      w.exercises = w.exercises.slice(0, 50);
+      for (const e of w.exercises) {
+        if (e.sets) e.sets = e.sets.slice(0, 50);
+      }
+    };
+    if (body.command?.activeWorkout) capWorkoutArrays(body.command.activeWorkout);
+    if (body.completedWorkout) capWorkoutArrays(body.completedWorkout);
 
     // Audit-3 SEC2-4: deterministic pre-provider safety stop — the same
     // standard the coach-chat route got in PR #62. The only free-text
@@ -179,7 +204,7 @@ export async function POST(req: Request) {
               stop === 'pain'
                 ? 'Stop and rest — possible injury reported'
                 : 'Take the safe, balanced path',
-            coachAdvice: COACH_CHAT_REFER_OUT[stop].en,
+            coachAdvice: COACH_CHAT_REFER_OUT[stop][language],
             modifiedExercises: [],
           },
         });
@@ -203,7 +228,12 @@ Rules:
   * You are an informational training assistant, NOT a physician, physical therapist, or medical professional.
   * NEVER provide medical diagnosis, clinical injury treatments, or pharmaceutical prescriptions.
   * If a user reports chest pain, shortness of breath, dizziness, or sharp joint injury, instruct them to stop immediately and seek medical care.
-  * Never recommend caloric restriction below the app's safe minimums (1500 kcal/day for men, 1200 kcal/day for women) or training through acute sharp joint pain.`;
+  * Never recommend caloric restriction below the app's safe minimums (1500 kcal/day for men, 1200 kcal/day for women) or training through acute sharp joint pain.
+- REPLY LANGUAGE: ${
+      language === 'hi'
+        ? 'Reply in Hindi (Devanagari) for all text fields. Keep exercise and food names in English.'
+        : 'Reply in English.'
+    }`;
 
     if (task === 'GENERATE_DAILY_PLAN') {
       systemInstruction = `${baseGuardrails}
@@ -330,6 +360,12 @@ Schema:
   } catch (error: any) {
     if (error instanceof RequestBodyTooLargeError) {
       return requestBodyTooLargeResponse();
+    }
+    // Task 2.3: the fleet-wide daily cap gets the same shape
+    // coach-chat returns (429 AI_DAILY_CAP), not a generic 500 —
+    // clients and monitoring can tell a cap from a crash.
+    if (error instanceof AiGlobalCapExceededError) {
+      return NextResponse.json({ error: 'AI_DAILY_CAP' }, { status: 429 });
     }
     const rawMsg = error?.message || 'Failed to process AI Coach request.';
     console.error('Gemini Coach API Error:', redactSecrets(rawMsg));

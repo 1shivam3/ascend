@@ -30,6 +30,7 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import { exportFullBackupJSON, restoreBackupSideData } from '@/lib/storage';
+import { recordBackupExported } from '@/lib/backup-nudge';
 import { buildCombinedCsvExport } from '@/lib/csv-export';
 import { getLocalTodayStr } from '@/lib/formatters';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
@@ -423,6 +424,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      recordBackupExported(); // Task 2.4: last-backup tracking
       toast.success(t('settings.backupSavedMsg'), t('settings.backupSavedTitle'));
     } catch {
       toast.error(t('settings.exportErrorMsg'), t('settings.exportErrorTitle'));

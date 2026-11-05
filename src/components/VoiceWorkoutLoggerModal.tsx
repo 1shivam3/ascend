@@ -45,7 +45,7 @@ export default function VoiceWorkoutLoggerModal({
 }: VoiceWorkoutLoggerModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const toast = useToast();
 
   const [isListening, setIsListening] = useState(false);
@@ -53,7 +53,12 @@ export default function VoiceWorkoutLoggerModal({
   const [parsedResult, setParsedResult] = useState<VoiceWorkoutResult | null>(null);
   const [isAiParsing, setIsAiParsing] = useState(false);
   const [autoApplyCountdown, setAutoApplyCountdown] = useState<number | null>(null);
-  const [speechLang, setSpeechLang] = useState<'en-IN' | 'hi-IN'>('en-IN');
+  // Task 2.5: start from the app language (was hardcoded en-IN, so
+  // Hindi users had to find the toggle before speaking Hindi). The
+  // manual toggle still overrides for this session.
+  const [speechLang, setSpeechLang] = useState<'en-IN' | 'hi-IN'>(() =>
+    language === 'hi' ? 'hi-IN' : 'en-IN'
+  );
   const [parseError, setParseError] = useState<string | null>(null);
   const [showReportAI, setShowReportAI] = useState(false);
   // Explicit recognizer failure states — never fail silently.

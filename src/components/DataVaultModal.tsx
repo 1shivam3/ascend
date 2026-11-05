@@ -11,6 +11,7 @@ import { getLocalTodayStr } from '@/lib/formatters';
 import { buildFullBackup, getCustomBarcodes } from '@/lib/storage';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
 import { dataLocationMessageKey, getDataLocationStatus, isPermanentAccount } from '@/lib/data-location';
+import { getLastBackupAt, recordBackupExported } from '@/lib/backup-nudge';
 import { useTranslation } from '@/lib/i18n';
 import {
   X,
@@ -55,8 +56,11 @@ export default function DataVaultModal({ isOpen, onClose, startAtDeleteConfirm }
   const addWorkout = useStore((state) => state.addWorkout);
   const addPR = useStore((state) => state.addPR);
 
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const toast = useToast();
+  // Task 2.4: last-downloaded-backup timestamp (this device), shown
+  // under the vault counts; refreshed in-place after an export here.
+  const [lastBackupAt, setLastBackupAt] = useState<number | null>(() => getLastBackupAt());
   // Task 1.2: the privacy line under the vault is COMPUTED from the
   // real auth state — the old hardcoded "100% on your device" claim
   // was false for every signed-in user (sync uploads their rows).
@@ -103,6 +107,10 @@ export default function DataVaultModal({ isOpen, onClose, startAtDeleteConfirm }
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      // Task 2.4: remember the download — drives the vault's
+      // last-backup line and stands the guest nudges down.
+      recordBackupExported();
+      setLastBackupAt(Date.now());
 
       // Save an emergency snapshot in localStorage in case user re-installs or clears main store.
       // Isolated try/catch: a quota failure here must not turn a successful
@@ -459,6 +467,16 @@ export default function DataVaultModal({ isOpen, onClose, startAtDeleteConfirm }
 
               <p className="text-2xs text-text-muted text-center pt-1 font-mono">
                 {t('vault.counts', { prs: prs.length, workouts: workouts.length, metrics: bodyMetrics.length })}
+              </p>
+              <p className="text-2xs text-text-muted text-center font-mono">
+                {lastBackupAt !== null
+                  ? t('vault.lastBackup', {
+                      date: new Date(lastBackupAt).toLocaleDateString(
+                        language === 'hi' ? 'hi-IN' : 'en-US',
+                        { day: 'numeric', month: 'short', year: 'numeric' }
+                      ),
+                    })
+                  : t('vault.noBackupYet')}
               </p>
             </div>
 

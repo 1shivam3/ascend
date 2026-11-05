@@ -11,6 +11,7 @@ import OnboardingScreen from '@/components/Onboarding';
 import { calculateAgeFromDob, isValidDob } from '@/lib/age';
 import HistoryForkScreen from '@/components/HistoryForkScreen';
 import { hasRetainedHistory, retainedHistoryCounts } from '@/lib/history-fork';
+import { requestPersistentStorage } from '@/lib/backup-nudge';
 import SplashScreen from '@/components/onboarding/SplashScreen';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 
@@ -106,6 +107,13 @@ export default function AppPage() {
     }
     const unsub = useStore.persist.onFinishHydration(() => setPersistHydrated(true));
     return unsub;
+  }, []);
+
+  // Task 2.4: ask the browser to exempt this origin from automatic
+  // storage eviction — guest history lives only in local storage.
+  // Best-effort: unsupported or denied changes nothing.
+  useEffect(() => {
+    void requestPersistentStorage();
   }, []);
 
   // Birthday refresh: a stored date of birth ages the profile once a

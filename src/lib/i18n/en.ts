@@ -1876,6 +1876,11 @@ export const en = {
   'vault.closeAria': 'Close Data Vault',
   'vault.exportedMsg': 'Exported {prs} PRs, {workouts} workouts & metrics successfully!',
   'vault.exportedToast': 'Exported {prs} PRs, {workouts} workouts & body logs.',
+  'vault.lastBackup': 'Last backup downloaded: {date}',
+  'vault.noBackupYet': 'No backup downloaded yet — it takes one tap and keeps your history safe.',
+  'backupNudge.title': 'Your history lives only on this device',
+  'backupNudge.bodyFirst': 'First workout logged — nice work. As a guest, your data is stored only in this browser, and browsers can clear it. Download a backup or create a free account so you never lose your history.',
+  'backupNudge.bodyEstablished': 'Your training history is still only on this device — browsers can clear site data (especially on iPhone), which would erase it. Download a backup or create a free account to keep it safe.',
   'vault.backupDownloaded': 'Backup Downloaded',
   'vault.exportFailToast': 'Failed to generate or download backup file.',
   'vault.exportError': 'Export Error',
@@ -3084,6 +3089,7 @@ export const en = {
   'coachModel.factAdherenceSuffix': '{day}s are the day most often missed.',
   'bodyMetrics.noChanges': 'No changes to save — these measurements already match your last saved values.',
   'bodyMetrics.prefillHint': 'Weight and height are filled from your profile. Grey example numbers are not saved values — leave a field blank if you didn\'t measure it; blank means "not measured", not zero.',
+  'bodyMetrics.entryUnitNote': 'This switch is for this entry only — your app-wide unit stays {unit}. Change it any time in You → Settings.',
 
   // ── Coach tab (Train > Coach) ──────────────────────────────────────
   'coachChat.intro': 'Your coach designs today\'s session from how you feel. Answer the check-in, start the session it builds.',

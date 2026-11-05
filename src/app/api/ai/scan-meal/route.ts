@@ -26,6 +26,8 @@ interface ScanMealRequestBody {
   mimeType?: string;
   userNotes?: string;
   hiddenIngredients?: string[];
+  /** Task 2.5: UI language ('hi' | 'en'), coerced in the handler. */
+  language?: unknown;
 }
 
 export async function POST(req: Request) {
@@ -79,6 +81,8 @@ export async function POST(req: Request) {
     let mimeType = 'image/jpeg';
     let userNotes = '';
     let hiddenIngredients: string[] = [];
+    // Task 2.5: reply language, set by whichever body branch runs.
+    let language: 'en' | 'hi' = 'en';
 
     if (contentType.includes('multipart/form-data')) {
       // B2 (audit, F-04 extension) + gauntlet SEC-11: content-length
@@ -136,6 +140,7 @@ export async function POST(req: Request) {
       const buffer = Buffer.from(await imageFile.arrayBuffer());
       cleanBase64 = buffer.toString('base64');
       userNotes = String(formData.get('userNotes') || '').slice(0, 1000);
+      language = formData.get('language') === 'hi' ? 'hi' : 'en';
 
       const hiddenRaw = formData.get('hiddenIngredients');
       if (typeof hiddenRaw === 'string') {
@@ -185,6 +190,7 @@ export async function POST(req: Request) {
       }
 
       userNotes = String(bodyNotes || '').slice(0, 1000);
+      language = body.language === 'hi' ? 'hi' : 'en';
       if (Array.isArray(bodyHidden)) {
         hiddenIngredients = bodyHidden.slice(0, 30).map((h) => String(h).slice(0, 100));
       }
@@ -276,7 +282,11 @@ Return ONLY valid, parseable JSON matching this schema with NO markdown ticks or
   "hiddenIngredients": [],
   "confidence": "high",
   "coachingNote": "One concise sentence on nutritional relevance or strength purpose."
-}`;
+}${
+      language === 'hi'
+        ? '\n\nREPLY LANGUAGE: Write "coachingNote" and each item\'s "preparation" in Hindi (Devanagari). Keep "mealName" and every item "name" in English exactly as recognized — food names are never translated in this app.'
+        : ''
+    }`;
 
     let resultJson: MealAnalysisResult | null = null;
     let providerUsed = 'gemini';

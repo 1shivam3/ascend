@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { RateLimitUnavailableError, checkRateLimit } from '@/lib/rate-limit';
 import { checkAiDailyQuota, aiQuotaExceededResponse, AiActorAuthError } from '@/lib/ai-quota';
-import { executeMultiProviderText } from '@/lib/ai-provider';
+import { AiGlobalCapExceededError, executeMultiProviderText } from '@/lib/ai-provider';
 import { MAX_PR_WEIGHT_KG } from '@/lib/strength-standards';
 import { rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
 
@@ -104,6 +104,12 @@ Respond with ONLY raw JSON matching this schema:
     }
 
     if (!parsed || typeof parsed.reps !== 'number' || parsed.reps <= 0) {
+      // Task 2.3: a fleet-cap outage is not a parse failure — return
+      // the same 429 AI_DAILY_CAP shape as coach-chat instead of
+      // mislabelling it 422 PARSE_FAILED.
+      if (lastError instanceof AiGlobalCapExceededError) {
+        return NextResponse.json({ error: 'AI_DAILY_CAP' }, { status: 429 });
+      }
       return NextResponse.json({
         error: 'PARSE_FAILED',
         // Gauntlet SEC-15: the 500 path below redacts, but this path
