@@ -256,7 +256,53 @@ describe('movement classifier — honest non-verdicts', () => {
       deepKneeFrames: 0,
       deadliftFrames: 0,
       squatFrames: 0,
+      flexedFrames: 0,
+      handHighFrames: 0,
+      handLowFrames: 0,
     });
+  });
+});
+
+describe('movement classifier — grip-balance path (under-sampled squat sets)', () => {
+  it('flexion cycles + set-long high hands → squat even when no frame reaches full depth', () => {
+    const c = new MovementClassifier();
+    // The WA0011 pattern: reps whose bottoms are too brief to sample
+    // at depth — dips reach knee ~125° (flexed, never "deep") with
+    // wrists unmeasurable mid-rep, while the bar sits on the back
+    // (hands high) through all the standing frames.
+    for (let rep = 0; rep < 4; rep++) {
+      play(c, [
+        { pose: STAND, frames: 5, hand: 'high' },
+        { pose: [15, 40, 20], frames: 3, hand: 'hidden' }, // knee 125, hip 120
+        { pose: STAND, frames: 5, hand: 'high' },
+      ]);
+    }
+    const result = c.classify();
+    expect(result.exercise).toBe('squat');
+    expect(result.evidence.squatFrames).toBe(0); // bent path never fired
+    expect(result.evidence.flexedFrames).toBeGreaterThanOrEqual(4);
+    expect(result.evidence.handHighFrames).toBeGreaterThanOrEqual(8);
+  });
+
+  it('high hands with NO flexion → insufficient_evidence (the standing-bystander guard)', () => {
+    const c = new MovementClassifier();
+    play(c, [{ pose: STAND, frames: 40, hand: 'high' }]);
+    const result = c.classify();
+    expect(result.exercise).toBe('insufficient_evidence');
+    expect(result.evidence.handHighFrames).toBeGreaterThanOrEqual(8);
+    expect(result.evidence.flexedFrames).toBe(0);
+  });
+
+  it('flexion cycles with LOW hands do not take the squat grip path', () => {
+    const c = new MovementClassifier();
+    for (let rep = 0; rep < 4; rep++) {
+      play(c, [
+        { pose: STAND, frames: 5, hand: 'low' },
+        { pose: [15, 40, 20], frames: 3, hand: 'hidden' },
+        { pose: STAND, frames: 5, hand: 'low' },
+      ]);
+    }
+    expect(c.classify().exercise).toBe('insufficient_evidence');
   });
 });
 

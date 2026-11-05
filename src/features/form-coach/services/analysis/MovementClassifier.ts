@@ -17,6 +17,15 @@
  *    (the owner's WA0002: bottom knee 71° / hip 63° — squat geometry by
  *    angles alone) is a deadlift by its grip. When the wrist is not
  *    measurable, the frame falls back to its angle class.
+ *  - Grip balance (stream level): a bar stays on the back for the
+ *    WHOLE set — between reps too — while a deadlift's hands are
+ *    never up at shoulder height. When the bent-frame evidence is
+ *    inconclusive because the set's bottoms were under-sampled (the
+ *    owner's WA0011: ~5 fast reps, only 3 frames at squat depth in
+ *    the whole stream), repeated clear knee flexion plus a set-long
+ *    dominance of high hands over low hands still identifies a squat.
+ *    The flexion requirement is what keeps a standing bystander with
+ *    raised hands (WA0013's spotter) out of this path.
  *
  * Verdicts are deliberately conservative: 'deadlift' and 'squat' are
  * POSITIVE findings on dominating evidence; 'unknown' means the
@@ -24,6 +33,17 @@
  * 'insufficient_evidence' means there was not enough measurable
  * movement to judge at all. Callers must never force an analyzer on
  * the last two.
+ *
+ * Measurement floor: the classifier accumulates evidence over many
+ * frames, so it measures at a lower landmark-visibility floor (0.3)
+ * than the analyzers' per-rep gates (0.5). On real gym footage the
+ * ankle is occluded by plates on a large share of frames (the
+ * deadlift setup especially); at the strict floor most of a set is
+ * unmeasurable and no honest verdict is possible at all. Dominance
+ * thresholds over the accumulated evidence — not per-frame purity —
+ * are what keep the verdict honest. Frames whose knee angle is
+ * anatomically implausible for either lift (< 25°) are landmark
+ * glitches and never become evidence.
  */
 
 import { NormalizedLandmark, PoseLandmarkIndex, DetectedSide } from '../../models/pose.types';
@@ -50,6 +70,12 @@ export interface ClassificationEvidence {
   deadliftFrames: number;
   /** Bent frames whose total evidence points to squat. */
   squatFrames: number;
+  /** Assessed frames with clear knee flexion (≤ 135°) — flexion cycles. */
+  flexedFrames: number;
+  /** Assessed frames with hands measured high (bar-on-back position). */
+  handHighFrames: number;
+  /** Assessed frames with hands measured low (hanging grip position). */
+  handLowFrames: number;
 }
 
 export interface ClassificationResult {
@@ -72,6 +98,18 @@ const SQUAT_SHARE = 0.5;
 /** Hand counts as "high" (bar on back) when it sits in the top 35% of
  * the shoulder→hip vertical span; "low" (deadlift grip) below the hip. */
 const HAND_HIGH_TORSO_FRACTION = 0.35;
+/** Visibility floor for the classifier's own angle measurements —
+ * lower than the analyzers' gates; see the module header. */
+const CLASSIFY_MIN_VISIBILITY = 0.3;
+/** Knee angles below this are landmark glitches, not human squats. */
+const KNEE_GLITCH_FLOOR_DEG = 25;
+/** Grip-balance path: clear knee flexion (well past standing noise)
+ * plus set-long high-hand dominance identifies an under-sampled
+ * squat set. See the module header for why both halves are required. */
+const FLEXED_KNEE_MAX_DEG = 135;
+const GRIP_PATH_MIN_FLEXED_FRAMES = 4;
+const GRIP_PATH_MIN_HAND_FRAMES = 8;
+const GRIP_PATH_SHARE = 0.65;
 
 export class MovementClassifier {
   private framesProcessed = 0;
@@ -81,6 +119,9 @@ export class MovementClassifier {
   private deepKneeFrames = 0;
   private deadliftFrames = 0;
   private squatFrames = 0;
+  private flexedFrames = 0;
+  private handHighFrames = 0;
+  private handLowFrames = 0;
 
   reset(): void {
     this.framesProcessed = 0;
@@ -90,6 +131,9 @@ export class MovementClassifier {
     this.deepKneeFrames = 0;
     this.deadliftFrames = 0;
     this.squatFrames = 0;
+    this.flexedFrames = 0;
+    this.handHighFrames = 0;
+    this.handLowFrames = 0;
   }
 
   getTrackingStats(): { framesProcessed: number; framesTracked: number } {
@@ -105,6 +149,9 @@ export class MovementClassifier {
       deepKneeFrames: this.deepKneeFrames,
       deadliftFrames: this.deadliftFrames,
       squatFrames: this.squatFrames,
+      flexedFrames: this.flexedFrames,
+      handHighFrames: this.handHighFrames,
+      handLowFrames: this.handLowFrames,
     };
   }
 
@@ -142,10 +189,22 @@ export class MovementClassifier {
     const side = this.determineSide(landmarks);
     // The signature, like every measurement here, is a side-view
     // measurement: front projections distort both angles and the grip
-    // test, so front/unknown frames never become evidence.
-    if (side !== 'left' && side !== 'right') return;
+    // test, so front frames never become evidence. 'unknown' frames —
+    // where the side could not be called confidently — are measured
+    // on the more visible side, the same leniency the analyzers apply
+    // (they grade unknown-side frames on the left profile).
+    if (side === 'front') return;
 
-    const preferLeft = side === 'left';
+    const leftVis =
+      ((landmarks[PoseLandmarkIndex.LEFT_HIP]?.visibility ?? 0) +
+        (landmarks[PoseLandmarkIndex.LEFT_SHOULDER]?.visibility ?? 0)) /
+      2;
+    const rightVis =
+      ((landmarks[PoseLandmarkIndex.RIGHT_HIP]?.visibility ?? 0) +
+        (landmarks[PoseLandmarkIndex.RIGHT_SHOULDER]?.visibility ?? 0)) /
+      2;
+    const preferLeft = side === 'left' || (side === 'unknown' && leftVis >= rightVis);
+
     const hip = landmarks[preferLeft ? PoseLandmarkIndex.LEFT_HIP : PoseLandmarkIndex.RIGHT_HIP];
     const knee = landmarks[preferLeft ? PoseLandmarkIndex.LEFT_KNEE : PoseLandmarkIndex.RIGHT_KNEE];
     const ankle = landmarks[preferLeft ? PoseLandmarkIndex.LEFT_ANKLE : PoseLandmarkIndex.RIGHT_ANKLE];
@@ -153,12 +212,29 @@ export class MovementClassifier {
       landmarks[preferLeft ? PoseLandmarkIndex.LEFT_SHOULDER : PoseLandmarkIndex.RIGHT_SHOULDER];
     const wrist = landmarks[preferLeft ? PoseLandmarkIndex.LEFT_WRIST : PoseLandmarkIndex.RIGHT_WRIST];
 
-    const kneeAngleDeg = calculateJointAngle(hip, knee, ankle, aspectRatio);
-    if (kneeAngleDeg === null) return;
-    const hipAngleDeg = calculateJointAngle(shoulder, hip, knee, aspectRatio);
+    const kneeAngleDeg = calculateJointAngle(hip, knee, ankle, aspectRatio, CLASSIFY_MIN_VISIBILITY);
+    if (kneeAngleDeg === null || kneeAngleDeg < KNEE_GLITCH_FLOOR_DEG) return;
+    const hipAngleDeg = calculateJointAngle(shoulder, hip, knee, aspectRatio, CLASSIFY_MIN_VISIBILITY);
     if (hipAngleDeg === null) return;
 
     this.assessedFrames += 1;
+
+    if (kneeAngleDeg <= FLEXED_KNEE_MAX_DEG) this.flexedFrames += 1;
+
+    // Hand position on every assessed frame: below the hip joint =
+    // holding a bar at arm's length (deadlift); up at shoulder height
+    // = holding a bar on the back (squat). Between the two, or
+    // unmeasurable, the frame is neutral.
+    let hand: 'low' | 'high' | 'neutral' = 'neutral';
+    if (isLandmarkReliable(wrist) && isLandmarkReliable(shoulder) && isLandmarkReliable(hip)) {
+      if (wrist.y > hip.y) {
+        hand = 'low';
+      } else if (wrist.y < shoulder.y + HAND_HIGH_TORSO_FRACTION * (hip.y - shoulder.y)) {
+        hand = 'high';
+      }
+    }
+    if (hand === 'low') this.handLowFrames += 1;
+    if (hand === 'high') this.handHighFrames += 1;
 
     const isHinge =
       hipAngleDeg <= HINGE_HIP_MAX_DEG &&
@@ -168,19 +244,9 @@ export class MovementClassifier {
     if (isDeep) this.deepKneeFrames += 1;
     if (!isHinge && !isDeep) return;
 
-    // Grip evidence on bent frames: where is the hand relative to the
-    // torso? Below the hip joint = holding a bar at arm's length
-    // (deadlift); up at shoulder height = holding a bar on the back
-    // (squat). Between the two, or unmeasurable, the angle class rules.
-    let hand: 'low' | 'high' | 'neutral' = 'neutral';
-    if (isLandmarkReliable(wrist) && isLandmarkReliable(shoulder) && isLandmarkReliable(hip)) {
-      if (wrist.y > hip.y) {
-        hand = 'low';
-      } else if (wrist.y < shoulder.y + HAND_HIGH_TORSO_FRACTION * (hip.y - shoulder.y)) {
-        hand = 'high';
-      }
-    }
-
+    // Bent-frame verdict: the grip decides when it is measurable (a
+    // deep-knee deadlift is a deadlift by its hands); otherwise the
+    // angle class rules.
     if (hand === 'low') {
       this.deadliftFrames += 1;
     } else if (hand === 'high') {
@@ -201,22 +267,47 @@ export class MovementClassifier {
     const totalEvidence = this.deadliftFrames + this.squatFrames;
 
     let exercise: DetectedExercise = 'unknown';
-    if (
-      this.assessedFrames < CLASSIFY_MIN_ASSESSED_FRAMES ||
-      totalEvidence < CLASSIFY_MIN_EVIDENCE_FRAMES
-    ) {
+    if (this.assessedFrames < CLASSIFY_MIN_ASSESSED_FRAMES) {
       exercise = 'insufficient_evidence';
     } else if (
+      totalEvidence >= CLASSIFY_MIN_EVIDENCE_FRAMES &&
       this.deadliftFrames >= CLASSIFY_MIN_KIND_FRAMES &&
       this.deadliftFrames / totalEvidence >= DEADLIFT_SHARE
     ) {
       exercise = 'deadlift';
     } else if (
+      totalEvidence >= CLASSIFY_MIN_EVIDENCE_FRAMES &&
       this.squatFrames >= CLASSIFY_MIN_KIND_FRAMES &&
       this.squatFrames / totalEvidence >= SQUAT_SHARE
     ) {
       exercise = 'squat';
+    } else if (totalEvidence >= CLASSIFY_MIN_EVIDENCE_FRAMES) {
+      // Plentiful bent evidence, split between the patterns: the
+      // movement was measurable and matched neither — unknown.
+      exercise = 'unknown';
+    } else if (this.gripPathSquat()) {
+      // Bent evidence too thin to judge (the set's bottoms were
+      // under-sampled): the stream-level grip balance decides.
+      exercise = 'squat';
+    } else {
+      exercise = 'insufficient_evidence';
     }
     return { exercise, evidence };
+  }
+
+  /**
+   * Grip-balance squat path: repeated clear knee flexion plus a
+   * set-long dominance of high hands (bar on the back) over low
+   * hands. Both halves are required — flexion alone is just movement,
+   * and high hands alone are just a standing person.
+   */
+  private gripPathSquat(): boolean {
+    const handTotal = this.handHighFrames + this.handLowFrames;
+    return (
+      this.flexedFrames >= GRIP_PATH_MIN_FLEXED_FRAMES &&
+      this.handHighFrames >= GRIP_PATH_MIN_HAND_FRAMES &&
+      handTotal > 0 &&
+      this.handHighFrames / handTotal >= GRIP_PATH_SHARE
+    );
   }
 }
