@@ -347,9 +347,9 @@ export function shouldDropStaleProfileUpdate(args: {
  *   devices with skewed clocks can still pick the wrong winner.
  *   Server-side stamping would need a DB migration and is out of
  *   scope for this change.
- * - Deletion boundary: explicit deletions (tombstone propagation)
- *   are NOT gated by stamps — see the push-gate comment in sync.ts.
- *   A newer remote edit can still lose to an older local delete.
+ * - Deletion boundary: CLOSED by the sync-convergence pass (S1/S2)
+ *   — deletions are now stamp-gated and converge through the
+ *   server tombstone layer; see "Sync convergence S1/S2" below.
  * - No conflict UI: the user chose the rule, not a conflict screen.
  *   The losing side's content is not preserved anywhere.
  */
@@ -508,4 +508,207 @@ export function prunableTombstones(
     if (!local.has(id) && !remote.has(id)) pruned.push(id);
   }
   return pruned;
+}
+
+/**
+ * Sync convergence S1/S2 — delete-vs-edit ordering.
+ *
+ * Until now deletions were NOT stamp-gated (see the KNOWN RESIDUALS
+ * note above): a local tombstone deleted the server row regardless of
+ * stamps, so an older delete could erase a newer edit from another
+ * device, and a device that never saw the tombstone kept its copy and
+ * re-uploaded it (deletions never converged). The fix is a
+ * server-stamped tombstone layer (public.sync_tombstones, migration
+ * 2026110501): every deletion carries WHEN it happened, and the
+ * delete-vs-edit question is decided by the same newest-wins rule as
+ * edits — with the helpers below as the whole decision surface, so
+ * the rule is vitest-pinnable without a Supabase client:
+ *
+ * - `resolveDeleteVsEdit(deletedAt, remoteUpdatedAt)`:
+ *   - remote stamp missing/unparseable → 'delete' (the row cannot
+ *     prove it is newer than the deletion).
+ *   - deletedAt missing/unparseable and the other side's stamp
+ *     parses → 'keep': the provable edit wins over an unprovable
+ *     delete. (Legacy LOCAL tombstones — recorded before stamps
+ *     existed — are special-cased by the callers and never reach
+ *     this rule: partitionTombstonesForPush gives them the
+ *     pre-convergence always-delete semantics, and the pull filter
+ *     always applies them. Server tombstone rows always carry a
+ *     deleted_at, so an unparseable one is a malformed row.)
+ *   - both parse → strictly-older edit loses ('delete'); a tie goes
+ *     to the deletion ('delete'): the tombstone is an explicit act
+ *     stamped at the same instant as the last known edit, and giving
+ *     ties to the delete makes two devices converge on the same
+ *     answer instead of flip-flopping.
+ * - Clock skew (DI-08.5) applies here exactly as it does to edits:
+ *   "newer" is judged by device clocks; the server only stores the
+ *   stamp the deleting device supplied.
+ */
+
+/** The five synced collections deletions converge for (sync table names). */
+export type TombstoneCollection =
+  | 'planned_workouts'
+  | 'personal_records'
+  | 'workouts'
+  | 'meals'
+  | 'body_metrics';
+
+/** One deletion, stamped. `deletedAt` is null for legacy (pre-stamp) tombstones. */
+export interface StampedTombstone {
+  id: string;
+  deletedAt: string | null;
+}
+
+/** Key under which a tombstone's stamp lives in the store's stamp map. */
+export function tombstoneStampKey(collection: TombstoneCollection, id: string): string {
+  return `${collection}:${id}`;
+}
+
+/** Pair bare tombstone ids with their stamps from the store's stamp map. */
+export function stampedTombstones(
+  ids: Iterable<string>,
+  stamps: Record<string, string> | null | undefined,
+  collection: TombstoneCollection,
+): StampedTombstone[] {
+  const out: StampedTombstone[] = [];
+  for (const id of ids) {
+    out.push({ id, deletedAt: stamps?.[tombstoneStampKey(collection, id)] ?? null });
+  }
+  return out;
+}
+
+/** Delete-vs-edit for one record: does the tombstone beat this stamp? */
+export function resolveDeleteVsEdit(
+  deletedAt: string | undefined | null,
+  remoteUpdatedAt: string | undefined | null,
+): 'delete' | 'keep' {
+  const remote = parseEditStamp(remoteUpdatedAt);
+  if (remote === null) return 'delete';
+  const deleted = parseEditStamp(deletedAt);
+  if (deleted === null) return 'keep';
+  return deleted >= remote ? 'delete' : 'keep';
+}
+
+/**
+ * Pull-side filter set: which local tombstones still block a remote
+ * row from being merged/adopted. A tombstone is INACTIVE when the
+ * remote row's edit is newer than the deletion (the edit resurrects
+ * the record): the caller drops those tombstones locally and lets
+ * the row through. Ids absent from `remoteStamps` have no remote row,
+ * so their tombstones stay active (nothing to resurrect from here).
+ */
+export function effectiveTombstones(
+  tombstones: StampedTombstone[],
+  remoteStamps: ReadonlyMap<string, string | null | undefined>,
+): { active: StampedTombstone[]; resurrectedIds: string[] } {
+  const active: StampedTombstone[] = [];
+  const resurrectedIds: string[] = [];
+  for (const tomb of tombstones) {
+    const remote = remoteStamps.get(tomb.id);
+    if (remote !== undefined && resolveDeleteVsEdit(tomb.deletedAt, remote) === 'keep') {
+      resurrectedIds.push(tomb.id);
+    } else {
+      active.push(tomb);
+    }
+  }
+  return { active, resurrectedIds };
+}
+
+/**
+ * Apply tombstones learned from the server (another device's
+ * deletions) to LOCAL rows: a row is removed when its own stamp does
+ * not beat the tombstone's deleted_at; a strictly newer local edit
+ * keeps the row and marks the tombstone resurrected (the caller
+ * clears the server tombstone and the record re-uploads on push).
+ */
+export function applyRemoteTombstones<T extends { id: string; updatedAt?: string | null }>(
+  localRows: T[],
+  remoteTombstones: StampedTombstone[],
+): { kept: T[]; removedIds: string[]; resurrectedIds: string[] } {
+  const byId = new Map(remoteTombstones.map((t) => [t.id, t]));
+  const kept: T[] = [];
+  const removedIds: string[] = [];
+  const resurrectedIds: string[] = [];
+  for (const row of localRows) {
+    const tomb = byId.get(row.id);
+    if (!tomb) {
+      kept.push(row);
+      continue;
+    }
+    if (resolveDeleteVsEdit(tomb.deletedAt, row.updatedAt) === 'keep') {
+      kept.push(row);
+      resurrectedIds.push(row.id);
+    } else {
+      removedIds.push(row.id);
+    }
+  }
+  return { kept, removedIds, resurrectedIds };
+}
+
+/**
+ * Push-side partition of one collection's local tombstones:
+ * - `toDelete`: the record is still on the server and the tombstone
+ *   beats its stamp — delete the row, then record the tombstone
+ *   server-side before pruning locally.
+ * - `toConfirm`: the record is already gone from the server — the
+ *   deletion only needs recording server-side so other devices learn
+ *   of it; prune locally once recorded (or, with the tombstone layer
+ *   unavailable, once absence is confirmed — the pre-convergence
+ *   behaviour).
+ * - `keptByEdit`: a newer remote edit beat the tombstone — drop the
+ *   local tombstone without deleting; the pull resurrects the record.
+ * Ids that are local again (re-added after deletion) are skipped
+ * entirely — they are not tombstones any more.
+ */
+export function partitionTombstonesForPush(
+  tombstones: StampedTombstone[],
+  localIds: Iterable<string>,
+  remoteStamps: ReadonlyMap<string, string | null | undefined>,
+): { toDelete: string[]; toConfirm: string[]; keptByEdit: string[] } {
+  const local = new Set(localIds);
+  const toDelete: string[] = [];
+  const toConfirm: string[] = [];
+  const keptByEdit: string[] = [];
+  for (const tomb of tombstones) {
+    if (local.has(tomb.id)) continue;
+    const remote = remoteStamps.get(tomb.id);
+    if (remote === undefined) {
+      toConfirm.push(tomb.id);
+    } else if (tomb.deletedAt === null) {
+      // LEGACY tombstone (recorded before stamps existed): it
+      // carries no ordering information, so it keeps the
+      // pre-convergence always-delete semantics — downgrading it to
+      // "loses to any stamped edit" would silently drop deletions
+      // made before the upgrade. Legacy tombstones prune on their
+      // first successful push, so the S2 exposure for them is one
+      // sync. (Pull-side filtering treats them the same way.)
+      toDelete.push(tomb.id);
+    } else if (resolveDeleteVsEdit(tomb.deletedAt, remote) === 'delete') {
+      toDelete.push(tomb.id);
+    } else {
+      keptByEdit.push(tomb.id);
+    }
+  }
+  return { toDelete, toConfirm, keptByEdit };
+}
+
+/**
+ * Push upsert filter for the tombstone layer: rows another device
+ * has deleted (server tombstone beats the row's own stamp) must not
+ * be re-uploaded by this device's push — that re-upload was the S1
+ * resurrection path. Rows whose edit beats the tombstone pass
+ * through (they resurrect the record; the pull clears the server
+ * tombstone).
+ */
+export function filterOutServerDeleted<T extends { id: string; updatedAt?: string | null }>(
+  rows: T[],
+  serverTombstones: StampedTombstone[],
+): T[] {
+  if (serverTombstones.length === 0) return rows;
+  const byId = new Map(serverTombstones.map((t) => [t.id, t]));
+  return rows.filter((row) => {
+    const tomb = byId.get(row.id);
+    if (!tomb) return true;
+    return resolveDeleteVsEdit(tomb.deletedAt, row.updatedAt) === 'keep';
+  });
 }

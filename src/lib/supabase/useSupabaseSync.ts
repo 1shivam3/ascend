@@ -9,12 +9,22 @@ export function useSupabaseSync() {
     lastSyncedAt: string | null;
     error: string | null;
     user: AuthUser | null;
+    // S4: a merge choice is waiting on the user (MergeChoiceModal).
+    pendingMergeChoice: boolean;
   }>(syncEngine.getStatus());
 
   useEffect(() => {
     syncEngine.init();
     const unsubscribe = syncEngine.subscribe((status, lastSyncedAt, error, user) => {
-      setState({ status, lastSyncedAt, error, user });
+      // pendingMergeChoice rides along via getStatus(): the listener
+      // signature predates S4 and other subscribers rely on it.
+      setState({
+        status,
+        lastSyncedAt,
+        error,
+        user,
+        pendingMergeChoice: syncEngine.getStatus().pendingMergeChoice,
+      });
     });
     return () => unsubscribe();
   }, []);
@@ -29,6 +39,9 @@ export function useSupabaseSync() {
     signInWithPassword: (email: string, password: string, opts?: { deferSync?: boolean }) =>
       syncEngine.signInWithPassword(email, password, opts),
     accountHasCloudData: (userId: string) => syncEngine.accountHasCloudData(userId),
+    // S4: resolve / suppress the OAuth/OTP merge-choice gate.
+    resolveMergeChoice: (choice: 'merge' | 'archive') => syncEngine.resolveMergeChoice(choice),
+    suppressMergeGateFor: (userId: string) => syncEngine.suppressMergeGateFor(userId),
     resetPasswordForEmail: (email: string) =>
       syncEngine.resetPasswordForEmail(email),
     sendEmailOtp: (email: string) => syncEngine.sendEmailOtp(email),

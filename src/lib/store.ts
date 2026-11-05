@@ -55,6 +55,7 @@ import { ARCHIVED_HISTORY_KEY, ARCHIVED_HISTORY_PREV_KEY, hasRetainedHistory } f
 import { calculateHydrationTarget } from './habits';
 import { getTabLeaderGuard } from './tab-leader';
 import { dropTombstonedRows } from './tombstone-heal';
+import { tombstoneStampKey, type TombstoneCollection } from './supabase/reconcile';
 import type { Language } from './i18n/en';
 import { generateLifterTwinProfile, generateTrainingDecision } from './lifter-twin';
 import { buildAthleteModel, type AthleteModel } from './athlete-model';
@@ -310,6 +311,14 @@ export interface AppState {
   clearDeletedWorkoutIds: (ids: string[]) => void;
   clearDeletedMealIds: (ids: string[]) => void;
   clearDeletedBodyMetricIds: (ids: string[]) => void;
+  /**
+   * Sync convergence S1/S2: when each tombstone above was created
+   * (ISO), keyed `${collection}:${id}` with the sync table name as
+   * collection. Absent stamp = a legacy tombstone recorded before
+   * stamps existed; sync treats those as the oldest possible delete
+   * (they lose to any stamped remote edit — see resolveDeleteVsEdit).
+   */
+  tombstoneStamps: Record<string, string>;
   favoriteFoods: FavoriteFood[];
   /** Household recipe learning — the user's own versions of foods.
    *  Local-persisted (partialize + backup import/export); no server
@@ -962,6 +971,40 @@ export function stampEditedRow<T>(row: T): T & { updatedAt: string } {
   return { ...row, updatedAt: new Date().toISOString() };
 }
 
+/**
+ * Sync convergence S1/S2: record WHEN tombstones were created, so
+ * sync can order a deletion against another device's edit of the
+ * same record (newer wins — see resolveDeleteVsEdit in
+ * supabase/reconcile.ts). Stamps live in the persisted
+ * `tombstoneStamps` map keyed `${collection}:${id}` (collection =
+ * the sync table name). Only delete actions stamp; consumers look
+ * stamps up ONLY for ids currently in a tombstone array, so a stale
+ * stamp left behind by an undo/re-add can never resurrect a delete.
+ */
+export function stampTombstoneDeletes(
+  stamps: Record<string, string> | undefined,
+  collection: TombstoneCollection,
+  ids: string[],
+): Record<string, string> {
+  if (ids.length === 0) return stamps || {};
+  const at = new Date().toISOString();
+  const next = { ...(stamps || {}) };
+  for (const id of ids) next[tombstoneStampKey(collection, id)] = at;
+  return next;
+}
+
+/** Drop stamps for tombstones sync has confirmed (or an edit has beaten). */
+export function clearTombstoneStamps(
+  stamps: Record<string, string> | undefined,
+  collection: TombstoneCollection,
+  ids: string[],
+): Record<string, string> {
+  if (!stamps || ids.length === 0) return stamps || {};
+  const next = { ...stamps };
+  for (const id of ids) delete next[tombstoneStampKey(collection, id)];
+  return next;
+}
+
 export function partializeAppState(state: AppState): Record<string, unknown> {
   return {
   profile: state.profile,
@@ -980,6 +1023,7 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   deletedWorkoutIds: state.deletedWorkoutIds,
   deletedMealIds: state.deletedMealIds,
   deletedBodyMetricIds: state.deletedBodyMetricIds,
+  tombstoneStamps: state.tombstoneStamps,
   userPortionPreferences: state.userPortionPreferences,
   favoriteFoods: state.favoriteFoods,
   customFoods: state.customFoods,
@@ -1152,6 +1196,7 @@ export function buildFreshHistoryState(): Partial<AppState> {
     deletedWorkoutIds: [],
     deletedMealIds: [],
     deletedBodyMetricIds: [],
+    tombstoneStamps: {},
     dailyCheckins: {},
     coach: getInitialCoachState(),
     healthSummary: null,
@@ -1208,17 +1253,22 @@ export const useAppStore = create<AppState>()(
       deletedWorkoutIds: [],
       deletedMealIds: [],
       deletedBodyMetricIds: [],
+      tombstoneStamps: {},
       clearDeletedPrIds: (ids) => set((state) => ({
         deletedPrIds: (state.deletedPrIds || []).filter((d) => !ids.includes(d)),
+        tombstoneStamps: clearTombstoneStamps(state.tombstoneStamps, 'personal_records', ids),
       })),
       clearDeletedWorkoutIds: (ids) => set((state) => ({
         deletedWorkoutIds: (state.deletedWorkoutIds || []).filter((d) => !ids.includes(d)),
+        tombstoneStamps: clearTombstoneStamps(state.tombstoneStamps, 'workouts', ids),
       })),
       clearDeletedMealIds: (ids) => set((state) => ({
         deletedMealIds: (state.deletedMealIds || []).filter((d) => !ids.includes(d)),
+        tombstoneStamps: clearTombstoneStamps(state.tombstoneStamps, 'meals', ids),
       })),
       clearDeletedBodyMetricIds: (ids) => set((state) => ({
         deletedBodyMetricIds: (state.deletedBodyMetricIds || []).filter((d) => !ids.includes(d)),
+        tombstoneStamps: clearTombstoneStamps(state.tombstoneStamps, 'body_metrics', ids),
       })),
       favoriteFoods: DEFAULT_FAVORITE_FOODS,
       customFoods: [],
@@ -1719,6 +1769,9 @@ export const useAppStore = create<AppState>()(
         deletedPrIds: (state.deletedPrIds || []).includes(id)
           ? state.deletedPrIds
           : [...(state.deletedPrIds || []), id],
+        // S1/S2: stamp the deletion so sync can order it against
+        // another device's edit of the same PR.
+        tombstoneStamps: stampTombstoneDeletes(state.tombstoneStamps, 'personal_records', [id]),
       })),
       
       setPRTarget: (exercise, targetKg) => set((state) => ({
@@ -2114,6 +2167,8 @@ export const useAppStore = create<AppState>()(
           deletedWorkoutIds: (state.deletedWorkoutIds || []).includes(id)
             ? state.deletedWorkoutIds
             : [...(state.deletedWorkoutIds || []), id],
+          // S1/S2: stamp the deletion for delete-vs-edit ordering.
+          tombstoneStamps: stampTombstoneDeletes(state.tombstoneStamps, 'workouts', [id]),
         };
       }),
       insertWorkoutAt: (workout, index) => set((state) => {
@@ -2158,6 +2213,8 @@ export const useAppStore = create<AppState>()(
         deletedMealIds: (state.deletedMealIds || []).includes(id)
           ? state.deletedMealIds
           : [...(state.deletedMealIds || []), id],
+        // S1/S2: stamp the deletion for delete-vs-edit ordering.
+        tombstoneStamps: stampTombstoneDeletes(state.tombstoneStamps, 'meals', [id]),
       })),
       insertMealAt: (meal, index) => set((state) => {
         if (state.meals.some((m) => m.id === meal.id)) return state;
@@ -2221,6 +2278,11 @@ export const useAppStore = create<AppState>()(
             removedIds.length > 0
               ? [...new Set([...(state.deletedMealIds || []), ...removedIds])]
               : state.deletedMealIds,
+          // S1/S2: stamp the deletion for delete-vs-edit ordering.
+          tombstoneStamps:
+            removedIds.length > 0
+              ? stampTombstoneDeletes(state.tombstoneStamps, 'meals', removedIds)
+              : state.tombstoneStamps,
         };
       }),
 
@@ -2268,6 +2330,8 @@ export const useAppStore = create<AppState>()(
               ...replacedIds,
             ]),
           ],
+          // S1/S2: stamp the same-date replacements' deletions.
+          tombstoneStamps: stampTombstoneDeletes(state.tombstoneStamps, 'body_metrics', replacedIds),
         };
       }),
       deleteBodyMetric: (id) => set((state) => ({
@@ -2276,6 +2340,8 @@ export const useAppStore = create<AppState>()(
         deletedBodyMetricIds: (state.deletedBodyMetricIds || []).includes(id)
           ? state.deletedBodyMetricIds
           : [...(state.deletedBodyMetricIds || []), id],
+        // S1/S2: stamp the deletion for delete-vs-edit ordering.
+        tombstoneStamps: stampTombstoneDeletes(state.tombstoneStamps, 'body_metrics', [id]),
       })),
       // Progress photos are downscaled (~800px JPEG) before storage; cap the
       // count so localStorage stays healthy. Persisted to their own key
@@ -2353,6 +2419,8 @@ export const useAppStore = create<AppState>()(
           deletedBodyMetricIds: [
             ...new Set([...(state.deletedBodyMetricIds || []), ...replacedIds]),
           ],
+          // S1/S2: stamp the replaced entries' deletions.
+          tombstoneStamps: stampTombstoneDeletes(state.tombstoneStamps, 'body_metrics', replacedIds),
         };
       }),
 
@@ -2432,6 +2500,7 @@ export const useAppStore = create<AppState>()(
 
       clearDeletedPlanIds: (ids) => set((state) => ({
         deletedPlanIds: state.deletedPlanIds.filter((d) => !ids.includes(d)),
+        tombstoneStamps: clearTombstoneStamps(state.tombstoneStamps, 'planned_workouts', ids),
       })),
 
       deletePlannedWorkout: (id) => set((state) => {
@@ -2467,6 +2536,8 @@ export const useAppStore = create<AppState>()(
           deletedPlanIds: state.deletedPlanIds.includes(id)
             ? state.deletedPlanIds
             : [...state.deletedPlanIds, id],
+          // S1/S2: stamp the deletion for delete-vs-edit ordering.
+          tombstoneStamps: stampTombstoneDeletes(state.tombstoneStamps, 'planned_workouts', [id]),
         };
       }),
 
@@ -3509,6 +3580,7 @@ export const useAppStore = create<AppState>()(
           deletedWorkoutIds: [],
           deletedMealIds: [],
           deletedBodyMetricIds: [],
+          tombstoneStamps: {},
           uiPreferences: { ...DEFAULT_UI_PREFERENCES },
           lastActiveTab: 'home',
           lastProgressSubTab: 'overview',

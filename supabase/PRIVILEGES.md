@@ -51,6 +51,12 @@ matching section here in the same change.
   day; UNIQUE(`user_id`, `date`) enforced by
   `supabase/migrations/20261029_body_metrics_unique_day.sql`
   (gauntlet DI-16).
+- `public.sync_tombstones` (`user_id`) — server-stamped deletion
+  tombstones for the five synced collections (sync convergence
+  S1/S2). Policies (tracked SQL): "Users can manage own sync
+  tombstones" (SELECT/INSERT/UPDATE/DELETE,
+  `auth.uid() = user_id`). Grants: authenticated + service_role
+  (account-deletion purge; rows also cascade on auth user deletion).
 
 ## Migration application order
 
@@ -64,6 +70,9 @@ ones are:
 3. `20261029_drop_legacy_coach_owner_access.sql` — R8 policy cleanup.
    Safe no-op when the legacy policies are absent.
 4. `20261029_profiles_avatar_url.sql` — R11 avatar column.
+5. `2026110501_sync_tombstones.sql` — sync-convergence tombstones
+   table (S1/S2). Client fails safe to the pre-convergence deletion
+   behaviour until this is applied.
 
 ## Out-of-band SQL (must not stay tribal knowledge)
 
