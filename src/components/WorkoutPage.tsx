@@ -3439,7 +3439,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                   </div>
                   <div>
                     <div className="text-xs font-semibold text-text-primary">ASCEND Form Coach</div>
-                    <div className="text-2xs text-text-muted">Squats only — upload a squat video for pose analysis & repetition counter</div>
+                    <div className="text-2xs text-text-muted">Squat & deadlift — auto-detected from your video for pose analysis & repetition counter</div>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-text-primary transition-colors" />

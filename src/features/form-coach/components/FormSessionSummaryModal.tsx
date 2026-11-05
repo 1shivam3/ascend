@@ -24,6 +24,13 @@ import { useToast } from '@/components/ui/Toast';
 interface FormSessionSummaryModalProps {
   summary: FormSessionSummary;
   workoutName?: string;
+  /** How the exercise was chosen, e.g. "Detected: Conventional
+   * Deadlift" — composed by the caller (already localized). */
+  detectionNote?: string | null;
+  /** Label for the correction control ("Re-run as Barbell Back
+   * Squat"), present only when detection chose the exercise. */
+  rerunLabel?: string | null;
+  onRerunAsOther?: () => void;
   onClose: () => void;
   onSavedToWorkout?: () => void;
   onAnalyzeAnother?: () => void;
@@ -31,6 +38,9 @@ interface FormSessionSummaryModalProps {
 
 export default function FormSessionSummaryModal({
   summary,
+  detectionNote,
+  rerunLabel,
+  onRerunAsOther,
   onClose,
   onSavedToWorkout,
   onAnalyzeAnother,
@@ -74,6 +84,20 @@ export default function FormSessionSummaryModal({
               Post-Set Analysis
             </span>
             <h2 className="text-xl font-bold tracking-tight">{summary.exerciseName}</h2>
+            {detectionNote && (
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-2xs font-medium text-text-secondary">{detectionNote}</span>
+                {onRerunAsOther && rerunLabel && (
+                  <button
+                    type="button"
+                    onClick={onRerunAsOther}
+                    className="text-2xs font-semibold text-accent-text underline underline-offset-2 cursor-pointer"
+                  >
+                    {rerunLabel}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           <button
             type="button"
@@ -149,7 +173,9 @@ export default function FormSessionSummaryModal({
               <div>
                 <span className="font-semibold">Consistent Technique</span>
                 <p className="text-text-secondary text-2xs mt-0.5">
-                  Full body was tracked reliably with consistent depth throughout the set.
+                  {summary.exerciseId === 'deadlift'
+                    ? 'Full body was tracked reliably with consistent lockouts throughout the set.'
+                    : 'Full body was tracked reliably with consistent depth throughout the set.'}
                 </p>
               </div>
             </div>
@@ -224,14 +250,25 @@ export default function FormSessionSummaryModal({
                       <span className="font-mono font-bold text-accent-text w-5">
                         #{rep.repNumber}
                       </span>
-                      <div>
-                        <span className="font-medium text-text-primary">
-                          Knee: {rep.minKneeAngleDeg}°
-                        </span>
-                        <span className="text-2xs text-text-muted block">
-                          Depth: {rep.estimatedDepth.replace('_', ' ')}
-                        </span>
-                      </div>
+                      {summary.exerciseId === 'deadlift' ? (
+                        <div>
+                          <span className="font-medium text-text-primary">
+                            Hip: {rep.minHipAngleDeg ?? '—'}°
+                          </span>
+                          <span className="text-2xs text-text-muted block">
+                            Lockout: {rep.lockoutAchieved ? 'Full' : 'Not reached'}
+                          </span>
+                        </div>
+                      ) : (
+                        <div>
+                          <span className="font-medium text-text-primary">
+                            Knee: {rep.minKneeAngleDeg}°
+                          </span>
+                          <span className="text-2xs text-text-muted block">
+                            Depth: {rep.estimatedDepth.replace('_', ' ')}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="text-right">

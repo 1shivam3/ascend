@@ -13,6 +13,7 @@ import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useAppNavigation } from '@/lib/navigation';
 import { useTranslation } from '@/lib/i18n';
 import { useFormCoach } from '../hooks/useFormCoach';
+import { FormExerciseId } from '../analyzers/ExerciseAnalyzer';
 import PoseOverlay from './PoseOverlay';
 import FormSessionSummaryModal from './FormSessionSummaryModal';
 import {
@@ -33,17 +34,28 @@ import {
 interface FormCoachModalProps {
   isOpen: boolean;
   onClose: () => void;
-  // No exerciseName prop on purpose: the only analyzer is the Barbell Back
-  // Squat, and every session is stamped with that canonical identity by the
-  // analyzer itself. Callers must not imply another exercise was analyzed.
+  // Optional preset from an in-workout entry: the exercise the user is
+  // performing. When set, that exercise's analyzer grades the video
+  // (with a detection-mismatch choice if the video clearly shows the
+  // other lift). When unset (generic entries), the movement is
+  // auto-detected. Either way the session's canonical exercise identity
+  // ("Barbell Back Squat" / "Conventional Deadlift") is stamped by the
+  // analyzer itself — callers never name what was analyzed.
+  presetExerciseId?: FormExerciseId;
   workoutId?: string;
   setIndex?: number;
   workoutName?: string;
 }
 
+const EXERCISE_NAMES: Record<FormExerciseId, string> = {
+  squat: 'Barbell Back Squat',
+  deadlift: 'Conventional Deadlift',
+};
+
 export default function FormCoachModal({
   isOpen,
   onClose,
+  presetExerciseId,
   workoutId,
   setIndex,
   workoutName,
@@ -61,6 +73,9 @@ export default function FormCoachModal({
     progressPercent,
     videoFileName,
     summary,
+    detection,
+    unsupportedInfo,
+    leaningExerciseId,
     error,
     videoRef,
     latestLandmarksRef,
@@ -69,17 +84,42 @@ export default function FormCoachModal({
     activeCue,
     currentKneeAngleDeg,
     minKneeAngleDeg,
+    minHipAngleDeg,
     detectedSide,
     isReady,
     analyzeVideo,
     completeAnalysis,
+    rerunAs,
+    acceptPreset,
     reset,
     cleanup,
   } = useFormCoach({
-    exerciseId: 'squat',
+    presetExerciseId,
     workoutId,
     setIndex,
   });
+
+  // The report header's detection line and the correction control:
+  // when detection chose the exercise, the user can re-run the same
+  // video as the other supported lift if the pick was wrong.
+  const detectionNote = detection
+    ? detection.source === 'detected'
+      ? t('formCoach.detected', { exercise: detection.exerciseName })
+      : detection.source === 'preset'
+        ? t('formCoach.presetNote', { exercise: detection.exerciseName })
+        : t('formCoach.correctedNote', { exercise: detection.exerciseName })
+    : null;
+  const otherExerciseId: FormExerciseId | null =
+    detection && detection.source === 'detected'
+      ? detection.exerciseId === 'squat'
+        ? 'deadlift'
+        : 'squat'
+      : null;
+
+  // Which analyzer the live HUD is following (preset, or the current
+  // detection leaning in auto mode) — decides the min-angle tile.
+  const hudExerciseId: FormExerciseId =
+    presetExerciseId ?? leaningExerciseId ?? 'squat';
 
   // Handle hardware / browser back button safely
   useEffect(() => {
@@ -213,16 +253,26 @@ export default function FormCoachModal({
             <div className="p-3.5 rounded-2xl bg-surface-elevated border border-border-subtle flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-accent/15 text-accent flex items-center justify-center font-bold text-xs font-mono">
-                  SQ
+                  {presetExerciseId === 'deadlift' ? 'DL' : presetExerciseId === 'squat' ? 'SQ' : 'AD'}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-text-primary">Barbell Back Squat</span>
+                    <span className="text-sm font-semibold text-text-primary">
+                      {presetExerciseId
+                        ? EXERCISE_NAMES[presetExerciseId]
+                        : t('formCoach.autoCardTitle')}
+                    </span>
                     <span className="px-1.5 py-0.5 rounded text-2xs font-mono uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                      Active
+                      {presetExerciseId ? 'Active' : t('formCoach.autoCardBadge')}
                     </span>
                   </div>
-                  <p className="text-2xs text-text-muted">Squats only — Form Coach analyzes the barbell back squat, filmed from the side. It cannot grade deadlifts or other lifts yet, and a video of another exercise will not produce a report.</p>
+                  <p className="text-2xs text-text-muted">
+                    {presetExerciseId === 'deadlift'
+                      ? t('formCoach.deadliftScope')
+                      : presetExerciseId === 'squat'
+                        ? t('formCoach.squatScope')
+                        : t('formCoach.autoScope')}
+                  </p>
                 </div>
               </div>
             </div>
@@ -295,7 +345,7 @@ export default function FormCoachModal({
                 Biomechanics Processing
               </span>
               <h3 className="text-base font-bold text-text-primary">
-                Analyzing Squat Mechanics…
+                {t('formCoach.analyzingTitle')}
               </h3>
               <p className="text-xs text-text-secondary">
                 Tracking joint angles, depth transitions, and rep duration
@@ -323,9 +373,17 @@ export default function FormCoachModal({
                 <span className="text-xl font-bold font-mono text-text-primary">{repCount}</span>
               </div>
               <div className="p-2.5 rounded-xl bg-surface-elevated border border-border-subtle">
-                <span className="text-2xs uppercase font-mono text-text-muted block">Min Knee Angle</span>
+                <span className="text-2xs uppercase font-mono text-text-muted block">
+                  {hudExerciseId === 'deadlift' ? t('formCoach.minHipAngle') : 'Min Knee Angle'}
+                </span>
                 <span className="text-xl font-bold font-mono text-text-primary">
-                  {minKneeAngleDeg !== null ? `${Math.round(minKneeAngleDeg)}°` : '--'}
+                  {hudExerciseId === 'deadlift'
+                    ? minHipAngleDeg !== null
+                      ? `${Math.round(minHipAngleDeg)}°`
+                      : '--'
+                    : minKneeAngleDeg !== null
+                      ? `${Math.round(minKneeAngleDeg)}°`
+                      : '--'}
                 </span>
               </div>
               <div className="p-2.5 rounded-xl bg-surface-elevated border border-border-subtle">
@@ -362,6 +420,15 @@ export default function FormCoachModal({
           <FormSessionSummaryModal
             summary={summary}
             workoutName={workoutName}
+            detectionNote={detectionNote}
+            rerunLabel={
+              otherExerciseId
+                ? t('formCoach.rerunAs', { exercise: EXERCISE_NAMES[otherExerciseId] })
+                : null
+            }
+            onRerunAsOther={
+              otherExerciseId ? () => rerunAs(otherExerciseId) : undefined
+            }
             onClose={handleSafeClose}
             onSavedToWorkout={handleSafeClose}
             onAnalyzeAnother={reset}
@@ -410,40 +477,93 @@ export default function FormCoachModal({
           </div>
         )}
 
-        {/* ── State 5: Not A Squat (D6) ─────────────────────────────────── */}
-        {state === 'not-squat' && (
+        {/* ── State 5: Unsupported / Mismatch (auto-detect decline) ─────── */}
+        {state === 'unsupported' && unsupportedInfo && (
           <div className="p-6 space-y-4">
             <div className="text-center space-y-3">
               <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mx-auto">
                 <AlertCircle className="w-6 h-6" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-base font-bold text-text-primary">This Doesn’t Look Like a Squat</h3>
+                <h3 className="text-base font-bold text-text-primary">
+                  {unsupportedInfo.reason === 'mismatch'
+                    ? t('formCoach.mismatchTitle', {
+                        exercise: EXERCISE_NAMES[unsupportedInfo.detectedExerciseId],
+                      })
+                    : unsupportedInfo.reason === 'unknown'
+                      ? t('formCoach.unsupportedUnknownTitle')
+                      : t('formCoach.unsupportedInsufficientTitle')}
+                </h3>
                 <p className="text-xs text-text-secondary max-w-sm mx-auto leading-relaxed">
-                  Form Coach tracked your movement, but the pattern is a hip hinge — the hips fold
-                  deeply while the knees stay comparatively straight — like a deadlift, not a squat.
-                  Form Coach currently analyzes barbell back squats only, so no report was generated
-                  and nothing was saved.
+                  {unsupportedInfo.reason === 'mismatch'
+                    ? t('formCoach.mismatchBody', {
+                        preset: EXERCISE_NAMES[unsupportedInfo.presetExerciseId],
+                        detected: EXERCISE_NAMES[unsupportedInfo.detectedExerciseId],
+                      })
+                    : unsupportedInfo.reason === 'unknown'
+                      ? t('formCoach.unsupportedUnknownBody')
+                      : t('formCoach.unsupportedInsufficientBody')}
                 </p>
               </div>
             </div>
 
-            <div className="pt-2 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={handleSafeClose}
-                className="py-2.5 px-5 rounded-xl border border-border-subtle bg-surface-elevated hover:bg-surface text-text-secondary text-xs font-medium cursor-pointer"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={reset}
-                className="py-2.5 px-5 rounded-xl bg-accent text-accent-on text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Try Another Video</span>
-              </button>
+            <div className="pt-1 flex flex-col items-center gap-2.5">
+              {unsupportedInfo.reason === 'mismatch' ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => rerunAs(unsupportedInfo.detectedExerciseId)}
+                    className="py-2.5 px-5 rounded-xl bg-accent text-accent-on text-xs font-semibold cursor-pointer"
+                  >
+                    {t('formCoach.analyseAs', {
+                      exercise: EXERCISE_NAMES[unsupportedInfo.detectedExerciseId],
+                    })}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={acceptPreset}
+                    className="py-2.5 px-5 rounded-xl border border-border-subtle bg-surface-elevated hover:bg-surface text-text-secondary text-xs font-medium cursor-pointer"
+                  >
+                    {t('formCoach.analyseAnyway', {
+                      exercise: EXERCISE_NAMES[unsupportedInfo.presetExerciseId],
+                    })}
+                  </button>
+                </>
+              ) : (
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => rerunAs('squat')}
+                    className="py-2.5 px-4 rounded-xl bg-accent text-accent-on text-xs font-semibold cursor-pointer"
+                  >
+                    {t('formCoach.analyseAs', { exercise: EXERCISE_NAMES.squat })}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => rerunAs('deadlift')}
+                    className="py-2.5 px-4 rounded-xl bg-accent text-accent-on text-xs font-semibold cursor-pointer"
+                  >
+                    {t('formCoach.analyseAs', { exercise: EXERCISE_NAMES.deadlift })}
+                  </button>
+                </div>
+              )}
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={handleSafeClose}
+                  className="py-2.5 px-5 rounded-xl border border-border-subtle bg-surface-elevated hover:bg-surface text-text-secondary text-xs font-medium cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={reset}
+                  className="py-2.5 px-5 rounded-xl border border-border-subtle bg-surface-elevated hover:bg-surface text-text-secondary text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Try Another Video</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
