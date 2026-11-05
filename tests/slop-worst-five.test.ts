@@ -147,7 +147,9 @@ describe('Fix 3 — README and Terms tell the truth', () => {
   it('legal version was bumped with the change', () => {
     // Task 1.2 (2026-11-05): bumped again for the privacy-page
     // truthfulness alignment (sign-in methods, Form Coach, Clarity).
-    expect(LEGAL_VERSION).toBe('2.10');
+    // Free-vision fallback (2026-11-05, user decision): bumped to 2.11
+    // for the meal-photo OpenRouter :free fallback disclosure.
+    expect(LEGAL_VERSION).toBe('2.11');
     expect(LEGAL_LAST_UPDATED).toBe('November 5, 2026');
   });
 });

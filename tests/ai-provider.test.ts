@@ -49,6 +49,13 @@ describe('AI Multi-Provider Engine', () => {
 
   describe('executeMultiProviderVision cascading fallback', () => {
     const originalEnv = process.env;
+    // Snapshot of the shipped OpenRouter vision list so tests that swap
+    // its contents restore it exactly (the list is populated since the
+    // 2026-11-05 free-vision-fallback decision — never leave it emptied).
+    const SHIPPED_OR_VISION_MODELS = [...OPENROUTER_VISION_MODELS];
+    const restoreShippedOrVisionModels = () => {
+      OPENROUTER_VISION_MODELS.splice(0, OPENROUTER_VISION_MODELS.length, ...SHIPPED_OR_VISION_MODELS);
+    };
 
     beforeEach(() => {
       process.env = { ...originalEnv };
@@ -134,7 +141,7 @@ describe('AI Multi-Provider Engine', () => {
     it('supports OpenRouter vision when explicitly configured with non-free model', async () => {
       process.env.GROQ_API_KEY = 'gsk_mock_groq_key_12345';
       process.env.OPENROUTER_API_KEY = 'sk-or-mock_openrouter_key_12345';
-      OPENROUTER_VISION_MODELS.push('custom/enterprise-vision');
+      OPENROUTER_VISION_MODELS.splice(0, OPENROUTER_VISION_MODELS.length, 'custom/enterprise-vision');
 
       try {
         const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
@@ -171,28 +178,73 @@ describe('AI Multi-Provider Engine', () => {
         });
 
         expect(result.provider).toBe('openrouter');
+        expect(result.model).toBe('custom/enterprise-vision');
         expect(result.data.mealName).toBe('OpenRouter Scanned Meal');
         fetchSpy.mockRestore();
       } finally {
-        OPENROUTER_VISION_MODELS.length = 0;
+        restoreShippedOrVisionModels();
       }
     });
 
-    it('blocks OpenRouter free-tier (:free) models from receiving meal photos to protect user data', async () => {
-      process.env.OPENROUTER_API_KEY = 'sk-or-mock_openrouter_key_12345';
-      OPENROUTER_VISION_MODELS.push('meta/llama-3.2-11b-vision:free');
-
-      try {
-        await expect(
-          executeMultiProviderVision({
-            imageBase64: 'fakebase64',
-            prompt: 'Analyze food',
-            timeoutMs: 1000,
-          })
-        ).rejects.toThrow(/prohibited for user meal photos/);
-      } finally {
-        OPENROUTER_VISION_MODELS.length = 0;
+    // User decision 2026-11-05: the OpenRouter :free vision fallback for
+    // meal photos is ENABLED. This replaces the previous test that pinned
+    // the hard ban (empty list + runtime throw on :free models). The new
+    // pinned behavior: a non-empty :free fallback list, Groq failure falls
+    // through to it, its success is used, and the request carries the
+    // X-Data-Collection: deny header.
+    it('ships a non-empty :free OpenRouter vision fallback list', () => {
+      expect(OPENROUTER_VISION_MODELS.length).toBeGreaterThan(0);
+      for (const model of OPENROUTER_VISION_MODELS) {
+        expect(model.endsWith(':free')).toBe(true);
       }
+    });
+
+    it('falls through from failed Groq to the shipped :free vision fallback and uses its result', async () => {
+      process.env.GROQ_API_KEY = 'gsk_mock_groq_key_12345';
+      process.env.OPENROUTER_API_KEY = 'sk-or-mock_openrouter_key_12345';
+      process.env.GEMINI_API_KEY = 'mock_gemini_key_12345';
+
+      let openRouterHeaders: Record<string, string> | undefined;
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any, init: any) => {
+        if (String(url).includes('groq.com')) {
+          return new Response(JSON.stringify({ error: { message: 'Groq rate limited' } }), {
+            status: 429,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        if (String(url).includes('openrouter.ai')) {
+          openRouterHeaders = init?.headers;
+          return new Response(
+            JSON.stringify({
+              choices: [
+                {
+                  message: {
+                    content: JSON.stringify({
+                      mealName: 'Free Fallback Meal',
+                      items: [{ name: 'Dal & Rice', calories: 380, proteinG: 14, carbsG: 58, fatG: 9 }],
+                    }),
+                  },
+                },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        return new Response('Not found', { status: 404 });
+      });
+
+      const result = await executeMultiProviderVision<any>({
+        imageBase64: 'fakebase64',
+        prompt: 'Analyze food',
+        timeoutMs: 1000,
+      });
+
+      expect(result.provider).toBe('openrouter');
+      expect(result.model).toBe(OPENROUTER_VISION_MODELS[0]);
+      expect(result.model.endsWith(':free')).toBe(true);
+      expect(result.data.mealName).toBe('Free Fallback Meal');
+      expect(openRouterHeaders?.['X-Data-Collection']).toBe('deny');
+      fetchSpy.mockRestore();
     });
 
     it('aborts immediately and cancels downstream attempts when signal is aborted', async () => {

@@ -9,8 +9,10 @@
  *
  * Feature types covered (the ones that send user content to AI
  * providers):
- *  - 'meal-scan': meal photos/text → Groq / Google Gemini (photos
- *    never go to free-tier models; ASCEND does not store the photo).
+ *  - 'meal-scan': meal photos/text → Groq / Google Gemini first; if
+ *    they are unavailable, photos may fall back to OpenRouter :free
+ *    vision models (user decision 2026-11-05; free-tier hosts may
+ *    retain submitted data). ASCEND does not store the photo.
  *  - 'coach-chat': chat text + training context → the AI fallback
  *    chain; some free-tier text models may retain submitted text.
  * Form Coach needs no notice: it runs 100% on-device (verified —
