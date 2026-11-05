@@ -38,6 +38,30 @@ describe('Toast action support (QA4-014)', () => {
   });
 });
 
+describe('Toast click-through body (Phase 3, Task 3.2)', () => {
+  it('the card body never intercepts taps; only its buttons do', () => {
+    const plain: ToastMessage = { id: 't3', type: 'info', message: 'Default goal set' };
+    const html = renderToStaticMarkup(<ToastItem toast={plain} onClose={() => {}} />);
+    // Card root carries pointer-events-none (clicks pass to the UI below).
+    expect(html).toContain('pointer-events-none flex items-start');
+    expect(html).not.toContain('pointer-events-auto flex items-start');
+    // The close button opts back in.
+    expect(html).toContain('pointer-events-auto text-white/60');
+  });
+
+  it('the action button stays tappable on action toasts', () => {
+    const toast: ToastMessage = {
+      id: 't4',
+      type: 'info',
+      message: 'Deleted Rice',
+      action: { label: 'Undo', onAction: () => {} },
+    };
+    const html = renderToStaticMarkup(<ToastItem toast={toast} onClose={() => {}} />);
+    expect(html).toContain('pointer-events-none flex items-start');
+    expect(html).toContain('pointer-events-auto mt-1.5');
+  });
+});
+
 describe('Undo restore actions (QA4-014)', () => {
   beforeEach(() => {
     useStore.getState().clearAllData();

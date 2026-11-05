@@ -96,6 +96,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 /**
  * Presentational toast card (exported for tests). Clicking the action
  * runs it and dismisses the toast via onClose.
+ *
+ * Phase 3 (Task 3.2): the card BODY is click-through
+ * (pointer-events-none) — it is display-only, and at bottom-24 it can
+ * sit exactly over a screen's bottom CTA for its 3.5s life; the
+ * first-run drive watched the goals-skip toast swallow the details
+ * screen's Continue tap twice. Only the card's two real buttons
+ * (action, close) opt back into pointer events.
  */
 export function ToastItem({
   toast,
@@ -107,7 +114,7 @@ export function ToastItem({
   const { t } = useTranslation();
   return (
     <div
-      className={`pointer-events-auto flex items-start gap-2.5 p-3.5 rounded-xl border shadow-xl backdrop-blur-md animate-fade-in transition-all ${
+      className={`pointer-events-none flex items-start gap-2.5 p-3.5 rounded-xl border shadow-xl backdrop-blur-md animate-fade-in transition-all ${
         toast.type === 'success'
           ? 'bg-emerald-950/90 border-emerald-500/40 text-emerald-200'
           : toast.type === 'error'
@@ -140,7 +147,7 @@ export function ToastItem({
               toast.action?.onAction();
               onClose();
             }}
-            className="mt-1.5 text-2xs font-mono font-bold underline underline-offset-2 decoration-current/60 hover:decoration-current cursor-pointer"
+            className="pointer-events-auto mt-1.5 text-2xs font-mono font-bold underline underline-offset-2 decoration-current/60 hover:decoration-current cursor-pointer"
           >
             {toast.action.label}
           </button>
@@ -151,7 +158,7 @@ export function ToastItem({
         type="button"
         onClick={onClose}
         aria-label={t('common.close')}
-        className="text-white/60 hover:text-white p-2 -m-1 rounded transition-colors flex-shrink-0"
+        className="pointer-events-auto text-white/60 hover:text-white p-2 -m-1 rounded transition-colors flex-shrink-0"
       >
         <X className="w-3.5 h-3.5" />
       </button>
