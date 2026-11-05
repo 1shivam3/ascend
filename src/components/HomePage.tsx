@@ -77,7 +77,6 @@ const BODY_PART_KEY: Record<string, StringKey> = {
   Conditioning: 'home.bodyPartConditioning',
 };
 
-const SuggestedWorkoutModal = dynamic(() => import('@/components/SuggestedWorkoutModal'), { ssr: false });
 const LogPastWorkoutModal = dynamic(() => import('@/components/LogPastWorkoutModal'), { ssr: false });
 const ScanMealModal = dynamic(() => import('@/components/ScanMealModal'), { ssr: false });
 const PostWorkoutTakeModal = dynamic(() => import('@/components/PostWorkoutTakeModal'), { ssr: false });
@@ -353,7 +352,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   // directly; the summary modal and its state are deleted, not kept
   // as a dead detour.
   const [isReminderCenterOpen, setIsReminderCenterOpen] = useState(false);
-  const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
   const [isLogPastModalOpen, setIsLogPastModalOpen] = useState(false);
   const [isScanMealModalOpen, setIsScanMealModalOpen] = useState(false);
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
@@ -374,12 +372,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       return registerBackHandler(() => { setIsChangeWorkoutOpen(false); return true; }, 100);
     }
   }, [isChangeWorkoutOpen, registerBackHandler]);
-
-  useEffect(() => {
-    if (isSuggestedModalOpen) {
-      return registerBackHandler(() => { setIsSuggestedModalOpen(false); return true; }, 100);
-    }
-  }, [isSuggestedModalOpen, registerBackHandler]);
 
   useEffect(() => {
     if (isCompletedWorkoutModalOpen) {
@@ -473,20 +465,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       toast.success(t('toast.sessionStarted', { name: planToStart.name }), t('toast.titleSessionStarted'));
     }
     onNavigate('workout');
-  };
-
-  const handleStartSuggestedWorkout = (workoutName: string, exercises: PlannedExercise[]) => {
-    const newPlanId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `plan_${Date.now()}`;
-    const plannedWorkout: PlannedWorkout = {
-      id: newPlanId,
-      name: workoutName,
-      createdAt: new Date().toISOString(),
-      exercises,
-    };
-    // Intentionally NOT saved to plannedWorkouts: starting a suggested workout
-    // no longer silently piles up saved plans. The user explicitly saves via
-    // the modal's "Save Plan" action if they want to keep it.
-    handleStartWorkoutFromHome(plannedWorkout);
   };
 
   // Display routine name and stats
@@ -1521,24 +1499,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       <ReminderCenterModal
         isOpen={isReminderCenterOpen}
         onClose={() => setIsReminderCenterOpen(false)}
-      />
-
-      {/* ── SUGGESTED WORKOUT MODAL ────────────────────────────────────────── */}
-      <SuggestedWorkoutModal
-        isOpen={isSuggestedModalOpen}
-        onClose={() => setIsSuggestedModalOpen(false)}
-        userUnit={userUnit}
-        onStartWorkout={handleStartSuggestedWorkout}
-        onSavePlan={(plan) => {
-          const newPlan: PlannedWorkout = {
-            id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `plan_${Date.now()}`,
-            name: plan.name,
-            createdAt: new Date().toISOString(),
-            exercises: plan.exercises,
-          };
-          addPlannedWorkout(newPlan);
-          toast.success(t('toast.planSaved', { name: plan.name }), t('toast.titlePlanSaved'));
-        }}
       />
 
       {/* ── LOG PAST WORKOUT MODAL ─────────────────────────────────────────── */}

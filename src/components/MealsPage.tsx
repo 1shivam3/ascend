@@ -265,7 +265,6 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [expandedMeals,        setExpandedMeals]        = useState<Set<string>>(new Set());
   const [showAllStaples,       setShowAllStaples]       = useState(false);
   const [isRecentMealsOpen,     setIsRecentMealsOpen]     = useState(true);
-  const [isMealHistoryOpen,     setIsMealHistoryOpen]     = useState(false);
   const [selectedHistoryDate,   setSelectedHistoryDate]   = useState<string | null>(null);
   const [expandedHistoryDays,   setExpandedHistoryDays]   = useState<Set<string>>(new Set());
   const [mealToDelete,          setMealToDelete]          = useState<{ id: string; name: string } | null>(null);
@@ -366,12 +365,6 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       return registerBackHandler(() => { setConfirmClearAll(false); return true; }, 100);
     }
   }, [confirmClearAll, registerBackHandler]);
-
-  useEffect(() => {
-    if (isMealHistoryOpen) {
-      return registerBackHandler(() => { setIsMealHistoryOpen(false); return true; }, 100);
-    }
-  }, [isMealHistoryOpen, registerBackHandler]);
 
   useEffect(() => {
     if (isMoreToolsOpen) {
@@ -3998,8 +3991,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <button
                 type="button"
                 onClick={() => {
+                  // Task 1.5(a): this row used to flip a state flag
+                  // that nothing rendered (dead control). The Meals
+                  // sub-tab IS the meal-history view — go there.
                   setIsToolsMenuOpen(false);
-                  setIsMealHistoryOpen(true);
+                  setFuelSubTab('meals');
                 }}
                 className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
               >
