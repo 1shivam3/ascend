@@ -28,9 +28,20 @@ export function isLandmarkReliable(
   if (typeof landmark.y !== 'number' || isNaN(landmark.y)) return false;
 
   const vis = landmark.visibility ?? 1.0;
-  const pres = landmark.presence ?? 1.0;
+  if (vis < minVisibility) return false;
 
-  return vis >= minVisibility && pres >= minPresence;
+  // Presence gates ONLY when the model actually populates it. The pose
+  // landmarker graph never sets presence — every real landmark arrives
+  // with presence === 0 (proto default), verified against extracted
+  // model output on the owner's squat video (deep audit D7, 2026-11-05).
+  // The original `presence ?? 1.0` default only rescued landmarks where
+  // the property was ABSENT, so real model output failed this screen on
+  // every landmark and no video could ever be analyzed.
+  const pres = landmark.presence;
+  if (pres !== undefined && pres !== null && pres > 0 && pres < minPresence) {
+    return false;
+  }
+  return true;
 }
 
 /**
