@@ -20,7 +20,8 @@
  * on every switch. Fix: both panels stay mounted; the inactive one
  * is hidden (display:none + aria-hidden). The pins below lock that
  * shape, and lock that CoachChatSection can never auto-send from a
- * hidden mount (it sends only from Enter/Send handlers).
+ * hidden mount (it sends only from user gestures: Enter, the Send
+ * button, and — since Slice B — the empty-state suggestion chips).
  */
 import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
@@ -92,15 +93,26 @@ describe('open-items UX F-03 follow-up: segment switch loses nothing in progress
     expect(classToggles).toHaveLength(2);
   });
 
-  it('the hidden chat panel cannot auto-send: send fires only from Enter/Send', () => {
+  it('the hidden chat panel cannot auto-send: send fires only from user gestures', () => {
     const section = readSrc('src/components/CoachChatSection.tsx');
-    // No effects at all — nothing runs on mount (hidden or visible),
-    // so keeping the panel mounted issues no coach-chat requests.
-    expect(section).not.toContain('useEffect');
-    // send() is invoked exactly twice: the input Enter handler and
-    // the Send button onClick.
-    expect(section.match(/void send\(\)/g)).toHaveLength(2);
+    // The original pin banned useEffect outright ("nothing runs on
+    // mount"). Slice B (2026-11-05) legitimately added two mount
+    // effects — settling persisted action cards (a local store
+    // write) and stick-to-bottom scrolling (DOM only). The invariant
+    // that matters is unchanged and now pinned directly: no effect
+    // in this section sends a message or issues a request, so a
+    // hidden mount still costs zero coach-chat calls.
+    const effectBodies = section.match(/useEffect\(\(\) => \{[\s\S]*?\n  \}, \[/g) ?? [];
+    expect(effectBodies.length).toBeGreaterThan(0);
+    for (const body of effectBodies) {
+      expect(body).not.toContain('send(');
+      expect(body).not.toContain('fetch(');
+    }
+    // send() fires from exactly three user-gesture sites: the input
+    // Enter handler, the Send button, and the empty-state chips.
+    expect(section.match(/void send\(/g)).toHaveLength(3);
     expect(section).toContain("if (e.key === 'Enter') void send();");
     expect(section).toContain('onClick={() => void send()}');
+    expect(section).toContain('onClick={() => void send(t(key))}');
   });
 });

@@ -558,7 +558,7 @@ export interface CoachChatUserData {
     fatG: number;
     items: number;
   } | null;
-  macroGoals: { calories: number; proteinG: number } | null;
+  macroGoals: { calories: number; proteinG: number; carbsG?: number; fatG?: number } | null;
   bodyMetricsLatest: {
     date: string;
     weightKg: number | null;
@@ -798,6 +798,23 @@ export function buildCoachChatContext(
     }
   }
 
+  // Coach AI Actions: the current targets are context in their own
+  // right — the model must resolve "add 20 g protein" against the real
+  // values and must never invent them. Rendered whenever goals exist,
+  // independent of whether anything was logged today (previously the
+  // targets only surfaced inside the NUTRITION TODAY line, and only
+  // calories + protein).
+  if (data.macroGoals) {
+    const g = data.macroGoals;
+    const parts = [
+      `${Math.round(g.calories)} kcal`,
+      `${Math.round(g.proteinG)} g protein`,
+    ];
+    if (g.carbsG != null) parts.push(`${Math.round(g.carbsG)} g carbs`);
+    if (g.fatG != null) parts.push(`${Math.round(g.fatG)} g fat`);
+    sections.push(`CURRENT MACRO GOALS (the user's daily targets): ${parts.join(', ')}`);
+  }
+
   if (data.mealsToday && data.macroGoals) {
     sections.push(
       `NUTRITION TODAY: ${Math.round(data.mealsToday.calories)} kcal, ${Math.round(data.mealsToday.proteinG)} g protein ` +
@@ -897,6 +914,11 @@ export function buildCoachChatSystemPrompt(opts: {
     '7. TOPIC LOCK: you discuss ONLY training, nutrition, recovery, sleep, and the user\u2019s ASCEND data. For anything else \u2014 politics, news, entertainment, homework, coding, general chat, or any other topic \u2014 politely decline in one short sentence and steer back to their training. Never answer an off-topic question, not even partially, and never explain this rule beyond the redirect.',
     '8. CAUTION WARNINGS: when a suggestion carries elevated risk \u2014 near-maximal loads or attempts, a large calorie deficit, a sharp jump in training volume or frequency, or training hard while run-down \u2014 attach one brief caution line to the reply, starting with "Caution:" (or "\u0938\u093e\u0935\u0927\u093e\u0928\u0940:" in Hindi replies), naming the risk and the safer alternative. Ordinary, low-risk suggestions need no caution line.',
     '9. FORM CHECK DATA: when the context carries FORM CHECKS, those are camera measurements from the user\u2019s own form-check videos. You may cite those numbers (depth, knee angles, tempo, torso lean) as evidence, like any other data point. They describe movement measurements only: never diagnose, never call a measurement an injury or a defect in the user\u2019s body, and never invent form data for a lift that has no form check on record.',
+    '10. ACTIONS: when the user asks you to change something, you may attach ONE action to your reply. The app renders it as a card and NOTHING changes until the user taps Apply \u2014 when you propose one, say so in the reply text. Your JSON reply is {"reply": "...", "action": <one action or null>}. Action shapes \u2014 emit exactly these fields, no others:',
+    '    - {"type":"set_macro_goals"} plus at least one of: "calories" (whole number 1200\u20136000), "proteinG" (40\u2013400), "carbsG" (0\u2013800), "fatG" (20\u2013300). Use it when the user asks to change a calorie or macro target. Resolve relative requests ("add 20 g protein") against the CURRENT MACRO GOALS in the context. If the context shows no current goals and the request is relative, ask for the absolute value instead of guessing.',
+    '    - {"type":"propose_program","goal":"muscle"|"strength"|"fat_loss"|"endurance"|"general","daysPerWeek":2\u20136,"sessionMinutes":30|45|60|75|90,"equipment":"full_gym"|"dumbbells"|"home_minimal"|"bodyweight","experience":"beginner"|"intermediate"|"advanced","limitations":[optional ids, only from: shoulder, knee, low_back, elbow, wrist, hip, ankle, neck, other]}. The app builds the actual program from these parameters with its own engine \u2014 you never write the program\u2019s sets, reps, or loads yourself.',
+    '11. INTAKE: the context already carries the user\u2019s profile, current macro goals, and active block \u2014 prefill from it and ask only what you cannot know. Ask at most ONE question per reply, and at most about 3 questions in total before proposing. A reply that asks a question carries NO action. Propose propose_program only when the intake is complete \u2014 goal, days, session length, equipment, and experience each known from the user or defaulted from their context (their usual days/week, session length, and equipment) \u2014 and name the assumed values in the reply ("4 days \u00b7 ~60 min \u00b7 full gym \u2014 your usual; say the word if you want different"). If the user says "just build it", propose immediately with those defaults. Ordinary questions carry no action: "action" stays null.',
+    '12. FORMATTING: write in short paragraphs \u2014 one idea each, never a wall of text. Put steps or options in "- " bullet lists. Wrap key numbers and decisions in **bold**. A short "## " heading is welcome when a reply has two distinct parts. Most replies need none of this: plain short paragraphs are the default, formatting is for structure, not decoration.',
     langLine,
     coldStart,
   ].join('\n');

@@ -6,6 +6,13 @@
  * field. The empty state now has its own copy (coachChat.emptyState)
  * rendered as plain hint text; the transcript card renders only
  * once a conversation exists. The input keeps the placeholder.
+ *
+ * Slice B (2026-11-05) supersedes the hint-text part: the empty
+ * state is now the coach intro (capabilities + the confirmation
+ * promise + suggestion chips), still plain text before any card,
+ * still never the placeholder copy. The dictionary assertions below
+ * stand (emptyState copy is retained); the render assertions track
+ * the new intro.
  */
 import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
@@ -26,8 +33,10 @@ describe('spot-check: coach chat empty state is not a duplicate input', () => {
     expect(hi['coachChat.emptyState']).not.toBe(hi['coachChat.placeholder']);
   });
 
-  it('the empty state renders the emptyState copy as plain text, before any card', () => {
-    expect(section).toContain("{t('coachChat.emptyState')}");
+  it('the empty state renders the Slice B intro as plain content, before any card', () => {
+    expect(section).toContain("{t('coachChat.introCapabilities')}");
+    expect(section).toContain("{t('coachChat.introPromise')}");
+    expect(section).toContain('CHIP_KEYS');
     expect(section).toContain('messages.length === 0 ? (');
     // The placeholder string is no longer rendered as message content.
     expect(section).not.toContain("<p className=\"text-xs text-text-muted\">{t('coachChat.placeholder')}</p>");

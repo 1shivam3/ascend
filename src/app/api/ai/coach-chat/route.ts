@@ -20,6 +20,7 @@ import {
   truncateReply,
 } from '@/lib/coach-chat';
 import { AiActorAuthError, aiQuotaExceededResponse, checkAiDailyQuota } from '@/lib/ai-quota';
+import { validateCoachAction } from '@/lib/coach-actions';
 import { COACH_SAFETY_FALLBACK, violatesCoachGuardrails } from '@/lib/coach-output';
 import { RateLimitUnavailableError, checkRateLimit } from '@/lib/rate-limit';
 import {
@@ -251,10 +252,10 @@ export async function POST(req: Request) {
       'USER MESSAGE:',
       rawMessage,
       '',
-      'Reply as JSON with a single "reply" field.',
+      'Reply as JSON: {"reply": "...", "action": <one action object, or null>}. Follow the ACTIONS rules in your instructions for the action shapes; use null when you are not proposing a change.',
     ].join('\n');
 
-    const execResult = await executeMultiProviderText<{ reply: string }>({
+    const execResult = await executeMultiProviderText<{ reply: string; action?: unknown }>({
       prompt,
       systemPrompt,
       timeoutMs: COACH_CHAT_PROVIDER_TIMEOUT_MS,
@@ -268,6 +269,21 @@ export async function POST(req: Request) {
     if (rawReply == null || rawReply.trim().length === 0) {
       return NextResponse.json({ error: 'PROVIDER_FAILED' }, { status: 502 });
     }
+
+    // Coach AI Actions (Slice A): the model's action is validated
+    // INDEPENDENTLY of its reply text — strict schema/range checks in
+    // validateCoachAction. A valid action rides along; an invalid or
+    // absent one is dropped silently and the plain reply is served
+    // (degrade, never fail the chat). Static paths above (safety stop,
+    // topic lock) return before this point and never carry an action.
+    // One coupling, deliberate: if the reply itself fails the guardrail
+    // scan below and is replaced by the static safety fallback, the
+    // action is dropped with it — a card must never ride on copy that
+    // does not describe it.
+    const validatedAction =
+      data && typeof data === 'object'
+        ? validateCoachAction((data as { action?: unknown }).action)
+        : null;
 
     // 5. Reply hardening (gauntlet SEC-22 pattern): hard length cap,
     // then the shared coach health-guardrail scan — a reply that tells
@@ -305,6 +321,7 @@ export async function POST(req: Request) {
       model: execResult.model,
       safetyStop: null,
       dailyRemaining: bindingRemaining(daily.remaining),
+      ...(validatedAction && !safetyFiltered ? { action: validatedAction } : {}),
       ...(safetyFiltered ? { safetyFiltered: true } : {}),
       ...(cautionRisk ? { cautionAdded: cautionRisk } : {}),
     });

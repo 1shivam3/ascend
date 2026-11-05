@@ -113,6 +113,10 @@ describe('i18n wiring coverage (pinned)', () => {
     // LegalLangSync (re-audit UX-R5) carries no copy — it only syncs
     // <html lang> from the stored locale on the legal pages.
     'src/components/LegalLangSync.tsx',
+    // CoachMarkdown (Slice B, 2026-11-05): a pure markdown-lite
+    // renderer — it renders the coach's reply text as React nodes and
+    // carries no user-visible strings of its own.
+    'src/components/CoachMarkdown.tsx',
     'src/components/TabSkeleton.tsx',
     'src/components/TelemetryProvider.tsx',
     'src/components/ui/Badge.tsx',

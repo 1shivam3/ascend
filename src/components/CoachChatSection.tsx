@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { getTodaySessionState } from '@/lib/workout-engine';
 import { getCurrentLanguage, useTranslation } from '@/lib/i18n';
@@ -13,7 +13,52 @@ import {
   currentDailyLeft,
   type CoachChatMessage,
 } from '@/lib/coach-chat-store';
+import { validateCoachAction } from '@/lib/coach-actions';
+import { settlePendingActions } from '@/lib/coach-action-executor';
+import CoachActionCard from '@/components/CoachActionCard';
+import CoachMarkdown from '@/components/CoachMarkdown';
 import { FormSessionRepository } from '@/features/form-coach/repositories/FormSessionRepository';
+
+/**
+ * Build the assistant message for one chat response (Slice B).
+ * The route already validated any action server-side; the client
+ * RE-validates before a card may render (two-layer validation, per
+ * the design brief) — an action that fails here is dropped silently
+ * and the plain reply is shown, never an error. Static safety/topic
+ * replies carry no action field at all, so they take the same path.
+ */
+export function assistantMessageFromResponse(
+  data: unknown,
+  now: number,
+  fallbackText: string
+): CoachChatMessage {
+  const rec = (data && typeof data === 'object' ? data : {}) as {
+    reply?: unknown;
+    evidence?: unknown;
+    action?: unknown;
+  };
+  const action = validateCoachAction(rec.action);
+  return {
+    role: 'assistant',
+    content: typeof rec.reply === 'string' ? rec.reply : fallbackText,
+    evidence: Array.isArray(rec.evidence) ? rec.evidence : [],
+    ts: now,
+    ...(action ? { action, actionState: 'pending' as const } : {}),
+  };
+}
+
+/** Empty-state suggestion chips (Slice B): fixed, allowlisted
+ * starters — each is sent verbatim as a user message. */
+const CHIP_KEYS = [
+  'coachChat.chipBuildWeek',
+  'coachChat.chipRaiseProtein',
+  'coachChat.chipPlanDays',
+  'coachChat.chipSquatStall',
+] as const;
+
+/** Wall clock for event handlers (send/settle paths) — kept out of
+ * render bodies on purpose. */
+const epochNow = () => Date.now();
 
 function weekIndexOf(startMonday: string, todayStr: string, weekCount: number): number {
   const parse = (s: string) => {
@@ -73,6 +118,33 @@ export default function CoachChatSection() {
     toLocalDateString(new Date())
   );
   const listRef = useRef<HTMLDivElement | null>(null);
+  // Scroll discipline (Slice B): auto-scroll only while the user is
+  // already near the bottom — a new coach message must never yank a
+  // scrolled-up reader down to it.
+  const stickRef = useRef(true);
+
+  // Settle persisted pending cards on mount: expired drafts and
+  // superseded duplicates resolve even if the user never sends again.
+  useEffect(() => {
+    const cur = useCoachChatStore.getState().messages;
+    const settled = settlePendingActions(cur, Date.now());
+    if (settled !== cur) setMessages(settled);
+  }, [setMessages]);
+
+  useEffect(() => {
+    if (!stickRef.current) return;
+    const el = listRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight });
+  }, [messages, sending]);
+
+  const patchMessage = useCallback(
+    (index: number, patch: Partial<CoachChatMessage>) => {
+      const cur = useCoachChatStore.getState().messages;
+      if (!cur[index]) return;
+      setMessages(cur.map((m, i) => (i === index ? { ...m, ...patch } : m)));
+    },
+    [setMessages]
+  );
 
   const userData: CoachChatUserData = useMemo(() => {
     const todayStr = toLocalDateString(new Date());
@@ -197,7 +269,14 @@ export default function CoachChatSection() {
         sessionsPlanned: r.sessionsPlanned,
       })),
       mealsToday,
-      macroGoals: macroGoals ? { calories: macroGoals.calories, proteinG: macroGoals.proteinG } : null,
+      macroGoals: macroGoals
+        ? {
+            calories: macroGoals.calories,
+            proteinG: macroGoals.proteinG,
+            carbsG: macroGoals.carbsG,
+            fatG: macroGoals.fatG,
+          }
+        : null,
       bodyMetricsLatest: latestMetric
         ? {
             date: latestMetric.date,
@@ -246,13 +325,16 @@ export default function CoachChatSection() {
     [userData, formSessions]
   );
 
-  const send = async () => {
-    const text = input.trim();
+  const send = async (presetText?: string) => {
+    const text = (presetText ?? input).trim();
     if (!text || sending) return;
     setError(null);
     setInput('');
     const history = messages.map((m) => ({ role: m.role, content: m.content }));
-    const nextMessages: CoachChatMessage[] = [...messages, { role: 'user', content: text }];
+    const nextMessages: CoachChatMessage[] = [
+      ...messages,
+      { role: 'user', content: text, ts: epochNow() },
+    ];
     setMessages(nextMessages);
     setSending(true);
     try {
@@ -282,21 +364,18 @@ export default function CoachChatSection() {
       if (typeof data?.dailyRemaining === 'number') {
         setDailyLeftRaw(data.dailyRemaining, toLocalDateString(new Date()));
       }
-      setMessages([
-        ...nextMessages,
-        {
-          role: 'assistant',
-          content: typeof data?.reply === 'string' ? data.reply : t('coachChat.errorGeneric'),
-          evidence: Array.isArray(data?.evidence) ? data.evidence : [],
-        },
-      ]);
+      // Settle on append: the new pending action supersedes any older
+      // pending one of the same type, and long-expired drafts settle.
+      setMessages(
+        settlePendingActions(
+          [...nextMessages, assistantMessageFromResponse(data, epochNow(), t('coachChat.errorGeneric'))],
+          epochNow()
+        )
+      );
     } catch {
       setError('generic');
     } finally {
       setSending(false);
-      requestAnimationFrame(() => {
-        listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
-      });
     }
   };
 
@@ -312,20 +391,51 @@ export default function CoachChatSection() {
       )}
 
       {messages.length === 0 ? (
-        /* Empty state: plain hint text with its OWN copy — not the
-           input's placeholder string inside the transcript card,
-           which read as a second, duplicate input box above the real
-           one (preview spot-check, 2026-11-01). The transcript card
-           renders only once a conversation exists. */
-        <p className="text-xs text-text-muted px-1">{t('coachChat.emptyState')}</p>
+        /* Empty state: an intro, NOT a stored message — it names what
+           the coach can do and the confirmation promise (nothing
+           changes until Apply), plus suggestion chips that send
+           through the normal path. Plain text, no transcript card:
+           the card renders only once a conversation exists (the
+           2026-11-01 duplicate-input spot-check still applies). */
+        <div className="space-y-2.5 px-1">
+          <p className="text-xs text-text-secondary">{t('coachChat.introCapabilities')}</p>
+          <p className="text-xs text-text-muted">{t('coachChat.introPromise')}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {CHIP_KEYS.map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => void send(t(key))}
+                className="px-3 py-1.5 rounded-full border border-border bg-bg-secondary text-xs font-bold text-text-primary cursor-pointer"
+              >
+                {t(key)}
+              </button>
+            ))}
+          </div>
+        </div>
       ) : (
-        <div ref={listRef} aria-live="polite" className="card p-3 space-y-3 max-h-80 overflow-y-auto">
+        <div
+          ref={listRef}
+          aria-live="polite"
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+          }}
+          className="card p-3 space-y-3 max-h-80 overflow-y-auto"
+        >
           {messages.map((m, i) => (
             <div key={i} className="space-y-1">
               <p className="text-2xs font-bold text-text-secondary">
                 {m.role === 'user' ? t('coachChat.you') : t('coachChat.coach')}
               </p>
-              <p className="text-sm text-text-primary whitespace-pre-wrap">{m.content}</p>
+              {m.role === 'assistant' ? (
+                <CoachMarkdown text={m.content} />
+              ) : (
+                <p className="text-sm text-text-primary whitespace-pre-wrap">{m.content}</p>
+              )}
+              {m.role === 'assistant' && m.action && (
+                <CoachActionCard message={m} onPatch={(patch) => patchMessage(i, patch)} />
+              )}
               {m.role === 'assistant' && m.evidence && m.evidence.length > 0 && (
                 <div className="text-2xs text-text-muted">
                   <p className="font-bold">{t('coachChat.basedOn')}</p>
@@ -338,7 +448,19 @@ export default function CoachChatSection() {
               )}
             </div>
           ))}
-          {sending && <p className="text-xs text-text-muted">{t('coachChat.sending')}</p>}
+          {sending && (
+            <div className="space-y-1">
+              <p className="text-2xs font-bold text-text-secondary">{t('coachChat.coach')}</p>
+              <div className="flex items-center gap-2" role="status">
+                <span className="flex items-end gap-1" aria-hidden="true">
+                  <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce" style={{ animationDelay: '300ms' }} />
+                </span>
+                <span className="text-xs text-text-muted">{t('coachChat.thinking')}</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
