@@ -9,13 +9,13 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { PoseLandmarkerService } from '../services/pose/PoseLandmarkerService';
 import { PoseLandmarksSmoother } from '../services/analysis/LandmarkSmoothing';
 import { SquatAnalyzer } from '../analyzers/SquatAnalyzer';
-import { ExerciseAnalyzer } from '../analyzers/ExerciseAnalyzer';
+import { ExerciseAnalyzer, MovementSignature } from '../analyzers/ExerciseAnalyzer';
 import { NormalizedLandmark, DetectedSide } from '../models/pose.types';
 import { FormCue, MovementPhase } from '../models/form-feedback.types';
 import { FormSessionSummary, FormCoachConfig } from '../models/form-session.types';
 import { FormSessionRepository } from '../repositories/FormSessionRepository';
 
-export type FormCoachState = 'select' | 'analyzing' | 'report' | 'no-tracking' | 'error';
+export type FormCoachState = 'select' | 'analyzing' | 'report' | 'no-tracking' | 'not-squat' | 'error';
 
 /**
  * D4: decides what the end of an analysis means. When pose tracking
@@ -25,15 +25,25 @@ export type FormCoachState = 'select' | 'analyzing' | 'report' | 'no-tracking' |
  * sitting in the analyzing state or rendering an empty report. When
  * tracking worked but no rep was valid, the summary (0 valid reps) IS
  * the honest result and renders as a report.
+ *
+ * D6: when tracking worked but the movement signature is positively
+ * NOT the graded exercise (a hip hinge fed to the squat analyzer), the
+ * honest outcome is 'not-squat' — no squat summary is built or saved.
+ * Tracking failure takes precedence: a stream that was never tracked
+ * cannot be judged as any movement.
  */
-export function resolveAnalysisOutcome(stats: {
-  framesProcessed: number;
-  framesTracked: number;
-}): 'report' | 'no-tracking' {
+export function resolveAnalysisOutcome(
+  stats: {
+    framesProcessed: number;
+    framesTracked: number;
+  },
+  movementSignature?: MovementSignature
+): 'report' | 'no-tracking' | 'not-squat' {
   if (stats.framesTracked === 0) return 'no-tracking';
   if (stats.framesProcessed >= 30 && stats.framesTracked / stats.framesProcessed < 0.02) {
     return 'no-tracking';
   }
+  if (movementSignature === 'not_squat') return 'not-squat';
   return 'report';
 }
 
@@ -279,17 +289,28 @@ export function useFormCoach({
 
   /**
    * Shared finish path for playback end and "View Report Now": builds
-   * the summary when tracking actually saw the lifter, and routes to
-   * the no-tracking state — saving nothing — when it never did (D4).
+   * the summary when tracking actually saw the lifter, routes to the
+   * no-tracking state — saving nothing — when it never did (D4), and
+   * routes to the not-squat state — also saving nothing — when the
+   * tracked movement is positively a different pattern (D6).
    */
   const finishAnalysis = useCallback(() => {
     const stats = analyzerRef.current.getTrackingStats?.() ?? {
       framesProcessed: 1,
       framesTracked: 1,
     };
-    if (resolveAnalysisOutcome(stats) === 'no-tracking') {
+    const outcome = resolveAnalysisOutcome(
+      stats,
+      analyzerRef.current.getMovementAssessment?.().signature
+    );
+    if (outcome === 'no-tracking') {
       setSummary(null);
       setState('no-tracking');
+      return;
+    }
+    if (outcome === 'not-squat') {
+      setSummary(null);
+      setState('not-squat');
       return;
     }
     const sessionSummary = analyzerRef.current.finishSet(workoutId, setIndex);

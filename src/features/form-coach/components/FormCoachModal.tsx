@@ -222,7 +222,7 @@ export default function FormCoachModal({
                       Active
                     </span>
                   </div>
-                  <p className="text-2xs text-text-muted">Currently the only supported exercise — analysis is tuned for a barbell back squat filmed from the side (depth, knee angles, rep cadence)</p>
+                  <p className="text-2xs text-text-muted">Squats only — Form Coach analyzes the barbell back squat, filmed from the side. It cannot grade deadlifts or other lifts yet, and a video of another exercise will not produce a report.</p>
                 </div>
               </div>
             </div>
@@ -410,7 +410,45 @@ export default function FormCoachModal({
           </div>
         )}
 
-        {/* ── State 5: Error State ─────────────────────────────────────────── */}
+        {/* ── State 5: Not A Squat (D6) ─────────────────────────────────── */}
+        {state === 'not-squat' && (
+          <div className="p-6 space-y-4">
+            <div className="text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mx-auto">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-text-primary">This Doesn’t Look Like a Squat</h3>
+                <p className="text-xs text-text-secondary max-w-sm mx-auto leading-relaxed">
+                  Form Coach tracked your movement, but the pattern is a hip hinge — the hips fold
+                  deeply while the knees stay comparatively straight — like a deadlift, not a squat.
+                  Form Coach currently analyzes barbell back squats only, so no report was generated
+                  and nothing was saved.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={handleSafeClose}
+                className="py-2.5 px-5 rounded-xl border border-border-subtle bg-surface-elevated hover:bg-surface text-text-secondary text-xs font-medium cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={reset}
+                className="py-2.5 px-5 rounded-xl bg-accent text-accent-on text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Try Another Video</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── State 6: Error State ─────────────────────────────────────────── */}
         {state === 'error' && (
           <div className="p-6 text-center space-y-4">
             <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mx-auto">
