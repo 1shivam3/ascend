@@ -88,6 +88,7 @@ const FormCoachModal = dynamic(() => import('@/features/form-coach/components/Fo
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import { calculateMealMacros, scaleMacroGoalsToCalories } from '@/lib/macros';
 import { effectiveMacroGoals, dayScaledGoals, fallbackMacroGoals, fallbackProteinTargetG } from '@/lib/effective-goals';
+import { hasRealBodyStats } from '@/lib/body-stats';
 import { toLocalDateString, calculateHydrationTarget } from '@/lib/habits';
 import { getTimeGreeting, getWeekRange } from '@/lib/formatters';
 import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
@@ -525,6 +526,10 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   }, [sessionInfo.durationMin, scheduledPlan]);
 
   // Weekly consistency: accurately calculated from logged sessions in current week
+  // Task 1.1: with no stored goals and placeholder body stats, there
+  // is no honest target — the strip shows the "set your weight"
+  // prompt instead of a fallback number derived from defaults.
+  const targetsNeedBodyStats = !macroGoals && !hasRealBodyStats(profile);
   // Today's Fuel summary: real calories and protein vs target
   const fuelStats = useMemo(() => {
     const todayMeals = meals.filter((m) => m.date === todayStr);
@@ -539,8 +544,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     // here vs bw x 1.8 on the Fuel screen).
     const effectiveGoals = effectiveMacroGoals(macroGoals, profile);
     const todayScaled = dayScaledGoals(effectiveGoals, mealDayKinds?.[todayStr]);
-    const calTarget = todayScaled?.calories ?? effectiveGoals?.calories ?? fallbackMacroGoals(profile).calories;
-    const protTarget = todayScaled?.proteinG ?? effectiveGoals?.proteinG ?? fallbackProteinTargetG(profile?.bodyweightKg);
+    const calTarget = targetsNeedBodyStats
+      ? null
+      : (todayScaled?.calories ?? effectiveGoals?.calories ?? fallbackMacroGoals(profile).calories);
+    const protTarget = targetsNeedBodyStats
+      ? null
+      : (todayScaled?.proteinG ?? effectiveGoals?.proteinG ?? fallbackProteinTargetG(profile?.bodyweightKg));
 
     return {
       calories: Math.round(macros.calories),
@@ -555,12 +564,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       carbs: Math.round(macros.carbsG),
       fat: Math.round(macros.fatG),
     };
-  }, [meals, profile, macroGoals, mealDayKinds, todayStr]);
+  }, [meals, profile, macroGoals, mealDayKinds, todayStr, targetsNeedBodyStats]);
 
   // Quiet protein-coach line for veg/eggitarian users tracking low —
   // one line under the nutrition cards, dismissible from the Meals tab.
   const homeProteinHint =
-    uiPreferences.coachEnabled && !isHintDismissed(todayStr, 'protein')
+    uiPreferences.coachEnabled && !isHintDismissed(todayStr, 'protein') && fuelStats.targetProtein !== null
       ? getProteinGapSuggestion({
           diet: profile?.dietPreference || 'non_vegetarian',
           proteinLoggedG: fuelStats.proteinExact,
@@ -667,9 +676,15 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums block leading-tight">
               {fuelStats.calories.toLocaleString()} cal
             </span>
-            <span className="text-xs text-text-muted tabular-nums block mt-1">
-              / {fuelStats.targetCalories.toLocaleString()}
-            </span>
+            {fuelStats.targetCalories !== null ? (
+              <span className="text-xs text-text-muted tabular-nums block mt-1">
+                / {fuelStats.targetCalories.toLocaleString()}
+              </span>
+            ) : (
+              <span className="text-2xs text-accent-text font-semibold block mt-1">
+                {t('targets.setWeightPrompt')}
+              </span>
+            )}
           </div>
         </div>
 
@@ -692,9 +707,15 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums block leading-tight">
               {fuelStats.protein} g
             </span>
-            <span className="text-xs text-text-muted tabular-nums block mt-1">
-              / {fuelStats.targetProtein} g
-            </span>
+            {fuelStats.targetProtein !== null ? (
+              <span className="text-xs text-text-muted tabular-nums block mt-1">
+                / {fuelStats.targetProtein} g
+              </span>
+            ) : (
+              <span className="text-2xs text-accent-text font-semibold block mt-1">
+                {t('targets.setWeightPrompt')}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -921,7 +942,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             customTargetMl: hydrationConfig?.dailyTargetMl,
             isCustomTarget: hydrationConfig?.isCustomTarget,
           })}
-          proteinTargetG={effectiveMacroGoals(macroGoals, profile)?.proteinG || (profile?.bodyweightKg ? Math.round(profile.bodyweightKg * 1.8) : 140)}
+          proteinTargetG={targetsNeedBodyStats ? null : (effectiveMacroGoals(macroGoals, profile)?.proteinG || (profile?.bodyweightKg ? Math.round(profile.bodyweightKg * 1.8) : 140))}
           defaultView={uiPreferences.defaultMatrixView ?? 'weekly'}
         />
       </div>

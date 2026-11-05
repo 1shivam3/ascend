@@ -217,6 +217,10 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
       bodyweightKg: weightKg,
       bodyweightLbs: weightLbs,
       heightCm: parsedHeightCm || profile.heightCm,
+      // Task 1.1: typed here = real stats (a height left blank keeps
+      // its previous provenance rather than claiming a new entry).
+      bodyweightSource: 'user',
+      ...(parsedHeightCm ? { heightSource: 'user' as const } : {}),
       avatar,
     });
 

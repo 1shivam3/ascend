@@ -14,6 +14,7 @@ import {
   type CoachChatMessage,
 } from '@/lib/coach-chat-store';
 import { validateCoachAction } from '@/lib/coach-actions';
+import { weightIsReal } from '@/lib/body-stats';
 import { settlePendingActions } from '@/lib/coach-action-executor';
 import CoachActionCard from '@/components/CoachActionCard';
 import CoachMarkdown from '@/components/CoachMarkdown';
@@ -215,7 +216,10 @@ export default function CoachChatSection() {
 
     return {
       userName: profile?.name ?? null,
-      bodyweightKg: profile?.bodyweightKg ?? null,
+      // Task 1.1: a placeholder bodyweight the user never entered is
+      // NOT context — the coach must see "not logged" and work without
+      // it, never compute nutrition advice from a seeded default.
+      bodyweightKg: weightIsReal(profile) ? (profile?.bodyweightKg ?? null) : null,
       unit: profile?.unit ?? 'kg',
       goal: trainingProfile?.goal ?? null,
       experience: trainingProfile?.experience ?? null,

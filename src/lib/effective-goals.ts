@@ -21,6 +21,7 @@
 
 import { calculateRecommendedMacroGoals, type ActivityLevel } from './macros';
 import { getDayKindTargets } from './nutrition-coach';
+import { hasRealBodyStats } from './body-stats';
 import {
   resolvePrimaryGoal,
   type AthleteGoal,
@@ -36,6 +37,10 @@ export interface EffectiveGoalsProfile {
   heightCm?: number | null;
   age?: number | null;
   activityLevel?: ActivityLevel;
+  /** Task 1.1 provenance (see lib/body-stats.ts): 'default' stats
+   * block derivation; absent counts as real (legacy profiles). */
+  bodyweightSource?: 'user' | 'default';
+  heightSource?: 'user' | 'default';
 }
 
 /**
@@ -50,6 +55,12 @@ export function effectiveMacroGoals(
 ): MacroGoals | null {
   if (macroGoals) return macroGoals;
   if (!profile || !profile.bodyweightKg) return null;
+  // Phase-1 Task 1.1: never DERIVE a target from placeholder body
+  // stats. When weight/height are onboarding defaults the user never
+  // entered, there is no honest target to show — callers render the
+  // "set your weight" prompt instead. Stored goals (above) are the
+  // user's own numbers and always win, provenance or not.
+  if (!hasRealBodyStats(profile)) return null;
   return calculateRecommendedMacroGoals(
     profile.bodyweightKg,
     resolvePrimaryGoal(profile.goals),

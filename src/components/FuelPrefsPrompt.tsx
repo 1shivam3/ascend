@@ -81,7 +81,9 @@ export default function FuelPrefsPrompt({ onDone }: FuelPrefsPromptProps) {
     const weightLbs = unit === 'lbs' ? Math.round(w * 10) / 10 : Math.round(w * 2.20462 * 10) / 10;
     const heightCm = Math.round(unit === 'lbs' ? h * 2.54 : h);
 
-    setProfile({ ...profile, bodyweightKg: weightKg, bodyweightLbs: weightLbs, heightCm });
+    // Task 1.1: values typed here are the user's real stats — record
+    // the provenance so targets may derive from them from now on.
+    setProfile({ ...profile, bodyweightKg: weightKg, bodyweightLbs: weightLbs, heightCm, bodyweightSource: 'user', heightSource: 'user' });
     setTrainingProfile({ activityLevel: activity as 'sedentary' | 'light' | 'active' | 'very_active' });
     updateBodyMetrics(weightKg, heightCm);
 

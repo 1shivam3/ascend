@@ -25,6 +25,7 @@ import {
   normalizeCalorieDelta,
 } from '@/lib/macros';
 import { effectiveMacroGoals, dayScaledGoals, macroSplitPercentages, fallbackMacroGoals, fallbackProteinTargetG } from '@/lib/effective-goals';
+import { hasRealBodyStats } from '@/lib/body-stats';
 import {
   Plus,
   X,
@@ -1070,6 +1071,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       setGoalProtein(macroGoals.proteinG ? String(macroGoals.proteinG) : '');
       setGoalCarbs(macroGoals.carbsG ? String(macroGoals.carbsG) : '');
       setGoalFat(macroGoals.fatG ? String(macroGoals.fatG) : '');
+    } else if (!hasRealBodyStats(profile)) {
+      // Task 1.1: no stored goals and placeholder body stats — do NOT
+      // pre-fill derived numbers the user never earned. The fields
+      // open empty; typing targets manually stays fully available.
+      setGoalCalories('');
+      setGoalProtein('');
+      setGoalCarbs('');
+      setGoalFat('');
     } else {
       const bw = profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG;
       const rec = calculateRecommendedMacroGoals(
@@ -1087,6 +1096,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   };
 
   const handleAutoCalculateGoals = () => {
+    // Task 1.1: the engine derives from bodyweight/height — with
+    // placeholder stats there is nothing honest to calculate.
+    if (!hasRealBodyStats(profile)) {
+      toast.error(t('targets.setWeightPrompt'), t('meals.macroEngine'));
+      return;
+    }
     const bw = profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG;
     const rec = calculateRecommendedMacroGoals(
       bw,
@@ -1360,9 +1375,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   // and the suggestion below can no longer disagree. Zero change when
   // stored goals exist and there is no day kind.
   const effectiveGoals = effectiveMacroGoals(macroGoals, profile);
+  // Task 1.1: no stored goals + placeholder body stats = no honest
+  // target anywhere on this tab (ring, macro cards, Macros sub-tab,
+  // suggestions) — the "set your weight" prompt renders instead.
+  const targetsNeedBodyStats = !macroGoals && !hasRealBodyStats(profile);
   // Gauntlet DI-11: shared fallback (was bw x 1.8 here vs bw x 2.0 on
   // Home — same numbers now, from effective-goals.ts).
-  const proteinTargetG = effectiveGoals?.proteinG || fallbackProteinTargetG(profile?.bodyweightKg);
+  const proteinTargetG = effectiveGoals?.proteinG || (targetsNeedBodyStats ? 0 : fallbackProteinTargetG(profile?.bodyweightKg));
   const proteinRemaining = Math.max(0, proteinTargetG - todayMacros.proteinG);
 
   // ── Fast/festival day pattern + nutrition coach ──────────────────────
@@ -1766,7 +1785,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
             {/* Circular Donut Ring */}
             <div className="relative inline-flex items-center justify-center">
-              <svg width={130} height={130} className="transform -rotate-90" role="img" aria-label={`${Math.round(todayMacros.calories).toLocaleString()} cal, ${t('meals.ofDailyTarget', { target: displayGoals?.calories || splitFallback.calories })}`}>
+              <svg width={130} height={130} className="transform -rotate-90" role="img" aria-label={`${Math.round(todayMacros.calories).toLocaleString()} cal, ${targetsNeedBodyStats ? t('targets.setWeightPrompt') : t('meals.ofDailyTarget', { target: displayGoals?.calories || splitFallback.calories })}`}>
                 <circle
                   cx={65}
                   cy={65}
@@ -1782,7 +1801,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   stroke="rgb(var(--accent))"
                   strokeWidth={10}
                   strokeDasharray={339.29}
-                  strokeDashoffset={339.29 - (Math.min(100, Math.max(0, displayGoals ? (todayMacros.calories / displayGoals.calories) * 100 : (todayMacros.calories / 2400) * 100)) / 100) * 339.29}
+                  strokeDashoffset={339.29 - (Math.min(100, Math.max(0, targetsNeedBodyStats ? 0 : displayGoals ? (todayMacros.calories / displayGoals.calories) * 100 : (todayMacros.calories / 2400) * 100)) / 100) * 339.29}
                   strokeLinecap="round"
                   fill="transparent"
                   className="transition-all duration-700 ease-out"
@@ -1797,9 +1816,15 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 </span>
               </div>
             </div>
-            <span className="text-xs font-semibold text-text-muted tabular-nums">
-              {t('meals.ofDailyTarget', { target: displayGoals?.calories || splitFallback.calories })}
-            </span>
+            {targetsNeedBodyStats ? (
+              <span className="text-xs font-semibold text-accent-text">
+                {t('targets.setWeightPrompt')}
+              </span>
+            ) : (
+              <span className="text-xs font-semibold text-text-muted tabular-nums">
+                {t('meals.ofDailyTarget', { target: displayGoals?.calories || splitFallback.calories })}
+              </span>
+            )}
 
             {/* Fast / festival day pattern — per-date, targets are guidance */}
             <div className="w-full space-y-1.5">
@@ -1873,9 +1898,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 <span className="text-base font-extrabold text-text-primary tabular-nums block">
                   {Math.round(todayMacros.proteinG)}g
                 </span>
-                <span className="text-2xs text-text-muted block">
-                  / {displayGoals?.proteinG || proteinTargetG}g
-                </span>
+                {!targetsNeedBodyStats && (
+                  <span className="text-2xs text-text-muted block">
+                    / {displayGoals?.proteinG || proteinTargetG}g
+                  </span>
+                )}
               </div>
 
               {/* Carbs */}
@@ -1884,9 +1911,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 <span className="text-base font-extrabold text-text-primary tabular-nums block">
                   {Math.round(todayMacros.carbsG)}g
                 </span>
-                <span className="text-2xs text-text-muted block">
-                  / {displayGoals?.carbsG || splitFallback.carbsG}g
-                </span>
+                {!targetsNeedBodyStats && (
+                  <span className="text-2xs text-text-muted block">
+                    / {displayGoals?.carbsG || splitFallback.carbsG}g
+                  </span>
+                )}
               </div>
 
               {/* Fat */}
@@ -1895,9 +1924,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 <span className="text-base font-extrabold text-text-primary tabular-nums block">
                   {Math.round(todayMacros.fatG)}g
                 </span>
-                <span className="text-2xs text-text-muted block">
-                  / {displayGoals?.fatG || splitFallback.fatG}g
-                </span>
+                {!targetsNeedBodyStats && (
+                  <span className="text-2xs text-text-muted block">
+                    / {displayGoals?.fatG || splitFallback.fatG}g
+                  </span>
+                )}
               </div>
             </div>
 
@@ -2676,6 +2707,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           </button>
         </div>
 
+        {targetsNeedBodyStats ? (
+          <p className="text-xs font-semibold text-accent-text leading-relaxed">
+            {t('targets.setWeightPrompt')}
+          </p>
+        ) : (
+          <>
         {/* Big numbers row */}
         <div className="grid grid-cols-4 gap-2 text-center">
           <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
@@ -2738,9 +2775,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             />
           </div>
         </div>
+          </>
+        )}
       </section>
 
-      {/* Today's Adherence Card */}
+      {/* Today's Adherence Card — only when an honest target exists */}
+      {!targetsNeedBodyStats && (
       <section className="card p-5 bg-bg-card border border-border space-y-3">
         <h3 className="text-xs font-bold text-text-primary uppercase tracking-wider text-text-muted">
           {t('meals.adherenceTitle')}
@@ -2812,6 +2852,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           </div>
         </div>
       </section>
+      )}
     </div>
   )}
 
@@ -3370,16 +3411,20 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     {t('meals.macroEngine')}
                   </p>
                   <p className="text-[0.6875rem] text-text-muted font-mono">
-                    {t('meals.basedOnBw', { kg: profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG })}
+                    {hasRealBodyStats(profile)
+                      ? t('meals.basedOnBw', { kg: profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG })
+                      : t('targets.setWeightPrompt')}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleAutoCalculateGoals}
-                  className="px-2.5 py-1 rounded bg-bg-elevated border border-border text-xs font-mono text-accent-text hover:border-accent/60 transition-colors font-bold cursor-pointer"
-                >
-                  {t('meals.apply')}
-                </button>
+                {hasRealBodyStats(profile) && (
+                  <button
+                    type="button"
+                    onClick={handleAutoCalculateGoals}
+                    className="px-2.5 py-1 rounded bg-bg-elevated border border-border text-xs font-mono text-accent-text hover:border-accent/60 transition-colors font-bold cursor-pointer"
+                  >
+                    {t('meals.apply')}
+                  </button>
+                )}
               </div>
             </div>
 

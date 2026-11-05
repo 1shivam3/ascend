@@ -76,6 +76,14 @@ export default function Onboarding() {
   // picked (handleFinishCalibration writes it here), or a non-default
   // choice silently reset to 'male'.
   const [detailsGender, setDetailsGender] = useState<Gender>(ONBOARDING_DEFAULTS.gender);
+  // Task 1.1: body stats the user actually entered on the details
+  // screen (canonical kg/cm + the unit they typed in), 'skipped' when
+  // they explicitly tapped "I'll add this later", null before the
+  // details step completes. Held in the parent for the same remount
+  // reason as name/gender/DOB above.
+  const [detailsBodyStats, setDetailsBodyStats] = useState<
+    { bodyweightKg: number; heightCm: number; unit: Unit } | 'skipped' | null
+  >(null);
   const unit = ONBOARDING_DEFAULTS.unit;
   const weight = ONBOARDING_DEFAULTS.weight;
   const heightCm = ONBOARDING_DEFAULTS.heightCm;
@@ -287,6 +295,7 @@ export default function Onboarding() {
     gender: Gender;
     dateOfBirth: string;
     limitations: string[];
+    bodyStats: { bodyweightKg: number; heightCm: number; unit: Unit } | null;
   }) => {
     // O3 (audit): hold the typed DOB in the parent FIRST, before any
     // validation return — backing into the details screen remounts it,
@@ -300,6 +309,9 @@ export default function Onboarding() {
     // the same way.
     setAthleteName(details.name);
     setDetailsGender(details.gender);
+    // Task 1.1: same hold for the body stats (entered values or the
+    // explicit skip), so backing into details never loses them.
+    setDetailsBodyStats(details.bodyStats ?? 'skipped');
     // Never silently fall back to a default goal: the athlete must choose.
     if (selectedGoals.length === 0) {
       toast.error(t('toast.chooseGoal'), t('toast.titleGoalRequired'));
@@ -308,18 +320,31 @@ export default function Onboarding() {
 
     setIsFinishing(true);
 
-    // Simplified onboarding: only name/gender/DOB/injury are asked upfront.
-    // Age is calculated from DOB (the details screen already validated
-    // 13–120); weight, height, unit, and diet keep the state defaults and
-    // are asked later — weight/height/diet on the first Fuel visit.
+    // Simplified onboarding: only name/gender/DOB/injury — and, since
+    // Task 1.1, weight/height — are asked upfront. Age is calculated
+    // from DOB (the details screen already validated 13–120); diet
+    // keeps the state default and is asked on the first Fuel visit.
     const age = calculateAgeFromDob(details.dateOfBirth) ?? 25;
     // Audit-3 FE-21: no placeholder name — the details form requires a
     // real name, and quick/guest paths must not invent 'Athlete' either.
     const nameToSave = sanitizeAthleteName(details.name.trim() || athleteName.trim(), MAX_ATHLETE_NAME_LENGTH);
-    const bodyweightKg =
-      unit === 'lbs' ? weight * 0.453592 : weight;
-    const bodyweightLbs =
-      unit === 'kg' ? weight * 2.20462 : weight;
+    // Task 1.1: entered stats win and are flagged 'user' on the
+    // profile. The seeded placeholders survive ONLY as plan-scaling
+    // estimates when the user explicitly skipped, flagged 'default'
+    // so no calorie target is ever derived from them (the macro-goal
+    // seeding below is skipped entirely in that case).
+    const effUnit = details.bodyStats?.unit ?? unit;
+    const effHeightCm = details.bodyStats?.heightCm ?? heightCm;
+    const bodyweightKg = details.bodyStats
+      ? details.bodyStats.bodyweightKg
+      : unit === 'lbs'
+        ? weight * 0.453592
+        : weight;
+    const bodyweightLbs = details.bodyStats
+      ? Math.round(details.bodyStats.bodyweightKg * 2.20462 * 10) / 10
+      : unit === 'kg'
+        ? weight * 2.20462
+        : weight;
 
     const finalGoals = [...selectedGoals];
     // Diet is deferred to the first Fuel visit; the state default
@@ -331,10 +356,14 @@ export default function Onboarding() {
       gender: details.gender,
       bodyweightKg: Math.round(bodyweightKg * 10) / 10,
       bodyweightLbs: Math.round(bodyweightLbs * 10) / 10,
-      heightCm: heightCm,
+      heightCm: effHeightCm,
+      // Task 1.1 provenance: 'user' only when the values were typed on
+      // the details screen; 'default' marks the seeded placeholders.
+      bodyweightSource: details.bodyStats ? ('user' as const) : ('default' as const),
+      heightSource: details.bodyStats ? ('user' as const) : ('default' as const),
       age,
       dateOfBirth: details.dateOfBirth,
-      unit,
+      unit: effUnit,
       dietPreference: chosenDiet,
       createdAt: new Date().toISOString(),
       goals: finalGoals,
@@ -367,16 +396,16 @@ export default function Onboarding() {
 
     if (daysPerWeek === 6) {
       preferredSplit = 'push_pull_legs';
-      generatedSplit = generateSplitWeeklySchedule('push_pull_legs', unit).plans;
+      generatedSplit = generateSplitWeeklySchedule('push_pull_legs', effUnit).plans;
     } else if (daysPerWeek === 5) {
       preferredSplit = 'bro_split';
-      generatedSplit = generateSplitWeeklySchedule('bro_split', unit).plans;
+      generatedSplit = generateSplitWeeklySchedule('bro_split', effUnit).plans;
     } else if (daysPerWeek <= 3) {
       preferredSplit = 'full_body';
-      generatedSplit = generateSplitWeeklySchedule('full_body', unit).plans;
+      generatedSplit = generateSplitWeeklySchedule('full_body', effUnit).plans;
     } else {
       preferredSplit = 'upper_lower';
-      generatedSplit = getGoalAdaptiveSplitTemplates(primaryGoal, unit, {
+      generatedSplit = getGoalAdaptiveSplitTemplates(primaryGoal, effUnit, {
         bodyweightKg,
         experience: experienceLevel,
       });
@@ -394,7 +423,7 @@ export default function Onboarding() {
     const allLimitations = Array.from(new Set([...priorLimitations, ...details.limitations]));
     if (generatedSplit) {
       generatedSplit = prepareGeneratedPlans(generatedSplit, {
-        unit,
+        unit: effUnit,
         bodyweightKg,
         experience: experienceLevel,
         ageYears: age,
@@ -442,13 +471,18 @@ export default function Onboarding() {
       setPendingPlans(null);
       setPendingSchedule(null);
     }
-    if (!existingGoals) {
+    // Task 1.1: seed the recommended targets ONLY from stats the user
+    // actually entered. On the explicit-skip path macroGoals stay
+    // unset — every surface then shows the "set your weight" prompt
+    // (and Fuel's first-visit prompt offers the second chance) instead
+    // of a number computed from placeholders.
+    if (!existingGoals && details.bodyStats) {
       setMacroGoals(
         calculateRecommendedMacroGoals(
           bodyweightKg,
           primaryGoal,
           details.gender,
-          heightCm,
+          effHeightCm,
           age,
           activityChoice
         )
@@ -737,20 +771,39 @@ export default function Onboarding() {
   }
 
   // ── DETAILS-LITE (Step 2 of 2) ───────────────────────────────────────────
-  // Simplified onboarding: only name, gender, date of birth, and the
-  // optional injury dropdown. Experience, schedule, equipment, activity,
-  // weight, height, diet, and unit are NOT asked here — they keep the
-  // state defaults below and are asked later, contextually: experience /
-  // equipment / days at the first plan build, activity / weight / height /
-  // diet on the first Fuel visit. The old experience/schedule screens
-  // still exist as components but are no longer forward steps.
+  // Simplified onboarding: name, gender, date of birth, weight/height
+  // (Task 1.1 — asked here because the food target derives from them;
+  // skippable only explicitly), and the optional injury dropdown.
+  // Experience, schedule, equipment, activity, and diet are NOT asked
+  // here — they keep the state defaults below and are asked later,
+  // contextually: experience / equipment / days at the first plan
+  // build, activity / diet on the first Fuel visit. The old
+  // experience/schedule screens still exist as components but are no
+  // longer forward steps.
   if (currentScreen === 'details') {
+    const entered = detailsBodyStats && detailsBodyStats !== 'skipped' ? detailsBodyStats : null;
     return (
       <PersonalDetailsScreen
         initialName={athleteName}
         initialGender={detailsGender}
         initialDob={dob}
         initialLimitations={trainingProfile?.injuriesOrLimitations || []}
+        initialUnit={entered?.unit ?? 'kg'}
+        initialWeight={
+          entered
+            ? String(
+                Math.round(
+                  (entered.unit === 'lbs' ? entered.bodyweightKg * 2.20462 : entered.bodyweightKg) * 10
+                ) / 10
+              )
+            : ''
+        }
+        initialHeight={
+          entered
+            ? String(Math.round((entered.unit === 'lbs' ? entered.heightCm / 2.54 : entered.heightCm) * 10) / 10)
+            : ''
+        }
+        initialBodyStatsSkipped={detailsBodyStats === 'skipped'}
         onContinue={handleFinishCalibration}
         onBack={() => setCurrentScreen('goals')}
         loading={isFinishing}
@@ -798,18 +851,14 @@ export default function Onboarding() {
           )}
           {/* Your daily food target — explained, never set silently.
               A fat-loss user previously got a lower number with no
-              idea why; a diabetic got no safety framing at all. */}
+              idea why; a diabetic got no safety framing at all.
+              Task 1.1: the card renders only when real targets exist
+              (seeded from entered stats, or the user's own stored
+              goals). When the user skipped weight/height there is NO
+              number to show — an honest prompt takes its place. */}
           {currentMacroGoals && currentMacroGoals.maintenanceCalories ? (
             <div className="bg-bg-card border border-border rounded-2xl px-4 py-3 shadow-2xs space-y-1">
               <p className="text-sm font-bold">{t('onboarding.foodTargetTitle', { calories: currentMacroGoals.calories.toLocaleString() })}</p>
-              {/* Open-items UX F-01: the target is computed from seeded
-                  default body stats in the simplified flow (weight /
-                  height are never asked). That fact gets its own
-                  prominent line — not just the small-print estimate
-                  note inside the paragraph below. */}
-              <p className="text-xs font-semibold text-accent-text leading-relaxed">
-                {t('onboarding.foodTargetDefaultsNote', { weight, unit, height: heightCm })}
-              </p>
               <p className="text-xs text-text-primary/70 leading-relaxed">
                 {t('onboarding.foodTargetBurn', { maintenance: currentMacroGoals.maintenanceCalories.toLocaleString() })}
                 {typeof currentMacroGoals.calorieDelta === 'number' && currentMacroGoals.calorieDelta < 0
@@ -823,7 +872,21 @@ export default function Onboarding() {
                 {t('onboarding.foodTargetDiabetesCaution')}
               </p>
             </div>
-          ) : null}
+          ) : currentMacroGoals ? null : (
+            <div className="bg-bg-card border border-border rounded-2xl px-4 py-3 shadow-2xs space-y-2">
+              <p className="text-sm font-bold">{t('onboarding.foodTargetMissingTitle')}</p>
+              <p className="text-xs text-text-primary/70 leading-relaxed">
+                {t('onboarding.foodTargetMissingBody')}
+              </p>
+              <button
+                type="button"
+                onClick={() => setCurrentScreen('details')}
+                className="text-xs font-bold text-accent-text hover:underline cursor-pointer"
+              >
+                {t('onboarding.foodTargetMissingCta')}
+              </button>
+            </div>
+          )}
           <div className="space-y-3">
             <button
               type="button"

@@ -27,6 +27,7 @@ import {
   formatWaterLiters,
 } from '@/lib/habits';
 import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
+import { hasRealBodyStats } from '@/lib/body-stats';
 
 interface WorkoutHeatmapProps {
   onNavigate?: (tab: 'home' | 'prs' | 'meals' | 'workout') => void;
@@ -72,7 +73,16 @@ export default function WorkoutHeatmap({
     customTargetMl: hydrationConfig?.dailyTargetMl,
     isCustomTarget: hydrationConfig?.isCustomTarget,
   });
-  const proteinTargetG = macroGoals?.proteinG || (profile?.bodyweightKg ? Math.round(profile.bodyweightKg * 1.8) : 140);
+  const proteinTargetG =
+    macroGoals?.proteinG ??
+    // Phase-1 Task 1.1: the bw-derived fallback only when the stored
+    // bodyweight is real — a placeholder weight must not silently set
+    // the protein habit's bar. Null = no target, habit never reads done.
+    (hasRealBodyStats(profile)
+      ? profile?.bodyweightKg
+        ? Math.round(profile.bodyweightKg * 1.8)
+        : 140
+      : null);
 
   // Group workouts by date (YYYY-MM-DD)
   const workoutMap = useMemo(() => {
@@ -319,7 +329,7 @@ export default function WorkoutHeatmap({
               const hasGym = (workoutMap.get(dateStr) || []).length > 0;
               const hasWater = (waterLogs[dateStr] || 0) >= waterTargetMl * 0.85;
               const hasCreatine = !!creatineLogs[dateStr]?.taken;
-              const hasProtein = (proteinMap.get(dateStr) || 0) >= proteinTargetG * 0.85;
+              const hasProtein = proteinTargetG !== null && (proteinMap.get(dateStr) || 0) >= proteinTargetG * 0.85;
 
               // Filter check for single-habit focus
               let isHabitDone = false;

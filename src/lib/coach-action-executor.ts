@@ -21,6 +21,7 @@ import type { AthleteGoal, MacroGoals } from './types';
 import type { EquipmentAccess } from './workout-engine';
 import { calculateRecommendedMacroGoals } from './macros';
 import { DEFAULT_BODYWEIGHT_KG } from './defaults';
+import { hasRealBodyStats } from './body-stats';
 import { buildIntakePrefill, limitationLabel, type BlockIntake } from './block-intake';
 import type { BlockProposal } from './block-engine';
 import type {
@@ -58,8 +59,9 @@ export function macroGoalsBaseMatches(snapshot: MacroGoals | null): boolean {
 }
 
 /** The starting point when the user has no goals yet: the app's own
- * recommended-goals calculation over their profile — the same helper
- * the store uses to seed defaults — never an invented number. */
+ * recommended-goals calculation over their profile — never an
+ * invented number. Only reached when the profile's body stats are
+ * real (applyMacroGoalsAction gates the placeholder case). */
 function recommendedBase(): MacroGoals {
   const state = useStore.getState();
   const profile = state.profile;
@@ -80,7 +82,11 @@ export interface MacroGoalsReceipt {
 
 export type ApplyMacroGoalsResult =
   | { ok: true; receipt: MacroGoalsReceipt }
-  | { ok: false; stale: true };
+  | { ok: false; stale: true }
+  /** Task 1.1: no stored goals and placeholder body stats — completing
+   * the goal set would require deriving numbers from stats the user
+   * never entered. Nothing is written. */
+  | { ok: false; stale: false; blocked: 'needs-body-stats' };
 
 /**
  * Apply a set_macro_goals action against the snapshot the card was
@@ -96,7 +102,22 @@ export function applyMacroGoalsAction(
   if (!macroGoalsBaseMatches(baseSnapshot)) return { ok: false, stale: true };
 
   const previous = state.macroGoals ? { ...state.macroGoals } : null;
-  const base = previous ?? recommendedBase();
+  let base: MacroGoals;
+  if (previous) {
+    base = previous;
+  } else if (hasRealBodyStats(state.profile)) {
+    base = recommendedBase();
+  } else {
+    // Task 1.1: no stored goals and the profile's weight/height are
+    // placeholders — recommendedBase() would derive the unnamed
+    // fields from numbers the user never entered. Apply only when
+    // the action itself names BOTH required fields; unnamed optional
+    // fields stay unset instead of being filled with inventions.
+    if (action.calories === undefined || action.proteinG === undefined) {
+      return { ok: false, stale: false, blocked: 'needs-body-stats' };
+    }
+    base = { calories: action.calories, proteinG: action.proteinG };
+  }
   const applied: MacroGoals = {
     ...base,
     ...(action.calories !== undefined ? { calories: action.calories } : {}),

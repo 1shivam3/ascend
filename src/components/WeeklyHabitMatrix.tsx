@@ -13,7 +13,7 @@ interface WeeklyHabitMatrixProps {
   creatineLogs: Record<string, CreatineLog>;
   meals: MealEntry[];
   waterTargetMl: number;
-  proteinTargetG: number;
+  proteinTargetG: number | null;
   /** Monday of the week to display. */
   weekStart: Date;
   /** When provided, renders prev/next week navigation. */
@@ -107,7 +107,7 @@ export default function WeeklyHabitMatrix({
     ...(showCreatine
       ? [{ label: t('habit.creatine'), color: '#F5B301', done: (d: string) => !!creatineLogs[d]?.taken }]
       : []),
-    { label: t('habit.protein'), color: '#22C55E', done: (d) => (proteinMap.get(d) || 0) >= proteinTargetG * 0.85 },
+    { label: t('habit.protein'), color: '#22C55E', done: (d) => proteinTargetG !== null && (proteinMap.get(d) || 0) >= proteinTargetG * 0.85 },
   ];
 
   const rangeLabel = `${days[0].date.toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { month: 'short', day: 'numeric' })} – ${days[days.length - 1].date.toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { month: 'short', day: 'numeric' })}`;

@@ -45,7 +45,10 @@ export interface MatrixInputs {
   waterLogs: Record<string, number>;
   creatineLogs: Record<string, CreatineLog>;
   waterTargetMl: number;
-  proteinTargetG: number;
+  /** Null when no honest protein target exists (body stats are
+   * placeholders the user never entered — Phase-1 Task 1.1): the
+   * protein habit then renders without a target and never reads done. */
+  proteinTargetG: number | null;
   showCreatine: boolean;
 }
 
@@ -99,7 +102,7 @@ export function getDaySummary(dateStr: string, inputs: MatrixInputs): DaySummary
           target: null,
         }]
       : []),
-    { id: 'protein', done: proteinG >= inputs.proteinTargetG * 0.85, value: proteinG, target: inputs.proteinTargetG },
+    { id: 'protein', done: inputs.proteinTargetG !== null && proteinG >= inputs.proteinTargetG * 0.85, value: proteinG, target: inputs.proteinTargetG },
   ];
   const empty =
     workouts.length === 0 && meals.length === 0 && !habits.some((h) => h.done);
