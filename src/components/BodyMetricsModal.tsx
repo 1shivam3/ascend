@@ -407,6 +407,13 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                 </button>
               </div>
             </div>
+            {/* Task 2.1: this toggle converts only the in-progress entry
+                and never writes profile.unit (unlike the Settings /
+                Progress Tools switches, which look identical) — say so
+                on screen so users don't expect an app-wide change. */}
+            <p className="text-2xs text-text-muted mb-1.5">
+              {t('bodyMetrics.entryUnitNote', { unit: preferredUnit.toUpperCase() })}
+            </p>
             <div className="relative">
               <input
                 id="modal-weight-input"

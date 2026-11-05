@@ -3084,6 +3084,7 @@ export const en = {
   'coachModel.factAdherenceSuffix': '{day}s are the day most often missed.',
   'bodyMetrics.noChanges': 'No changes to save — these measurements already match your last saved values.',
   'bodyMetrics.prefillHint': 'Weight and height are filled from your profile. Grey example numbers are not saved values — leave a field blank if you didn\'t measure it; blank means "not measured", not zero.',
+  'bodyMetrics.entryUnitNote': 'This switch is for this entry only — your app-wide unit stays {unit}. Change it any time in You → Settings.',
 
   // ── Coach tab (Train > Coach) ──────────────────────────────────────
   'coachChat.intro': 'Your coach designs today\'s session from how you feel. Answer the check-in, start the session it builds.',
