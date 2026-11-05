@@ -35,6 +35,7 @@ import {
 } from './lifter-twin';
 import { calculateWorkoutTonnage } from './ai-coach';
 import { SAFE_MIN_CALORIES } from './macros';
+import { isMinorAge } from './minor-targets';
 import { getWeekDateStrings, plural, formatKg, getLocalTodayStr, parseLocalDate } from './formatters';
 import { EXERCISE_LIBRARY, findLibraryExercise } from './exercise-library';
 import type { MuscleGroup } from './exercise-library';
@@ -1605,7 +1606,8 @@ export function suggestCalorieAdjustment(
   trend: WeightTrend,
   goal: AthleteGoal,
   currentTargets: MacroGoals,
-  gender: Gender = 'male'
+  gender: Gender = 'male',
+  ageYears?: number
 ): CalorieSuggestion {
   const safeMin = SAFE_MIN_CALORIES[gender] ?? SAFE_MIN_CALORIES.male;
   const current = Math.max(0, Math.round(currentTargets?.calories ?? 0));
@@ -1653,6 +1655,19 @@ export function suggestCalorieAdjustment(
       reasonI18n,
     };
   };
+
+  // Phase 3 (Task 3.1): minors are maintenance-only. The coach never
+  // proposes a calorie change to a 13–17-year-old — not a cut, not a
+  // bulk push — whatever the trend or the goal says. This guard runs
+  // before the data checks: for a minor the answer does not depend
+  // on the trend at all.
+  if (isMinorAge(ageYears)) {
+    return hold(
+      `You're still growing, so your calorie target stays at maintenance — no cuts and no bulk pushes until 18. ` +
+      `Eat enough to fuel your training and growth, keep protein steady, and let the work do its job.`,
+      { key: 'coachDigest.calMinorHold' }
+    );
+  }
 
   // Two weigh-ins are not a trend. Suggestions need enough signal to act on.
   if (

@@ -41,6 +41,7 @@ interface CoachChatRequestBody {
     contextText?: unknown;
     evidence?: unknown;
     hasData?: unknown;
+    minor?: unknown;
   };
 }
 
@@ -103,6 +104,10 @@ export async function POST(req: Request) {
     const contextText =
       typeof rawContext.contextText === 'string' ? rawContext.contextText.slice(0, 12000) : '';
     const hasData = rawContext.hasData === true;
+    // Phase 3 (Task 3.1): minor flag, same client-supplied trust
+    // level as hasData — it only ever ADDS the restrictive MINOR
+    // ATHLETE rule to the system prompt.
+    const minor = rawContext.minor === true;
     const evidence = Array.isArray(rawContext.evidence)
       ? rawContext.evidence.filter((e): e is string => typeof e === 'string').slice(0, 30)
       : [];
@@ -235,7 +240,7 @@ export async function POST(req: Request) {
     if (quotaDeny) return quotaDeny;
     if (!daily.ok) return daily.response;
 
-    const systemPrompt = buildCoachChatSystemPrompt({ language, hasData });
+    const systemPrompt = buildCoachChatSystemPrompt({ language, hasData, minor });
     const prompt = [
       // Final-cert SEC F-02: the context block is relabelled as what it
       // is — untrusted user-provided data, never instructions —

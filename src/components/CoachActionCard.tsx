@@ -17,6 +17,11 @@ import {
 } from '@/lib/coach-action-executor';
 import { buildIntakePrefill } from '@/lib/block-intake';
 import { hasRealBodyStats } from '@/lib/body-stats';
+import {
+  isMinorAge,
+  minorMaintenanceFor,
+  MINOR_MAINTENANCE_TOLERANCE_KCAL,
+} from '@/lib/minor-targets';
 import type { BlockProposal } from '@/lib/block-engine';
 import type {
   CoachActionReceipt,
@@ -256,6 +261,7 @@ export default function CoachActionCard({
   const { t } = useTranslation();
   const storeGoals = useStore((s) => s.macroGoals);
   const profile = useStore((s) => s.profile);
+  const trainingProfile = useStore((s) => s.trainingProfile);
   const liveGoals = liveMacroGoals !== undefined ? liveMacroGoals : storeGoals;
   const [undoStale, setUndoStale] = useState(false);
   const [applyFailed, setApplyFailed] = useState(false);
@@ -362,6 +368,33 @@ export default function CoachActionCard({
     const base = message.actionBase;
     const moved = base !== undefined && !sameMacroFields(liveGoals, base);
     const stale = state === 'stale' || (state === 'pending' && moved);
+
+    // Phase 3 (Task 3.1): minor maintenance guard, rendered up front.
+    // For a 13–17 user, an action whose calories would move the
+    // target off maintenance can never apply — the executor refuses
+    // it with blocked:'minor-maintenance-only' — so the card says
+    // why and offers no Apply, mirroring the needs-body-stats
+    // pattern below. Maintenance is read from the goals' own
+    // derivation field first, else computed from the profile.
+    const minorMaintenance =
+      liveGoals?.maintenanceCalories ??
+      base?.maintenanceCalories ??
+      minorMaintenanceFor(profile, trainingProfile?.activityLevel);
+    const minorBlocked =
+      isMinorAge(profile?.age) &&
+      action.calories !== undefined &&
+      minorMaintenance != null &&
+      Math.abs(action.calories - minorMaintenance) > MINOR_MAINTENANCE_TOLERANCE_KCAL;
+    if (minorBlocked) {
+      return (
+        <div className="rounded-xl border border-border bg-bg-secondary/60 p-3 space-y-2">
+          <p className="text-xs font-bold text-text-primary">{t('coachChat.actionMacroTitle')}</p>
+          <MacroRows rows={macroDiffRows(action, base !== undefined ? base : liveGoals)} />
+          <p className="text-xs text-text-secondary">{t('coachChat.actionMinorMaintenance')}</p>
+          <div className="flex gap-2">{dismissButton}</div>
+        </div>
+      );
+    }
 
     if (stale) {
       // Fresh diff: the same change read against the LIVE goals.

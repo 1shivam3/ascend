@@ -3053,6 +3053,8 @@ export const en = {
   'coachDigest.calGrowFuelFlat': 'The scale is flat but the goal is growth — you can\'t build a bigger house without more bricks. Adding 100 kcal gives training something to build with. Reassess in two weeks.',
   'coachDigest.calGrowFuelLosing': 'The scale is losing but the goal is growth — you can\'t build a bigger house without more bricks. Adding 100 kcal gives training something to build with. Reassess in two weeks.',
   'coachDigest.calMaintFlat': 'Weight is stable and the goal is maintenance — the nutrition side is doing its job. Nothing to change.',
+  // Phase 3 (Task 3.1): the minor hold — the coach never proposes a calorie change under 18.
+  'coachDigest.calMinorHold': 'You\'re still growing, so your calorie target stays at maintenance — no cuts and no bulk pushes until 18. Eat enough to fuel your training and growth, keep protein steady, and let the work do its job.',
   'coachDigest.calMaintGain': 'Weight is creeping up ({rate}) while the goal is maintenance. A gentle 100 kcal trim steadies it without any real sacrifice.',
   'coachDigest.calMaintLose': 'Weight is drifting down ({rate}) while the goal is maintenance. Adding 100 kcal holds you level.',
   'coachDigest.adjPain': 'Holding {exercise} where it is — you flagged pain in the last session. Train around it, not through it; if it lingers past a week, get it checked rather than pushing the load.',
@@ -3235,6 +3237,8 @@ export const en = {
   'coachChat.actionStaleBody':
     'Here is the same change against your current targets. Check it, then apply if it still looks right.',
   'coachChat.actionNeedsBodyStats': 'Add your weight and height in You → Profile first — complete targets can only be set from your real measurements.',
+  // Phase 3 (Task 3.1): minor maintenance-only blocked state.
+  'coachChat.actionMinorMaintenance': 'You\'re under 18, so your calorie target stays at maintenance — enough to fuel growth and training. Calorie cuts and bulk targets unlock at 18.',
   'privacy.statusDeviceOnly': 'Your data lives on this device only — nothing is synced to the cloud.',
   'privacy.statusDeviceAndCloud': 'Your data lives on this device and syncs to your private cloud account — only you can access it.',
   'aiNotice.mealScan': 'AI meal scan: your meal photo is sent to our AI providers (Groq and Google Gemini) to estimate nutrition. If they are unavailable, your photo may be sent to a free-tier vision model via OpenRouter as a fallback — free-tier providers may keep the data they receive. ASCEND does not store your photo.',

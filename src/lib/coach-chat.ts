@@ -511,6 +511,11 @@ export interface CoachChatPrSummary {
 
 export interface CoachChatUserData {
   userName: string | null;
+  /** Phase 3 (Task 3.1): the user's age when known — rendered into
+   * the context so the model can see a minor's age as data, and the
+   * client derives the system prompt's MINOR ATHLETE rule flag from
+   * the same profile field. Optional: older builders omit it. */
+  ageYears?: number | null;
   bodyweightKg: number | null;
   unit: 'kg' | 'lbs';
   goal: string | null;
@@ -695,6 +700,7 @@ export function buildCoachChatContext(
 
   const userLine = [
     `Name: ${data.userName ?? 'not set'}`,
+    ...(data.ageYears != null ? [`Age: ${data.ageYears}`] : []),
     `Bodyweight: ${data.bodyweightKg != null ? fmtKg(data.bodyweightKg, data.unit) : 'not logged'}`,
     `Goal: ${data.goal ?? 'not set'}`,
     `Experience: ${data.experience ?? 'not set'}`,
@@ -895,6 +901,11 @@ export function buildCoachChatContext(
 export function buildCoachChatSystemPrompt(opts: {
   language: 'en' | 'hi';
   hasData: boolean;
+  /** Phase 3 (Task 3.1): the user is 13–17 — appends the MINOR
+   * ATHLETE rule. Derived client-side from profile.age (the same
+   * trust level as hasData: a false claim only earns the user MORE
+   * restrictive coaching, never less). */
+  minor?: boolean;
 }): string {
   const langLine =
     opts.language === 'hi'
@@ -920,6 +931,11 @@ export function buildCoachChatSystemPrompt(opts: {
     '    - {"type":"propose_program","goal":"muscle"|"strength"|"fat_loss"|"endurance"|"general","daysPerWeek":2\u20136,"sessionMinutes":30|45|60|75|90,"equipment":"full_gym"|"dumbbells"|"home_minimal"|"bodyweight","experience":"beginner"|"intermediate"|"advanced","limitations":[optional ids, only from: shoulder, knee, low_back, elbow, wrist, hip, ankle, neck, other]}. The app builds the actual program from these parameters with its own engine \u2014 you never write the program\u2019s sets, reps, or loads yourself.',
     '11. INTAKE: the context already carries the user\u2019s profile, current macro goals, and active block \u2014 prefill from it and ask only what you cannot know. Ask at most ONE question per reply, and at most about 3 questions in total before proposing. A reply that asks a question carries NO action. Propose propose_program only when the intake is complete \u2014 goal, days, session length, equipment, and experience each known from the user or defaulted from their context (their usual days/week, session length, and equipment) \u2014 and name the assumed values in the reply ("4 days \u00b7 ~60 min \u00b7 full gym \u2014 your usual; say the word if you want different"). If the user says "just build it", propose immediately with those defaults. Ordinary questions carry no action: "action" stays null.',
     '12. FORMATTING: write in short paragraphs \u2014 one idea each, never a wall of text. Put steps or options in "- " bullet lists. Wrap key numbers and decisions in **bold**. A short "## " heading is welcome when a reply has two distinct parts. Most replies need none of this: plain short paragraphs are the default, formatting is for structure, not decoration.',
+    ...(opts.minor
+      ? [
+          '13. MINOR ATHLETE: this user is under 18 and still growing. NEVER suggest a calorie deficit or a calorie surplus, and never set weight-loss or weight-gain targets \u2014 their calorie target stays at maintenance. If they ask to cut or bulk, explain briefly that targets stay at maintenance until 18 so growth is never traded for a number, and steer to training quality, protein, sleep, and consistency. A set_macro_goals action for this user may only keep "calories" at their current target from the context \u2014 never propose a different calorie number.',
+        ]
+      : []),
     langLine,
     coldStart,
   ].join('\n');
