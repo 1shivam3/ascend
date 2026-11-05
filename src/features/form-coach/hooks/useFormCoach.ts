@@ -194,8 +194,9 @@ export function useFormCoach({
   /** The user's correction: re-run the same video as this exercise. */
   const forcedExerciseRef = useRef<FormExerciseId | null>(null);
   const lastFileRef = useRef<File | null>(null);
+  /** The entry-point preset is fixed for the life of a modal mount
+   * (each entry point renders its own modal), so it is captured once. */
   const presetRef = useRef<FormExerciseId | undefined>(presetExerciseId);
-  presetRef.current = presetExerciseId;
 
   const animFrameRef = useRef<number | null>(null);
   const uploadedVideoUrlRef = useRef<string | null>(null);
