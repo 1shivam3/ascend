@@ -145,8 +145,10 @@ describe('Fix 3 — README and Terms tell the truth', () => {
   });
 
   it('legal version was bumped with the change', () => {
-    expect(LEGAL_VERSION).toBe('2.9');
-    expect(LEGAL_LAST_UPDATED).toBe('November 2, 2026');
+    // Task 1.2 (2026-11-05): bumped again for the privacy-page
+    // truthfulness alignment (sign-in methods, Form Coach, Clarity).
+    expect(LEGAL_VERSION).toBe('2.10');
+    expect(LEGAL_LAST_UPDATED).toBe('November 5, 2026');
   });
 });
 

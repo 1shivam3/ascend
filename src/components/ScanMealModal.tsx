@@ -13,6 +13,7 @@ import { tildeForFoods } from '@/lib/meal-display';
 import { getLocalTodayStr, round1 } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
 import ReportAIModal from '@/components/ReportAIModal';
+import AiNoticeBanner from '@/components/AiNoticeBanner';
 import { toUserMessage } from '@/lib/user-error';
 import PermissionHelp from '@/components/ui/PermissionHelp';
 import { useTranslation, type StringKey } from '@/lib/i18n';
@@ -727,6 +728,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       />
 
       <div className="bg-bg-card border border-border rounded-2xl w-full max-w-lg shadow-2xl relative animate-scale-in my-auto overflow-hidden">
+        {/* Task 1.2: first-use AI disclosure (once, local, non-blocking) */}
+        <div className="px-4 sm:px-5 pt-4">
+          <AiNoticeBanner feature="meal-scan" />
+        </div>
         {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-5 border-b border-border">
           <div className="flex items-center gap-2.5">

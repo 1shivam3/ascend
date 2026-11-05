@@ -2,8 +2,11 @@
  * QA4-043 / RB-3 regression tests.
  *
  * The privacy policy promises "an integrated in-app reporting button
- * (flag icon) next to all AI outputs", but ReportAIModal had ZERO
+ * (flag icon)" next to AI outputs, but ReportAIModal had ZERO
  * importers — the promised button did not exist in the shipped UI.
+ * (Task 1.2 scoped the promise to the surfaces that render the flag —
+ * meal scanning, barcode results, voice logging, post-workout
+ * summaries — because coach chat renders none.)
  *
  * The source-scan tests below fail if ReportAIModal ever loses its
  * importers again, and pin the flag affordance (aria-label + testid)
@@ -100,7 +103,14 @@ describe('QA4-043 ReportAIModal reachability', () => {
 
   it('the privacy policy promise matches the shipped surfaces', () => {
     const privacy = readSrc('app/privacy/page.tsx');
-    expect(privacy).toContain('reporting button (flag icon) next to all AI outputs');
+    // Task 1.2: the promise is scoped to the surfaces that actually
+    // render the flag (meal scan, barcode, voice logger, post-workout)
+    // — the previous "next to all AI outputs" wording overclaimed,
+    // since coach chat renders none.
+    expect(privacy).toContain(
+      'reporting button (flag icon) next to AI outputs in meal scanning, barcode results, voice logging, and post-workout summaries'
+    );
+    expect(privacy).not.toContain('next to all AI outputs');
     // …and the surfaces above actually exist (guarded by the test above).
     expect(Object.keys(EXPECTED_SURFACES).length).toBeGreaterThanOrEqual(4);
   });

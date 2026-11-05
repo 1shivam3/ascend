@@ -176,7 +176,7 @@ export const en = {
   'settings.faqQ4': 'How do backup and sync work?',
   'settings.faqA4': 'Your data lives on this device first. Sign in to sync it to the cloud, and export a JSON backup anytime from Data & Privacy.',
   'settings.faqQ5': 'Is my data private?',
-  'settings.faqA5': 'Your data stays yours: it is stored on your device, and cloud sync only moves your own rows. Read the full policy for details.',
+  'settings.faqA5': 'Your data stays yours: it lives on your device, and if you sign in, it also syncs to your private cloud account.',
   'settings.faqQ6': 'What does reset do?',
   'settings.faqA6': 'Delete WebApp Data & Reset in Data & Account wipes everything on this device and starts fresh. Download a backup first if you want to keep your history.',
   'settings.faqQ7': 'How do I delete my account?',
@@ -277,7 +277,6 @@ export const en = {
   // that does not exist — it lands on the Settings screen, so it now
   // says so. (It still scrolls to the Training Preferences section.)
   'onboarding.summaryEdit': 'Edit in You → Settings',
-  'onboarding.guestNote': 'No account needed — your data stays on this device.',
   'onboarding.dietPreference': 'Diet Preference',
   'onboarding.dietHint': 'Used by the protein coach for suggestions that fit how you eat.',
   'onboarding.dietVegetarian': 'Vegetarian',
@@ -1939,7 +1938,6 @@ export const en = {
   'vault.csvTitle': 'Import Workout History (CSV)',
   'vault.csvDesc': 'Import your training history: upload a CSV export to bring in past workouts and PRs.',
   'vault.uploadCsv': 'Upload Workout CSV',
-  'vault.privacyGuarantee': 'Your data stays 100% on your device. Backups download as a file you keep.',
   'vault.deleteReset': 'Delete WebApp Data & Reset',
   'vault.deleteResetHint': 'Permanent: everything on this device is erased and nothing is archived. (Start fresh, by contrast, archives your history so you can restore it.)',
   'auth.goBack': 'Go back',
@@ -3192,6 +3190,11 @@ export const en = {
   'coachChat.actionStaleBody':
     'Here is the same change against your current targets. Check it, then apply if it still looks right.',
   'coachChat.actionNeedsBodyStats': 'Add your weight and height in You → Profile first — complete targets can only be set from your real measurements.',
+  'privacy.statusDeviceOnly': 'Your data lives on this device only — nothing is synced to the cloud.',
+  'privacy.statusDeviceAndCloud': 'Your data lives on this device and syncs to your private cloud account — only you can access it.',
+  'aiNotice.mealScan': 'AI meal scan: your meal photo is sent to our AI providers (Groq and Google Gemini) to estimate nutrition. Photos are never sent to free-tier models, and ASCEND does not store your photo.',
+  'aiNotice.coachChat': 'AI coach chat: your messages, with your training context, are sent to our AI providers to draft replies. Some free-tier text models may keep submitted text — please avoid sensitive personal details.',
+  'aiNotice.dismiss': 'Got it',
   'coachChat.actionExpired': 'This draft expired — ask me again and I will draft a fresh one.',
   'coachChat.actionDismissedNote': 'Draft dismissed',
   'coachChat.actionSupersededNote': 'Replaced by a newer draft below',
