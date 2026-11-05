@@ -23,7 +23,7 @@ async function createLandmarkerInstance(vision: any, wasmPath: string, modelPath
       delegate: 'GPU',
     },
     runningMode: 'VIDEO',
-    numPoses: 1,
+    numPoses: 2, // deep audit: detect up to 2 people for subject selection (was 1)
     minPoseDetectionConfidence: 0.5,
     minPosePresenceConfidence: 0.5,
     minTrackingConfidence: 0.5,
@@ -35,7 +35,7 @@ async function createLandmarkerInstance(vision: any, wasmPath: string, modelPath
       delegate: 'CPU',
     },
     runningMode: 'VIDEO',
-    numPoses: 1,
+    numPoses: 2, // deep audit: detect up to 2 people for subject selection (was 1)
     minPoseDetectionConfidence: 0.5,
     minPosePresenceConfidence: 0.5,
     minTrackingConfidence: 0.5,
@@ -120,6 +120,9 @@ self.onmessage = async (event: MessageEvent) => {
         payload: {
           landmarks,
           worldLandmarks,
+          // All detected people — the main thread picks the lifter among
+          // them (subject selection, deep-audit commit 2).
+          poses: result.landmarks ?? null,
           timestampMs: safeTimestamp,
         },
       });

@@ -12,7 +12,9 @@ describe('Form Coach — Streamlined Video Upload Architecture & Isolation', () 
 
   it('useFormCoach provides focused video analysis state machine without camera streams', () => {
     // 5 simple states (D4 added the terminal 'no-tracking' state)
-    expect(useFormCoachSrc).toContain("export type FormCoachState = 'select' | 'analyzing' | 'report' | 'no-tracking' | 'error';");
+    // D6: the union gained 'not-squat' — a tracked movement that is
+    // positively a different pattern (hip hinge) ends there, unsaved.
+    expect(useFormCoachSrc).toContain("export type FormCoachState = 'select' | 'analyzing' | 'report' | 'no-tracking' | 'not-squat' | 'error';");
 
     // Video analysis actions
     expect(useFormCoachSrc).toContain('const analyzeVideo = useCallback');

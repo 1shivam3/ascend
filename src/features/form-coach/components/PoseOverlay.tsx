@@ -8,6 +8,49 @@
 import React, { useEffect, useRef } from 'react';
 import { NormalizedLandmark, POSE_CONNECTIONS, PoseLandmarkIndex, DetectedSide } from '../models/pose.types';
 
+export interface VideoContentRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * The rectangle the video PICTURE actually occupies inside its element
+ * under `object-fit: contain` (letterbox/pillarbox math). Deep audit D5b:
+ * the overlay canvas used to be stretched over the whole container with
+ * `object-cover` while the <video> used `object-contain` — for a portrait
+ * phone video in the landscape player the skeleton rendered ~3x too
+ * tall, cropped, and shifted onto the black pillarbox, matching no
+ * person in the frame (owner screenshot, 2026-11-05). The canvas element
+ * is now positioned over exactly this rect, and its bitmap stays at the
+ * video's native resolution, so normalized landmark coordinates map 1:1.
+ */
+export function computeVideoContentRect(
+  containerWidth: number,
+  containerHeight: number,
+  videoWidth: number,
+  videoHeight: number
+): VideoContentRect {
+  if (
+    containerWidth <= 0 ||
+    containerHeight <= 0 ||
+    videoWidth <= 0 ||
+    videoHeight <= 0
+  ) {
+    return { left: 0, top: 0, width: Math.max(0, containerWidth), height: Math.max(0, containerHeight) };
+  }
+  const scale = Math.min(containerWidth / videoWidth, containerHeight / videoHeight);
+  const width = videoWidth * scale;
+  const height = videoHeight * scale;
+  return {
+    left: (containerWidth - width) / 2,
+    top: (containerHeight - height) / 2,
+    width,
+    height,
+  };
+}
+
 interface PoseOverlayProps {
   landmarksRef: React.MutableRefObject<NormalizedLandmark[] | null>;
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -37,6 +80,38 @@ export default function PoseOverlay({
         if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
+        }
+
+        // Position the canvas ELEMENT over the video's actual picture
+        // rect (object-contain letterboxing) — not the whole container.
+        // The bitmap stays at native video resolution, so the drawing
+        // coordinates below are unaffected. (D5b)
+        const parent = canvas.parentElement;
+        if (parent) {
+          const rect = computeVideoContentRect(
+            parent.clientWidth,
+            parent.clientHeight,
+            video.videoWidth,
+            video.videoHeight
+          );
+          const style = canvas.style;
+          const next = {
+            left: `${rect.left}px`,
+            top: `${rect.top}px`,
+            width: `${rect.width}px`,
+            height: `${rect.height}px`,
+          };
+          if (
+            style.left !== next.left ||
+            style.top !== next.top ||
+            style.width !== next.width ||
+            style.height !== next.height
+          ) {
+            style.left = next.left;
+            style.top = next.top;
+            style.width = next.width;
+            style.height = next.height;
+          }
         }
 
         const ctx = canvas.getContext('2d');
@@ -140,7 +215,7 @@ export default function PoseOverlay({
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 w-full h-full object-cover pointer-events-none z-10"
+      className="absolute pointer-events-none z-10"
       aria-hidden="true"
     />
   );

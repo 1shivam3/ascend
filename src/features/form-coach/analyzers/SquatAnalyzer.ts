@@ -5,7 +5,7 @@
  * joint-angle tracking, depth estimation, and evidence-backed observations.
  */
 
-import { ExerciseAnalyzer, AnalyzerFrameResult } from './ExerciseAnalyzer';
+import { ExerciseAnalyzer, AnalyzerFrameResult, MovementAssessment } from './ExerciseAnalyzer';
 import { NormalizedLandmark, PoseLandmarkIndex, DetectedSide } from '../models/pose.types';
 import { FormCue, FormObservation, MovementPhase } from '../models/form-feedback.types';
 import { FormRep, FormSessionSummary } from '../models/form-session.types';
@@ -38,6 +38,30 @@ const VISIBILITY_BAD_SHARE = 0.6;
  */
 const FRONT_CONFIDENT_MIN_VOTES = 4;
 const FRONT_CONFIDENT_SHARE = 0.6;
+
+/**
+ * D6: movement-signature thresholds. The analyzer previously graded ANY
+ * tracked movement as a squat — a deadlift set came back as valid squat
+ * reps with depth and torso faults (owner report, 2026-11-05). A frame
+ * is HINGE evidence when the hip is flexed deeply (≤ HINGE_HIP_MAX_DEG)
+ * while the knee stays at least HINGE_KNEE_HIP_MIN_DIFF_DEG straighter
+ * than the hip — the hip-hinge pattern of a deadlift/RDL. A frame is
+ * DEEP evidence when the knee reaches squat-depth flexion
+ * (≤ DEEP_KNEE_MAX_DEG, the state machine's valid-depth band) without
+ * hinge dominance: a genuine squat bottom flexes knee and hip together
+ * (small differential), and even a good-morning squat passes through
+ * deep-knee frames with a small differential on the way down and up.
+ * Only profile-view frames count — the signature, like every other
+ * measurement here, is a side-view measurement.
+ */
+const HINGE_HIP_MAX_DEG = 98;
+const HINGE_KNEE_HIP_MIN_DIFF_DEG = 35;
+const DEEP_KNEE_MAX_DEG = 110;
+const SIGNATURE_MIN_ASSESSED_FRAMES = 20;
+const SIGNATURE_MIN_HINGE_FRAMES = 10;
+const SIGNATURE_MIN_DEEP_FRAMES = 10;
+const SIGNATURE_HINGE_SHARE = 0.7;
+const SIGNATURE_SQUAT_SHARE = 0.5;
 
 /** Majority view over classified votes; 'front' must win outright — a tie
  * resolves to a side view, so the front-view guidance never fires on
@@ -99,6 +123,11 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
   // from "tracked, but no valid reps".
   private framesProcessed = 0;
   private framesTracked = 0;
+  // D6: movement-signature accounting (profile-view frames where both
+  // the knee and hip angles were measurable).
+  private signatureAssessedFrames = 0;
+  private signatureHingeFrames = 0;
+  private signatureDeepKneeFrames = 0;
 
   constructor(config: Partial<RepStateMachineConfig> = {}) {
     this.depthTargetDeg = config.depthTargetDeg ?? DEFAULT_SQUAT_CONFIG.depthTargetDeg;
@@ -209,11 +238,48 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
     this.anklesVisibilityWindow = [];
     this.framesProcessed = 0;
     this.framesTracked = 0;
+    this.signatureAssessedFrames = 0;
+    this.signatureHingeFrames = 0;
+    this.signatureDeepKneeFrames = 0;
   }
 
   /** D4: how many frames were offered vs how many carried a detected pose. */
   getTrackingStats(): { framesProcessed: number; framesTracked: number } {
     return { framesProcessed: this.framesProcessed, framesTracked: this.framesTracked };
+  }
+
+  /**
+   * D6: does the tracked motion actually look like a squat? A set is
+   * judged 'not_squat' only on POSITIVE hinge evidence — many assessed
+   * frames, at least SIGNATURE_MIN_HINGE_FRAMES of them hinge-patterned,
+   * and hinge frames dominating the decisive (hinge or deep) frames.
+   * Anything ambiguous stays 'insufficient_evidence' and the caller
+   * keeps the normal squat-report path: a shallow squat, a brief clip,
+   * or noisy tracking must never be relabeled as another exercise.
+   */
+  getMovementAssessment(): MovementAssessment {
+    const decisive = this.signatureHingeFrames + this.signatureDeepKneeFrames;
+    let signature: MovementAssessment['signature'] = 'insufficient_evidence';
+    if (
+      this.signatureAssessedFrames >= SIGNATURE_MIN_ASSESSED_FRAMES &&
+      this.signatureHingeFrames >= SIGNATURE_MIN_HINGE_FRAMES &&
+      decisive > 0 &&
+      this.signatureHingeFrames / decisive >= SIGNATURE_HINGE_SHARE
+    ) {
+      signature = 'not_squat';
+    } else if (
+      this.signatureDeepKneeFrames >= SIGNATURE_MIN_DEEP_FRAMES &&
+      decisive > 0 &&
+      this.signatureDeepKneeFrames / decisive >= SIGNATURE_SQUAT_SHARE
+    ) {
+      signature = 'squat';
+    }
+    return {
+      signature,
+      assessedFrames: this.signatureAssessedFrames,
+      hingeFrames: this.signatureHingeFrames,
+      deepKneeFrames: this.signatureDeepKneeFrames,
+    };
   }
 
   /**
@@ -365,6 +431,27 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
     // Calculate joint angles
     const kneeAngleDeg = calculateJointAngle(hip, knee, ankle, aspectRatio);
     const torsoInclinationDeg = calculateSegmentInclination(shoulder, hip, aspectRatio);
+
+    // D6: movement-signature accounting. The hip angle (shoulder–hip–knee)
+    // is what separates a squat from a hip hinge: at a squat bottom the
+    // knee and hip flex together, while a deadlift folds the hip deeply
+    // with the knee comparatively straight. Profile views only — front
+    // projections distort both angles, and front view already carries
+    // its own refilm guidance.
+    if ((side === 'left' || side === 'right') && kneeAngleDeg !== null) {
+      const hipAngleDeg = calculateJointAngle(shoulder, hip, knee, aspectRatio);
+      if (hipAngleDeg !== null) {
+        this.signatureAssessedFrames += 1;
+        if (
+          hipAngleDeg <= HINGE_HIP_MAX_DEG &&
+          kneeAngleDeg - hipAngleDeg >= HINGE_KNEE_HIP_MIN_DIFF_DEG
+        ) {
+          this.signatureHingeFrames += 1;
+        } else if (kneeAngleDeg <= DEEP_KNEE_MAX_DEG) {
+          this.signatureDeepKneeFrames += 1;
+        }
+      }
+    }
 
     // Check readiness
     let isReady = true;
