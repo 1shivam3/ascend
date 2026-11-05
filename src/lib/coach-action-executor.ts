@@ -20,6 +20,11 @@ import { useStore } from './store';
 import type { AthleteGoal, MacroGoals } from './types';
 import type { EquipmentAccess } from './workout-engine';
 import { calculateRecommendedMacroGoals } from './macros';
+import {
+  isMinorAge,
+  minorMaintenanceFor,
+  MINOR_MAINTENANCE_TOLERANCE_KCAL,
+} from './minor-targets';
 import { DEFAULT_BODYWEIGHT_KG } from './defaults';
 import { hasRealBodyStats } from './body-stats';
 import { buildIntakePrefill, limitationLabel, type BlockIntake } from './block-intake';
@@ -86,7 +91,14 @@ export type ApplyMacroGoalsResult =
   /** Task 1.1: no stored goals and placeholder body stats — completing
    * the goal set would require deriving numbers from stats the user
    * never entered. Nothing is written. */
-  | { ok: false; stale: false; blocked: 'needs-body-stats' };
+  | { ok: false; stale: false; blocked: 'needs-body-stats' }
+  /** Phase 3 (Task 3.1): the user is 13–17 and the action's calories
+   * would move their target off maintenance. Minors are
+   * maintenance-only; nothing is written. (The store's setMacroGoals
+   * clamp would catch the write anyway — this blocked state exists
+   * so the card can say why, honestly, instead of silently applying
+   * different numbers than the ones it displayed.) */
+  | { ok: false; stale: false; blocked: 'minor-maintenance-only' };
 
 /**
  * Apply a set_macro_goals action against the snapshot the card was
@@ -102,6 +114,27 @@ export function applyMacroGoalsAction(
   if (!macroGoalsBaseMatches(baseSnapshot)) return { ok: false, stale: true };
 
   const previous = state.macroGoals ? { ...state.macroGoals } : null;
+
+  // Phase 3 (Task 3.1): minor maintenance guard. Only the action's
+  // CALORIES are judged — gram-only actions keep the stored calorie
+  // target, which the store clamp already holds at maintenance.
+  // Maintenance comes from the stored goals' own derivation field
+  // when present (it is a property of the user), else from the
+  // profile via the engine helper; when neither exists there is no
+  // honest band to judge against and the store clamp remains the
+  // backstop.
+  if (isMinorAge(state.profile?.age) && action.calories !== undefined) {
+    const maintenance =
+      previous?.maintenanceCalories ??
+      minorMaintenanceFor(state.profile, state.trainingProfile?.activityLevel);
+    if (
+      maintenance != null &&
+      Math.abs(action.calories - maintenance) > MINOR_MAINTENANCE_TOLERANCE_KCAL
+    ) {
+      return { ok: false, stale: false, blocked: 'minor-maintenance-only' };
+    }
+  }
+
   let base: MacroGoals;
   if (previous) {
     base = previous;

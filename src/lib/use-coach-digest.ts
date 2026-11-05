@@ -137,7 +137,10 @@ export function useCoachDigest() {
           macroGoals,
           // Gender drives the safe floor; omitting it silently defaulted
           // everyone to the male floor.
-          profile?.gender ?? 'male'
+          profile?.gender ?? 'male',
+          // Phase 3 (Task 3.1): age drives the minor guard — for a
+          // 13–17 profile the suggestion is always a maintenance hold.
+          profile?.age
         )
       : null;
     // After an apply/dismiss, never immediately re-offer a change: stay
@@ -154,7 +157,7 @@ export function useCoachDigest() {
       weightLogCount: stats.count,
       latestWeightDate: stats.latestDate,
     };
-  }, [bodyMetrics, macroGoals, goals, profile?.gender, coach.lastCalorieAdjustment]);
+  }, [bodyMetrics, macroGoals, goals, profile?.gender, profile?.age, coach.lastCalorieAdjustment]);
 
   // Auto-regulation, wired at last: adjustNextTargets (RPE + reps +
   // pain, %-based) existed fully tested but had ZERO production callers —

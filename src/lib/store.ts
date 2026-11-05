@@ -12,6 +12,7 @@ import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   BodyMetricEntry,
   MacroGoals,
+  resolvePrimaryGoal,
   PlannedWorkout,
   PlannedExercise,
   FavoriteFood,
@@ -159,6 +160,9 @@ import {
   type HealthFetchResult,
 } from './health-connect';
 import { kgToLbs } from './units';
+import { enforceMinorMacroGoals, isMinorAge } from './minor-targets';
+import { calculateRecommendedMacroGoals } from './macros';
+import { hasRealBodyStats } from './body-stats';
 
 export * from './types';
 
@@ -1647,6 +1651,37 @@ export const useAppStore = create<AppState>()(
         const nextGoals = (profile.goals && profile.goals.length > 0)
           ? profile.goals
           : (state.goals && state.goals.length > 0 ? state.goals : ['build_muscle' as AthleteGoal]);
+        // Phase 3 (Task 3.1): DOB/age re-evaluation. Every age change
+        // travels through here — Edit Profile saves, onboarding, and
+        // the page.tsx birthday refresh — so minor status is
+        // re-applied to stored targets in the same write:
+        //  - profile is a minor (13–17) now: clamp stored targets to
+        //    maintenance recomputed from the NEW profile (covers
+        //    entering the band and weight/height edits inside it);
+        //  - profile just LEFT the band (was minor, now 18+):
+        //    recompute targets under adult rules from the new
+        //    profile, so an 18th birthday unlocks the goal's real
+        //    target instead of leaving the maintenance clamp behind;
+        //  - no band change: stored targets pass through untouched.
+        // Placeholder stats never derive (Task 1.1): without real
+        // body stats there is no honest maintenance to clamp to, and
+        // stored goals (the user's own numbers) stay as they are.
+        let nextMacroGoals = state.macroGoals;
+        if (nextMacroGoals && hasRealBodyStats(profile) && profile.bodyweightKg && profile.bodyweightKg > 0) {
+          const activityLevel = state.trainingProfile?.activityLevel;
+          if (isMinorAge(profile.age)) {
+            nextMacroGoals = enforceMinorMacroGoals(nextMacroGoals, profile, activityLevel);
+          } else if (isMinorAge(state.profile?.age)) {
+            nextMacroGoals = calculateRecommendedMacroGoals(
+              profile.bodyweightKg,
+              resolvePrimaryGoal(nextGoals),
+              profile.gender ?? 'male',
+              profile.heightCm ?? undefined,
+              profile.age ?? undefined,
+              activityLevel
+            );
+          }
+        }
         return {
           // Stamp every profile write with the edit time so sync's
           // last-write-wins can tell a fresh local edit from a stale
@@ -1655,6 +1690,7 @@ export const useAppStore = create<AppState>()(
           // refreshed here — sync itself writes via setState, not here.
           profile: { ...profile, goals: nextGoals, updatedAt: new Date().toISOString() },
           goals: nextGoals,
+          macroGoals: nextMacroGoals,
           hasCompletedOnboarding: true,
           bodyMetrics: nextMetrics,
           favoriteFoods: nextFavorites,
@@ -2310,7 +2346,20 @@ export const useAppStore = create<AppState>()(
         return copiedCount;
       },
 
-      setMacroGoals: (goals) => set({ macroGoals: goals }),
+      // Phase 3 (Task 3.1): this setter is the ONE write path for
+      // macro targets — manual editors, Fuel prefs, GoalSelector,
+      // the Home coach suggestion, onboarding seeding and the coach
+      // action executor all land here — so the minor rule is
+      // enforced here: for a 13–17 profile with real body stats,
+      // stored targets are clamped to maintenance (see
+      // lib/minor-targets.ts). Adults and null pass through verbatim.
+      setMacroGoals: (goals) => set((state) => ({
+        macroGoals: enforceMinorMacroGoals(
+          goals,
+          state.profile,
+          state.trainingProfile?.activityLevel
+        ),
+      })),
 
       addBodyMetric: (entry) => set((state) => {
         // Re-audit DI-R3: normalize the date like every other write path
@@ -2938,7 +2987,11 @@ export const useAppStore = create<AppState>()(
           existingPlans: state.plannedWorkouts,
           unit: state.profile?.unit ?? 'kg',
           todayStr,
-          nutritionPhase: intake.goal === 'lose_fat' ? 'deficit' : null,
+          // Phase 3 (Task 3.1): a minor's block never carries a
+          // deficit nutrition phase — minors are maintenance-only
+          // (lib/minor-targets.ts), whatever the training goal.
+          nutritionPhase:
+            intake.goal === 'lose_fat' && !isMinorAge(state.profile?.age) ? 'deficit' : null,
           bodyweightKg: state.profile?.bodyweightKg,
           ageYears: state.profile?.age,
           dislikedExercises: state.trainingProfile?.dislikedExercises ?? [],

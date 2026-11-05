@@ -15,6 +15,7 @@ import {
 } from '@/lib/coach-chat-store';
 import { validateCoachAction } from '@/lib/coach-actions';
 import { weightIsReal } from '@/lib/body-stats';
+import { isMinorAge } from '@/lib/minor-targets';
 import { settlePendingActions } from '@/lib/coach-action-executor';
 import CoachActionCard from '@/components/CoachActionCard';
 import AiNoticeBanner from '@/components/AiNoticeBanner';
@@ -217,6 +218,9 @@ export default function CoachChatSection() {
 
     return {
       userName: profile?.name ?? null,
+      // Phase 3 (Task 3.1): the coach sees the user's age as data;
+      // the same field drives the MINOR ATHLETE prompt rule below.
+      ageYears: profile?.age ?? null,
       // Task 1.1: a placeholder bodyweight the user never entered is
       // NOT context — the coach must see "not logged" and work without
       // it, never compute nutrition advice from a seeded default.
@@ -354,6 +358,9 @@ export default function CoachChatSection() {
             contextText: context.contextText,
             evidence: context.evidence,
             hasData: context.hasData,
+            // Phase 3 (Task 3.1): 13–17 → the route adds the MINOR
+            // ATHLETE rule to the system prompt.
+            minor: isMinorAge(profile?.age),
           },
         }),
       });

@@ -1471,15 +1471,11 @@ export function calculateRecommendedMacroGoals(
     case 'lose_fat': {
       proteinPerKg = 2.2; // Elevated protein to preserve lean mass
       const floor = getSafeMinCalories(gender);
-      const isMinor = typeof ageYears === 'number' && ageYears > 0 && ageYears < 18;
       // Deficit scales with maintenance (20%, capped at 450 kcal): a flat
       // −450 is a gentle cut for a large athlete but a 27% crash for a
       // small sedentary one, which pinned her exactly at the floor.
       const deficit = Math.min(450, Math.round(maintenance * 0.2));
-      if (isMinor) {
-        // Never prescribe an energy deficit to a minor — growth comes first.
-        targetCalories = maintenance;
-      } else if (maintenance - deficit < floor) {
+      if (maintenance - deficit < floor) {
         // Small athletes: the gendered floor would erase (or invert) the
         // deficit. Prescribe the floor — but never ABOVE maintenance,
         // which used to label a surplus as fat loss.
@@ -1498,6 +1494,20 @@ export function calculateRecommendedMacroGoals(
       targetCalories = maintenance; // Sustainable baseline
       proteinPerKg = 1.6;
       break;
+  }
+
+  // Phase 3 (Task 3.1): minors are MAINTENANCE-ONLY — for every goal.
+  // The lose_fat branch used to be the only guarded one (no deficit
+  // under 18); the build_muscle / get_stronger surpluses above were
+  // still prescribed to 13–17-year-olds. Growth comes first: under
+  // 18 the calorie target IS maintenance, whatever the goal. Protein
+  // per kg stays goal-driven (it is not an energy target). The age
+  // range is (0, 18), wider than the 13–17 product band: under-13
+  // accounts are rejected at every entry point, but a legacy or
+  // restored record must still never be prescribed a deficit or a
+  // surplus. See lib/minor-targets.ts for the full enforcement map.
+  if (typeof ageYears === 'number' && ageYears > 0 && ageYears < 18) {
+    targetCalories = maintenance;
   }
 
   // Protein calculation
