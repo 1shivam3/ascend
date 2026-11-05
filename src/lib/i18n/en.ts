@@ -3192,7 +3192,7 @@ export const en = {
   'coachChat.actionNeedsBodyStats': 'Add your weight and height in You → Profile first — complete targets can only be set from your real measurements.',
   'privacy.statusDeviceOnly': 'Your data lives on this device only — nothing is synced to the cloud.',
   'privacy.statusDeviceAndCloud': 'Your data lives on this device and syncs to your private cloud account — only you can access it.',
-  'aiNotice.mealScan': 'AI meal scan: your meal photo is sent to our AI providers (Groq and Google Gemini) to estimate nutrition. Photos are never sent to free-tier models, and ASCEND does not store your photo.',
+  'aiNotice.mealScan': 'AI meal scan: your meal photo is sent to our AI providers (Groq and Google Gemini) to estimate nutrition. If they are unavailable, your photo may be sent to a free-tier vision model via OpenRouter as a fallback — free-tier providers may keep the data they receive. ASCEND does not store your photo.',
   'aiNotice.coachChat': 'AI coach chat: your messages, with your training context, are sent to our AI providers to draft replies. Some free-tier text models may keep submitted text — please avoid sensitive personal details.',
   'aiNotice.dismiss': 'Got it',
   'coachChat.actionExpired': 'This draft expired — ask me again and I will draft a fresh one.',

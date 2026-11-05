@@ -144,7 +144,10 @@ describe('AI first-use notices', () => {
 
   it('notice copy exists in both dictionaries and names the data flow', () => {
     expect(en[aiNoticeMessageKey('meal-scan')]).toContain('Groq and Google Gemini');
-    expect(en[aiNoticeMessageKey('meal-scan')]).toContain('never sent to free-tier models');
+    // User decision 2026-11-05: the :free vision fallback for meal photos
+    // is ENABLED (reversing the earlier ban), so the notice must disclose
+    // the OpenRouter free-tier fallback instead of claiming a ban.
+    expect(en[aiNoticeMessageKey('meal-scan')]).toContain('free-tier vision model via OpenRouter');
     expect(en[aiNoticeMessageKey('coach-chat')]).toContain('free-tier text models may keep submitted text');
     expect(hi[aiNoticeMessageKey('meal-scan')]).toBeTruthy();
     expect(hi[aiNoticeMessageKey('coach-chat')]).toBeTruthy();

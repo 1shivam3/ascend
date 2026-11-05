@@ -164,12 +164,22 @@ export const GROQ_TEXT_MODELS = [
   'qwen/qwen3.8-27b',
 ];
 
-// OpenRouter Vision Models:
-// OpenRouter routes requests through third-party host aggregators whose data retention terms vary.
-// Free-tier endpoints (:free) log prompts and imagery for host model training, making them unsuitable for meal photos.
-// Production meal photos route directly to verified first-party developer endpoints (Groq LPU and Google Gemini API).
-// OpenRouter is intentionally skipped for vision (empty array) to guarantee user photo privacy.
-export const OPENROUTER_VISION_MODELS: string[] = [];
+// OpenRouter Vision Models — FREE-TIER FALLBACK (user decision, 2026-11-05):
+// Meal photos go to first-party commercial endpoints first (Groq LPU, then
+// Google Gemini API). Only when Groq is unavailable does the cascade fall
+// through to these OpenRouter :free vision models. Free-tier endpoints may
+// retain submitted data under their hosts' terms; every OpenRouter vision
+// request carries the `X-Data-Collection: deny` header (see
+// callOpenRouterVision). This reverses the earlier hard ban on :free vision
+// models by the user's explicit decision of 2026-11-05, and the fallback is
+// disclosed in the Privacy Policy (LEGAL_VERSION 2.11).
+// IDs verified against OpenRouter's public models listing
+// (openrouter.ai/api/v1/models) on 2026-11-05: zero pricing and image in
+// architecture.input_modalities for both.
+export const OPENROUTER_VISION_MODELS: string[] = [
+  'nvidia/nemotron-3.5-super-vl:free',
+  'google/gemma-4-31b-it:free',
+];
 
 // OpenRouter verified models for text-only (natural language logging, coach)
 // Empirically tested live with sub-3s response latencies under valid JSON completion
@@ -303,12 +313,9 @@ async function callOpenRouterVision<T>(
   opts: VisionOptions,
   timeoutMs: number
 ): Promise<T> {
-  if (model.endsWith(':free')) {
-    throw new Error(
-      `OpenRouter model ${model} uses free-tier third-party logging/training terms and is strictly prohibited for user meal photos`
-    );
-  }
-
+  // :free vision models are allowed here as the post-Groq fallback
+  // (user decision, 2026-11-05 — see OPENROUTER_VISION_MODELS). The
+  // X-Data-Collection: deny header below is sent on every request.
   const { signal, cleanup } = createTimeoutController(timeoutMs, opts.signal);
 
   try {
@@ -428,7 +435,7 @@ export async function executeMultiProviderVision<T>(
       errors.push('Groq: GROQ_API_KEY not configured');
     }
 
-    // --- STAGE 2: OPENROUTER (Skipped for vision by default to protect photo privacy) ---
+    // --- STAGE 2: OPENROUTER (free-tier vision fallback — only reached when Groq fails; user decision 2026-11-05) ---
     const openRouterKey = getServerOpenRouterApiKey();
     if (openRouterKey && OPENROUTER_VISION_MODELS.length > 0) {
       for (const model of OPENROUTER_VISION_MODELS) {
