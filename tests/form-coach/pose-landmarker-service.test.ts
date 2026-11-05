@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { PoseLandmarkerService } from '../../src/features/form-coach/services/pose/PoseLandmarkerService';
 
 describe('PoseLandmarkerService', () => {
@@ -15,6 +17,18 @@ describe('PoseLandmarkerService', () => {
     expect(service.getStatus()).toBe('uninitialized');
     expect(service.getErrorMessage()).toBeNull();
     expect(service.isUsingWorker()).toBe(false);
+  });
+
+  it('defaults to the self-hosted FULL pose model, and the asset ships', () => {
+    // User decision 2026-11-05: the heavier model. The lite model never
+    // detected the lifter behind the plate in the owner's front-view video
+    // (WA0013 — spotter only on 115/115 frames), so subject selection had
+    // nothing to select. Pin both the resolved path AND the file's
+    // presence: a path pin alone would still 404 if the asset went missing.
+    const service = new PoseLandmarkerService();
+    const modelPath = (service as any).config.modelPath as string;
+    expect(modelPath).toBe('/mediapipe/models/pose_landmarker_full.task');
+    expect(existsSync(join(process.cwd(), 'public', modelPath))).toBe(true);
   });
 
   it('rejects in SSR context when window is undefined', async () => {

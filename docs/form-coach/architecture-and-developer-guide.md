@@ -12,7 +12,7 @@ V1 delivers a full production implementation for **Barbell Back Squat**, with an
 | Component | Technology | Role |
 |---|---|---|
 | **Pose Estimation** | `@mediapipe/tasks-vision` (v0.10.21) | Google MediaPipe 33-point body landmark tracking |
-| **Model Asset** | `pose_landmarker_lite.task` (5.77 MB) | Quantized Float16 on-device neural model (Apache 2.0 License) |
+| **Model Asset** | `pose_landmarker_full.task` (9.40 MB) | Quantized Float16 on-device neural model (Apache 2.0 License). Switched from the lite model 2026-11-05: lite never detected the lifter behind the plate in the owner's front-view video (spotter only); full detects both people so subject selection can pick the lifter. |
 | **WASM Runtime** | `public/mediapipe/wasm/` | Locally bundled WebAssembly binaries (`vision_wasm_internal.*`) |
 | **Threading** | Web Worker (`pose.worker.ts`) | Off-main-thread inference with transferable `ImageBitmap` |
 | **Main-Thread Fallback** | `PoseLandmarkerService` | Direct GPU/WebGL inference if Web Workers are restricted |
