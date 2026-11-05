@@ -1193,7 +1193,7 @@ export const en = {
   'settings.methodGuest': 'Guest',
   'settings.signedInWith': 'Signed in with {method}',
   'settings.guestMethodNote': 'Guest — your data stays on this device.',
-  'settings.supportedMethods': 'Ways to sign in: Google, Apple, email & password, email link — or continue as guest.',
+  'settings.supportedMethods': 'Ways to sign in: Google, or email & password — or continue as guest.',
   'settings.customizeTodayHint': 'Choose which Today sections show, and their order.',
   'settings.themeDark': 'Graphite Dark',
   'settings.themeLight': 'Chalk Light',

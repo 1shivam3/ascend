@@ -1200,7 +1200,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'settings.methodGuest': 'गेस्ट',
   'settings.signedInWith': '{method} से साइन इन है',
   'settings.guestMethodNote': 'गेस्ट — आपका डेटा इसी डिवाइस पर रहता है।',
-  'settings.supportedMethods': 'साइन-इन तरीके: गूगल, ऐपल, ईमेल और पासवर्ड, ईमेल लिंक — या गेस्ट के रूप में जारी रखें।',
+  'settings.supportedMethods': 'साइन-इन तरीके: गूगल, या ईमेल और पासवर्ड — या गेस्ट के रूप में जारी रखें।',
   'settings.customizeTodayHint': 'चुनें कि Today में कौन-से सेक्शन दिखें और किस क्रम में।',
   'settings.themeDark': 'ग्रेफ़ाइट डार्क',
   'settings.themeLight': 'चॉक लाइट',

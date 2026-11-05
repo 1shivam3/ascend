@@ -681,6 +681,16 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             )}
           </div>
         </div>
+        {/* Sign-in methods card (Task 1.3): the offered methods are
+            Google and email & password ONLY — no Apple sign-in and
+            no email-link/magic-link flow exist in this app, and the
+            settings.supportedMethods copy must never claim otherwise.
+            App Store Review Guideline 4.8 note: third-party login
+            services on iOS must be paired with an equivalent-privacy
+            option (e.g. Sign in with Apple). ASCEND ships Android /
+            web only today; if an iOS build ever ships with Google
+            sign-in, add Sign in with Apple AND update the copy in
+            the same change. */}
         <div className="card p-4 sm:p-5 bg-bg-card border border-border rounded-2xl shadow-xs space-y-3">
           <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.accountMethods')}</span>
           {user ? (
