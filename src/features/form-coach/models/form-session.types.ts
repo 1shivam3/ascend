@@ -22,6 +22,16 @@ export interface FormRep {
   observations: string[];
   isValid: boolean;
   invalidReason?: string;
+  /**
+   * Deadlift measurements (stamped by the deadlift analyzer only; squat
+   * reps leave these undefined). minHipAngleDeg is the deepest hip fold
+   * of the rep; lockoutAchieved says whether the rep finished with hips
+   * and knees fully extended; hipsRoseFirst flags the measured pattern
+   * of the hips rising ahead of the shoulders during the pull.
+   */
+  minHipAngleDeg?: number;
+  lockoutAchieved?: boolean;
+  hipsRoseFirst?: boolean;
 }
 
 export interface FormSessionSummary {

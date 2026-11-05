@@ -24,6 +24,13 @@ export interface RuleEvaluationContext {
   phase: MovementPhase;
   currentKneeAngleDeg: number | null;
   minKneeAngleDeg: number | null;
+  /**
+   * Hip-angle equivalents for hinge-pattern analyzers (deadlift).
+   * Optional so squat contexts keep compiling unchanged; the deadlift
+   * rules read these.
+   */
+  currentHipAngleDeg?: number | null;
+  minHipAngleDeg?: number | null;
   torsoInclinationDeg: number | null;
   trackingConfidence: number;
   feetVisible: boolean;
