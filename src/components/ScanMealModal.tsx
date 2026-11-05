@@ -14,7 +14,7 @@ import { getLocalTodayStr, round1 } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
 import ReportAIModal from '@/components/ReportAIModal';
 import AiNoticeBanner from '@/components/AiNoticeBanner';
-import { toUserMessage } from '@/lib/user-error';
+import { localizedUserMessage } from '@/lib/user-error';
 import PermissionHelp from '@/components/ui/PermissionHelp';
 import { getCurrentLanguage, useTranslation, type StringKey } from '@/lib/i18n';
 import { useAppNavigation } from '@/lib/navigation';
@@ -69,7 +69,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const store = useStore();
   const toast = useToast();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -356,7 +356,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       // REQUIREMENT 13 + QA4-016: never render raw err.message — the
       // central sanitizer maps memory/quota and everything else to
       // safe, actionable copy (no URLs, status codes, provider names).
-      const message = toUserMessage(err, 'image', false);
+      const message = localizedUserMessage(t, language, err, 'image', false);
 
       setScanError(message);
       toast.error(message, t('scan.photoNotice'));
@@ -456,7 +456,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       // QA4-016: ALL errors go through the central sanitizer now — the
       // old code only sanitized provider-named errors and rendered
       // err.message raw for everything else (URLs, status codes, JSON).
-      const errorMsg = toUserMessage(err, 'scan', false);
+      const errorMsg = localizedUserMessage(t, language, err, 'scan', false);
       setScanError(errorMsg);
       toast.error(errorMsg, t('scan.noticeTitle'));
       setStep('select');

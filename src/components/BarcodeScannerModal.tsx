@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { FoodItem } from '@/lib/types';
 import { round1 } from '@/lib/formatters';
-import { toUserMessage } from '@/lib/user-error';
+import { localizedUserMessage } from '@/lib/user-error';
 import { fetchProductByBarcode, ScannedProduct, scannedProductToFoodItem } from '@/lib/openfoodfacts';
 import { getFoodSuggestions, estimateMacros } from '@/lib/macros';
 import { selectScannerEngine, NATIVE_BARCODE_FORMATS, isValidManualBarcode, validatePer100gMacros } from '@/lib/barcode-scanner';
@@ -49,7 +49,7 @@ export default function BarcodeScannerModal({
 }: BarcodeScannerModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const toast = useToast();
   const addFavoriteFood = useStore((state) => state.addFavoriteFood);
 
@@ -532,7 +532,7 @@ export default function BarcodeScannerModal({
         toast.info(t('scan2.unclearMsg'), t('scan2.labelScan'));
       }
     } catch (err: any) {
-      toast.error(toUserMessage(err, 'image'), t('scan2.labelFail'));
+      toast.error(localizedUserMessage(t, language, err, 'image'), t('scan2.labelFail'));
     } finally {
       setIsScanningLabel(false);
       if (labelInputRef.current) labelInputRef.current.value = '';

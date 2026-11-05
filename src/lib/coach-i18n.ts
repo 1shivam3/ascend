@@ -15,6 +15,7 @@
  *
  * Param conventions (the renderer localizes these by NAME):
  * - `day`: a DayOfWeek id ('monday' …) → full weekday name in the UI language.
+ *   `fromDay` / `toDay` (schedule-move proposals) localize the same way.
  * - `exercise`: a library exercise name → EXERCISE_NAME_HI in Hindi mode,
  *   unchanged otherwise (unknown / user-created names fall back to the original).
  * - `family`: a MovementFamily id → 'horizontal push' in English,
@@ -54,7 +55,12 @@ const FAMILY_HI: Record<MovementFamily, string> = {
   other: 'अन्य',
 };
 
-function localizeDay(value: string, language: Language): string {
+/**
+ * Full weekday name for a DayOfWeek id in the given language (unknown
+ * ids pass through). Exported for renderers that hold raw day ids
+ * outside a LocalizedSentence (e.g. a review's missedDays list).
+ */
+export function localizeDay(value: string, language: Language): string {
   const idx = DAY_ORDER.indexOf(value as DayOfWeek);
   return idx >= 0 ? WEEKDAYS[language].full[idx] : value;
 }
@@ -67,7 +73,7 @@ function localizeFamily(value: string, language: Language): string {
 
 function localizeParam(name: string, value: string | number, language: Language): string | number {
   if (typeof value !== 'string') return value;
-  if (name === 'day') return localizeDay(value, language);
+  if (name === 'day' || name === 'fromDay' || name === 'toDay') return localizeDay(value, language);
   if (name === 'exercise') return language === 'hi' ? (getExerciseHindiName(value) ?? value) : value;
   if (name === 'family') return localizeFamily(value, language);
   if (name === 'fams')

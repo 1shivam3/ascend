@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useStore, getLastImportNormalizedCount } from '@/lib/store';
-import { toUserMessage } from '@/lib/user-error';
+import { localizedUserMessage } from '@/lib/user-error';
 import { useToast } from '@/components/ui/Toast';
 import { ensureDeleteWillPersist } from '@/lib/delete-persist-guard';
 import { resolveWorkoutMode } from '@/lib/workout-mode';
@@ -117,7 +117,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   const workoutMode = resolveWorkoutMode(uiPreferences.density, uiPreferences.workoutModeOverride);
   const plannedWorkouts = useStore((state) => state.plannedWorkouts);
   const toast = useToast();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const modeLabel = (m: string) =>
     t(
       m === 'intermediate'
@@ -575,7 +575,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         setShowDeleteConfirm(false);
       }
     } catch (err: any) {
-      toast.error(toUserMessage(err, 'generic'));
+      toast.error(localizedUserMessage(t, language, err, 'generic'));
     } finally {
       setIsDeleting(false);
     }

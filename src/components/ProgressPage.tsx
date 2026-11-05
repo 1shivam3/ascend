@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { tabListKeyDown } from '@/lib/tab-keyboard';
 import { useStore } from '@/lib/store';
-import { toUserMessage } from '@/lib/user-error';
+import { localizedUserMessage } from '@/lib/user-error';
 import { isSetCompleted, BodyMetricEntry, WorkoutEntry, resolvePrimaryGoal } from '@/lib/types';
 import {
   TrendingUp,
@@ -273,7 +273,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   const uiPreferences = useStore((state) => state.uiPreferences);
   const setUiPreferences = useStore((state) => state.setUiPreferences);
   const toast = useToast();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   // Audit-3 FE-19: rollover-aware "today" (was: new Date() at render —
   // an app left open overnight kept showing yesterday as today).
   const todayStr = useToday();
@@ -322,7 +322,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
         toast.success(t('progress.photoAddedMsg'), t('progress.photoAddedTitle'));
       }
     } catch (err) {
-      toast.error(toUserMessage(err, 'image'), t('progress.photoUploadFailedTitle'));
+      toast.error(localizedUserMessage(t, language, err, 'image'), t('progress.photoUploadFailedTitle'));
     } finally {
       setIsUploadingPhoto(false);
     }

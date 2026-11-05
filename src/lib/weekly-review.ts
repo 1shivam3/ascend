@@ -60,14 +60,15 @@ import { kgToLbs, lbsToKg } from './units';
 export type ReviewFocusKind = 'safety' | 'adherence' | 'stall' | 'progression' | 'consistency';
 
 export type RevisionProposal =
-  | { kind: 'next_week_type'; text: string }
-  | { kind: 'stall_change'; exerciseKey: string; text: string }
+  | { kind: 'next_week_type'; text: string; textI18n?: LocalizedSentence }
+  | { kind: 'stall_change'; exerciseKey: string; text: string; textI18n?: LocalizedSentence }
   | {
       kind: 'schedule_move';
       fromDay: DayOfWeek;
       toDay: DayOfWeek;
       planId: string;
       text: string;
+      textI18n?: LocalizedSentence;
       applied?: boolean;
     };
 
@@ -80,9 +81,15 @@ export interface WeeklyReview {
   tonnageKg: number;
   tonnageDeltaPct: number | null;
   volumeHighlights: { muscle: string; sets: number; deltaSets: number }[];
-  prs: { exercise: string; detail: string }[];
+  prs: { exercise: string; detail: string; detailI18n?: LocalizedSentence }[];
   recoveryLines: string[];
+  /** Item-4: index-aligned localizable structs for recoveryLines
+   *  (null where a line has no struct). Optional: reviews persisted
+   *  before this field existed fall back to the English lines. */
+  recoveryLinesI18n?: (LocalizedSentence | null)[];
   coachLines: string[];
+  /** Item-4: index-aligned localizable structs for coachLines. */
+  coachLinesI18n?: (LocalizedSentence | null)[];
   painEscalation: string | null;
   /** LIVE-P1-03: same escalation as a localizable struct (family ids, not display text). */
   painEscalationI18n?: LocalizedSentence | null;
@@ -293,25 +300,38 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
   // PRs set this week.
   const prs = input.prs
     .filter((pr) => inWeek(pr.date, monday))
-    .map((pr) => ({
-      exercise: pr.exercise,
-      detail:
+    .map((pr) => {
+      const detailI18n: LocalizedSentence =
         pr.oneRepMax > 0
-          ? `estimated 1RM ${Math.round(pr.oneRepMax)} kg`
-          : `${Math.round(pr.weightKg)} kg × ${pr.reps}`,
-    }));
+          ? { key: 'weeklyReview.prEstimated1RM', params: { value: Math.round(pr.oneRepMax) } }
+          : { key: 'weeklyReview.prSet', params: { value: Math.round(pr.weightKg), reps: pr.reps } };
+      return {
+        exercise: pr.exercise,
+        detail:
+          pr.oneRepMax > 0
+            ? `estimated 1RM ${Math.round(pr.oneRepMax)} kg`
+            : `${Math.round(pr.weightKg)} kg × ${pr.reps}`,
+        detailI18n,
+      };
+    });
 
   // Recovery vs the athlete's own baselines (PR-A check-in means, 1–5).
   const recoveryLines: string[] = [];
+  const recoveryLinesI18n: (LocalizedSentence | null)[] = [];
   const model = input.athleteModel;
   const weekCheckins = Object.entries(input.dailyCheckins)
     .filter(([date]) => inWeek(date, monday))
     .map(([, c]) => c);
   if (model && weekCheckins.length >= 2) {
-    const dims: { key: 'sleep' | 'soreness' | 'energy'; label: string }[] = [
-      { key: 'sleep', label: 'Sleep' },
-      { key: 'soreness', label: 'Soreness score' },
-      { key: 'energy', label: 'Energy' },
+    const dims: {
+      key: 'sleep' | 'soreness' | 'energy';
+      label: string;
+      above: LocalizedSentence['key'];
+      below: LocalizedSentence['key'];
+    }[] = [
+      { key: 'sleep', label: 'Sleep', above: 'weeklyReview.recoverySleepAbove', below: 'weeklyReview.recoverySleepBelow' },
+      { key: 'soreness', label: 'Soreness score', above: 'weeklyReview.recoverySorenessAbove', below: 'weeklyReview.recoverySorenessBelow' },
+      { key: 'energy', label: 'Energy', above: 'weeklyReview.recoveryEnergyAbove', below: 'weeklyReview.recoveryEnergyBelow' },
     ];
     for (const dim of dims) {
       const baseline = model.checkinBaselines[dim.key];
@@ -327,16 +347,22 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
         recoveryLines.push(
           `${dim.label} averaged ${round1(mean)} this week — ${delta > 0 ? 'above' : 'below'} your usual ${round1(baseline.value)} across the last 8 weeks.`
         );
+        recoveryLinesI18n.push({
+          key: delta > 0 ? dim.above : dim.below,
+          params: { mean: round1(mean), baseline: round1(baseline.value) },
+        });
       }
     }
   }
   if (recoveryLines.length === 0 && weekCheckins.length > 0) {
     recoveryLines.push('Check-ins this week sat close to your usual baselines — no recovery flags.');
+    recoveryLinesI18n.push({ key: 'weeklyReview.recoveryBaselineOk' });
   }
 
   // What the coach changed this week, and why (from the policy ledger +
   // plateau proposals applied in the window).
   const coachLines: string[] = [];
+  const coachLinesI18n: (LocalizedSentence | null)[] = [];
   const weekDecisions = input.policyRecords.filter((r) =>
     inWeek((r.createdAt || '').slice(0, 10), monday)
   );
@@ -349,16 +375,30 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
         ? `${d.exerciseName}: load progression approved by the policy — the lift hit the top of its rep range with effort to spare.`
         : `${d.exerciseName}: rep progression — the load stays, the target rep goes up by one.`
     );
+    coachLinesI18n.push({
+      key: d.ruleId === 'LOAD-PROG-01' ? 'weeklyReview.coachLoadProgression' : 'weeklyReview.coachRepProgression',
+      params: { exercise: d.exerciseName },
+    });
   }
   const safetyHolds = weekDecisions.filter((r) => r.ruleId === 'SAFETY-01');
   if (safetyHolds.length > 0) {
     coachLines.push(
       `Progression was locked on ${safetyHolds[0].exerciseName} after a pain report (SAFETY-01) — safety rules outrank progression, always.`
     );
+    coachLinesI18n.push({
+      key: 'weeklyReview.coachSafetyHold',
+      params: { exercise: safetyHolds[0].exerciseName },
+    });
   }
   for (const p of input.coachBlocks.plateauProposals ?? []) {
     if (p.status === 'applied' && inWeek(p.createdOn, monday)) {
       coachLines.push(`Plateau change applied: ${p.changeText}`);
+      // The change text itself is a nested generated string and passes
+      // through untranslated; the frame around it localizes.
+      coachLinesI18n.push({
+        key: 'weeklyReview.coachPlateauApplied',
+        params: { change: p.changeText },
+      });
     }
   }
 
@@ -393,10 +433,24 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
       coachLines.push(
         `Form checks: ${weekFormSessions.length} ${label}${sessionWord} · depth below parallel on ${below} of ${formReps.length} reps · avg tempo ${avgTempo}s/rep`
       );
+      coachLinesI18n.push({
+        key: 'weeklyReview.coachFormChecksReps',
+        params: {
+          count: weekFormSessions.length,
+          scope: `${label}${sessionWord}`,
+          below,
+          total: formReps.length,
+          tempo: avgTempo,
+        },
+      });
     } else {
       coachLines.push(
         `Form checks: ${weekFormSessions.length} ${label}${sessionWord} · no valid reps measured`
       );
+      coachLinesI18n.push({
+        key: 'weeklyReview.coachFormChecksNoReps',
+        params: { count: weekFormSessions.length, scope: `${label}${sessionWord}` },
+      });
     }
   }
 
@@ -442,6 +496,15 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
             : nextType === 'test'
               ? `Next week is week ${weekNo} — test week. Main lifts get measured; progressions pause so the numbers are honest.`
               : `Next week is week ${weekNo} of your block — a build week. Same plan, progression rules live.`,
+        textI18n: {
+          key:
+            nextType === 'deload'
+              ? 'weeklyReview.revisionNextWeekDeload'
+              : nextType === 'test'
+                ? 'weeklyReview.revisionNextWeekTest'
+                : 'weeklyReview.revisionNextWeekBuild',
+          params: { week: weekNo },
+        },
       });
     }
   }
@@ -450,6 +513,10 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
       kind: 'stall_change',
       exerciseKey: canonicalizeExerciseName(managedStall.exercise),
       text: `A plateau change for ${managedStall.exercise} is waiting in Train → Your Coach.`,
+      textI18n: {
+        key: 'weeklyReview.revisionStallChange',
+        params: { exercise: managedStall.exercise },
+      },
     });
   }
   // Schedule realism: the athlete-model's most-skipped day was ALSO
@@ -474,6 +541,10 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
         toDay: freeDay,
         planId,
         text: `${mostSkipped} keeps getting skipped — it is your most-missed day across the last 8 weeks too. Move this session to ${freeDay}? The plan itself does not change.`,
+        textI18n: {
+          key: 'weeklyReview.revisionScheduleMove',
+          params: { fromDay: mostSkipped, toDay: freeDay },
+        },
       });
     }
   }
@@ -596,7 +667,9 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
     volumeHighlights,
     prs,
     recoveryLines,
+    recoveryLinesI18n,
     coachLines,
+    coachLinesI18n,
     painEscalation,
     painEscalationI18n,
     focus,

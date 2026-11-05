@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { X, User, Check, Scale, Ruler, Camera, Trash2 } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { toUserMessage } from '@/lib/user-error';
+import { localizedUserMessage } from '@/lib/user-error';
 import { useToast } from '@/components/ui/Toast';
 import { useTranslation } from '@/lib/i18n';
 import { Gender, Unit, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
@@ -23,7 +23,7 @@ export interface EditProfileModalProps {
 export default function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const storeProfile = useStore((state) => state.profile);
   const profile = storeProfile ?? useStore.getState().profile;
   const setProfile = useStore((state) => state.setProfile);
@@ -111,7 +111,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
       setProfile({ ...profile, avatar: dataUrl });
       toast.success(t('editProfile.photoUpdated'), t('editProfile.photoSetTitle'));
     } catch (err) {
-      toast.error(toUserMessage(err, 'image'), t('progress.photoUploadFailedTitle'));
+      toast.error(localizedUserMessage(t, language, err, 'image'), t('progress.photoUploadFailedTitle'));
     } finally {
       setIsUploadingAvatar(false);
     }

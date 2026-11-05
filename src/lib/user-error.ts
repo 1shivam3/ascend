@@ -17,14 +17,40 @@
  * never returned. The returned string NEVER contains a URL, a status
  * code, a provider name, or raw exception text. Pattern checks run on
  * the raw message internally only; nothing raw is echoed back.
+ *
+ * Localization (item-4, 2026-11-05): every fixed message also carries
+ * a `LocalizedSentence` key (`userError.*`) via
+ * `toUserMessageLocalized`, so client callers can render it through
+ * coach-i18n's renderLocalizedSentence in the UI language. The one
+ * exception is the pass-through branch: short plain-language messages
+ * written by our own code are returned as-is (they are already in
+ * whatever language the throwing code produced) with no struct.
+ * All callers are client components — no server route calls this.
  */
+import { renderLocalizedSentence } from './coach-i18n';
+import type { LocalizedSentence } from './coach-i18n';
+import type { Language, StringKey } from './i18n/en';
 
 export type UserErrorContext = 'scan' | 'image' | 'generic';
+
+export interface UserMessage {
+  /** Safe English copy (identical to what toUserMessage returns). */
+  text: string;
+  /** Localizable struct for the same copy, when the copy is one of
+   *  this module's fixed messages. Absent for pass-through messages. */
+  i18n?: LocalizedSentence;
+}
 
 const FALLBACKS: Record<UserErrorContext, string> = {
   scan: 'Could not analyze this photo. Please try again, or use manual food search or the offline estimate below.',
   image: 'Failed to process this photo. Please try again.',
   generic: 'Something went wrong. Please try again.',
+};
+
+const FALLBACK_KEYS: Record<UserErrorContext, StringKey> = {
+  scan: 'userError.fallbackScan',
+  image: 'userError.fallbackImage',
+  generic: 'userError.fallbackGeneric',
 };
 
 /** Provider / config vocabulary that must never reach the UI. Detection
@@ -74,6 +100,18 @@ export function toUserMessage(
   context: UserErrorContext = 'generic',
   log = true,
 ): string {
+  return toUserMessageLocalized(err, context, log).text;
+}
+
+/**
+ * Same mapping as toUserMessage, but also returns the localizable
+ * struct for fixed copy so callers can render in the UI language.
+ */
+export function toUserMessageLocalized(
+  err: unknown,
+  context: UserErrorContext = 'generic',
+  log = true,
+): UserMessage {
   if (log && typeof console !== 'undefined') {
     // Full detail stays on the console side for support/diagnostics.
     console.error('[ascend] user-facing error (sanitized):', err);
@@ -83,10 +121,11 @@ export function toUserMessage(
   const lower = raw.toLowerCase();
   const code = codeOf(err);
   const name = nameOf(err);
+  const fixed = (text: string, key: StringKey): UserMessage => ({ text, i18n: { key } });
 
   // Cancelled by the user / superseded request — not an error at all.
   if (name === 'AbortError' || lower.includes('abort')) {
-    return 'Cancelled.';
+    return fixed('Cancelled.', 'userError.cancelled');
   }
 
   // AI daily quota / fleet cap (server codes AI_QUOTA_EXCEEDED /
@@ -97,8 +136,8 @@ export function toUserMessage(
   // generic fallback and the remedy was lost.
   if (code === 'AI_QUOTA_EXCEEDED' || code === 'AI_DAILY_CAP') {
     return context === 'scan'
-      ? "You've reached today's AI scan limit — it resets tomorrow, and signing in raises the limit. Manual food search and the offline estimate still work."
-      : "You've reached today's AI limit — it resets tomorrow, and signing in raises the limit.";
+      ? fixed("You've reached today's AI scan limit — it resets tomorrow, and signing in raises the limit. Manual food search and the offline estimate still work.", 'userError.quotaScan')
+      : fixed("You've reached today's AI limit — it resets tomorrow, and signing in raises the limit.", 'userError.quotaGeneric');
   }
 
   // Device memory / storage pressure (image pipeline).
@@ -108,7 +147,7 @@ export function toUserMessage(
     lower.includes('quota') ||
     lower.includes('out of memory')
   ) {
-    return 'Your device is low on memory or storage. Try closing background apps, then try again.';
+    return fixed('Your device is low on memory or storage. Try closing background apps, then try again.', 'userError.lowMemory');
   }
 
   // Connectivity.
@@ -118,12 +157,12 @@ export function toUserMessage(
     lower.includes('offline') ||
     code === 'NETWORK_ERROR'
   ) {
-    return 'No connection right now. Check your internet and try again — or use the offline options below.';
+    return fixed('No connection right now. Check your internet and try again — or use the offline options below.', 'userError.noConnection');
   }
 
   // Timeouts.
   if (name === 'TimeoutError' || lower.includes('timed out') || lower.includes('timeout')) {
-    return 'That took too long and timed out. Please try again.';
+    return fixed('That took too long and timed out. Please try again.', 'userError.timeout');
   }
 
   // AI provider unconfigured / unavailable (keys, provider names, 503s).
@@ -134,13 +173,13 @@ export function toUserMessage(
     PROVIDER_OR_CONFIG_PATTERN.test(raw)
   ) {
     return context === 'scan'
-      ? 'Meal photo recognition is temporarily unavailable. You can use manual food search or the offline estimate below.'
-      : 'This feature is temporarily unavailable. Please try again later.';
+      ? fixed('Meal photo recognition is temporarily unavailable. You can use manual food search or the offline estimate below.', 'userError.unavailableScan')
+      : fixed('This feature is temporarily unavailable. Please try again later.', 'userError.unavailableGeneric');
   }
 
   // Rate limiting — status kept server-side; user gets the action.
   if (code === '429' || lower.includes('rate limit') || lower.includes('too many requests')) {
-    return 'Too many requests right now. Please wait a moment and try again.';
+    return fixed('Too many requests right now. Please wait a moment and try again.', 'userError.rateLimit');
   }
 
   // Bad image input.
@@ -148,19 +187,36 @@ export function toUserMessage(
     lower.includes('image') &&
     (lower.includes('too large') || lower.includes('unsupported') || lower.includes('invalid'))
   ) {
-    return 'That photo could not be read. Try a different photo (JPEG or PNG works best).';
+    return fixed('That photo could not be read. Try a different photo (JPEG or PNG works best).', 'userError.badImage');
   }
 
   // Anything that still looks like internals → generic fallback.
   if (!raw || URL_OR_CODE_PATTERN.test(raw) || PROVIDER_OR_CONFIG_PATTERN.test(raw)) {
-    return FALLBACKS[context];
+    return fixed(FALLBACKS[context], FALLBACK_KEYS[context]);
   }
 
   // Short, plain-language messages from our own code are safe to show:
   // single sentence, no internals (checked above), reasonable length.
+  // No struct: the message is app-authored copy, shown as written.
   if (raw.length <= 120 && !raw.includes('\n') && !RAW_EXCEPTION_PATTERN.test(raw)) {
-    return raw;
+    return { text: raw };
   }
 
-  return FALLBACKS[context];
+  return fixed(FALLBACKS[context], FALLBACK_KEYS[context]);
+}
+
+/**
+ * One-call convenience for client callers: sanitize + render in the
+ * UI language. Falls back to the English text for pass-through
+ * messages (no struct) and whenever the language is English.
+ */
+export function localizedUserMessage(
+  t: (key: StringKey, params?: Record<string, string | number>) => string,
+  language: Language,
+  err: unknown,
+  context: UserErrorContext = 'generic',
+  log = true,
+): string {
+  const m = toUserMessageLocalized(err, context, log);
+  return renderLocalizedSentence(t, language, m.i18n, m.text);
 }
