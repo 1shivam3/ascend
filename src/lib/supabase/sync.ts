@@ -721,7 +721,8 @@ class SupabaseSyncEngine {
 
   public async signInWithPassword(
     email: string,
-    password: string
+    password: string,
+    opts?: { deferSync?: boolean }
   ): Promise<{ error?: string; user?: AuthUser }> {
     if (typeof window !== 'undefined') {
       try {
@@ -747,12 +748,45 @@ class SupabaseSyncEngine {
           isAnonymous: false,
         };
         this.notify();
-        await this.triggerSyncNow();
+        // Task 1.4: deferSync lets the caller interpose the
+        // merge-choice BEFORE the first sync runs — once
+        // triggerSyncNow executes, the guest-migration merge is
+        // already decided. Callers that defer MUST call
+        // triggerSyncNow themselves after the user chooses.
+        if (!opts?.deferSync) {
+          await this.triggerSyncNow();
+        }
         return { user: this.currentUser };
       }
       return {};
     } catch (err: any) {
       return { error: err?.message || 'Login failed' };
+    }
+  }
+
+  /**
+   * Task 1.4: does this account already hold data in the cloud?
+   * Used by the post-login merge choice: the choice is offered only
+   * when BOTH the device (guest data) and the account have something
+   * to lose. RLS scopes every query to the signed-in user, so any
+   * row visible here is the account's own. Best-effort: a failed
+   * probe reads as "no cloud data" and the normal sync proceeds.
+   */
+  public async accountHasCloudData(userId: string): Promise<boolean> {
+    const supabase = getSupabase();
+    if (!supabase) return false;
+    try {
+      const [profileRes, workoutsRes, mealsRes] = await Promise.all([
+        supabase.from('profiles').select('id').eq('id', userId).maybeSingle(),
+        supabase.from('workouts').select('id').eq('user_id', userId).limit(1),
+        supabase.from('meals').select('id').eq('user_id', userId).limit(1),
+      ]);
+      if (profileRes.data) return true;
+      if (workoutsRes.data && workoutsRes.data.length > 0) return true;
+      if (mealsRes.data && mealsRes.data.length > 0) return true;
+      return false;
+    } catch {
+      return false;
     }
   }
 

@@ -26,8 +26,9 @@ export function useSupabaseSync() {
     signInWithApple: () => syncEngine.signInWithApple(),
     signUpWithPassword: (email: string, password: string, fullName?: string) =>
       syncEngine.signUpWithPassword(email, password, fullName),
-    signInWithPassword: (email: string, password: string) =>
-      syncEngine.signInWithPassword(email, password),
+    signInWithPassword: (email: string, password: string, opts?: { deferSync?: boolean }) =>
+      syncEngine.signInWithPassword(email, password, opts),
+    accountHasCloudData: (userId: string) => syncEngine.accountHasCloudData(userId),
     resetPasswordForEmail: (email: string) =>
       syncEngine.resetPasswordForEmail(email),
     sendEmailOtp: (email: string) => syncEngine.sendEmailOtp(email),
