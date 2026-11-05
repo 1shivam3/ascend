@@ -198,8 +198,21 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
   const [dateInput, setDateInput] = useState<string>('');
   const [errors, setErrors] = useState<Partial<Record<BodyMetricsField, string>>>({});
 
+  // Seed the form ONCE per open. `unit` stays in the deps (the seed
+  // reads it), but the effect must not re-run on a unit toggle: the
+  // toggle handler converts every field by hand, and a re-seed here
+  // would discard both those conversions and any typed-but-unsaved
+  // edits, snapping the form back to the profile/latest values.
+  const seededForOpenRef = useRef(false);
+
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) {
+      seededForOpenRef.current = false;
+      return;
+    }
+    if (seededForOpenRef.current) return;
+    seededForOpenRef.current = true;
+    {
       const displayWeight =
         unit === 'lbs'
           ? (kgToLbs(currentWeightKg)).toFixed(1)
@@ -458,7 +471,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                 className="w-full text-sm font-mono font-bold pl-3 pr-12 py-2.5 rounded-xl bg-bg-secondary border border-border/80 text-text-primary focus:outline-none focus:border-accent"
               />
               <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-mono text-text-muted uppercase">
-                CM
+                {unit === 'lbs' ? 'IN' : 'CM'}
               </span>
             </div>
             <p className="text-2xs text-text-muted mt-1 font-mono">

@@ -60,7 +60,6 @@ import {
   getLastExercisePerformance,
   getProgressionRecommendation,
   getTodaySessionState,
-  getGoalAdaptiveSplitTemplates,
   isSetCompleted,
   finalizeWorkoutExercises,
   getExecutedExercises,
@@ -152,8 +151,6 @@ const emptyPlanExercise = (unit: 'kg' | 'lbs', targetReps = 8): PlannedExercise 
   targetUnit: unit,
   notes: '',
 });
-
-export const BUILTIN_SPLIT_TEMPLATES: PlannedWorkout[] = getGoalAdaptiveSplitTemplates('build_muscle', 'kg');
 
 function PlanModal({
   isOpen,
