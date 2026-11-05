@@ -621,3 +621,35 @@ DO $$ BEGIN
   CREATE POLICY "Users can manage own weekly reviews" ON public.weekly_reviews
     FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 END $$;
+
+-- ==============================================================================
+-- 17. Sync Tombstones (2026-11-05 sync convergence, S1/S2)
+-- ==============================================================================
+-- Server-stamped deletion tombstones: one row per deleted record in
+-- the five synced collections (collection = the sync table name),
+-- stamped with when the deletion happened, so deletions converge
+-- across devices and order correctly against edits (newer wins).
+-- Standalone migration: supabase/migrations/2026110501_sync_tombstones.sql
+-- (that file also carries the REVOKE/GRANT block; grants live only in
+-- migrations by this project's convention). Run this section (or the
+-- migration) in the Dashboard SQL Editor to apply. Until applied, the
+-- client detects the missing table and falls back to the
+-- pre-convergence deletion behaviour.
+CREATE TABLE IF NOT EXISTS public.sync_tombstones (
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  collection TEXT NOT NULL,
+  record_id TEXT NOT NULL,
+  deleted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, collection, record_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sync_tombstones_user_id ON public.sync_tombstones (user_id);
+
+ALTER TABLE public.sync_tombstones ENABLE ROW LEVEL SECURITY;
+
+-- Sync Tombstones Policy
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Users can manage own sync tombstones" ON public.sync_tombstones;
+  CREATE POLICY "Users can manage own sync tombstones" ON public.sync_tombstones
+    FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+END $$;

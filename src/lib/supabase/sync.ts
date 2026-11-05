@@ -1,14 +1,12 @@
 import { getSupabase } from './client';
 import { normalizeDateToLocalDay } from '../formatters';
-import { useStore, resolveAvatar, buildFreshHistoryState, PROGRESS_PHOTOS_KEY } from '../store';
+import { useStore, resolveAvatar, buildFreshHistoryState, PROGRESS_PHOTOS_KEY, stampTombstoneDeletes, clearTombstoneStamps } from '../store';
 import { getTabLeaderGuard } from '../tab-leader';
 import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, BodyMetricEntry, PlannedWorkout } from '../types';
 import {
   mergeRemotePlans,
   mergeRemoteRecords,
   dedupeBodyMetricsByDate,
-  prunableTombstones,
-  tombstonedIdsToDelete,
   isLocalProfileNewer,
   buildPlanExtras,
   planFieldsFromExtras,
@@ -16,7 +14,16 @@ import {
   filterRowsForPush,
   shouldPushRow,
   shouldDropStaleProfileUpdate,
+  resolveDeleteVsEdit,
+  effectiveTombstones,
+  applyRemoteTombstones,
+  partitionTombstonesForPush,
+  filterOutServerDeleted,
+  stampedTombstones,
+  tombstoneStampKey,
   type PullSliceKey,
+  type StampedTombstone,
+  type TombstoneCollection,
 } from './reconcile';
 import { isCrossAccountSwitch as isCrossAccountSwitchFn, decideStartFreshGate } from '../start-fresh-guard';
 import { DEFAULT_BODYWEIGHT_KG } from '../defaults';
@@ -68,6 +75,76 @@ export async function fetchAllUserRowsPaged(
     const page = (data as any[] | null) || [];
     rows.push(...page);
     if (page.length < SYNC_READ_PAGE_SIZE) return { data: rows, error: null };
+  }
+}
+
+/**
+ * Sync convergence S1/S2: the server tombstone layer
+ * (public.sync_tombstones, migration 2026110501). One row per
+ * deletion: (collection, record_id, deleted_at). The table has no
+ * `id` column (its PK is the triple), so it cannot reuse
+ * fetchAllUserRowsPaged's `id` ordering — this twin pages by
+ * record_id with the same feature-detection posture for client
+ * doubles. Rows for unknown collections are dropped defensively.
+ * ANY error (including the pre-migration missing-table error) comes
+ * back as `error`, and every caller treats that as "layer
+ * unavailable" — the pre-convergence behaviour, never a sync failure.
+ */
+const SYNC_TOMBSTONE_COLLECTIONS: readonly TombstoneCollection[] = [
+  'planned_workouts',
+  'personal_records',
+  'workouts',
+  'meals',
+  'body_metrics',
+];
+
+export interface SyncTombstoneRow {
+  collection: TombstoneCollection;
+  recordId: string;
+  deletedAt: string | null;
+}
+
+export async function fetchSyncTombstoneRows(
+  supabase: any,
+  userId: string,
+): Promise<{ data: SyncTombstoneRow[] | null; error: any }> {
+  const build = () =>
+    supabase
+      .from('sync_tombstones')
+      .select('collection, record_id, deleted_at')
+      .eq('user_id', userId);
+  const mapRows = (rows: any[]): SyncTombstoneRow[] =>
+    (rows || [])
+      .filter(
+        (r: any) =>
+          r &&
+          typeof r.record_id === 'string' &&
+          (SYNC_TOMBSTONE_COLLECTIONS as readonly string[]).includes(r.collection),
+      )
+      .map((r: any) => ({
+        collection: r.collection as TombstoneCollection,
+        recordId: r.record_id as string,
+        deletedAt: typeof r.deleted_at === 'string' ? r.deleted_at : null,
+      }));
+  const probe = build();
+  const ordered =
+    probe && typeof probe.order === 'function'
+      ? probe.order('record_id', { ascending: true })
+      : null;
+  if (!ordered || typeof ordered.range !== 'function') {
+    const { data, error } = await probe;
+    if (error) return { data: null, error };
+    return { data: mapRows(data), error: null };
+  }
+  const rows: any[] = [];
+  for (let from = 0; ; from += SYNC_READ_PAGE_SIZE) {
+    const { data, error } = await build()
+      .order('record_id', { ascending: true })
+      .range(from, from + SYNC_READ_PAGE_SIZE - 1);
+    if (error) return { data: null, error };
+    const page = (data as any[] | null) || [];
+    rows.push(...page);
+    if (page.length < SYNC_READ_PAGE_SIZE) return { data: mapRows(rows), error: null };
   }
 }
 
@@ -1218,6 +1295,12 @@ class SupabaseSyncEngine {
         remoteCoachBlocksState = null;
       }
 
+      // S1/S2: the server tombstone layer (deletions made on other
+      // devices, stamped), fetched BEFORE the merge so the apply-time
+      // recompute below can fold it in. null = layer unavailable
+      // (pre-migration) → pre-convergence behaviour everywhere.
+      const serverTombstones = await this.fetchSyncTombstones(user.id);
+
       const localState = useStore.getState();
 
       // Detect if the existing local profile belongs to a DIFFERENT authenticated account.
@@ -1533,15 +1616,87 @@ class SupabaseSyncEngine {
       // profile update (if any) still applies as computed — its own
       // mid-sync race is a documented residual (R2b-profile).
       const freshState = useStore.getState();
+      // S1/S2 (sync convergence): fold the server tombstone layer
+      // into the recompute inputs. Per slice:
+      // - local rows another device deleted — whose local stamp does
+      //   not beat the tombstone — leave the merge base (this is what
+      //   makes a deletion CONVERGE on this device);
+      // - a STAMPED local tombstone a newer remote edit beats stops
+      //   filtering, so the edit resurrects the record (S2);
+      //   legacy unstamped tombstones keep the pre-convergence
+      //   always-filter semantics;
+      // - server tombstones join the filter set, so a record this
+      //   device has never held is not adopted only to be deleted
+      //   again next cycle.
+      // serverTombstones === null (pre-migration) skips all of it:
+      // the inputs below are then exactly the pre-convergence ones.
+      const TOMBSTONE_TABLE_BY_SLICE: Record<PullSliceKey, TombstoneCollection> = {
+        prs: 'personal_records',
+        workouts: 'workouts',
+        meals: 'meals',
+        bodyMetrics: 'body_metrics',
+        plannedWorkouts: 'planned_workouts',
+      };
+      const DELETED_KEY_BY_SLICE = {
+        prs: 'deletedPrIds',
+        workouts: 'deletedWorkoutIds',
+        meals: 'deletedMealIds',
+        bodyMetrics: 'deletedBodyMetricIds',
+        plannedWorkouts: 'deletedPlanIds',
+      } as const;
+      const removedByServerTombstone: Partial<Record<PullSliceKey, StampedTombstone[]>> = {};
+      const resurrectedLocalTombIds: Partial<Record<PullSliceKey, string[]>> = {};
+      const resurrectedServerTombs: { collection: TombstoneCollection; id: string }[] = [];
+      const sliceBase: Partial<Record<PullSliceKey, { id: string }[]>> = {};
+      const buildSliceInput = (
+        key: PullSliceKey,
+      ): { local: { id: string }[]; tombstones: Iterable<string> } => {
+        const freshRows = (freshState[key] || []) as unknown as { id: string; updatedAt?: string }[];
+        const localTombIds = (freshState[DELETED_KEY_BY_SLICE[key]] ||
+          []) as unknown as string[];
+        sliceBase[key] = freshRows;
+        if (!serverTombstones) return { local: freshRows, tombstones: localTombIds };
+        const collection = TOMBSTONE_TABLE_BY_SLICE[key];
+        const remoteTombs = serverTombstones.get(collection) || [];
+        const applied = applyRemoteTombstones(freshRows, remoteTombs);
+        sliceBase[key] = applied.kept;
+        if (applied.removedIds.length > 0) {
+          removedByServerTombstone[key] = remoteTombs.filter((t) =>
+            applied.removedIds.includes(t.id),
+          );
+        }
+        for (const id of applied.resurrectedIds) {
+          resurrectedServerTombs.push({ collection, id });
+        }
+        const remoteStamps = new Map<string, string | null>();
+        for (const row of (pullRemote[key] || []) as { id: string; updatedAt?: string }[]) {
+          remoteStamps.set(row.id, row.updatedAt ?? null);
+        }
+        const localTombs = stampedTombstones(localTombIds, freshState.tombstoneStamps, collection);
+        const stampedOnly = localTombs.filter((t) => t.deletedAt !== null);
+        const { active, resurrectedIds } = effectiveTombstones(stampedOnly, remoteStamps);
+        resurrectedLocalTombIds[key] = resurrectedIds;
+        const activeIds = new Set(active.map((t) => t.id));
+        const filterIds = new Set<string>([
+          ...localTombIds.filter(
+            (id) =>
+              !stampedOnly.some((t) => t.id === id) || activeIds.has(id),
+          ),
+          ...remoteTombs.map((t) => t.id),
+        ]);
+        for (const id of applied.resurrectedIds) filterIds.delete(id);
+        for (const id of resurrectedIds) filterIds.delete(id);
+        return { local: applied.kept, tombstones: filterIds };
+      };
       // Explicitly id-shaped: the recompute only relies on `.id` and
       // reference preservation, so the five differently-typed slices
       // share one input type instead of forcing a single record type.
       const freshInput: Record<PullSliceKey, { local: { id: string }[]; tombstones: Iterable<string> }> = {
-        prs: { local: freshState.prs || [], tombstones: freshState.deletedPrIds || [] },
-        workouts: { local: freshState.workouts || [], tombstones: freshState.deletedWorkoutIds || [] },
-        meals: { local: freshState.meals || [], tombstones: freshState.deletedMealIds || [] },
-        bodyMetrics: { local: freshState.bodyMetrics || [], tombstones: freshState.deletedBodyMetricIds || [] },
-        plannedWorkouts: { local: freshState.plannedWorkouts || [], tombstones: freshState.deletedPlanIds || [] },
+        prs: buildSliceInput('prs'),
+        workouts: buildSliceInput('workouts'),
+        meals: buildSliceInput('meals'),
+        bodyMetrics: buildSliceInput('bodyMetrics'),
+        plannedWorkouts: buildSliceInput('plannedWorkouts'),
       };
       const freshSlices = (() => {
         // F28: adopt remote edits only in the merge branch AND only
@@ -1609,11 +1764,71 @@ class SupabaseSyncEngine {
       ) {
         updates.coachBlocks = remoteCoachBlocksState;
       }
+      // S1/S2 post-pass: apply the server tombstone layer to the
+      // slices the recompute actually produced (some of its branches
+      // merge from the pre-round-trip capture, which never saw the
+      // tombstones), and fold the bookkeeping into the same setState:
+      // records removed by a server tombstone are recorded as LOCAL
+      // tombstones (stamped with the server deleted_at) so the
+      // deletion sticks across pulls, and local tombstones a newer
+      // remote edit beat are dropped with their stamps. A
+      // cross-account switch gets only the row filtering — its
+      // tombstone arrays belong to the previous account's lifecycle.
+      if (serverTombstones) {
+        for (const key of Object.keys(TOMBSTONE_TABLE_BY_SLICE) as PullSliceKey[]) {
+          const collection = TOMBSTONE_TABLE_BY_SLICE[key];
+          const remoteTombs = serverTombstones.get(collection) || [];
+          if (remoteTombs.length > 0 && Array.isArray(updates[key])) {
+            const applied = applyRemoteTombstones(updates[key], remoteTombs);
+            if (applied.removedIds.length > 0) updates[key] = applied.kept;
+            for (const id of applied.resurrectedIds) {
+              resurrectedServerTombs.push({ collection, id });
+            }
+          }
+          if (isCrossAccountSwitch) continue;
+          const removed = removedByServerTombstone[key] || [];
+          const resurrected = resurrectedLocalTombIds[key] || [];
+          if (removed.length === 0 && resurrected.length === 0) continue;
+          const deletedKey = DELETED_KEY_BY_SLICE[key];
+          if (!Array.isArray(updates[key]) && removed.length > 0) {
+            // Merge branch, recompute reported no change — but a
+            // server tombstone removed rows from the base, and that
+            // removal IS the change to apply.
+            updates[key] = sliceBase[key];
+          }
+          const currentDeleted = (updates[deletedKey] ??
+            freshState[deletedKey] ??
+            []) as unknown as string[];
+          let nextDeleted = currentDeleted.filter((id) => !resurrected.includes(id));
+          for (const tomb of removed) {
+            if (!nextDeleted.includes(tomb.id)) nextDeleted = [...nextDeleted, tomb.id];
+          }
+          updates[deletedKey] = nextDeleted;
+          let stamps = (updates.tombstoneStamps ??
+            freshState.tombstoneStamps ??
+            {}) as Record<string, string>;
+          if (resurrected.length > 0) {
+            stamps = clearTombstoneStamps(stamps, collection, resurrected);
+          }
+          if (removed.length > 0) {
+            stamps = { ...stamps };
+            for (const tomb of removed) {
+              if (tomb.deletedAt) stamps[tombstoneStampKey(collection, tomb.id)] = tomb.deletedAt;
+            }
+          }
+          updates.tombstoneStamps = stamps;
+        }
+      }
       // The captured needsLocalUpdate reflects pre-round-trip state;
       // the only thing that matters now is whether updates still has keys.
       needsLocalUpdate = Object.keys(updates).length > 0;
       if (needsLocalUpdate) {
         useStore.setState(updates);
+      }
+      // S2: clear the server tombstones newer local/remote edits beat,
+      // so the resurrected records are not re-deleted by later pulls.
+      if (resurrectedServerTombs.length > 0) {
+        await this.clearSyncTombstones(user.id, resurrectedServerTombs);
       }
 
       // 4. Push Local -> Cloud (Initial Migration or Incremental Updates)
@@ -1669,6 +1884,98 @@ class SupabaseSyncEngine {
       return stamps;
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * S1/S2: read the server tombstone layer (deletions made on other
+   * devices, stamped), grouped by collection. Returns null when the
+   * layer is unavailable — pre-migration the sync_tombstones table
+   * does not exist yet — and EVERY consumer treats null as "fall back
+   * to the pre-convergence behaviour" (today's semantics), never as
+   * an error and never as "no deletions happened".
+   */
+  private async fetchSyncTombstones(
+    userId: string,
+  ): Promise<Map<TombstoneCollection, StampedTombstone[]> | null> {
+    try {
+      const supabase = getSupabase();
+      if (!supabase) return null;
+      const { data, error } = await fetchSyncTombstoneRows(supabase, userId);
+      if (error || !data) return null;
+      const byCollection = new Map<TombstoneCollection, StampedTombstone[]>();
+      for (const row of data) {
+        const list = byCollection.get(row.collection) || [];
+        list.push({ id: row.recordId, deletedAt: row.deletedAt });
+        byCollection.set(row.collection, list);
+      }
+      return byCollection;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * S1: record deletions in the server tombstone layer so other
+   * devices learn of them (best-effort; false = not recorded, the
+   * caller keeps its local tombstones and retries next push). A
+   * legacy tombstone with no stamp is recorded with `now` — the
+   * moment it reaches the server is the only honest stamp it has.
+   */
+  private async recordSyncTombstones(
+    userId: string,
+    collection: TombstoneCollection,
+    tombs: StampedTombstone[],
+  ): Promise<boolean> {
+    try {
+      if (tombs.length === 0) return true;
+      const supabase = getSupabase();
+      if (!supabase) return false;
+      const rows = tombs.map((t) => ({
+        user_id: userId,
+        collection,
+        record_id: t.id,
+        deleted_at: t.deletedAt ?? new Date().toISOString(),
+      }));
+      const { error } = await supabase
+        .from('sync_tombstones')
+        .upsert(rows, { onConflict: 'user_id,collection,record_id' });
+      return !error;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * S2: clear server tombstones a strictly newer edit has beaten, so
+   * the resurrected record is not re-deleted by the next pull on any
+   * device (best-effort; a leftover tombstone loses to the same edit
+   * again on every pull, so a failed clear self-heals).
+   */
+  private async clearSyncTombstones(
+    userId: string,
+    entries: { collection: TombstoneCollection; id: string }[],
+  ): Promise<void> {
+    try {
+      if (entries.length === 0) return;
+      const supabase = getSupabase();
+      if (!supabase) return;
+      const byCollection = new Map<TombstoneCollection, string[]>();
+      for (const entry of entries) {
+        const list = byCollection.get(entry.collection) || [];
+        list.push(entry.id);
+        byCollection.set(entry.collection, list);
+      }
+      for (const [collection, ids] of byCollection) {
+        await supabase
+          .from('sync_tombstones')
+          .delete()
+          .eq('user_id', userId)
+          .eq('collection', collection)
+          .in('record_id', ids);
+      }
+    } catch {
+      // Best-effort — see the doc comment.
     }
   }
 
@@ -1758,6 +2065,21 @@ class SupabaseSyncEngine {
 
     const state = useStore.getState();
 
+    // S1/S2: the server tombstone layer, read once per push. null =
+    // unavailable (pre-migration) → every consumer below falls back
+    // to the pre-convergence behaviour. Rows another device deleted
+    // (server tombstone beats the local stamp) are invisible to the
+    // push — re-uploading them was the S1 resurrection path; the
+    // pull removes them locally.
+    const serverTombstones = await this.fetchSyncTombstones(userId);
+    const visibleRows = <T extends { id: string; updatedAt?: string }>(
+      rows: T[],
+      collection: TombstoneCollection,
+    ): T[] =>
+      serverTombstones
+        ? filterOutServerDeleted(rows, serverTombstones.get(collection) || [])
+        : rows;
+
     // F29 (audit): upsert errors used to be swallowed (the calls below
     // never inspected `{ error }`), yet syncPush reported 'synced'
     // regardless. Record the first failure across all steps, attempt
@@ -1783,11 +2105,14 @@ class SupabaseSyncEngine {
     // upserts. Skips are silent, not errors: the rule working as
     // designed must not report 'error' on every sync.
     //
-    // RESIDUAL (scope boundary, edits only): explicit deletions are
-    // NOT stamp-gated — propagateAllDeletions below deletes tombstoned
-    // remote rows regardless of stamps, so a newer remote edit can
-    // still lose to an older local delete. Tombstone propagation is
-    // unchanged by design.
+    // DELETIONS (S1/S2, sync convergence): explicit deletions ARE
+    // stamp-gated now — propagateAllDeletions resolves each tombstone
+    // against the remote row's stamp (newer wins) and records the
+    // deletion in the server tombstone layer before the local
+    // tombstone may prune, so deletions converge across devices.
+    // Until the 2026110501 migration runs, the layer reads as
+    // unavailable and propagation keeps the pre-convergence
+    // semantics exactly.
     //
     // RESIDUAL DI-08.5 (clock skew): "newest" is judged by device
     // clocks; skewed clocks can pick the wrong winner. Server-side
@@ -1840,7 +2165,7 @@ class SupabaseSyncEngine {
       if (prStamps === null) {
         record({ message: 'Could not read remote PR stamps; PR push skipped' });
       } else {
-        const { toUpsert } = filterRowsForPush(state.prs, prStamps);
+        const { toUpsert } = filterRowsForPush(visibleRows(state.prs, 'personal_records'), prStamps);
         if (toUpsert.length > 0) {
           const prRows = toUpsert.map((p) => ({
             id: p.id,
@@ -1869,7 +2194,7 @@ class SupabaseSyncEngine {
       if (workoutStamps === null) {
         record({ message: 'Could not read remote workout stamps; workout push skipped' });
       } else {
-        const { toUpsert } = filterRowsForPush(state.workouts, workoutStamps);
+        const { toUpsert } = filterRowsForPush(visibleRows(state.workouts, 'workouts'), workoutStamps);
         if (toUpsert.length > 0) {
           const workoutRows = toUpsert.map((w) => ({
             id: w.id,
@@ -1893,7 +2218,7 @@ class SupabaseSyncEngine {
       if (mealStamps === null) {
         record({ message: 'Could not read remote meal stamps; meal push skipped' });
       } else {
-        const { toUpsert } = filterRowsForPush(state.meals, mealStamps);
+        const { toUpsert } = filterRowsForPush(visibleRows(state.meals, 'meals'), mealStamps);
         if (toUpsert.length > 0) {
           const mealRows = toUpsert.map((m) => ({
             id: m.id,
@@ -1917,7 +2242,7 @@ class SupabaseSyncEngine {
       if (metricStamps === null) {
         record({ message: 'Could not read remote body-metric stamps; body-metric push skipped' });
       } else {
-        const { toUpsert } = filterRowsForPush(state.bodyMetrics, metricStamps);
+        const { toUpsert } = filterRowsForPush(visibleRows(state.bodyMetrics, 'body_metrics'), metricStamps);
         if (toUpsert.length > 0) {
           await this.pushBodyMetricRows(toUpsert, userId, record);
         }
@@ -1934,7 +2259,7 @@ class SupabaseSyncEngine {
       if (planStamps === null) {
         record({ message: 'Could not read remote plan stamps; plan push skipped' });
       } else {
-        const { toUpsert } = filterRowsForPush(state.plannedWorkouts, planStamps);
+        const { toUpsert } = filterRowsForPush(visibleRows(state.plannedWorkouts, 'planned_workouts'), planStamps);
         if (toUpsert.length > 0) {
           await this.pushPlanRows(toUpsert, userId, record);
         }
@@ -1976,8 +2301,10 @@ class SupabaseSyncEngine {
     // union pull-merge resurrected it on the next sync. Delete exactly the
     // tombstoned records (explicit user deletions) — a full local reset
     // clears tombstones without reaching this path, so a "reset" never
-    // wipes the cloud copy.
-    await this.propagateAllDeletions(userId);
+    // wipes the cloud copy. S1/S2: each deletion is also recorded in the
+    // server tombstone layer (when available) before its local tombstone
+    // prunes, and a tombstone never deletes a NEWER remote edit.
+    await this.propagateAllDeletions(userId, serverTombstones);
 
     // F29: surface the first upsert failure instead of reporting 'synced'.
     if (firstError.current) {
@@ -2003,30 +2330,51 @@ class SupabaseSyncEngine {
   }
 
   /**
-   * Delete the tombstoned rows of ONE table server-side. Fail-safe: on
-   * any uncertainty, delete nothing. Only ids that are (a) gone locally,
-   * (b) still on the server and (c) explicitly tombstoned are deleted —
-   * a plain local/server diff alone never deletes (a reset must not wipe
-   * the cloud copy).
+   * Propagate ONE table's explicit deletions server-side, with the
+   * S1/S2 convergence rules. Fail-safe: on any uncertainty, delete
+   * nothing and prune nothing. Only ids that are (a) gone locally and
+   * (b) explicitly tombstoned are ever deleted — a plain local/server
+   * diff alone never deletes (a reset must not wipe the cloud copy).
+   *
+   * Per tombstone (partitionTombstonesForPush decides):
+   * - keptByEdit: a NEWER remote edit beat the tombstone — the local
+   *   tombstone is dropped without deleting; the pull resurrects the
+   *   record here. (Stamped tombstones only; legacy unstamped ones
+   *   keep the pre-convergence always-delete semantics.)
+   * - toDelete: the tombstone beats the remote row's stamp — delete
+   *   the row.
+   * - toConfirm: the row is already gone remotely.
+   * A local tombstone prunes only once the deletion is RECORDED in
+   * the server tombstone layer (so other devices learn of it), or —
+   * when the layer is unavailable (pre-migration) — once the row is
+   * confirmed deleted/absent, exactly the pre-convergence rule.
    */
   private async propagateDeletions(
     userId: string,
-    table: string,
-    tombstones: string[],
+    table: TombstoneCollection,
+    tombstones: StampedTombstone[],
     localIds: Set<string>,
     clearTombstones: (ids: string[]) => void,
+    serverTombs: StampedTombstone[] | null,
   ): Promise<void> {
     try {
       if (tombstones.length === 0) return;
       const supabase = getSupabase();
       if (!supabase) return;
-      // DI2-1: paged — with a truncated id list, a tombstoned row past
-      // the cap looks deleted and its tombstone gets pruned, so the
-      // next pull resurrects the record.
-      const { data, error } = await fetchAllUserRowsPaged(supabase, table, 'id', 'user_id', userId);
+      // DI2-1: paged — with a truncated list, a tombstoned row past
+      // the cap reads as absent and its tombstone gets confirmed
+      // without the row ever being deleted.
+      const { data, error } = await fetchAllUserRowsPaged(supabase, table, 'id,updated_at', 'user_id', userId);
       if (error) return;
-      const remoteIds = (data || []).map((r: any) => r.id as string);
-      const toDelete = tombstonedIdsToDelete(localIds, remoteIds, tombstones);
+      const remoteStamps = new Map<string, string | null>();
+      for (const row of data || []) {
+        remoteStamps.set((row as any).id as string, ((row as any).updated_at as string | null) ?? null);
+      }
+      const { toDelete, toConfirm, keptByEdit } = partitionTombstonesForPush(
+        tombstones,
+        localIds,
+        remoteStamps,
+      );
       if (toDelete.length > 0) {
         const { error: delError } = await supabase
           .from(table)
@@ -2035,53 +2383,98 @@ class SupabaseSyncEngine {
           .in('id', toDelete);
         if (delError) return;
       }
-      // Server confirms the deletions — prune those tombstones (a tombstone
-      // for an id no longer on the server and not local is dead weight).
-      const remainingRemoteIds = remoteIds.filter((id) => !toDelete.includes(id));
-      const pruned = prunableTombstones(tombstones, localIds, remainingRemoteIds);
-      if (pruned.length > 0) clearTombstones(pruned);
+      const clearable: string[] = [...keptByEdit];
+      if (serverTombs !== null) {
+        // Record every deletion this device knows about that the
+        // layer does not already hold a NEWER-OR-EQUAL stamp for
+        // (two devices can delete the same record; the later stamp
+        // is the ordering fact other devices resolve against).
+        const recorded = new Map(serverTombs.map((t) => [t.id, t.deletedAt]));
+        const byId = new Map(tombstones.map((t) => [t.id, t]));
+        const toRecord: StampedTombstone[] = [];
+        for (const id of [...toDelete, ...toConfirm]) {
+          const tomb = byId.get(id);
+          if (!tomb) continue;
+          const existing = recorded.get(id);
+          if (existing === undefined) {
+            toRecord.push(tomb);
+            continue;
+          }
+          // Already recorded: only overwrite when OUR stamp is
+          // strictly newer (parsed comparison — ISO strings from the
+          // server and from device clocks are not lexicographically
+          // comparable across formats/offsets).
+          const oursMs = tomb.deletedAt ? Date.parse(tomb.deletedAt) : NaN;
+          const existingMs = existing ? Date.parse(existing) : NaN;
+          if (!Number.isNaN(oursMs) && (Number.isNaN(existingMs) || oursMs > existingMs)) {
+            toRecord.push(tomb);
+          }
+        }
+        if (toRecord.length > 0) {
+          const ok = await this.recordSyncTombstones(userId, table, toRecord);
+          if (ok) clearable.push(...toDelete, ...toConfirm);
+          // Not recorded → keep the local tombstones; the next push
+          // retries (the rows are already deleted, so they land in
+          // toConfirm then).
+        } else {
+          clearable.push(...toDelete, ...toConfirm);
+        }
+      } else {
+        clearable.push(...toDelete, ...toConfirm);
+      }
+      if (clearable.length > 0) clearTombstones([...new Set(clearable)]);
     } catch {
       // Offline or unexpected — never block the push on this.
     }
   }
 
   /** Propagate explicit deletions for every synced entity (QA4-001). */
-  private async propagateAllDeletions(userId: string): Promise<void> {
+  private async propagateAllDeletions(
+    userId: string,
+    serverTombstones: Map<TombstoneCollection, StampedTombstone[]> | null,
+  ): Promise<void> {
     const s = useStore.getState();
+    const per = (collection: TombstoneCollection): StampedTombstone[] | null =>
+      serverTombstones ? serverTombstones.get(collection) || [] : null;
     await this.propagateDeletions(
       userId,
       'planned_workouts',
-      s.deletedPlanIds || [],
+      stampedTombstones(s.deletedPlanIds || [], s.tombstoneStamps, 'planned_workouts'),
       new Set((s.plannedWorkouts || []).map((p) => p.id)),
       (ids) => useStore.getState().clearDeletedPlanIds(ids),
+      per('planned_workouts'),
     );
     await this.propagateDeletions(
       userId,
       'personal_records',
-      s.deletedPrIds || [],
+      stampedTombstones(s.deletedPrIds || [], s.tombstoneStamps, 'personal_records'),
       new Set((s.prs || []).map((p) => p.id)),
       (ids) => useStore.getState().clearDeletedPrIds(ids),
+      per('personal_records'),
     );
     await this.propagateDeletions(
       userId,
       'workouts',
-      s.deletedWorkoutIds || [],
+      stampedTombstones(s.deletedWorkoutIds || [], s.tombstoneStamps, 'workouts'),
       new Set((s.workouts || []).map((w) => w.id)),
       (ids) => useStore.getState().clearDeletedWorkoutIds(ids),
+      per('workouts'),
     );
     await this.propagateDeletions(
       userId,
       'meals',
-      s.deletedMealIds || [],
+      stampedTombstones(s.deletedMealIds || [], s.tombstoneStamps, 'meals'),
       new Set((s.meals || []).map((m) => m.id)),
       (ids) => useStore.getState().clearDeletedMealIds(ids),
+      per('meals'),
     );
     await this.propagateDeletions(
       userId,
       'body_metrics',
-      s.deletedBodyMetricIds || [],
+      stampedTombstones(s.deletedBodyMetricIds || [], s.tombstoneStamps, 'body_metrics'),
       new Set((s.bodyMetrics || []).map((b) => b.id)),
       (ids) => useStore.getState().clearDeletedBodyMetricIds(ids),
+      per('body_metrics'),
     );
   }
 
