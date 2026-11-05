@@ -9,6 +9,7 @@ import { getLocalTodayStr, round1 } from '@/lib/formatters';
 import { useTranslation } from '@/lib/i18n';
 import { useToast } from '@/components/ui/Toast';
 import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
+import { kgToLbs, lbsToKg } from '@/lib/units';
 
 interface BodyMetricsModalProps {
   isOpen: boolean;
@@ -54,7 +55,7 @@ export function validateBodyMetricsForm(input: BodyMetricsFormInput): BodyMetric
   const { unit } = input;
 
   const parsedWeight = parseFloat(input.weight);
-  const weightKg = unit === 'lbs' ? parsedWeight * 0.453592 : parsedWeight;
+  const weightKg = unit === 'lbs' ? lbsToKg(parsedWeight) : parsedWeight;
   if (isNaN(parsedWeight) || weightKg < 30 || weightKg > 300) {
     errors.weight =
       unit === 'lbs'
@@ -201,7 +202,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
     if (isOpen) {
       const displayWeight =
         unit === 'lbs'
-          ? (currentWeightKg * 2.20462).toFixed(1)
+          ? (kgToLbs(currentWeightKg)).toFixed(1)
           : currentWeightKg.toFixed(1);
       setWeightInput(displayWeight);
       setHeightInput(
@@ -240,9 +241,9 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
     const currentVal = parseFloat(weightInput);
     if (!isNaN(currentVal) && currentVal > 0) {
       if (newUnit === 'lbs') {
-        setWeightInput((currentVal * 2.20462).toFixed(1));
+        setWeightInput((kgToLbs(currentVal)).toFixed(1));
       } else {
-        setWeightInput((currentVal / 2.20462).toFixed(1));
+        setWeightInput((lbsToKg(currentVal)).toFixed(1));
       }
     }
     // Convert circumference inputs
@@ -603,14 +604,14 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                 const diffKg = prev ? entry.weightKg - prev.weightKg : null;
                 const displayWeight =
                   preferredUnit === 'lbs'
-                    ? `${Math.round(entry.weightKg * 2.20462 * 10) / 10} lbs`
+                    ? `${Math.round(kgToLbs(entry.weightKg) * 10) / 10} lbs`
                     : `${entry.weightKg} kg`;
 
                 const diffFormatted =
                   diffKg !== null
                     ? diffKg > 0
-                      ? `+${preferredUnit === 'lbs' ? (diffKg * 2.20462).toFixed(1) : diffKg.toFixed(1)}`
-                      : `${preferredUnit === 'lbs' ? (diffKg * 2.20462).toFixed(1) : diffKg.toFixed(1)}`
+                      ? `+${preferredUnit === 'lbs' ? (kgToLbs(diffKg)).toFixed(1) : diffKg.toFixed(1)}`
+                      : `${preferredUnit === 'lbs' ? (kgToLbs(diffKg)).toFixed(1) : diffKg.toFixed(1)}`
                     : null;
 
                 return (

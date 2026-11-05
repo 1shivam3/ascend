@@ -1,6 +1,7 @@
 import { WorkoutEntry, WorkoutExercise, WorkoutSet, PersonalRecord, Unit } from './types';
 import { calculateOneRepMax } from './strength-standards';
 import { parseImportedDateString } from './formatters';
+import { kgToLbs, lbsToKg } from './units';
 
 /**
  * Universal CSV Workout Importer for Strong, Hevy, FitNotes, and generic workout logs.
@@ -243,7 +244,7 @@ export function parseWorkoutCSV(csvText: string, options: ParseWorkoutCSVOptions
       for (const s of ex.sets) {
         if (typeof s.weight === 'number' && s.weight > 0 && s.reps > 0) {
           // PersonalRecord is canonically kg — convert lbs sets first.
-          const weightKg = s.unit === 'lbs' ? s.weight * 0.453592 : s.weight;
+          const weightKg = s.unit === 'lbs' ? lbsToKg(s.weight) : s.weight;
           const e1rm = calculateOneRepMax(weightKg, s.reps);
           const current = prMap[ex.name];
           if (!current || e1rm > current.e1RM) {
@@ -258,7 +259,7 @@ export function parseWorkoutCSV(csvText: string, options: ParseWorkoutCSVOptions
     id: `pr_imp_${contentHash(`${exercise}|${data.date}|${Math.round(data.e1RM * 10)}|${data.weight}|${data.reps}`)}`,
     exercise,
     weightKg: data.weight,
-    weightLbs: Math.round(data.weight * 2.20462 * 10) / 10,
+    weightLbs: Math.round(kgToLbs(data.weight) * 10) / 10,
     reps: data.reps,
     oneRepMax: Math.round(data.e1RM * 10) / 10,
     date: data.date,

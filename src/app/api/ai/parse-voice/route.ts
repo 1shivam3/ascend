@@ -4,6 +4,7 @@ import { checkAiDailyQuota, aiQuotaExceededResponse, AiActorAuthError } from '@/
 import { AiGlobalCapExceededError, executeMultiProviderText } from '@/lib/ai-provider';
 import { MAX_PR_WEIGHT_KG } from '@/lib/strength-standards';
 import { rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
+import { kgToLbs } from '@/lib/units';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -124,7 +125,7 @@ Respond with ONLY raw JSON matching this schema:
     // result on a 4-second hands-free timer, so an unclamped hallucination
     // (99999 kg, RPE 999) would land in the log — and in PR/e1RM math —
     // unless the user cancels in time.
-    const maxWeight = userUnit === 'lbs' ? Math.ceil(MAX_PR_WEIGHT_KG * 2.20462) : MAX_PR_WEIGHT_KG;
+    const maxWeight = userUnit === 'lbs' ? Math.ceil(kgToLbs(MAX_PR_WEIGHT_KG)) : MAX_PR_WEIGHT_KG;
     const clampNum = (v: unknown, min: number, max: number): number | undefined => {
       if (typeof v !== 'number' || !Number.isFinite(v)) return undefined;
       return Math.min(max, Math.max(min, v));

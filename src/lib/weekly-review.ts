@@ -51,6 +51,7 @@ import { mainCompoundKey } from './percent-1rm';
 import { calculateWorkoutVolumeKg } from './volume';
 import { earliestDataDate } from './scheduled-days';
 import type { FormSessionSummary } from '../features/form-coach/models/form-session.types';
+import { kgToLbs, lbsToKg } from './units';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shapes
@@ -219,7 +220,7 @@ function bestE1rmInWindow(
       for (const s of ex.sets ?? []) {
         if (!isSetCompleted(s) || s.isWarmup) continue;
         if (typeof s.weight !== 'number' || !(s.weight > 0) || !(s.reps > 0)) continue;
-        const kg = s.unit === 'lbs' ? s.weight / 2.20462 : s.weight;
+        const kg = s.unit === 'lbs' ? lbsToKg(s.weight) : s.weight;
         best = Math.max(best, calculateOneRepMax(kg, s.reps));
       }
     }
@@ -660,7 +661,7 @@ export function buildSessionDebrief(input: {
       const inc =
         scheme.incrementKg != null
           ? input.unit === 'lbs'
-            ? `${Math.round(scheme.incrementKg * 2.20462 * 2) / 2} lbs`
+            ? `${Math.round(kgToLbs(scheme.incrementKg) * 2) / 2} lbs`
             : `${scheme.incrementKg} kg`
           : '';
       lines.push(

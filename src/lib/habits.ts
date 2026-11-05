@@ -16,6 +16,7 @@ import {
 } from './types';
 import { calculateWorkoutVolumeKg } from './volume';
 import { DEFAULT_BODYWEIGHT_KG } from './defaults';
+import { kgToLbs } from './units';
 
 export type { DayType };
 
@@ -264,7 +265,7 @@ export function getDailyObjectives(params: {
   const weightDone = !!weightEntry;
   const displayBw = weightEntry
     ? profileUnit === 'lbs'
-      ? `${Math.round(weightEntry.weightKg * 2.20462)} lbs`
+      ? `${Math.round(kgToLbs(weightEntry.weightKg))} lbs`
       : `${Math.round(weightEntry.weightKg)} kg`
     : 'Log Today';
   objectives.push({
@@ -637,7 +638,7 @@ export function buildDailyTimeline(params: {
   if (weightEntry) {
     const disp =
       profileUnit === 'lbs'
-        ? `${Math.round(weightEntry.weightKg * 2.20462)} lbs`
+        ? `${Math.round(kgToLbs(weightEntry.weightKg))} lbs`
         : `${Math.round(weightEntry.weightKg)} kg`;
     events.push({
       id: `weight_${weightEntry.id}`,

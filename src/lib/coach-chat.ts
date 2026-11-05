@@ -17,6 +17,7 @@
  */
 
 import type { FormSessionSummary } from '../features/form-coach/models/form-session.types';
+import { kgToLbs } from './units';
 
 // ── Caps (defined in code, enforced server-side) ──────────────────────────
 /** Max reply length the server will ever return (chars). */
@@ -590,7 +591,7 @@ export interface CoachChatContext {
 }
 
 function fmtKg(v: number, unit: 'kg' | 'lbs'): string {
-  return unit === 'lbs' ? `${Math.round(v * 2.20462)} lbs` : `${Math.round(v)} kg`;
+  return unit === 'lbs' ? `${Math.round(kgToLbs(v))} lbs` : `${Math.round(v)} kg`;
 }
 
 // ── Form-check bridge (B2) ────────────────────────────────────────────────

@@ -29,6 +29,7 @@ import type { EquipmentAccess } from '@/lib/workout-engine';
 import { estimateSessionMinutes, MAX_WORKOUT_WEIGHT_KG } from '@/lib/workout-engine';
 import { canonicalizeExerciseName } from '@/lib/workout-outcome-evidence';
 import { CalendarRange, ChevronRight, Sparkles, Trash2, X } from 'lucide-react';
+import { kgToLbs } from '@/lib/units';
 
 interface CoachBlockModalProps {
   isOpen: boolean;
@@ -579,7 +580,7 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
                                 const unit = ex.targetUnit || profile?.unit || 'kg';
                                 const step = unit === 'lbs' ? 5 : 2.5;
                                 const w = ex.targetWeight as number;
-                                const cap = unit === 'lbs' ? Math.round(MAX_WORKOUT_WEIGHT_KG * 2.20462) : MAX_WORKOUT_WEIGHT_KG;
+                                const cap = unit === 'lbs' ? Math.round(kgToLbs(MAX_WORKOUT_WEIGHT_KG)) : MAX_WORKOUT_WEIGHT_KG;
                                 return (
                                   <span className="flex items-center gap-1">
                                     <button

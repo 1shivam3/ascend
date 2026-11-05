@@ -18,6 +18,7 @@
  */
 import { calculateOneRepMax, resolveCompoundVariant } from './strength-standards';
 import { isSetCompleted } from './types';
+import { kgToLbs, lbsToKg } from './units';
 import type { PersonalRecord, PlannedWorkout, Unit, WorkoutEntry } from './types';
 
 export const TOP_SET_PCT = 0.8;
@@ -58,10 +59,8 @@ export function isMainCompound(name: string): boolean {
   return mainCompoundKey(name) !== null;
 }
 
-const LBS_PER_KG = 2.20462;
-
 function toKg(weight: number, unit: Unit | undefined): number {
-  return unit === 'lbs' ? weight / LBS_PER_KG : weight;
+  return unit === 'lbs' ? lbsToKg(weight) : weight;
 }
 
 /**
@@ -123,7 +122,7 @@ export function percentSetWeights(
   setCount: number,
   unit: Unit
 ): number[] {
-  const e1rm = unit === 'lbs' ? e1rmKg * LBS_PER_KG : e1rmKg;
+  const e1rm = unit === 'lbs' ? kgToLbs(e1rmKg) : e1rmKg;
   const count = Math.max(1, setCount || 1);
   return Array.from({ length: count }, (_, i) =>
     roundToLoadable(e1rm * (i === 0 ? TOP_SET_PCT : BACKOFF_PCT), unit)

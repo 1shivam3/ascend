@@ -52,6 +52,7 @@ import { useAppNavigation } from '@/lib/navigation';
 import { useTranslation } from '@/lib/i18n';
 import { safeRandomId, getLocalTodayStr, formatLocalDate } from '@/lib/formatters';
 import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
+import { kgToLbs, lbsToKg } from '@/lib/units';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -293,7 +294,7 @@ function LevelProgressionModal({
 
   const requiredDisplay =
     userUnit === 'lbs'
-      ? Math.round(nextInfo.requiredRatioKg * 2.20462 * 10) / 10
+      ? Math.round(kgToLbs(nextInfo.requiredRatioKg) * 10) / 10
       : nextInfo.requiredRatioKg;
 
   const isBW = isBodyweightExercise(exercise);
@@ -467,7 +468,7 @@ function LiftCard({
   const { t } = useTranslation();
   const display1RM =
     userUnit === 'lbs'
-      ? Math.round(item.best1RMKg * 2.20462 * 10) / 10
+      ? Math.round(kgToLbs(item.best1RMKg) * 10) / 10
       : Math.round(item.best1RMKg * 10) / 10;
   const isMain = isMainCompoundLift(item.exercise);
   const toGo = Math.max(0, Math.round((item.nextMilestone - display1RM) * 10) / 10);
@@ -714,7 +715,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
 
   const displayWeight = (kg: number) => {
     if (userUnit === 'lbs') {
-      return `${Math.round(kg * 2.20462)} lbs`;
+      return `${Math.round(kgToLbs(kg))} lbs`;
     }
     return `${Math.round(kg * 10) / 10} kg`;
   };
@@ -817,10 +818,10 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
       if (addedWeightNum > 0) {
         if (unit === 'lbs') {
           addedLbs = addedWeightNum;
-          addedKg = addedWeightNum * 0.453592;
+          addedKg = lbsToKg(addedWeightNum);
         } else {
           addedKg = addedWeightNum;
-          addedLbs = addedWeightNum * 2.20462;
+          addedLbs = kgToLbs(addedWeightNum);
         }
       }
       if (addedKg > MAX_PR_WEIGHT_KG) {
@@ -874,10 +875,10 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
       let weightLbs = 0;
       if (unit === 'lbs') {
         weightLbs = weightNum;
-        weightKg = weightNum * 0.453592;
+        weightKg = lbsToKg(weightNum);
       } else {
         weightKg = weightNum;
-        weightLbs = weightNum * 2.20462;
+        weightLbs = kgToLbs(weightNum);
       }
 
       if (weightKg > MAX_PR_WEIGHT_KG) {
@@ -935,7 +936,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
       return;
     }
 
-    const targetKg = userUnit === 'lbs' ? targetVal * 0.453592 : targetVal;
+    const targetKg = userUnit === 'lbs' ? lbsToKg(targetVal) : targetVal;
     setPRTarget(targetModalExercise, Math.round(targetKg * 10) / 10);
     toast.success(
       t('prs.toastTargetUpdated', {
@@ -1018,11 +1019,11 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
         gender
       );
 
-      const best1RMUserUnit = userUnit === 'lbs' ? g.best1RMKg * 2.20462 : g.best1RMKg;
+      const best1RMUserUnit = userUnit === 'lbs' ? kgToLbs(g.best1RMKg) : g.best1RMKg;
       const customTargetKg = prTargets?.[ex];
       const customTargetUserUnit = customTargetKg
         ? userUnit === 'lbs'
-          ? customTargetKg * 2.20462
+          ? kgToLbs(customTargetKg)
           : customTargetKg
         : undefined;
 
@@ -1343,14 +1344,14 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                   const isBW = isBodyweightExercise(item.exercise);
                   setPlateModalWeight(
                     isBW && item.bestSet.weight === 0
-                      ? (userUnit === 'lbs' ? bodyweightKg * 2.20462 : bodyweightKg)
+                      ? (userUnit === 'lbs' ? kgToLbs(bodyweightKg) : bodyweightKg)
                       : item.bestSet.weight
                   );
                   setPlateModalMeta({
                     exerciseName: item.exercise,
                     bestSetWeight:
                       isBW && item.bestSet.weight === 0
-                        ? (userUnit === 'lbs' ? bodyweightKg * 2.20462 : bodyweightKg)
+                        ? (userUnit === 'lbs' ? kgToLbs(bodyweightKg) : bodyweightKg)
                         : item.bestSet.weight,
                     milestoneWeight: item.nextMilestone,
                   });
@@ -1396,14 +1397,14 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                         const isBW = isBodyweightExercise(item.exercise);
                         setPlateModalWeight(
                           isBW && item.bestSet.weight === 0
-                            ? (userUnit === 'lbs' ? bodyweightKg * 2.20462 : bodyweightKg)
+                            ? (userUnit === 'lbs' ? kgToLbs(bodyweightKg) : bodyweightKg)
                             : item.bestSet.weight
                         );
                         setPlateModalMeta({
                           exerciseName: item.exercise,
                           bestSetWeight:
                             isBW && item.bestSet.weight === 0
-                              ? (userUnit === 'lbs' ? bodyweightKg * 2.20462 : bodyweightKg)
+                              ? (userUnit === 'lbs' ? kgToLbs(bodyweightKg) : bodyweightKg)
                               : item.bestSet.weight,
                           milestoneWeight: item.nextMilestone,
                         });
@@ -1473,14 +1474,14 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                               const isBW = isBodyweightExercise(item.exercise);
                               setPlateModalWeight(
                                 isBW && item.bestSet.weight === 0
-                                  ? (userUnit === 'lbs' ? bodyweightKg * 2.20462 : bodyweightKg)
+                                  ? (userUnit === 'lbs' ? kgToLbs(bodyweightKg) : bodyweightKg)
                                   : item.bestSet.weight
                               );
                               setPlateModalMeta({
                                 exerciseName: item.exercise,
                                 bestSetWeight:
                                   isBW && item.bestSet.weight === 0
-                                    ? (userUnit === 'lbs' ? bodyweightKg * 2.20462 : bodyweightKg)
+                                    ? (userUnit === 'lbs' ? kgToLbs(bodyweightKg) : bodyweightKg)
                                     : item.bestSet.weight,
                                 milestoneWeight: item.nextMilestone,
                               });
@@ -1517,14 +1518,14 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                           const isBW = isBodyweightExercise(item.exercise);
                           setPlateModalWeight(
                             isBW && item.bestSet.weight === 0
-                              ? (userUnit === 'lbs' ? bodyweightKg * 2.20462 : bodyweightKg)
+                              ? (userUnit === 'lbs' ? kgToLbs(bodyweightKg) : bodyweightKg)
                               : item.bestSet.weight
                           );
                           setPlateModalMeta({
                             exerciseName: item.exercise,
                             bestSetWeight:
                               isBW && item.bestSet.weight === 0
-                                ? (userUnit === 'lbs' ? bodyweightKg * 2.20462 : bodyweightKg)
+                                ? (userUnit === 'lbs' ? kgToLbs(bodyweightKg) : bodyweightKg)
                                 : item.bestSet.weight,
                             milestoneWeight: item.nextMilestone,
                           });
@@ -1680,7 +1681,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                   )}
                   {weight.trim() !== '' && (() => {
                     const wNum = parseFloat(weight);
-                    const wKg = unit === 'lbs' ? wNum * 0.453592 : wNum;
+                    const wKg = unit === 'lbs' ? lbsToKg(wNum) : wNum;
                     const reason =
                       isNaN(wNum) ? t('prs.validNumber')
                       : wNum <= 0 ? t('prs.weightGtZero')

@@ -31,6 +31,7 @@ export type { MovementFamily } from './exercise-library';
 import { getTodayDayOfWeek, getWorkoutBodyParts } from './workout-schedule';
 import { calculateSetEffortDrift } from './lifter-twin';
 import { canonicalizeExerciseName } from './workout-outcome-evidence';
+import { kgToLbs, lbsToKg } from './units';
 
 export {
   getSetExecutionStatus,
@@ -52,9 +53,9 @@ export const MAX_SET_REPS = 100;
 
 export function clampWorkoutWeight(weight: number, unit: 'kg' | 'lbs' = 'kg'): number {
   if (!Number.isFinite(weight)) return 0;
-  const kg = unit === 'lbs' ? weight / 2.20462 : weight;
+  const kg = unit === 'lbs' ? lbsToKg(weight) : weight;
   const cappedKg = Math.min(Math.max(0, kg), MAX_WORKOUT_WEIGHT_KG);
-  const out = unit === 'lbs' ? cappedKg * 2.20462 : cappedKg;
+  const out = unit === 'lbs' ? kgToLbs(cappedKg) : cappedKg;
   return Math.round(out * 10) / 10;
 }
 
@@ -578,9 +579,9 @@ export function getLastExercisePerformance(
           let normalizedWeight = s.weight;
           if (typeof s.weight === 'number' && !isNaN(s.weight) && s.unit && s.unit !== userUnit) {
             if (userUnit === 'lbs' && s.unit === 'kg') {
-              normalizedWeight = Math.round(s.weight * 2.20462 * 10) / 10;
+              normalizedWeight = Math.round(kgToLbs(s.weight) * 10) / 10;
             } else if (userUnit === 'kg' && s.unit === 'lbs') {
-              normalizedWeight = Math.round(s.weight * 0.453592 * 10) / 10;
+              normalizedWeight = Math.round(lbsToKg(s.weight) * 10) / 10;
             }
           }
           return {
@@ -957,8 +958,8 @@ export function getExercisePrescription(
   // No past workout: check PR / baseline calibration
   if (matchedPr && matchedPr.oneRepMax > 0) {
     const targetW = suggestLoad(matchedPr.oneRepMax, defaultTargetReps, Math.round(targetRpe), userUnit);
-    const prW = userUnit === 'lbs' ? (matchedPr.weightLbs || Math.round(matchedPr.weightKg * 2.20462)) : matchedPr.weightKg;
-    const e1rmDisplay = userUnit === 'lbs' ? Math.round(matchedPr.oneRepMax * 2.20462) : matchedPr.oneRepMax;
+    const prW = userUnit === 'lbs' ? (matchedPr.weightLbs || Math.round(kgToLbs(matchedPr.weightKg))) : matchedPr.weightKg;
+    const e1rmDisplay = userUnit === 'lbs' ? Math.round(kgToLbs(matchedPr.oneRepMax)) : matchedPr.oneRepMax;
 
     return {
       exerciseName: cleanName,
@@ -1071,9 +1072,9 @@ export function getProgressionRecommendation(
           let normalizedWeight = s.weight;
           if (typeof s.weight === 'number' && !isNaN(s.weight) && s.unit && s.unit !== userUnit) {
             if (userUnit === 'lbs' && s.unit === 'kg') {
-              normalizedWeight = Math.round(s.weight * 2.20462 * 10) / 10;
+              normalizedWeight = Math.round(kgToLbs(s.weight) * 10) / 10;
             } else if (userUnit === 'kg' && s.unit === 'lbs') {
-              normalizedWeight = Math.round(s.weight * 0.453592 * 10) / 10;
+              normalizedWeight = Math.round(lbsToKg(s.weight) * 10) / 10;
             }
           }
           return {
@@ -2088,7 +2089,7 @@ export function getTodaySessionState(
       for (const ex of tw.exercises) {
         for (const s of ex.sets) {
           if (typeof s.weight === 'number' && s.weight > 0 && s.reps > 0) {
-            const wKg = s.unit === 'lbs' ? s.weight * 0.453592 : s.weight;
+            const wKg = s.unit === 'lbs' ? lbsToKg(s.weight) : s.weight;
             vol += wKg * s.reps;
           }
           if (s.reps > 0) sets++;

@@ -1,4 +1,5 @@
 import type { Unit } from './types';
+import { kgToLbs, lbsToKg } from './units';
 
 /**
  * Body-stat provenance + validation (Phase-1 Task 1.1).
@@ -79,9 +80,9 @@ export function toStoredBodyStats(
   unit: Unit,
 ): { bodyweightKg: number; bodyweightLbs: number; heightCm: number } {
   const bodyweightKg =
-    Math.round((unit === 'lbs' ? weight * 0.453592 : weight) * 10) / 10;
+    Math.round((unit === 'lbs' ? lbsToKg(weight) : weight) * 10) / 10;
   const bodyweightLbs =
-    Math.round((unit === 'lbs' ? weight : weight * 2.20462) * 10) / 10;
+    Math.round((unit === 'lbs' ? weight : kgToLbs(weight)) * 10) / 10;
   const heightCm = Math.round(unit === 'lbs' ? height * 2.54 : height);
   return { bodyweightKg, bodyweightLbs, heightCm };
 }

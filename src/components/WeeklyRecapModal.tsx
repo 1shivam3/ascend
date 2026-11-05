@@ -11,6 +11,7 @@ import { getWeekRange, parseLocalDate } from '@/lib/formatters';
 import { selectWeeklyRecapPRs } from '@/lib/weekly-recap';
 import { calculateWorkoutVolumeKg } from '@/lib/volume';
 import { useTranslation } from '@/lib/i18n';
+import { kgToLbs } from '@/lib/units';
 
 interface WeeklyRecapModalProps {
   isOpen: boolean;
@@ -61,7 +62,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
         }
       }
     }
-    const totalVolume = profile?.unit === 'lbs' ? totalVolumeKg * 2.20462 : totalVolumeKg;
+    const totalVolume = profile?.unit === 'lbs' ? kgToLbs(totalVolumeKg) : totalVolumeKg;
 
     // Recent PRs this calendar week (Mon–Sun). F8 (certification):
     // selection lives in lib/weekly-recap — baselines excluded by the

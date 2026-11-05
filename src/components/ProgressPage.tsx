@@ -49,6 +49,7 @@ import { useTranslation, type StringKey } from '@/lib/i18n';
 import { resizeAndCompressImage } from '@/lib/image-processing';
 import ConfirmationModal from '@/components/ConfirmationModal';
 import type { ProgressPhoto } from '@/lib/types';
+import { kgToLbs } from '@/lib/units';
 
 function formatProgressDate(dateStr: string): string {
   try {
@@ -334,7 +335,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       return '—';
     }
     if (userUnit === 'lbs') {
-      return `${Math.round(kg * 2.20462)} lbs`;
+      return `${Math.round(kgToLbs(kg))} lbs`;
     }
     return `${Math.round(kg * 10) / 10} kg`;
   };
@@ -481,7 +482,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     return {
       dataPoints,
       deltaText,
-      latest1RM: dataPoints.length > 0 ? dataPoints[dataPoints.length - 1].value : heroLift.best1RMKg ? (userUnit === 'lbs' ? Math.round(heroLift.best1RMKg * 2.20462) : Math.round(heroLift.best1RMKg * 10) / 10) : null,
+      latest1RM: dataPoints.length > 0 ? dataPoints[dataPoints.length - 1].value : heroLift.best1RMKg ? (userUnit === 'lbs' ? Math.round(kgToLbs(heroLift.best1RMKg)) : Math.round(heroLift.best1RMKg * 10) / 10) : null,
     };
   }, [heroLift, workouts, prs, userUnit, t]);
 
@@ -626,7 +627,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     const dataPoints = filtered.map((m) => {
-      const val = userUnit === 'lbs' ? m.weightKg * 2.20462 : m.weightKg;
+      const val = userUnit === 'lbs' ? kgToLbs(m.weightKg) : m.weightKg;
       return { date: m.date, value: Math.round(val * 10) / 10 };
     });
 
@@ -661,7 +662,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     return {
       dataPoints,
       deltaText,
-      latestWeight: currentWeightKg ? (userUnit === 'lbs' ? Math.round(currentWeightKg * 2.20462) : Math.round(currentWeightKg * 10) / 10) : null,
+      latestWeight: currentWeightKg ? (userUnit === 'lbs' ? Math.round(kgToLbs(currentWeightKg)) : Math.round(currentWeightKg * 10) / 10) : null,
     };
   }, [sortedMetrics, profile, userUnit, bodyTimeRange, currentWeightKg, t]);
 

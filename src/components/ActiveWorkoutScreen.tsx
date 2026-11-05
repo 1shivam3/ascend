@@ -78,6 +78,7 @@ import {
 import { safeRandomId, getLocalTodayStr, getLocalDateOfTimestamp, formatDuration } from '@/lib/formatters';
 import ConfirmationModal from '@/components/ConfirmationModal';
 import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
+import { kgToLbs, lbsToKg } from '@/lib/units';
 
 interface ActiveWorkoutScreenProps {
   initialExercises: WorkoutExercise[];
@@ -1937,7 +1938,7 @@ export default function ActiveWorkoutScreen({
             const sWeight = parseFloat(String(s.weight)) || 0;
             const sReps = parseInt(String(s.reps), 10) || 0;
             if (sReps > 0 && (sWeight > 0 || isBW)) {
-              const wKg = s.unit === 'lbs' ? sWeight * 0.453592 : sWeight;
+              const wKg = s.unit === 'lbs' ? lbsToKg(sWeight) : sWeight;
               // SIM-P1-06: never let an above-cap load feed PR detection,
               // even if it arrived via import or an older client.
               if (!isBW && wKg > MAX_WORKOUT_WEIGHT_KG) continue;
@@ -1956,7 +1957,7 @@ export default function ActiveWorkoutScreen({
                       if (pastSet.isWarmup || !isSetCompleted(pastSet)) continue;
                       const pw = parseFloat(String(pastSet.weight)) || 0;
                       const pr = parseInt(String(pastSet.reps), 10) || 0;
-                      const pwKg = pastSet.unit === 'lbs' ? pw * 0.453592 : pw;
+                      const pwKg = pastSet.unit === 'lbs' ? lbsToKg(pw) : pw;
                       if (Math.abs(pwKg - wKg) < 1.0 && pr > maxPrevRepsAtWeight) {
                         maxPrevRepsAtWeight = pr;
                       }
@@ -1969,7 +1970,7 @@ export default function ActiveWorkoutScreen({
                 if (!bestRepPR || (sReps - maxPrevRepsAtWeight > bestRepPR.reps - bestRepPR.prevReps)) {
                   bestRepPR = {
                     weightKg: Math.round(wKg * 10) / 10,
-                    weightLbs: Math.round(wKg * 2.20462 * 10) / 10,
+                    weightLbs: Math.round(kgToLbs(wKg) * 10) / 10,
                     reps: sReps,
                     prevReps: maxPrevRepsAtWeight,
                     e1RMKg: Math.round(e1rm * 10) / 10,
@@ -1986,7 +1987,7 @@ export default function ActiveWorkoutScreen({
               id: prId,
               exercise: ex.name,
               weightKg: topSet.weightKg,
-              weightLbs: Math.round(topSet.weightKg * 2.20462 * 10) / 10,
+              weightLbs: Math.round(kgToLbs(topSet.weightKg) * 10) / 10,
               reps: topSet.reps,
               oneRepMax: topSet.e1RMKg,
               date: today,

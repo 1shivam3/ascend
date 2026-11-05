@@ -8,6 +8,7 @@ import { buildCompactUserContext } from './ai-context';
 import { getAiAuthHeaders } from './ai-client-auth';
 import { getNextSessionTarget, exerciseHadPain } from './workout-engine';
 import { DEFAULT_BODYWEIGHT_KG } from './defaults';
+import { lbsToKg } from './units';
 
 /**
  * Calculates total tonnage (volume in kg) for a workout session.
@@ -188,7 +189,7 @@ export function generateDeterministicPostWorkoutTake(
       completedSetCount += 1;
       const w = parseFloat(String(s.weight)) || 0;
       const r = parseInt(String(s.reps), 10) || 0;
-      totalVolumeKg += (s.unit === 'lbs' ? w * 0.453592 : w) * r;
+      totalVolumeKg += (s.unit === 'lbs' ? lbsToKg(w) : w) * r;
     }
   }
   const roundedVolumeKg = Math.round(totalVolumeKg);

@@ -41,6 +41,7 @@ import type { MuscleGroup } from './exercise-library';
 import { isPlaceholderSubstitute } from './workout-engine';
 import { DAY_ORDER, type LocalizedSentence } from './coach-i18n';
 import { DEFAULT_BODYWEIGHT_KG } from './defaults';
+import { kgToLbs, lbsToKg } from './units';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers
@@ -57,7 +58,7 @@ function daysBetween(a: string, b: string): number {
 
 function toKg(set: WorkoutSet): number {
   const w = typeof set.weight === 'number' && Number.isFinite(set.weight) ? set.weight : 0;
-  return set.unit === 'lbs' ? w * 0.453592 : w;
+  return set.unit === 'lbs' ? lbsToKg(w) : w;
 }
 
 /**
@@ -426,7 +427,7 @@ export function adjustNextTargets(
           e.painfulExerciseName.trim().toLowerCase() === target.exercise.trim().toLowerCase()
       );
 
-    const oldWeightKg = target.unit === 'lbs' ? target.weight * 0.453592 : target.weight;
+    const oldWeightKg = target.unit === 'lbs' ? lbsToKg(target.weight) : target.weight;
     let pct = 0;
     let action: TargetAdjustment['action'] = 'hold';
     let reason: string;
@@ -486,7 +487,7 @@ export function adjustNextTargets(
     const step = target.unit === 'lbs' ? 5 : 2.5;
     newWeightKg = Math.max(step, Math.min(MAX_PR_WEIGHT_KG, newWeightKg));
     const newWeight = roundToStep(
-      target.unit === 'lbs' ? newWeightKg * 2.20462 : newWeightKg,
+      target.unit === 'lbs' ? kgToLbs(newWeightKg) : newWeightKg,
       target.unit
     );
     const oldRounded = roundToStep(target.weight, target.unit);

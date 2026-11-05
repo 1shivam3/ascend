@@ -8,36 +8,17 @@ import {
   getSetExecutionStatus,
 } from '@/lib/types';
 
-/** Standard ASCEND pound-to-kilogram conversion constant */
-export const LBS_TO_KG = 0.453592;
+import {
+  KG_TO_LBS,
+  LBS_TO_KG,
+  convertWeight,
+  normalizeWeightToKg,
+} from './units';
 
-/** Standard ASCEND kilogram-to-pound conversion constant */
-export const KG_TO_LBS = 2.20462;
-
-/**
- * Normalizes any weight value to kilograms.
- */
-export function normalizeWeightToKg(weight: number, unit: Unit): number {
-  if (weight < 0) return 0; // Guard against negative weights (0 is valid for bodyweight)
-  if (unit === 'lbs') {
-    return weight * LBS_TO_KG;
-  }
-  return weight;
-}
-
-/**
- * Converts a weight from one unit to another.
- */
-export function convertWeight(weight: number, fromUnit: Unit, toUnit: Unit): number {
-  if (fromUnit === toUnit) return weight;
-  if (fromUnit === 'lbs' && toUnit === 'kg') {
-    return weight * LBS_TO_KG;
-  }
-  if (fromUnit === 'kg' && toUnit === 'lbs') {
-    return weight * KG_TO_LBS;
-  }
-  return weight;
-}
+// Conversion constants + helpers now live in lib/units.ts (single
+// source of truth); re-exported here so existing importers of this
+// module keep working unchanged.
+export { KG_TO_LBS, LBS_TO_KG, convertWeight, normalizeWeightToKg };
 
 /**
  * Determines whether explicit prescription data exists on a workout set.

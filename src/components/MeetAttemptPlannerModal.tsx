@@ -8,6 +8,7 @@ import { calculateDOTS } from '@/lib/dots';
 import { calculatePlates } from '@/lib/plate-calculator';
 import { useTranslation } from '@/lib/i18n';
 import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
+import { kgToLbs, lbsToKg } from '@/lib/units';
 
 interface MeetAttemptPlannerModalProps {
   isOpen: boolean;
@@ -26,7 +27,7 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
   // "lbs" label (and feeding the mixed total to DOTS) produced attempts
   // that were wrong by 2.2× for lbs users.
   const toUserUnit = (kg: number) =>
-    userUnit === 'lbs' ? Math.round(kg * 2.20462 * 10) / 10 : kg;
+    userUnit === 'lbs' ? Math.round(kgToLbs(kg) * 10) / 10 : kg;
 
   // Find user's best 1RMs for Squat, Bench, Deadlift
   const defaultSquat = useMemo(() => {
@@ -72,7 +73,7 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
     const bodyweightKg = profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG;
     const gender = profile?.gender || 'male';
     // DOTS is defined on kilograms — convert the user-unit total back.
-    const projectedTotalKg = userUnit === 'lbs' ? projectedTotal * 0.453592 : projectedTotal;
+    const projectedTotalKg = userUnit === 'lbs' ? lbsToKg(projectedTotal) : projectedTotal;
     const projectedDots = calculateDOTS(bodyweightKg, projectedTotalKg, gender);
 
     return {

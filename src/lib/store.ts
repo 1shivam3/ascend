@@ -157,6 +157,7 @@ import {
   type HealthDaySummary,
   type HealthFetchResult,
 } from './health-connect';
+import { kgToLbs } from './units';
 
 export * from './types';
 
@@ -1982,7 +1983,7 @@ export const useAppStore = create<AppState>()(
                         stepIncrement:
                           Math.round(
                             (targetUnit === 'lbs'
-                              ? managedPolicy.scheme.incrementKg * 2.20462
+                              ? kgToLbs(managedPolicy.scheme.incrementKg)
                               : managedPolicy.scheme.incrementKg) * 2
                           ) / 2,
                         approvalSource: 'coach_approved' as const,
@@ -2330,7 +2331,7 @@ export const useAppStore = create<AppState>()(
         const updatedProfile = state.profile ? {
           ...state.profile,
           bodyweightKg: Math.round(newest.weightKg * 10) / 10,
-          bodyweightLbs: Math.round(newest.weightKg * 2.20462 * 10) / 10,
+          bodyweightLbs: Math.round(kgToLbs(newest.weightKg) * 10) / 10,
           ...(newest.heightCm ? { heightCm: Math.round(newest.heightCm) } : {}),
           // Task 1.1: a logged measurement is a REAL stat — once the
           // profile weight/height follow a measurement, targets may
@@ -3778,7 +3779,7 @@ export const useAppStore = create<AppState>()(
           name: sanitizeAthleteName('', MAX_ATHLETE_NAME_LENGTH),
           gender: 'male',
           bodyweightKg: 70,
-          bodyweightLbs: Math.round(70 * 2.20462 * 10) / 10,
+          bodyweightLbs: Math.round(kgToLbs(70) * 10) / 10,
           heightCm: 175,
           bodyweightSource: 'default',
           heightSource: 'default',

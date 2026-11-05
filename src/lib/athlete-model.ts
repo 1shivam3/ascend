@@ -36,6 +36,7 @@ import { resolveExerciseMuscle, type MuscleGroup } from './exercise-library';
 import { parseLocalDate } from './formatters';
 import { getScheduledPlanEntries, earliestDataDate } from './scheduled-days';
 import type { LocalizedSentence } from './coach-i18n';
+import { lbsToKg } from './units';
 
 /**
  * Muscle for recovery purposes — the library resolver WITHOUT its
@@ -246,7 +247,7 @@ interface LiftSession {
 
 function weightKgOf(weight: number | undefined, unit: string | undefined): number | null {
   if (typeof weight !== 'number' || !Number.isFinite(weight) || weight <= 0) return null;
-  return unit === 'lbs' ? weight * 0.453592 : weight;
+  return unit === 'lbs' ? lbsToKg(weight) : weight;
 }
 
 /** A workout counts as trained only if at least one set was actually completed. */

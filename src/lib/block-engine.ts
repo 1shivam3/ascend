@@ -61,6 +61,7 @@ import { getWorkoutBodyParts } from './workout-schedule';
 import type { AthleteModel } from './athlete-model';
 import type { StallFlag } from './coach-engine';
 import type { BlockIntake } from './block-intake';
+import { kgToLbs } from './units';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shapes
@@ -1127,7 +1128,7 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
       if (e1rm && role !== 'accessory') {
         const pct = role === 'main' ? MAIN_LOAD_PCT[focus] : 0.68;
         const kg = e1rm * pct;
-        targetWeight = roundToLoadable(unit === 'lbs' ? kg * 2.20462 : kg, unit);
+        targetWeight = roundToLoadable(unit === 'lbs' ? kgToLbs(kg) : kg, unit);
       }
       const targetReps = Math.min(range.max, Math.max(range.min, ex.targetReps || range.min + 1));
       // Load continuity across block boundaries: the %1RM anchor (and,

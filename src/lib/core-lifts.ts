@@ -18,6 +18,7 @@
 import { exerciseNamesEqual } from './lifter-twin';
 import { calculateOneRepMax } from './strength-standards';
 import { isSetCompleted, type PersonalRecord, type WorkoutEntry } from './types';
+import { lbsToKg } from './units';
 
 export interface CoreLift {
   name: string;
@@ -71,7 +72,7 @@ export function computeCoreLifts(
           if (matchesCoreLift(ex.name, item.aliases)) {
             ex.sets.filter(isSetCompleted).forEach((s) => {
               if (s.weight && s.reps) {
-                const wKg = s.unit === 'lbs' ? s.weight * 0.453592 : s.weight;
+                const wKg = s.unit === 'lbs' ? lbsToKg(s.weight) : s.weight;
                 const e1rm = calculateOneRepMax(wKg, s.reps);
                 if (e1rm > maxWorkout1RM) maxWorkout1RM = e1rm;
               }

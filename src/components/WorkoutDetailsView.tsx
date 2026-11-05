@@ -20,6 +20,7 @@ import { buildPercentSuggestions } from '@/lib/percent-1rm';
 import { getWorkoutBodyParts } from '@/lib/workout-schedule';
 import { applyPackedSwapsToPlan } from '@/lib/crowded-gym';
 import { useTranslation } from '@/lib/i18n';
+import { kgToLbs } from '@/lib/units';
 
 interface WorkoutDetailsViewProps {
   plan: PlannedWorkout;
@@ -259,7 +260,7 @@ export default function WorkoutDetailsView({
                               pct: 80,
                               e1rm:
                                 percentSuggestions[idx].unit === 'lbs'
-                                  ? Math.round(percentSuggestions[idx].e1rmKg * 2.20462)
+                                  ? Math.round(kgToLbs(percentSuggestions[idx].e1rmKg))
                                   : Math.round(percentSuggestions[idx].e1rmKg),
                             })}
                           </span>
