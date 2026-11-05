@@ -13,7 +13,12 @@ import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useAppNavigation } from '@/lib/navigation';
 import { useTranslation } from '@/lib/i18n';
 import { useFormCoach } from '../hooks/useFormCoach';
-import { FormExerciseId } from '../analyzers/ExerciseAnalyzer';
+import {
+  FormExerciseId,
+  FORM_EXERCISE_IDS,
+  FORM_EXERCISE_NAMES,
+} from '../analyzers/ExerciseAnalyzer';
+import type { StringKey } from '@/lib/i18n/en';
 import PoseOverlay from './PoseOverlay';
 import FormSessionSummaryModal from './FormSessionSummaryModal';
 import {
@@ -36,20 +41,46 @@ interface FormCoachModalProps {
   onClose: () => void;
   // Optional preset from an in-workout entry: the exercise the user is
   // performing. When set, that exercise's analyzer grades the video
-  // (with a detection-mismatch choice if the video clearly shows the
-  // other lift). When unset (generic entries), the movement is
-  // auto-detected. Either way the session's canonical exercise identity
-  // ("Barbell Back Squat" / "Conventional Deadlift") is stamped by the
-  // analyzer itself — callers never name what was analyzed.
+  // (with a detection-mismatch choice if the video clearly shows a
+  // different exercise). When unset (generic entries), the movement is
+  // auto-detected. Either way the session's canonical exercise
+  // identity ("Barbell Back Squat", "Conventional Deadlift", …) is
+  // stamped by the analyzer itself — callers never name what was
+  // analyzed.
   presetExerciseId?: FormExerciseId;
   workoutId?: string;
   setIndex?: number;
   workoutName?: string;
 }
 
-const EXERCISE_NAMES: Record<FormExerciseId, string> = {
-  squat: 'Barbell Back Squat',
-  deadlift: 'Conventional Deadlift',
+const EXERCISE_NAMES = FORM_EXERCISE_NAMES;
+
+/** Two-letter card badge per exercise. */
+const EXERCISE_INITIALS: Record<FormExerciseId, string> = {
+  squat: 'SQ',
+  deadlift: 'DL',
+  'overhead-press': 'OP',
+  'bent-over-row': 'BR',
+  'bicep-curl': 'BC',
+  lunge: 'LU',
+  'push-up': 'PU',
+  'lateral-raise': 'LR',
+  plank: 'PL',
+  'bench-press': 'BP',
+};
+
+/** Scope line shown on the select card for a preset exercise. */
+const EXERCISE_SCOPE_KEYS: Record<FormExerciseId, StringKey> = {
+  squat: 'formCoach.squatScope',
+  deadlift: 'formCoach.deadliftScope',
+  'overhead-press': 'formCoach.pressScope',
+  'bent-over-row': 'formCoach.rowScope',
+  'bicep-curl': 'formCoach.curlScope',
+  lunge: 'formCoach.lungeScope',
+  'push-up': 'formCoach.pushUpScope',
+  'lateral-raise': 'formCoach.raiseScope',
+  plank: 'formCoach.plankScope',
+  'bench-press': 'formCoach.benchScope',
 };
 
 export default function FormCoachModal({
@@ -101,7 +132,7 @@ export default function FormCoachModal({
 
   // The report header's detection line and the correction control:
   // when detection chose the exercise, the user can re-run the same
-  // video as the other supported lift if the pick was wrong.
+  // video as any other supported exercise if the pick was wrong.
   const detectionNote = detection
     ? detection.source === 'detected'
       ? t('formCoach.detected', { exercise: detection.exerciseName })
@@ -109,12 +140,10 @@ export default function FormCoachModal({
         ? t('formCoach.presetNote', { exercise: detection.exerciseName })
         : t('formCoach.correctedNote', { exercise: detection.exerciseName })
     : null;
-  const otherExerciseId: FormExerciseId | null =
+  const rerunOptions: FormExerciseId[] =
     detection && detection.source === 'detected'
-      ? detection.exerciseId === 'squat'
-        ? 'deadlift'
-        : 'squat'
-      : null;
+      ? FORM_EXERCISE_IDS.filter((id) => id !== detection.exerciseId)
+      : [];
 
   // Which analyzer the live HUD is following (preset, or the current
   // detection leaning in auto mode) — decides the min-angle tile.
@@ -253,7 +282,7 @@ export default function FormCoachModal({
             <div className="p-3.5 rounded-2xl bg-surface-elevated border border-border-subtle flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-accent/15 text-accent flex items-center justify-center font-bold text-xs font-mono">
-                  {presetExerciseId === 'deadlift' ? 'DL' : presetExerciseId === 'squat' ? 'SQ' : 'AD'}
+                  {presetExerciseId ? EXERCISE_INITIALS[presetExerciseId] : 'AD'}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
@@ -267,11 +296,9 @@ export default function FormCoachModal({
                     </span>
                   </div>
                   <p className="text-2xs text-text-muted">
-                    {presetExerciseId === 'deadlift'
-                      ? t('formCoach.deadliftScope')
-                      : presetExerciseId === 'squat'
-                        ? t('formCoach.squatScope')
-                        : t('formCoach.autoScope')}
+                    {presetExerciseId
+                      ? t(EXERCISE_SCOPE_KEYS[presetExerciseId])
+                      : t('formCoach.autoScope')}
                   </p>
                 </div>
               </div>
@@ -421,14 +448,11 @@ export default function FormCoachModal({
             summary={summary}
             workoutName={workoutName}
             detectionNote={detectionNote}
-            rerunLabel={
-              otherExerciseId
-                ? t('formCoach.rerunAs', { exercise: EXERCISE_NAMES[otherExerciseId] })
-                : null
-            }
-            onRerunAsOther={
-              otherExerciseId ? () => rerunAs(otherExerciseId) : undefined
-            }
+            rerunOptions={rerunOptions.map((id) => ({
+              id,
+              label: t('formCoach.rerunAs', { exercise: EXERCISE_NAMES[id] }),
+            }))}
+            onRerunAs={(id) => rerunAs(id as FormExerciseId)}
             onClose={handleSafeClose}
             onSavedToWorkout={handleSafeClose}
             onAnalyzeAnother={reset}
@@ -530,21 +554,17 @@ export default function FormCoachModal({
                   </button>
                 </>
               ) : (
-                <div className="flex items-center gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => rerunAs('squat')}
-                    className="py-2.5 px-4 rounded-xl bg-accent text-accent-on text-xs font-semibold cursor-pointer"
-                  >
-                    {t('formCoach.analyseAs', { exercise: EXERCISE_NAMES.squat })}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => rerunAs('deadlift')}
-                    className="py-2.5 px-4 rounded-xl bg-accent text-accent-on text-xs font-semibold cursor-pointer"
-                  >
-                    {t('formCoach.analyseAs', { exercise: EXERCISE_NAMES.deadlift })}
-                  </button>
+                <div className="flex flex-wrap items-center justify-center gap-2 max-w-sm">
+                  {FORM_EXERCISE_IDS.map((id) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => rerunAs(id)}
+                      className="py-2 px-3.5 rounded-xl bg-accent text-accent-on text-xs font-semibold cursor-pointer"
+                    >
+                      {t('formCoach.analyseAs', { exercise: EXERCISE_NAMES[id] })}
+                    </button>
+                  ))}
                 </div>
               )}
               <div className="flex items-center gap-3 pt-1">
