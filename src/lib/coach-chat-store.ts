@@ -19,11 +19,34 @@
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { CoachAction } from './coach-actions';
+import type { MacroGoals } from './types';
+
+export type CoachActionState = 'pending' | 'applied' | 'dismissed' | 'stale' | 'superseded';
+
+/** Receipt for an applied set_macro_goals action: what the goals were
+ * and what they became — renders the card's old → new line and powers
+ * Undo (a fresh version-checked restore, see coach-action-executor). */
+export interface CoachActionReceipt {
+  previous: MacroGoals | null;
+  applied: MacroGoals;
+}
 
 export interface CoachChatMessage {
   role: 'user' | 'assistant';
   content: string;
   evidence?: string[];
+  /** Coach AI Actions (Slice A): at most one validated action per
+   * assistant reply. Absent on every pre-existing persisted message —
+   * all fields below are optional for exactly that reason. */
+  action?: CoachAction;
+  /** Lifecycle of `action`; meaningful only when `action` is set. */
+  actionState?: CoachActionState;
+  /** Epoch ms the message was appended (drives the 30-min card
+   * expiry). Absent on threads persisted before Slice A. */
+  ts?: number;
+  /** Set when a set_macro_goals action is applied. */
+  appliedSnapshot?: CoachActionReceipt;
 }
 
 interface CoachChatState {

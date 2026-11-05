@@ -197,7 +197,14 @@ export default function CoachChatSection() {
         sessionsPlanned: r.sessionsPlanned,
       })),
       mealsToday,
-      macroGoals: macroGoals ? { calories: macroGoals.calories, proteinG: macroGoals.proteinG } : null,
+      macroGoals: macroGoals
+        ? {
+            calories: macroGoals.calories,
+            proteinG: macroGoals.proteinG,
+            carbsG: macroGoals.carbsG,
+            fatG: macroGoals.fatG,
+          }
+        : null,
       bodyMetricsLatest: latestMetric
         ? {
             date: latestMetric.date,
