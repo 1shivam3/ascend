@@ -3151,6 +3151,52 @@ export const en = {
   'coachChat.coach': 'Coach',
   'coachChat.dailyLeft': '{n} messages left today',
 
+  // ── Coach AI Actions (Slice B): intro, chips, draft cards ────────
+  'coachChat.thinking': 'Coach is thinking…',
+  'coachChat.introCapabilities':
+    'I can draft a training plan or new nutrition targets from your own data — and answer questions about your training, progress, and recovery.',
+  'coachChat.introPromise':
+    'When I draft a change, nothing is applied until you tap Apply on the card.',
+  'coachChat.chipBuildWeek': 'Build me a muscle-gain week',
+  'coachChat.chipRaiseProtein': 'Raise my protein target',
+  'coachChat.chipPlanDays': 'Plan my training days',
+  'coachChat.chipSquatStall': 'Why did my squat stall?',
+  'coachChat.actionApply': 'Apply',
+  'coachChat.actionDismiss': 'Dismiss',
+  'coachChat.actionMacroTitle': 'Nutrition targets',
+  'coachChat.macroCalories': 'Calories',
+  'coachChat.macroProtein': 'Protein',
+  'coachChat.macroCarbs': 'Carbs',
+  'coachChat.macroFat': 'Fat',
+  'coachChat.unitKcal': 'kcal',
+  'coachChat.unitGram': 'g',
+  'coachChat.actionNotSet': 'Not set',
+  'coachChat.actionStaleTitle': 'Your targets changed since I drafted this',
+  'coachChat.actionStaleBody':
+    'Here is the same change against your current targets. Check it, then apply if it still looks right.',
+  'coachChat.actionExpired': 'This draft expired — ask me again and I will draft a fresh one.',
+  'coachChat.actionDismissedNote': 'Draft dismissed',
+  'coachChat.actionSupersededNote': 'Replaced by a newer draft below',
+  'coachChat.actionAppliedMacroTitle': 'Targets updated',
+  'coachChat.actionUndone': 'Undone — your previous targets are back.',
+  'coachChat.actionUndoStale':
+    'Your targets changed again after this was applied, so Undo will not overwrite them.',
+  'coachChat.actionProgramMeta': '{goal} · {weeks} weeks · {days} days a week · ~{minutes} min a session',
+  'coachChat.actionIntakeLine': '{days} days a week · ~{minutes} min a session · {equipment} · {experience}',
+  'coachChat.actionAssumedFromProfile': 'These match your usual setup from your profile.',
+  'coachChat.actionProgramApplied':
+    'Program set — it is now your active plan. You can manage it any time from the Coach tab.',
+  'coachChat.actionProgramFailed':
+    'I could not build this program — try asking again with different days, time, or equipment.',
+  'coachChat.actionProgramApplyFailed':
+    'That draft could not be set as your plan — it may have been replaced. Ask me to draft it again.',
+  'coachChat.goalMuscle': 'Build muscle',
+  'coachChat.goalStrength': 'Get stronger',
+  'coachChat.goalFatLoss': 'Lose fat',
+  'coachChat.goalEndurance': 'Build endurance',
+  'coachChat.goalGeneral': 'General fitness',
+  'coachChat.equipHomeMinimal': 'Minimal home kit',
+
   // ── App chrome (re-audit UX-R4: system surfaces localized) ──────────
   'app.skipToContent': 'Skip to main content',
   'app.offlineBanner': 'Offline Gym Mode Active • Tap for details',

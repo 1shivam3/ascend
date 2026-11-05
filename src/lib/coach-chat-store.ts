@@ -47,6 +47,17 @@ export interface CoachChatMessage {
   ts?: number;
   /** Set when a set_macro_goals action is applied. */
   appliedSnapshot?: CoachActionReceipt;
+  /** Slice B: the macro goals as they stood when the card first
+   * rendered (null = no goals existed then). Captured ONCE, on first
+   * render, and persisted with the message — so an apply after a
+   * reload still version-checks against proposal-time values, not
+   * whatever the goals happen to be when the reloaded card paints.
+   * `undefined` means "not captured yet". set_macro_goals only. */
+  actionBase?: MacroGoals | null;
+  /** Slice B: true once an applied set_macro_goals receipt has been
+   * undone. The receipt is retained so the card can keep showing
+   * what was applied and that it was reversed. */
+  undone?: boolean;
 }
 
 interface CoachChatState {

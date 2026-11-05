@@ -3156,6 +3156,53 @@ export const hi: Partial<Record<StringKey, string>> = {
   'coachChat.coach': 'कोच',
   'coachChat.dailyLeft': 'आज {n} संदेश बाकी हैं',
 
+  // ── Coach AI Actions (Slice B; Hindi machine translation,
+  // unreviewed — same posture as the other coach-chat additions) ──
+  'coachChat.thinking': 'कोच सोच रहा है…',
+  'coachChat.introCapabilities':
+    'मैं आपके अपने डेटा से ट्रेनिंग प्लान या नए पोषण लक्ष्य ड्राफ़्ट कर सकता हूँ — और आपकी ट्रेनिंग, प्रगति और रिकवरी के सवालों के जवाब दे सकता हूँ।',
+  'coachChat.introPromise':
+    'जब मैं कोई बदलाव ड्राफ़्ट करता हूँ, तो कार्ड पर Apply दबाने से पहले कुछ भी लागू नहीं होता।',
+  'coachChat.chipBuildWeek': 'मेरे लिए मसल-गेन वाला हफ़्ता बनाओ',
+  'coachChat.chipRaiseProtein': 'मेरा प्रोटीन लक्ष्य बढ़ाओ',
+  'coachChat.chipPlanDays': 'मेरे ट्रेनिंग दिन प्लान करो',
+  'coachChat.chipSquatStall': 'मेरा स्क्वाट क्यों रुका हुआ है?',
+  'coachChat.actionApply': 'लागू करें',
+  'coachChat.actionDismiss': 'हटाएँ',
+  'coachChat.actionMacroTitle': 'पोषण लक्ष्य',
+  'coachChat.macroCalories': 'कैलोरी',
+  'coachChat.macroProtein': 'प्रोटीन',
+  'coachChat.macroCarbs': 'कार्ब्स',
+  'coachChat.macroFat': 'फैट',
+  'coachChat.unitKcal': 'kcal',
+  'coachChat.unitGram': 'ग्राम',
+  'coachChat.actionNotSet': 'सेट नहीं है',
+  'coachChat.actionStaleTitle': 'इस ड्राफ़्ट के बाद से आपके लक्ष्य बदल गए हैं',
+  'coachChat.actionStaleBody':
+    'यही बदलाव आपके मौजूदा लक्ष्यों के हिसाब से फिर से दिखाया गया है। जाँचकर, सही लगे तो लागू करें।',
+  'coachChat.actionExpired': 'इस ड्राफ़्ट की समय-सीमा खत्म हो गई है — फिर से पूछें, मैं नया ड्राफ़्ट बनाऊँगा।',
+  'coachChat.actionDismissedNote': 'ड्राफ़्ट हटाया गया',
+  'coachChat.actionSupersededNote': 'नीचे नए ड्राफ़्ट ने इसे बदल दिया है',
+  'coachChat.actionAppliedMacroTitle': 'लक्ष्य अपडेट हो गए',
+  'coachChat.actionUndone': 'पूर्ववत हो गया — आपके पिछले लक्ष्य वापस आ गए हैं।',
+  'coachChat.actionUndoStale':
+    'लागू होने के बाद आपके लक्ष्य फिर बदल गए हैं, इसलिए पूर्ववत उन्हें नहीं बदलेगा।',
+  'coachChat.actionProgramMeta': '{goal} · {weeks} हफ़्ते · हफ़्ते में {days} दिन · प्रति सेशन ~{minutes} मिनट',
+  'coachChat.actionIntakeLine': 'हफ़्ते में {days} दिन · प्रति सेशन ~{minutes} मिनट · {equipment} · {experience}',
+  'coachChat.actionAssumedFromProfile': 'ये आपकी प्रोफ़ाइल के सामान्य सेटअप से मेल खाते हैं।',
+  'coachChat.actionProgramApplied':
+    'प्रोग्राम सेट हो गया — यह अब आपका सक्रिय प्लान है। आप इसे कभी भी Coach टैब से प्रबंधित कर सकते हैं।',
+  'coachChat.actionProgramFailed':
+    'मैं यह प्रोग्राम नहीं बना सका — दिन, समय या उपकरण बदलकर फिर पूछें।',
+  'coachChat.actionProgramApplyFailed':
+    'यह ड्राफ़्ट आपके प्लान के रूप में सेट नहीं हो सका — हो सकता है इसे बदल दिया गया हो। मुझसे फिर से ड्राफ़्ट बनाने को कहें।',
+  'coachChat.goalMuscle': 'मसल बनाना',
+  'coachChat.goalStrength': 'ताकत बढ़ाना',
+  'coachChat.goalFatLoss': 'फैट घटाना',
+  'coachChat.goalEndurance': 'स्टैमिना बनाना',
+  'coachChat.goalGeneral': 'सामान्य फिटनेस',
+  'coachChat.equipHomeMinimal': 'घर का न्यूनतम सामान',
+
   // ── App chrome (re-audit UX-R4; Hindi machine-written, flagged for
   // native-speaker review like the coach-chat additions) ──
   'app.skipToContent': 'मुख्य सामग्री पर जाएं',
