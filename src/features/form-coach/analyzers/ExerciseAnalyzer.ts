@@ -16,6 +16,14 @@ export interface AnalyzerFrameResult {
   currentKneeAngleDeg: number | null;
   /** Running minimum knee angle of the current rep (null if not yet measurable). */
   minKneeAngleDeg: number | null;
+  /**
+   * Hip-angle equivalents for hinge-pattern analyzers (deadlift). The
+   * squat analyzer leaves these null; the deadlift analyzer fills them
+   * alongside the knee fields so the HUD can show the angle that drives
+   * the movement being graded.
+   */
+  currentHipAngleDeg: number | null;
+  minHipAngleDeg: number | null;
   torsoInclinationDeg: number | null;
   detectedSide: DetectedSide;
   trackingConfidence: number;
@@ -24,6 +32,9 @@ export interface AnalyzerFrameResult {
     reason?: string;
   };
 }
+
+/** The exercises Form Coach can grade today. */
+export type FormExerciseId = 'squat' | 'deadlift';
 
 /**
  * D6: what the tracked motion, taken as a whole, actually looks like.

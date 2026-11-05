@@ -416,7 +416,17 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
     );
     const label = sameExercise ? `${weekFormSessions[0].exerciseId} ` : '';
     if (formReps.length > 0) {
-      const below = formReps.filter((r) => r.estimatedDepth === 'below_parallel').length;
+      // The metric follows the exercise: squat reps are summarized by
+      // depth class, deadlift reps by lockout — a deadlift rep must
+      // never land in the "below parallel" denominator (or vice versa).
+      const squatReps = weekFormSessions
+        .filter((s) => s.exerciseId === 'squat')
+        .flatMap((s) => s.reps);
+      const deadliftReps = weekFormSessions
+        .filter((s) => s.exerciseId === 'deadlift')
+        .flatMap((s) => s.reps);
+      const below = squatReps.filter((r) => r.estimatedDepth === 'below_parallel').length;
+      const lockouts = deadliftReps.filter((r) => r.lockoutAchieved).length;
       const tempoWeight = weekFormSessions.reduce((acc, s) => acc + s.totalValidReps, 0);
       const avgTempo =
         tempoWeight > 0
@@ -430,19 +440,52 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
               weekFormSessions.reduce((acc, s) => acc + s.averageRepDurationSeconds, 0) /
                 weekFormSessions.length
             );
-      coachLines.push(
-        `Form checks: ${weekFormSessions.length} ${label}${sessionWord} · depth below parallel on ${below} of ${formReps.length} reps · avg tempo ${avgTempo}s/rep`
-      );
-      coachLinesI18n.push({
-        key: 'weeklyReview.coachFormChecksReps',
-        params: {
-          count: weekFormSessions.length,
-          scope: `${label}${sessionWord}`,
-          below,
-          total: formReps.length,
-          tempo: avgTempo,
-        },
-      });
+      const scope = `${label}${sessionWord}`;
+      if (deadliftReps.length === 0) {
+        coachLines.push(
+          `Form checks: ${weekFormSessions.length} ${scope} · depth below parallel on ${below} of ${formReps.length} reps · avg tempo ${avgTempo}s/rep`
+        );
+        coachLinesI18n.push({
+          key: 'weeklyReview.coachFormChecksReps',
+          params: {
+            count: weekFormSessions.length,
+            scope,
+            below,
+            total: formReps.length,
+            tempo: avgTempo,
+          },
+        });
+      } else if (squatReps.length === 0) {
+        coachLines.push(
+          `Form checks: ${weekFormSessions.length} ${scope} · full lockout on ${lockouts} of ${deadliftReps.length} reps · avg tempo ${avgTempo}s/rep`
+        );
+        coachLinesI18n.push({
+          key: 'weeklyReview.coachFormChecksLockouts',
+          params: {
+            count: weekFormSessions.length,
+            scope,
+            lockouts,
+            total: deadliftReps.length,
+            tempo: avgTempo,
+          },
+        });
+      } else {
+        coachLines.push(
+          `Form checks: ${weekFormSessions.length} ${scope} · depth below parallel on ${below} of ${squatReps.length} squat reps · full lockout on ${lockouts} of ${deadliftReps.length} deadlift reps · avg tempo ${avgTempo}s/rep`
+        );
+        coachLinesI18n.push({
+          key: 'weeklyReview.coachFormChecksMixed',
+          params: {
+            count: weekFormSessions.length,
+            scope,
+            below,
+            squatTotal: squatReps.length,
+            lockouts,
+            deadliftTotal: deadliftReps.length,
+            tempo: avgTempo,
+          },
+        });
+      }
     } else {
       coachLines.push(
         `Form checks: ${weekFormSessions.length} ${label}${sessionWord} · no valid reps measured`

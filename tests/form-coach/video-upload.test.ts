@@ -14,7 +14,12 @@ describe('Form Coach — Streamlined Video Upload Architecture & Isolation', () 
     // 5 simple states (D4 added the terminal 'no-tracking' state)
     // D6: the union gained 'not-squat' — a tracked movement that is
     // positively a different pattern (hip hinge) ends there, unsaved.
-    expect(useFormCoachSrc).toContain("export type FormCoachState = 'select' | 'analyzing' | 'report' | 'no-tracking' | 'not-squat' | 'error';");
+    // Auto-detect (2026-11-05): 'not-squat' is replaced by 'unsupported'
+    // — with a deadlift analyzer shipped, a hinge is routed and graded,
+    // and the decline outcome now covers any movement that detection
+    // cannot confidently identify (unknown / insufficient evidence /
+    // preset mismatch), still unsaved.
+    expect(useFormCoachSrc).toContain("export type FormCoachState = 'select' | 'analyzing' | 'report' | 'no-tracking' | 'unsupported' | 'error';");
 
     // Video analysis actions
     expect(useFormCoachSrc).toContain('const analyzeVideo = useCallback');
@@ -47,7 +52,9 @@ describe('Form Coach — Streamlined Video Upload Architecture & Isolation', () 
 
     // Analyzing state
     expect(modalSrc).toContain("state === 'analyzing'");
-    expect(modalSrc).toContain('Analyzing Squat Mechanics');
+    // Auto-detect: the analyzing header is exercise-neutral (the lift
+    // is not known until detection concludes) and i18n-backed.
+    expect(modalSrc).toContain("t('formCoach.analyzingTitle')");
     expect(modalSrc).toContain('View Report Now');
 
     // Report state

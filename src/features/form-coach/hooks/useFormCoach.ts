@@ -3,6 +3,16 @@
  *
  * Streamlined on-device biomechanical video analysis.
  * User uploads a recorded workout video -> automated frame analysis -> instant form report.
+ *
+ * Auto-detect: the tracked landmark stream feeds a MovementClassifier
+ * alongside the exercise analyzers. A generic upload is routed at the
+ * end of the stream to the analyzer the classifier positively
+ * identified (squat or deadlift); when the movement matches neither —
+ * or too little of it was measurable — the outcome is the honest
+ * 'unsupported' state and nothing is saved. An in-workout entry may
+ * preset the exercise; if detection confidently contradicts the
+ * preset, the user chooses which lift to grade (mismatch), and any
+ * report can be re-run as the other exercise (the correction path).
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -10,13 +20,22 @@ import { PoseLandmarkerService } from '../services/pose/PoseLandmarkerService';
 import { PoseLandmarksSmoother } from '../services/analysis/LandmarkSmoothing';
 import { PoseSubjectTracker } from '../services/pose/PoseSubjectTracker';
 import { SquatAnalyzer } from '../analyzers/SquatAnalyzer';
-import { ExerciseAnalyzer, MovementSignature } from '../analyzers/ExerciseAnalyzer';
+import { DeadliftAnalyzer } from '../analyzers/DeadliftAnalyzer';
+import {
+  ExerciseAnalyzer,
+  FormExerciseId,
+  MovementSignature,
+} from '../analyzers/ExerciseAnalyzer';
+import {
+  MovementClassifier,
+  DetectedExercise,
+} from '../services/analysis/MovementClassifier';
 import { NormalizedLandmark, DetectedSide } from '../models/pose.types';
 import { FormCue, MovementPhase } from '../models/form-feedback.types';
 import { FormSessionSummary, FormCoachConfig } from '../models/form-session.types';
 import { FormSessionRepository } from '../repositories/FormSessionRepository';
 
-export type FormCoachState = 'select' | 'analyzing' | 'report' | 'no-tracking' | 'not-squat' | 'error';
+export type FormCoachState = 'select' | 'analyzing' | 'report' | 'no-tracking' | 'unsupported' | 'error';
 
 /**
  * D4: decides what the end of an analysis means. When pose tracking
@@ -32,6 +51,10 @@ export type FormCoachState = 'select' | 'analyzing' | 'report' | 'no-tracking' |
  * honest outcome is 'not-squat' — no squat summary is built or saved.
  * Tracking failure takes precedence: a stream that was never tracked
  * cannot be judged as any movement.
+ *
+ * Retained as the D6 routing contract; the hook's end-of-analysis
+ * routing now goes through resolveDetectionOutcome below, which
+ * generalizes this to both supported exercises.
  */
 export function resolveAnalysisOutcome(
   stats: {
@@ -48,8 +71,76 @@ export function resolveAnalysisOutcome(
   return 'report';
 }
 
+/** How the analyzer for a run is chosen. */
+export type AnalyzerMode =
+  | { type: 'auto' }
+  | { type: 'preset'; exerciseId: FormExerciseId }
+  | { type: 'forced'; exerciseId: FormExerciseId };
+
+export type DetectionOutcome =
+  | { kind: 'report'; exerciseId: FormExerciseId }
+  | { kind: 'no-tracking' }
+  | { kind: 'unsupported'; reason: 'unknown' | 'insufficient_evidence' }
+  | { kind: 'mismatch'; detectedExerciseId: FormExerciseId };
+
+/**
+ * End-of-analysis routing for auto-detect. Tracking failure takes
+ * precedence (a stream that was never tracked cannot be judged as any
+ * movement). A forced run (the user's correction) always reports as
+ * the chosen exercise. A preset run reports as the preset unless
+ * detection confidently names the OTHER supported exercise — then the
+ * user decides (mismatch). An auto run reports as the detected
+ * exercise, and declines — saving nothing — when detection is
+ * 'unknown' or 'insufficient_evidence': an analyzer is never forced
+ * on an unidentified movement.
+ */
+export function resolveDetectionOutcome(args: {
+  stats: { framesProcessed: number; framesTracked: number };
+  mode: AnalyzerMode;
+  detection: DetectedExercise;
+}): DetectionOutcome {
+  const { stats, mode, detection } = args;
+  if (stats.framesTracked === 0) return { kind: 'no-tracking' };
+  if (stats.framesProcessed >= 30 && stats.framesTracked / stats.framesProcessed < 0.02) {
+    return { kind: 'no-tracking' };
+  }
+  if (mode.type === 'forced') {
+    return { kind: 'report', exerciseId: mode.exerciseId };
+  }
+  if (mode.type === 'preset') {
+    if (
+      (detection === 'squat' || detection === 'deadlift') &&
+      detection !== mode.exerciseId
+    ) {
+      return { kind: 'mismatch', detectedExerciseId: detection };
+    }
+    return { kind: 'report', exerciseId: mode.exerciseId };
+  }
+  if (detection === 'squat' || detection === 'deadlift') {
+    return { kind: 'report', exerciseId: detection };
+  }
+  return { kind: 'unsupported', reason: detection };
+}
+
+/** What produced the report on screen, and how it was chosen. */
+export interface FormCoachDetection {
+  exerciseId: FormExerciseId;
+  exerciseName: string;
+  source: 'detected' | 'preset' | 'corrected';
+}
+
+export type UnsupportedInfo =
+  | { reason: 'unknown' | 'insufficient_evidence' }
+  | {
+      reason: 'mismatch';
+      detectedExerciseId: FormExerciseId;
+      presetExerciseId: FormExerciseId;
+    };
+
 export interface UseFormCoachOptions {
-  exerciseId?: string;
+  /** In-workout entries preset the exercise being performed. Generic
+   * entries leave this unset and the movement is auto-detected. */
+  presetExerciseId?: FormExerciseId;
   workoutId?: string;
   setIndex?: number;
   initialConfig?: Partial<FormCoachConfig>;
@@ -57,14 +148,13 @@ export interface UseFormCoachOptions {
 }
 
 export function useFormCoach({
-  exerciseId = 'squat',
+  presetExerciseId,
   workoutId,
   setIndex,
   initialConfig,
   onRepCompleted,
 }: UseFormCoachOptions = {}) {
   const [state, setState] = useState<FormCoachState>('select');
-  const [selectedExerciseId, setSelectedExerciseId] = useState(exerciseId);
   const [progressPercent, setProgressPercent] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoFileName, setVideoFileName] = useState<string | null>(null);
@@ -72,6 +162,9 @@ export function useFormCoach({
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
   const [error, setError] = useState<Error | null>(null);
   const [summary, setSummary] = useState<FormSessionSummary | null>(null);
+  const [detection, setDetection] = useState<FormCoachDetection | null>(null);
+  const [unsupportedInfo, setUnsupportedInfo] = useState<UnsupportedInfo | null>(null);
+  const [leaningExerciseId, setLeaningExerciseId] = useState<FormExerciseId | null>(null);
 
   // Live telemetry during analysis / replay
   const [repCount, setRepCount] = useState(0);
@@ -79,6 +172,8 @@ export function useFormCoach({
   const [activeCue, setActiveCue] = useState<FormCue | null>(null);
   const [currentKneeAngleDeg, setCurrentKneeAngleDeg] = useState<number | null>(null);
   const [minKneeAngleDeg, setMinKneeAngleDeg] = useState<number | null>(null);
+  const [currentHipAngleDeg, setCurrentHipAngleDeg] = useState<number | null>(null);
+  const [minHipAngleDeg, setMinHipAngleDeg] = useState<number | null>(null);
   const [torsoInclinationDeg, setTorsoInclinationDeg] = useState<number | null>(null);
   const [detectedSide, setDetectedSide] = useState<DetectedSide>('unknown');
   const [trackingConfidence, setTrackingConfidence] = useState(0);
@@ -93,12 +188,34 @@ export function useFormCoach({
   // Deep audit: picks the lifter among detected people (a spotter standing
   // closer to the camera must not become the analyzed subject).
   const subjectTrackerRef = useRef<PoseSubjectTracker>(new PoseSubjectTracker());
-  const analyzerRef = useRef<ExerciseAnalyzer>(new SquatAnalyzer(initialConfig));
+  const squatAnalyzerRef = useRef<ExerciseAnalyzer>(new SquatAnalyzer(initialConfig));
+  const deadliftAnalyzerRef = useRef<ExerciseAnalyzer>(new DeadliftAnalyzer());
+  const classifierRef = useRef<MovementClassifier>(new MovementClassifier());
+  /** The user's correction: re-run the same video as this exercise. */
+  const forcedExerciseRef = useRef<FormExerciseId | null>(null);
+  const lastFileRef = useRef<File | null>(null);
+  /** The entry-point preset is fixed for the life of a modal mount
+   * (each entry point renders its own modal), so it is captured once. */
+  const presetRef = useRef<FormExerciseId | undefined>(presetExerciseId);
 
   const animFrameRef = useRef<number | null>(null);
   const uploadedVideoUrlRef = useRef<string | null>(null);
   const latestLandmarksRef = useRef<NormalizedLandmark[] | null>(null);
   const isAnalyzingRef = useRef<boolean>(false);
+
+  const analyzerFor = useCallback((exerciseId: FormExerciseId): ExerciseAnalyzer => {
+    return exerciseId === 'deadlift' ? deadliftAnalyzerRef.current : squatAnalyzerRef.current;
+  }, []);
+
+  const getMode = useCallback((): AnalyzerMode => {
+    if (forcedExerciseRef.current) {
+      return { type: 'forced', exerciseId: forcedExerciseRef.current };
+    }
+    if (presetRef.current) {
+      return { type: 'preset', exerciseId: presetRef.current };
+    }
+    return { type: 'auto' };
+  }, []);
 
   /**
    * Resets the analyzer to select state.
@@ -110,6 +227,8 @@ export function useFormCoach({
     }
     isAnalyzingRef.current = false;
     subjectTrackerRef.current.reset();
+    forcedExerciseRef.current = null;
+    lastFileRef.current = null;
     if (uploadedVideoUrlRef.current) {
       URL.revokeObjectURL(uploadedVideoUrlRef.current);
       uploadedVideoUrlRef.current = null;
@@ -122,8 +241,13 @@ export function useFormCoach({
     setActiveCue(null);
     setCurrentKneeAngleDeg(null);
     setMinKneeAngleDeg(null);
+    setCurrentHipAngleDeg(null);
+    setMinHipAngleDeg(null);
     setTorsoInclinationDeg(null);
     setSummary(null);
+    setDetection(null);
+    setUnsupportedInfo(null);
+    setLeaningExerciseId(null);
     setError(null);
     setState('select');
   }, []);
@@ -138,6 +262,10 @@ export function useFormCoach({
       setRepCount(0);
       setActiveCue(null);
       setSummary(null);
+      setDetection(null);
+      setUnsupportedInfo(null);
+      setLeaningExerciseId(null);
+      lastFileRef.current = file;
 
       try {
         if (uploadedVideoUrlRef.current) {
@@ -183,7 +311,9 @@ export function useFormCoach({
         });
 
         // Reset analyzers for new set
-        analyzerRef.current.reset();
+        squatAnalyzerRef.current.reset();
+        deadliftAnalyzerRef.current.reset();
+        classifierRef.current.reset();
         smootherRef.current.reset();
         subjectTrackerRef.current.reset();
 
@@ -201,6 +331,20 @@ export function useFormCoach({
   );
 
   /**
+   * Correction path: re-run the same video forced as the given
+   * exercise, regardless of what detection concluded.
+   */
+  const rerunAs = useCallback(
+    (exerciseId: FormExerciseId) => {
+      const file = lastFileRef.current;
+      if (!file) return;
+      forcedExerciseRef.current = exerciseId;
+      void analyzeVideo(file);
+    },
+    [analyzeVideo]
+  );
+
+  /**
    * Cleanly stops animation loops and releases resources.
    */
   const cleanup = useCallback(() => {
@@ -214,7 +358,8 @@ export function useFormCoach({
       uploadedVideoUrlRef.current = null;
     }
     poseServiceRef.current.destroy();
-    analyzerRef.current.cleanup();
+    squatAnalyzerRef.current.cleanup();
+    deadliftAnalyzerRef.current.cleanup();
     latestLandmarksRef.current = null;
   }, []);
 
@@ -265,8 +410,32 @@ export function useFormCoach({
 
             latestLandmarksRef.current = landmarks;
 
-            // Run movement analysis
-            const result = analyzerRef.current.processFrame(landmarks, frameTimeMs, aspectRatio);
+            // Auto-detect evidence accumulates over the same tracked
+            // stream the analyzers consume.
+            classifierRef.current.processFrame(landmarks, aspectRatio);
+            const leaning = classifierRef.current.classify().exercise;
+            const leaningId: FormExerciseId | null =
+              leaning === 'squat' || leaning === 'deadlift' ? leaning : null;
+            setLeaningExerciseId(leaningId);
+
+            // Run movement analysis. In auto mode BOTH analyzers track
+            // the stream (their per-frame math is cheap; pose inference
+            // is the expensive part and runs once) and the classifier's
+            // verdict at the end decides whose summary is kept. In
+            // preset/forced mode only the chosen analyzer runs. The HUD
+            // follows the chosen — or currently leaning — analyzer.
+            const mode = getMode();
+            const sourceId: FormExerciseId =
+              mode.type === 'auto' ? (leaningId ?? 'squat') : mode.exerciseId;
+            const feedIds: FormExerciseId[] =
+              mode.type === 'auto' ? ['squat', 'deadlift'] : [mode.exerciseId];
+
+            let result: ReturnType<ExerciseAnalyzer['processFrame']> | null = null;
+            for (const id of feedIds) {
+              const r = analyzerFor(id).processFrame(landmarks, frameTimeMs, aspectRatio);
+              if (id === sourceId) result = r;
+            }
+            if (!result) return;
 
             setIsReady(result.readiness.isReady);
             setReadinessReason(result.readiness.reason);
@@ -274,6 +443,8 @@ export function useFormCoach({
             setTrackingConfidence(result.trackingConfidence);
             setCurrentKneeAngleDeg(result.currentKneeAngleDeg);
             setMinKneeAngleDeg(result.minKneeAngleDeg);
+            setCurrentHipAngleDeg(result.currentHipAngleDeg);
+            setMinHipAngleDeg(result.minHipAngleDeg);
             setTorsoInclinationDeg(result.torsoInclinationDeg);
 
             if (isAnalyzingRef.current) {
@@ -305,39 +476,76 @@ export function useFormCoach({
         animFrameRef.current = null;
       }
     };
-  }, [onRepCompleted]);
+  }, [onRepCompleted, analyzerFor, getMode]);
 
   /**
-   * Shared finish path for playback end and "View Report Now": builds
-   * the summary when tracking actually saw the lifter, routes to the
-   * no-tracking state — saving nothing — when it never did (D4), and
-   * routes to the not-squat state — also saving nothing — when the
-   * tracked movement is positively a different pattern (D6).
+   * Shared finish path for playback end and "View Report Now": routes
+   * by the detection outcome — a saved report for the identified (or
+   * preset/forced) exercise, the no-tracking state when the lifter
+   * was never tracked, and the unsupported state — saving nothing —
+   * when the movement cannot be confidently identified.
    */
   const finishAnalysis = useCallback(() => {
-    const stats = analyzerRef.current.getTrackingStats?.() ?? {
-      framesProcessed: 1,
-      framesTracked: 1,
-    };
-    const outcome = resolveAnalysisOutcome(
+    const stats = classifierRef.current.getTrackingStats();
+    const detectionResult = classifierRef.current.classify();
+    const mode = getMode();
+    const outcome = resolveDetectionOutcome({
       stats,
-      analyzerRef.current.getMovementAssessment?.().signature
-    );
-    if (outcome === 'no-tracking') {
+      mode,
+      detection: detectionResult.exercise,
+    });
+
+    if (outcome.kind === 'no-tracking') {
       setSummary(null);
       setState('no-tracking');
       return;
     }
-    if (outcome === 'not-squat') {
+    if (outcome.kind === 'unsupported') {
       setSummary(null);
-      setState('not-squat');
+      setUnsupportedInfo({ reason: outcome.reason });
+      setState('unsupported');
       return;
     }
-    const sessionSummary = analyzerRef.current.finishSet(workoutId, setIndex);
+    if (outcome.kind === 'mismatch') {
+      setSummary(null);
+      setUnsupportedInfo({
+        reason: 'mismatch',
+        detectedExerciseId: outcome.detectedExerciseId,
+        presetExerciseId: mode.type === 'preset' ? mode.exerciseId : outcome.detectedExerciseId,
+      });
+      setState('unsupported');
+      return;
+    }
+    const sessionSummary = analyzerFor(outcome.exerciseId).finishSet(workoutId, setIndex);
     FormSessionRepository.saveSession(sessionSummary);
     setSummary(sessionSummary);
+    setDetection({
+      exerciseId: outcome.exerciseId,
+      exerciseName: sessionSummary.exerciseName,
+      source: mode.type === 'forced' ? 'corrected' : mode.type === 'preset' ? 'preset' : 'detected',
+    });
     setState('report');
-  }, [workoutId, setIndex]);
+  }, [workoutId, setIndex, analyzerFor, getMode]);
+
+  /**
+   * Mismatch resolution: the user keeps the workout's preset exercise
+   * even though detection named the other lift. The preset analyzer
+   * tracked the whole stream, so its summary can be built now.
+   */
+  const acceptPreset = useCallback(() => {
+    if (unsupportedInfo?.reason !== 'mismatch') return;
+    const presetId = unsupportedInfo.presetExerciseId;
+    const sessionSummary = analyzerFor(presetId).finishSet(workoutId, setIndex);
+    FormSessionRepository.saveSession(sessionSummary);
+    setSummary(sessionSummary);
+    setDetection({
+      exerciseId: presetId,
+      exerciseName: sessionSummary.exerciseName,
+      source: 'preset',
+    });
+    setUnsupportedInfo(null);
+    setState('report');
+  }, [unsupportedInfo, workoutId, setIndex, analyzerFor]);
 
   // Video completion listener
   useEffect(() => {
@@ -397,8 +605,7 @@ export function useFormCoach({
   return {
     state,
     setState,
-    selectedExerciseId,
-    setSelectedExerciseId,
+    presetExerciseId,
     progressPercent,
     videoUrl,
     videoFileName,
@@ -406,6 +613,9 @@ export function useFormCoach({
     videoCurrentTime,
     error,
     summary,
+    detection,
+    unsupportedInfo,
+    leaningExerciseId,
     videoRef,
     canvasRef,
     latestLandmarksRef,
@@ -415,6 +625,8 @@ export function useFormCoach({
     activeCue,
     currentKneeAngleDeg,
     minKneeAngleDeg,
+    currentHipAngleDeg,
+    minHipAngleDeg,
     torsoInclinationDeg,
     detectedSide,
     trackingConfidence,
@@ -423,6 +635,8 @@ export function useFormCoach({
     // Actions
     analyzeVideo,
     completeAnalysis,
+    rerunAs,
+    acceptPreset,
     reset,
     cleanup,
   };

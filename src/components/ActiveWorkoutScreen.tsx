@@ -159,17 +159,22 @@ function PackedSwapBanner({
 }
 
 /**
- * Form Coach currently ships exactly one analyzer — the bilateral squat
- * pattern (canonical session identity: "Barbell Back Squat"). The in-workout
- * entry is therefore offered only during squat-family exercises; single-leg
- * split squats are excluded because side-view two-leg depth analysis does
- * not describe them. Standalone entries (Train tools, Home) always open the
- * modal, which states the squat-only scope before any file is chosen.
+ * Form Coach ships two analyzers — the bilateral squat pattern
+ * (canonical session identity: "Barbell Back Squat") and the
+ * conventional deadlift hinge ("Conventional Deadlift"). The
+ * in-workout entry is offered only during exercises one of them
+ * grades, and presets that exercise so the analyzer is chosen by the
+ * workout context (detection still runs and can flag a mismatch).
+ * Single-leg split squats are excluded because side-view two-leg
+ * depth analysis does not describe them. Standalone entries (Train
+ * tools, Home) always open the modal in auto-detect mode.
  */
-function isFormCoachSquatExercise(name?: string | null): boolean {
-  if (!name) return false;
+function formCoachPresetForExercise(name?: string | null): 'squat' | 'deadlift' | null {
+  if (!name) return null;
   const n = name.toLowerCase();
-  return n.includes('squat') && !n.includes('split') && !n.includes('bulgarian');
+  if (n.includes('deadlift')) return 'deadlift';
+  if (n.includes('squat') && !n.includes('split') && !n.includes('bulgarian')) return 'squat';
+  return null;
 }
 
 export default function ActiveWorkoutScreen({
@@ -1177,7 +1182,8 @@ export default function ActiveWorkoutScreen({
     return getDemoForExercise(currentExercise.name);
   }, [currentExercise?.name]);
   const hasFormSurface = formCues.length > 0 || currentDemo !== null;
-  const isFormCoachSupported = isFormCoachSquatExercise(currentExercise?.name);
+  const formCoachPreset = formCoachPresetForExercise(currentExercise?.name);
+  const isFormCoachSupported = formCoachPreset !== null;
 
   const [showFormCoach, setShowFormCoach] = useState(false);
   const [showFormCues, setShowFormCues] = useState(false);
@@ -2113,9 +2119,9 @@ export default function ActiveWorkoutScreen({
           {/* Form cues + Warm-up: the two things a beginner needs MOST
               were buried 4th/6th in the overflow menu. They get visible
               header buttons (the menu entries stay for discoverability). */}
-          {/* ASCEND Form Coach — video-upload squat form analysis. Shown
-              only for squat-family exercises: it is the one movement the
-              analyzer supports (see isFormCoachSquatExercise). */}
+          {/* ASCEND Form Coach — video-upload form analysis. Shown only
+              for squat- and deadlift-family exercises: the movements the
+              analyzers support (see formCoachPresetForExercise). */}
           {isFormCoachSupported && (
           <button
             type="button"
@@ -3606,11 +3612,13 @@ export default function ActiveWorkoutScreen({
         />
       )}
 
-      {/* ── ASCEND Form Coach Modal (video-upload squat analysis) ─────── */}
+      {/* ── ASCEND Form Coach Modal (video-upload analysis, exercise
+          preset from the current workout exercise) ─────────────────── */}
       {showFormCoach && (
         <FormCoachModal
           isOpen={showFormCoach}
           onClose={() => setShowFormCoach(false)}
+          presetExerciseId={formCoachPreset ?? undefined}
           workoutId={planId}
           setIndex={activeSetIdx}
           workoutName={workoutName}
