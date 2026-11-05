@@ -29,7 +29,7 @@ import { saveCustomBarcode } from '@/lib/storage';
 import { analyzeMealPhoto } from '@/lib/ai-scan-meal';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
-import { useTranslation } from '@/lib/i18n';
+import { getCurrentLanguage, useTranslation } from '@/lib/i18n';
 import { useAppNavigation } from '@/lib/navigation';
 import { useEscapeToClose } from '@/lib/use-escape-to-close';
 import { Capacitor } from '@capacitor/core';
@@ -508,6 +508,7 @@ export default function BarcodeScannerModal({
       const result = await analyzeMealPhoto({
         file,
         userNotes: 'Nutrition facts label or ingredients list on product packaging. Extract food name, brand, calories per 100g, protein in grams, carbs in grams, fat in grams.',
+        language: getCurrentLanguage(),
       });
 
       if (result && result.items && result.items.length > 0) {

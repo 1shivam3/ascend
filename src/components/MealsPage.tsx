@@ -6,7 +6,7 @@ import { tabListKeyDown } from '@/lib/tab-keyboard';
 import { getAiAuthHeaders } from '@/lib/ai-client-auth';
 import { ensureDeleteWillPersist } from '@/lib/delete-persist-guard';
 import { useStore } from '@/lib/store';
-import { useTranslation } from '@/lib/i18n';
+import { getCurrentLanguage, useTranslation } from '@/lib/i18n';
 import type { StringKey } from '@/lib/i18n/en';
 import { renderLocalizedSentence } from '@/lib/coach-i18n';
 import { mergeEditedMealFoods } from '@/lib/meal-edit';
@@ -1240,6 +1240,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         },
         body: JSON.stringify({
           query: q,
+          // Task 2.5: lets the route answer with a Hindi mealName
+          // for Hindi users (food names stay English by convention).
+          language: getCurrentLanguage(),
         }),
       });
 

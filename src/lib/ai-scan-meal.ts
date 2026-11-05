@@ -12,6 +12,11 @@ export interface ScanMealOptions {
   userNotes?: string;
   hiddenIngredients?: string[];
   signal?: AbortSignal;
+  /** Task 2.5: UI language from the caller. This module is shared
+   *  with server code (the scan-meal route imports its offline
+   *  estimators), so it cannot read the i18n store itself — client
+   *  callers pass getCurrentLanguage(). */
+  language?: string;
 }
 
 /**
@@ -76,6 +81,9 @@ export async function analyzeMealPhoto(options: ScanMealOptions): Promise<MealAn
   if (options.hiddenIngredients && options.hiddenIngredients.length > 0) {
     formData.append('hiddenIngredients', JSON.stringify(options.hiddenIngredients));
   }
+  // Task 2.5: the route localizes coachingNote/preparation from
+  // this (food names stay English by app convention).
+  formData.append('language', options.language === 'hi' ? 'hi' : 'en');
   const response = await fetch('/api/ai/scan-meal', {
     method: 'POST',
     // F-02 (audit): session token when signed in → higher per-account

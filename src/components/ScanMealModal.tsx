@@ -16,7 +16,7 @@ import ReportAIModal from '@/components/ReportAIModal';
 import AiNoticeBanner from '@/components/AiNoticeBanner';
 import { toUserMessage } from '@/lib/user-error';
 import PermissionHelp from '@/components/ui/PermissionHelp';
-import { useTranslation, type StringKey } from '@/lib/i18n';
+import { getCurrentLanguage, useTranslation, type StringKey } from '@/lib/i18n';
 import { useAppNavigation } from '@/lib/navigation';
 import {
   Camera,
@@ -439,6 +439,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         userNotes: userNotes.trim(),
         hiddenIngredients: selectedHiddenIngredients,
         signal: controller.signal,
+        language: getCurrentLanguage(),
       });
 
       const result = applyLearnedPortionPreferences(rawResult);
@@ -625,6 +626,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
           file: processedBlob,
           userNotes: `${userNotes ? userNotes + '. ' : ''}Correction from user: ${refinementInput.trim()}`,
           hiddenIngredients: selectedHiddenIngredients,
+          language: getCurrentLanguage(),
         });
         setOilLevels({});
         setAnalysis(refinedResult);

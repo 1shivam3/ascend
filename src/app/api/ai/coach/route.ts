@@ -13,6 +13,9 @@ type AITaskType =
 
 interface CoachRequestBody {
   task?: AITaskType;
+  /** Task 2.5: UI language from the client ('hi' | 'en'); coerced
+   *  below — anything else is English. */
+  language?: unknown;
   userContext?: string; // High-signal compact context from buildCompactUserContext
 
   // Specific payloads depending on task
@@ -142,6 +145,10 @@ export async function POST(req: Request) {
     // structured context, well under 64 KB.
     const body: CoachRequestBody = await readJsonBodyWithLimit(req, 64 * 1024);
     const task = body.task || 'COACH_INSIGHT';
+    // Task 2.5: reply language (coach-chat coercion pattern). Drives
+    // the safety refer-out copy and a guardrail line below; the
+    // client only started sending this in 2.5 — absent = English.
+    const language: 'en' | 'hi' = body.language === 'hi' ? 'hi' : 'en';
 
     // 2. Input size limits and sanitization
     if (body.userContext && body.userContext.length > 10000) {
@@ -197,7 +204,7 @@ export async function POST(req: Request) {
               stop === 'pain'
                 ? 'Stop and rest — possible injury reported'
                 : 'Take the safe, balanced path',
-            coachAdvice: COACH_CHAT_REFER_OUT[stop].en,
+            coachAdvice: COACH_CHAT_REFER_OUT[stop][language],
             modifiedExercises: [],
           },
         });
@@ -221,7 +228,12 @@ Rules:
   * You are an informational training assistant, NOT a physician, physical therapist, or medical professional.
   * NEVER provide medical diagnosis, clinical injury treatments, or pharmaceutical prescriptions.
   * If a user reports chest pain, shortness of breath, dizziness, or sharp joint injury, instruct them to stop immediately and seek medical care.
-  * Never recommend caloric restriction below the app's safe minimums (1500 kcal/day for men, 1200 kcal/day for women) or training through acute sharp joint pain.`;
+  * Never recommend caloric restriction below the app's safe minimums (1500 kcal/day for men, 1200 kcal/day for women) or training through acute sharp joint pain.
+- REPLY LANGUAGE: ${
+      language === 'hi'
+        ? 'Reply in Hindi (Devanagari) for all text fields. Keep exercise and food names in English.'
+        : 'Reply in English.'
+    }`;
 
     if (task === 'GENERATE_DAILY_PLAN') {
       systemInstruction = `${baseGuardrails}

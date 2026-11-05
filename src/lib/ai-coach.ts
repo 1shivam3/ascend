@@ -255,6 +255,12 @@ async function executeAIRequest<T>(
       headers,
       body: JSON.stringify({
         ...payload,
+        // Task 2.5: the route localizes its reply (guardrails +
+        // safety refer-out) from this; it was never sent, so Hindi
+        // users always got English Coach's Take output. Read from
+        // the state already in scope — importing the i18n module
+        // here would drag React hooks into shared module graphs.
+        language: state.uiPreferences?.language === 'hi' ? 'hi' : 'en',
         userContext: buildCompactUserContext(state),
       }),
       signal: controller.signal,
