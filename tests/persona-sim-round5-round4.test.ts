@@ -38,7 +38,9 @@ describe('Toast i18n coverage, complete (SIM-P2-01 Round 4)', () => {
       ['toast.mealPinnedOne', 'toast.mealPinnedMany'],
       ['toast.yesterdayCopiedOne', 'toast.yesterdayCopiedMany'],
       ['toast.mealsCopiedOne', 'toast.mealsCopiedMany'],
-      ['toast.lastSessionLoadedOne', 'toast.lastSessionLoadedMany'],
+      // Task 1.5(e): toast.lastSessionLoadedOne/Many were dropped from
+      // this list — their only consumer (Train's dead repeat-workout
+      // handler) was removed and the keys deleted as orphans.
       ['toast.newPRsOne', 'toast.newPRsMany'],
       ['toast.workoutLoggedOne', 'toast.workoutLoggedMany'],
       ['toast.interruptedSavedOne', 'toast.interruptedSavedMany'],
@@ -52,11 +54,11 @@ describe('Toast i18n coverage, complete (SIM-P2-01 Round 4)', () => {
   });
 
   it('renders converted toasts in Hindi with params interpolated', () => {
-    expect(translate('hi', 'toast.voiceListening')).toContain('सुन रहा हूं');
+    // Task 1.5(e): the toast.voiceListening / toast.voiceLogged
+    // assertions were dropped — those keys belonged to Train's dead
+    // page-level voice logger and were deleted as orphans.
     expect(translate('hi', 'toast.restReady')).toContain('आराम का समय समाप्त');
     expect(translate('hi', 'toast.pressBackAgain')).toContain('Back दबाएं');
-    expect(translate('hi', 'toast.voiceLogged', { exercise: 'Squat', sets: '70×8, 70×8' }))
-      .toContain('Squat');
     expect(translate('hi', 'toast.targetsCalibrated',
       { bw: 80, goal: 'Build Muscle', kcal: 2800, protein: 160, carbs: 300, fat: 90 }))
       .toContain('2800');

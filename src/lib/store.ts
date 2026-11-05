@@ -83,7 +83,6 @@ import {
 import { readFormSessions } from '../features/form-coach/repositories/form-session-storage';
 import { buildDefaultWeeklySchedule, getTodayDayOfWeek, getWorkoutBodyParts, DAYS_OF_WEEK } from './workout-schedule';
 import { safeRandomId, sanitizeAthleteName, isValidEntryDate, normalizeDateToLocalDay, normalizeRowDates, normalizeAndDedupeBodyMetricDates } from './formatters';
-import { calculateRecommendedMacroGoals } from './macros';
 import {
   evaluateTrainingDecisionPolicyV0,
   canPersistDecisionToLedger,
@@ -2333,6 +2332,12 @@ export const useAppStore = create<AppState>()(
           bodyweightKg: Math.round(newest.weightKg * 10) / 10,
           bodyweightLbs: Math.round(newest.weightKg * 2.20462 * 10) / 10,
           ...(newest.heightCm ? { heightCm: Math.round(newest.heightCm) } : {}),
+          // Task 1.1: a logged measurement is a REAL stat — once the
+          // profile weight/height follow a measurement, targets may
+          // derive from them (this is "editing weight later makes the
+          // target appear" for the Body Metrics path).
+          bodyweightSource: 'user' as const,
+          ...(newest.heightCm ? { heightSource: 'user' as const } : {}),
           // Profile changed — stamp it so sync's last-write-wins keeps
           // this edit over an older server row (QA4A-001).
           updatedAt: new Date().toISOString(),
@@ -3761,6 +3766,12 @@ export const useAppStore = create<AppState>()(
         // (snapshot + legacy keys deleted above). The guide flag is
         // cleared so the new user sees the guide once on first Today
         // arrival, same as a fresh onboarding completion.
+        // Task 1.1: the 70 kg / 175 cm values here are placeholders,
+        // exactly like an onboarding skip — they are flagged 'default'
+        // on the profile below and NO macro goals are seeded from
+        // them (onboarding stopped seeding default-derived targets;
+        // this path mirrors it). Targets appear once the user enters
+        // real stats (Fuel prompt / Edit Profile / Body Metrics).
         const store = get();
         store.setProfile({
           id: getOrCreateGuestId(),
@@ -3769,6 +3780,8 @@ export const useAppStore = create<AppState>()(
           bodyweightKg: 70,
           bodyweightLbs: Math.round(70 * 2.20462 * 10) / 10,
           heightCm: 175,
+          bodyweightSource: 'default',
+          heightSource: 'default',
           unit: 'kg',
           dietPreference: 'non_vegetarian',
           createdAt: new Date().toISOString(),
@@ -3788,9 +3801,8 @@ export const useAppStore = create<AppState>()(
           injuriesOrLimitations: [],
           coachingStyle: 'balanced',
         });
-        store.setMacroGoals(
-          calculateRecommendedMacroGoals(70, 'build_muscle', 'male', 175, undefined, 'light')
-        );
+        // Task 1.1: no macro-goal seeding here — see the provenance
+        // note above. macroGoals stay null until real stats exist.
         return true;
       },
 

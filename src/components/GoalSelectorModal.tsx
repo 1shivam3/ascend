@@ -5,6 +5,7 @@ import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
 import { calculateRecommendedMacroGoals } from '@/lib/macros';
+import { hasRealBodyStats } from '@/lib/body-stats';
 import {
   X,
   Target,
@@ -88,7 +89,9 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
       goal: primaryGoal,
     });
 
-    if (recalcMacros && profile?.bodyweightKg) {
+    // Task 1.1: recalculation derives targets from bodyweight/height —
+    // only when those stats are real, never from placeholders.
+    if (recalcMacros && profile?.bodyweightKg && hasRealBodyStats(profile)) {
       const newMacros = calculateRecommendedMacroGoals(
         profile.bodyweightKg,
         primaryGoal,
@@ -245,8 +248,9 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
           </ul>
         </div>
 
-        {/* Recalculate Nutrition Option */}
-        {profile?.bodyweightKg && (
+        {/* Recalculate Nutrition Option — offered only when the stats
+            it derives from are real (Task 1.1) */}
+        {profile?.bodyweightKg && hasRealBodyStats(profile) && (
           <label className="flex items-center gap-2.5 p-3 rounded-xl bg-bg-card border border-border cursor-pointer select-none">
             <input
               type="checkbox"

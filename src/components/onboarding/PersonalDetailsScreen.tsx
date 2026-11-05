@@ -2,19 +2,23 @@
 
 import React, { useState } from 'react';
 import { AlertCircle, Loader2 } from 'lucide-react';
-import { Gender, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
+import { Gender, Unit, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
 import StepProgressBar from './StepProgressBar';
 import DobPicker from '@/components/DobPicker';
 import { useTranslation } from '@/lib/i18n';
 import { calculateAgeFromDob, dobPickerBounds, dobPreviewAge, isValidDob } from '@/lib/age';
+import { validateBodyStats, toStoredBodyStats } from '@/lib/body-stats';
 
 /**
  * Details-lite (simplified onboarding, step 2 of 2).
  *
- * Only what first-run Today genuinely needs: name, gender, date of birth
- * (age is calculated from it), and the single optional injury dropdown.
- * Everything else (weight, height, diet, experience, equipment, days,
- * activity, unit) is deferred to contextual prompts later and written with
+ * What first-run genuinely needs: name, gender, date of birth
+ * (age is calculated from it), the single optional injury dropdown,
+ * and — since Phase-1 Task 1.1 — weight & height, because the daily
+ * food target is computed from them and must never again come from
+ * silent placeholders (skippable only via the explicit "I'll add this
+ * later" button). Everything else (diet, experience, equipment, days,
+ * activity) is deferred to contextual prompts later and written with
  * safe defaults at finish time — never left undefined.
  *
  * Injury control moved VERBATIM from ScheduleScreen: same <select>,
@@ -29,6 +33,15 @@ export interface PersonalDetailsData {
   gender: Gender;
   dateOfBirth: string;
   limitations: string[];
+  /**
+   * Phase-1 Task 1.1: the user's REAL weight/height in canonical
+   * stored units, or null when they explicitly tapped "I'll add this
+   * later". Null is a deliberate choice, never an omission — Continue
+   * is blocked until the user either enters both values or taps the
+   * skip button, so a calorie target is never again computed from
+   * silently seeded placeholders.
+   */
+  bodyStats: { bodyweightKg: number; heightCm: number; unit: Unit } | null;
 }
 
 interface PersonalDetailsScreenProps {
@@ -36,6 +49,11 @@ interface PersonalDetailsScreenProps {
   initialGender?: Gender;
   initialDob?: string;
   initialLimitations?: string[];
+  /** Previously entered body stats (back-navigation), display units. */
+  initialUnit?: Unit;
+  initialWeight?: string;
+  initialHeight?: string;
+  initialBodyStatsSkipped?: boolean;
   onContinue: (details: PersonalDetailsData) => void;
   onBack: () => void;
   loading?: boolean;
@@ -46,6 +64,10 @@ export default function PersonalDetailsScreen({
   initialGender = 'male',
   initialDob = '',
   initialLimitations = [],
+  initialUnit = 'kg',
+  initialWeight = '',
+  initialHeight = '',
+  initialBodyStatsSkipped = false,
   onContinue,
   onBack,
   loading = false,
@@ -60,6 +82,12 @@ export default function PersonalDetailsScreen({
   // date while name/gender/limitations survived via their initial* props.
   const [dob, setDob] = useState(initialDob || '');
   const [limitations, setLimitations] = useState<string[]>(initialLimitations || []);
+  // Body stats (Task 1.1): typed in the chosen unit; skipped is an
+  // explicit state, distinct from "not yet answered".
+  const [statsUnit, setStatsUnit] = useState<Unit>(initialUnit);
+  const [weightInput, setWeightInput] = useState(initialWeight);
+  const [heightInput, setHeightInput] = useState(initialHeight);
+  const [statsSkipped, setStatsSkipped] = useState(initialBodyStatsSkipped);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -106,12 +134,53 @@ export default function PersonalDetailsScreen({
       return;
     }
 
+    // Body stats (Task 1.1): three honest states — entered (validate
+    // with the Body Metrics ranges), explicitly skipped, or
+    // unanswered. Unanswered blocks: a silent default is exactly the
+    // failure this step exists to remove.
+    let bodyStats: PersonalDetailsData['bodyStats'] = null;
+    if (!statsSkipped) {
+      const w = parseFloat(weightInput);
+      const h = parseFloat(heightInput);
+      if (weightInput.trim() === '' && heightInput.trim() === '') {
+        setError(t('onboarding.bodyStatsPending'));
+        return;
+      }
+      const badField = validateBodyStats(w, h, statsUnit);
+      if (badField === 'weight') {
+        setError(t(statsUnit === 'lbs' ? 'onboarding.errWeightRangeLbs' : 'onboarding.errWeightRangeKg'));
+        return;
+      }
+      if (badField === 'height') {
+        setError(t(statsUnit === 'lbs' ? 'onboarding.errHeightRangeIn' : 'onboarding.errHeightRangeCm'));
+        return;
+      }
+      const stored = toStoredBodyStats(w, h, statsUnit);
+      bodyStats = { bodyweightKg: stored.bodyweightKg, heightCm: stored.heightCm, unit: statsUnit };
+    }
+
     onContinue({
       name: athleteName,
       gender: genderSelection,
       dateOfBirth: dob,
       limitations,
+      bodyStats,
     });
+  };
+
+  // Switching the entry unit converts whatever is typed, mirroring the
+  // Body Metrics modal — the numbers on screen never change meaning.
+  const switchStatsUnit = (next: Unit) => {
+    if (next === statsUnit) return;
+    const w = parseFloat(weightInput);
+    const h = parseFloat(heightInput);
+    if (!Number.isNaN(w)) {
+      setWeightInput(String(Math.round((next === 'lbs' ? w * 2.20462 : w * 0.453592) * 10) / 10));
+    }
+    if (!Number.isNaN(h)) {
+      setHeightInput(String(Math.round((next === 'lbs' ? h / 2.54 : h * 2.54) * 10) / 10));
+    }
+    setStatsUnit(next);
   };
 
   const bounds = dobPickerBounds();
@@ -214,6 +283,86 @@ export default function PersonalDetailsScreen({
               {t('onboarding.dateOfBirthHint')}
             </span>
             <DobPicker id="details-dob" value={dob} onChange={setDob} min={bounds.min} max={bounds.max} />
+          </div>
+
+          {/* Weight & height (Task 1.1) — asked here because the food
+              target is computed from them; the only way past without
+              them is the explicit skip button below. */}
+          <div className="p-4 rounded-2xl bg-bg-card border border-border shadow-2xs space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="block text-xs font-semibold text-text-primary">
+                {t('onboarding.bodyStatsTitle')}
+              </span>
+              <div className="grid grid-cols-2 gap-1 p-0.5 rounded-lg bg-bg-primary border border-border shrink-0">
+                {(['kg', 'lbs'] as const).map((u) => (
+                  <button
+                    key={u}
+                    type="button"
+                    onClick={() => switchStatsUnit(u)}
+                    className={`py-1 px-2.5 rounded-md text-2xs font-bold transition-all cursor-pointer ${
+                      statsUnit === u
+                        ? 'bg-bg-card text-text-primary shadow-2xs border border-border'
+                        : 'text-text-muted hover:text-text-primary'
+                    }`}
+                  >
+                    {t(u === 'kg' ? 'onboarding.unitKgCm' : 'onboarding.unitLbsIn')}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <span className="block text-2xs text-text-muted">{t('onboarding.bodyStatsHint')}</span>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label htmlFor="details-weight" className="text-2xs font-semibold text-text-secondary">
+                  {t('onboarding.weightLabel')} ({statsUnit})
+                </label>
+                <input
+                  id="details-weight"
+                  type="number"
+                  step="0.1"
+                  inputMode="decimal"
+                  value={weightInput}
+                  onChange={(e) => {
+                    setWeightInput(e.target.value);
+                    setStatsSkipped(false);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary outline-none transition"
+                />
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="details-height" className="text-2xs font-semibold text-text-secondary">
+                  {t('onboarding.heightLabel')} ({statsUnit === 'lbs' ? 'in' : 'cm'})
+                </label>
+                <input
+                  id="details-height"
+                  type="number"
+                  step="0.1"
+                  inputMode="decimal"
+                  value={heightInput}
+                  onChange={(e) => {
+                    setHeightInput(e.target.value);
+                    setStatsSkipped(false);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary outline-none transition"
+                />
+              </div>
+            </div>
+            {statsSkipped ? (
+              <p className="text-2xs text-text-muted">{t('onboarding.bodyStatsLaterNote')}</p>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setStatsSkipped(true);
+                  setWeightInput('');
+                  setHeightInput('');
+                  setError(null);
+                }}
+                className="text-xs font-semibold text-accent-text hover:underline cursor-pointer"
+              >
+                {t('onboarding.addLater')}
+              </button>
+            )}
           </div>
 
           {/* Injury — single optional dropdown, verbatim from ScheduleScreen.

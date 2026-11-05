@@ -4,6 +4,7 @@ import React from 'react';
 import { RotateCcw } from 'lucide-react';
 import LanguagePicker from '@/components/ui/LanguagePicker';
 import { useTranslation } from '@/lib/i18n';
+import { dataLocationMessageKey, getDataLocationStatus } from '@/lib/data-location';
 
 interface WelcomeScreenProps {
   onGetStarted: () => void;
@@ -97,7 +98,12 @@ export default function WelcomeScreen({
         >
           {t('onboarding.continueAsGuest')}
         </button>
-        <p className="text-2xs text-text-muted text-center">{t('onboarding.guestNote')}</p>
+        {/* Task 1.2: the guest copy is the COMPUTED device-only status
+            line (this button's path is guest by construction), not a
+            hardcoded claim that could drift from behavior. */}
+        <p className="text-2xs text-text-muted text-center">
+          {t(dataLocationMessageKey(getDataLocationStatus(false)))}
+        </p>
       </div>
     </div>
   );

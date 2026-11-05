@@ -153,6 +153,19 @@ export interface UserProfile {
   bodyweightKg: number;
   bodyweightLbs: number;
   heightCm?: number;
+  /**
+   * Phase-1 (Task 1.1) provenance for the two body stats every calorie
+   * target derives from: 'user' = the user actually entered the value;
+   * 'default' = a seeded placeholder (onboarding skip / start-fresh
+   * default profile) that was never entered. Absent = legacy profile
+   * created before provenance existed — treated as 'user' (its values
+   * predate the simplified onboarding and may well be real; existing
+   * users must not lose their targets). LOCAL ONLY, like dateOfBirth:
+   * the sync upsert/pull field lists are explicit and do not include
+   * these keys, so they never leave the device.
+   */
+  bodyweightSource?: 'user' | 'default';
+  heightSource?: 'user' | 'default';
   age?: number;
   /**
    * Date of birth, YYYY-MM-DD. LOCAL DEVICE ONLY — never synced: the

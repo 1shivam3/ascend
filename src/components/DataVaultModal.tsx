@@ -9,6 +9,8 @@ import { parseWorkoutCSV } from '@/lib/workout-import';
 import { toUserMessage } from '@/lib/user-error';
 import { getLocalTodayStr } from '@/lib/formatters';
 import { buildFullBackup, getCustomBarcodes } from '@/lib/storage';
+import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
+import { dataLocationMessageKey, getDataLocationStatus, isPermanentAccount } from '@/lib/data-location';
 import { useTranslation } from '@/lib/i18n';
 import {
   X,
@@ -55,6 +57,13 @@ export default function DataVaultModal({ isOpen, onClose, startAtDeleteConfirm }
 
   const { t } = useTranslation();
   const toast = useToast();
+  // Task 1.2: the privacy line under the vault is COMPUTED from the
+  // real auth state — the old hardcoded "100% on your device" claim
+  // was false for every signed-in user (sync uploads their rows).
+  const { user: syncUser } = useSupabaseSync();
+  const dataLocationKey = dataLocationMessageKey(
+    getDataLocationStatus(isPermanentAccount(syncUser))
+  );
 
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(!!startAtDeleteConfirm);
@@ -486,10 +495,10 @@ export default function DataVaultModal({ isOpen, onClose, startAtDeleteConfirm }
               />
             </div>
 
-            {/* Privacy Guarantee */}
+            {/* Privacy status — computed, never hardcoded (Task 1.2) */}
             <div className="flex items-center gap-2 p-3 rounded-xl bg-bg-secondary/40 border border-border/40 text-2xs text-text-muted font-mono">
               <Shield className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-              <span>{t('vault.privacyGuarantee')}</span>
+              <span>{t(dataLocationKey)}</span>
             </div>
 
             {/* FND-05: no delete button here anymore — deletion lives

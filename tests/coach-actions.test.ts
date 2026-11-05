@@ -251,7 +251,25 @@ describe('executor: macro goals apply / undo / stale', () => {
   });
 
   it('with no existing goals, missing fields come from the recommended base', () => {
-    seedStore({ macroGoals: null });
+    // Task 1.1: the recommended base derives from the profile's body
+    // stats, so this path now requires REAL stats on the profile (a
+    // null/placeholder profile blocks a partial draft instead — see
+    // tests/body-stats.test.ts).
+    seedStore({
+      macroGoals: null,
+      profile: {
+        id: 'guest_test',
+        name: 'Test',
+        gender: 'male',
+        bodyweightKg: 70,
+        bodyweightLbs: 154.3,
+        heightCm: 175,
+        bodyweightSource: 'user',
+        heightSource: 'user',
+        unit: 'kg',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+    });
     const result = applyMacroGoalsAction({ type: 'set_macro_goals', proteinG: 170 }, null);
     expect(result.ok).toBe(true);
     if (!result.ok) return;

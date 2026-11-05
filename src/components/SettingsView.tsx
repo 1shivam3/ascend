@@ -51,15 +51,20 @@ import { resolveTodayLayout, sanitizeTodayLayout, DEFAULT_TODAY_LAYOUT } from '@
 import LanguagePicker from '@/components/ui/LanguagePicker';
 import PermissionHelp from '@/components/ui/PermissionHelp';
 import { useTranslation } from '@/lib/i18n';
+import { dataLocationMessageKey, getDataLocationStatus, isPermanentAccount } from '@/lib/data-location';
 import type { StringKey } from '@/lib/i18n/en';
 
-/** Settings FAQ — plain 1–2 sentence answers. The privacy answer links
- *  to the full Privacy Policy page; nothing here is legal advice. */
+/** Settings FAQ — plain 1–2 sentence answers. The privacy answer is
+ *  COMPUTED from the live auth state (Task 1.2, lib/data-location.ts)
+ *  rather than a static string, and links to the full Privacy Policy
+ *  page; nothing here is legal advice. */
 const FAQ_ITEMS: { q: StringKey; a: StringKey; link?: { href: string; label: StringKey } }[] = [
   { q: 'settings.faqQ1', a: 'settings.faqA1' },
   { q: 'settings.faqQ2', a: 'settings.faqA2' },
   { q: 'settings.faqQ3', a: 'settings.faqA3' },
   { q: 'settings.faqQ4', a: 'settings.faqA4' },
+  // The `a` here is the status-neutral fallback; the render overrides
+  // it with the computed status line for the live auth state.
   { q: 'settings.faqQ5', a: 'settings.faqA5', link: { href: '/privacy', label: 'settings.privacyPolicy' } },
   { q: 'settings.faqQ6', a: 'settings.faqA6' },
   { q: 'settings.faqQ7', a: 'settings.faqA7' },
@@ -676,6 +681,16 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             )}
           </div>
         </div>
+        {/* Sign-in methods card (Task 1.3): the offered methods are
+            Google and email & password ONLY — no Apple sign-in and
+            no email-link/magic-link flow exist in this app, and the
+            settings.supportedMethods copy must never claim otherwise.
+            App Store Review Guideline 4.8 note: third-party login
+            services on iOS must be paired with an equivalent-privacy
+            option (e.g. Sign in with Apple). ASCEND ships Android /
+            web only today; if an iOS build ever ships with Google
+            sign-in, add Sign in with Apple AND update the copy in
+            the same change. */}
         <div className="card p-4 sm:p-5 bg-bg-card border border-border rounded-2xl shadow-xs space-y-3">
           <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.accountMethods')}</span>
           {user ? (
@@ -1471,7 +1486,11 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 </button>
                 {open && (
                   <div className="pt-2">
-                    <p className="text-2xs text-text-muted leading-relaxed">{t(item.a)}</p>
+                    <p className="text-2xs text-text-muted leading-relaxed">
+                      {item.q === 'settings.faqQ5'
+                        ? t(dataLocationMessageKey(getDataLocationStatus(isPermanentAccount(user))))
+                        : t(item.a)}
+                    </p>
                     {item.link && (
                       <a
                         href={item.link.href}

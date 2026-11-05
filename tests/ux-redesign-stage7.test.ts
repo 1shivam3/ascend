@@ -86,7 +86,11 @@ describe('Stage 7 — onboarding', () => {
     const src = read('src/components/onboarding/WelcomeScreen.tsx');
     expect(src).not.toContain('Discreet Guest');
     expect(src).toContain("t('onboarding.continueAsGuest')");
-    expect(src).toContain("t('onboarding.guestNote')");
+    // Task 1.2: the note under the guest button is the COMPUTED
+    // device-only status line (lib/data-location.ts), not a
+    // hardcoded 'onboarding.guestNote' claim.
+    expect(src).toContain('dataLocationMessageKey(getDataLocationStatus(false))');
+    expect(src).not.toContain("t('onboarding.guestNote')");
     const keyPos = src.indexOf("t('onboarding.continueAsGuest')");
     const start = src.lastIndexOf('<button', keyPos);
     const btn = src.slice(start, src.indexOf('>', start));

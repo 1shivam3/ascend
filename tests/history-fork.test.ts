@@ -5,7 +5,6 @@ import {
   readArchivedHistory,
   retainedHistoryCounts,
 } from '../src/lib/history-fork';
-import { calculateRecommendedMacroGoals } from '../src/lib/macros';
 import { useStore } from '@/lib/store';
 
 // FND-06: a fresh profile must never silently inherit retained history.
@@ -130,9 +129,13 @@ describe('startFreshFromRetainedHistory / restoreArchivedHistory', () => {
     expect(after.trainingProfile.preferredDurationMin).toBe(45);
     expect(after.trainingProfile.coachingStyle).toBe('balanced');
     expect(after.trainingProfile.injuriesOrLimitations).toEqual([]);
-    expect(after.macroGoals).toEqual(
-      calculateRecommendedMacroGoals(70, 'build_muscle', 'male', 175, undefined, 'light')
-    );
+    // Task 1.1: the seeded 70 kg / 175 cm are placeholders — flagged
+    // 'default' — and NO macro goals are derived from them (mirrors
+    // the onboarding skip path). Targets appear once real stats are
+    // entered.
+    expect(after.profile!.bodyweightSource).toBe('default');
+    expect(after.profile!.heightSource).toBe('default');
+    expect(after.macroGoals).toBeNull();
     // setProfile's baseline bodyweight backfill.
     expect(after.bodyMetrics).toHaveLength(1);
     expect(after.bodyMetrics[0].weightKg).toBe(70);
@@ -154,9 +157,7 @@ describe('startFreshFromRetainedHistory / restoreArchivedHistory', () => {
     expect(storage.getItem('ascend_emergency_snapshot')).toBeNull();
 
     // The fork gate in page.tsx requires NO profile, so a present
-    // profile skips the fork — even though the computed macroGoals
-    // now count as a target in hasRetainedHistory (same as after any
-    // normal onboarding, which also sets macroGoals).
+    // profile skips the fork.
     expect(after.profile).not.toBeNull();
     expect(after.hasCompletedOnboarding).toBe(true);
   });

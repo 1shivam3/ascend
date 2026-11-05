@@ -59,7 +59,6 @@ import { WorkoutEntry, WorkoutExercise, WorkoutSet, PlannedWorkout, PlannedExerc
 import {
   getLastExercisePerformance,
   getProgressionRecommendation,
-  parseVoiceWorkout,
   getTodaySessionState,
   getGoalAdaptiveSplitTemplates,
   isSetCompleted,
@@ -82,11 +81,6 @@ import {
   percentSetWeights,
   TOP_SET_PCT,
 } from '@/lib/percent-1rm';
-import {
-  createSpeechRecognizer,
-  isSpeechRecognitionSupported,
-  isNativePlatform,
-} from '@/lib/voice-logger';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import FormCoachModal from '@/features/form-coach/components/FormCoachModal';
 import ExerciseLibraryModal from '@/components/ExerciseLibraryModal';
@@ -99,7 +93,6 @@ import CoachChatSection from '@/components/CoachChatSection';
 import PlanPrefsPrompt from '@/components/PlanPrefsPrompt';
 import CoachWeeklyReviewModal from '@/components/CoachWeeklyReviewModal';
 import BlockDebriefModal from '@/components/BlockDebriefModal';
-import GoalSelectorModal from '@/components/GoalSelectorModal';
 import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek, SetExecutionStatus, DEFAULT_GOALS, resolvePrimaryGoal, MAX_PLAN_NAME_LENGTH } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
 
@@ -1290,11 +1283,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     return stored || null;
   }, [targetExerciseForDecision, policyDecisionRecords]);
 
-  const [isChangeWorkoutOpen, setIsChangeWorkoutOpen] = useState(false);
-  const changeWorkoutRef = useRef<HTMLDivElement>(null); const { dialogProps: changeWorkoutDialogProps } = useModalA11y(changeWorkoutRef, isChangeWorkoutOpen, () => setIsChangeWorkoutOpen(false));
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLogPastModalOpen, setIsLogPastModalOpen] = useState(false);
-  const [isGoalSelectorOpen, setIsGoalSelectorOpen] = useState(false);
   const [isFormCoachOpen, setIsFormCoachOpen] = useState(false);
   const [isPlateModalOpen, setIsPlateModalOpen] = useState(false);
   const [expandedWorkouts, setExpandedWorkouts] = useState<Set<string>>(new Set());
@@ -1313,9 +1303,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   useEffect(() => {
     setRestTotalSeconds(defaultRestSeconds);
   }, [defaultRestSeconds]);
-
-  // ── Voice State ────────────────────────────────────────────────────────────
-  const [isListening, setIsListening] = useState(false);
 
   // ── Exercise Library & AI State ───────────────────────────────────────────
   const [isExerciseLibraryOpen, setIsExerciseLibraryOpen] = useState(false);
@@ -1413,12 +1400,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   }, [isToolsMenuOpen, registerBackHandler]);
 
   useEffect(() => {
-    if (isChangeWorkoutOpen) {
-      return registerBackHandler(() => { setIsChangeWorkoutOpen(false); return true; }, 100);
-    }
-  }, [isChangeWorkoutOpen, registerBackHandler]);
-
-  useEffect(() => {
     if (isPlateModalOpen) {
       return registerBackHandler(() => { setIsPlateModalOpen(false); return true; }, 100);
     }
@@ -1481,12 +1462,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       return registerBackHandler(() => { setIsLogPastModalOpen(false); return true; }, 100);
     }
   }, [isLogPastModalOpen, registerBackHandler]);
-
-  useEffect(() => {
-    if (isGoalSelectorOpen) {
-      return registerBackHandler(() => { setIsGoalSelectorOpen(false); return true; }, 100);
-    }
-  }, [isGoalSelectorOpen, registerBackHandler]);
 
   useEffect(() => {
     if (postWorkoutSummary) {
@@ -1598,116 +1573,11 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     });
   };
 
-  const handleRepeatLastWorkout = () => {
-    if (workouts.length === 0) return;
-    const last = workouts[0];
-    setSessionStartTime(Date.now());
-    const clonedExercises: WorkoutExercise[] = last.exercises.map((ex) => ({
-      name: ex.name,
-      sets: ex.sets.map((s) => ({
-        weight: s.weight,
-        reps: s.reps,
-        unit: s.unit || userUnit,
-        completed: false,
-        status: 'pending' as const,
-        rpe: s.rpe,
-        prescribedWeight: s.weight,
-        prescribedReps: s.reps,
-        prescribedRpe: s.rpe,
-        prescribedUnit: s.unit || userUnit,
-      })),
-    }));
-    setExercises(clonedExercises);
-    setDate(getLocalTodayStr());
-    setStartedFromPlan(`Repeated (${last.date})`);
-    setIsModalOpen(true);
-    toast.success(clonedExercises.length === 1 ? t('toast.lastSessionLoadedOne') : t('toast.lastSessionLoadedMany', { count: clonedExercises.length }), t('toast.titleWorkoutLoaded'));
-  };
-
-  // Voice logging goes through the shared recognizer in lib/voice-logger:
-  // Web Speech in browsers, the native OS recognizer inside the app
-  // (Android WebView has no Web Speech API). Transcripts stream into
-  // pageVoiceTranscriptRef and are parsed once when the session ends.
-  const pageVoiceRecognizerRef = useRef<any>(null);
-  const pageVoiceTranscriptRef = useRef('');
-  const pageVoiceHandledRef = useRef(false);
-
-  const processPageVoiceTranscript = (transcript: string) => {
-    const parsed = parseVoiceWorkout(transcript, availableExercises);
-    if (parsed) {
-      setExercises((prev) => [
-        ...prev.filter((e) => e.name.trim()),
-        {
-          name: parsed.exerciseName,
-          sets: parsed.sets.map((s) => ({ ...s, unit: userUnit })),
-        },
-      ]);
-      toast.success(t('toast.voiceLogged', { exercise: parsed.exerciseName, sets: parsed.sets.map((s) => `${s.weight}×${s.reps}`).join(', ') }), t('toast.titleVoiceAdded'));
-    } else {
-      toast.error(t('toast.voiceParseFailed', { transcript }), t('toast.titleVoiceError'));
-    }
-  };
-
-  const toggleVoiceLogging = () => {
-    if (typeof window === 'undefined') return;
-
-    if (isListening) {
-      // Stop now — the recognizer's onEnd parses the final transcript.
-      try {
-        pageVoiceRecognizerRef.current?.stop();
-      } catch {}
-      setIsListening(false);
-      return;
-    }
-
-    if (!isSpeechRecognitionSupported()) {
-      toast.error(t('toast.voiceUnsupportedBrowser'), t('toast.titleVoiceLogging'));
-      return;
-    }
-
-    try {
-      pageVoiceTranscriptRef.current = '';
-      pageVoiceHandledRef.current = false;
-      try {
-        pageVoiceRecognizerRef.current?.abort();
-      } catch {}
-
-      const recognizer = createSpeechRecognizer({
-        lang: 'en-US',
-        onResult: (text: string) => {
-          pageVoiceTranscriptRef.current = text;
-        },
-        onError: (err: string) => {
-          setIsListening(false);
-          if (err === 'not-allowed' || err === 'service-not-allowed') {
-            toast.error(isNativePlatform() ? t('toast.voiceMicNative') : t('toast.voiceMicBrowser'), t('toast.titleVoiceLogging'));
-          } else if (err === 'unavailable') {
-            toast.error(t('toast.voiceUnavailableDevice'), t('toast.titleVoiceLogging'));
-          }
-        },
-        onEnd: () => {
-          setIsListening(false);
-          const transcript = pageVoiceTranscriptRef.current.trim();
-          if (transcript && !pageVoiceHandledRef.current) {
-            pageVoiceHandledRef.current = true;
-            processPageVoiceTranscript(transcript);
-          }
-        },
-      });
-
-      if (!recognizer) {
-        toast.error(t('toast.voiceUnsupportedBrowser'), t('toast.titleVoiceLogging'));
-        return;
-      }
-
-      pageVoiceRecognizerRef.current = recognizer;
-      recognizer.start();
-      setIsListening(true);
-      toast.info(t('toast.voiceListening'), t('toast.titleVoiceLogging'));
-    } catch {
-      setIsListening(false);
-    }
-  };
+  // Task 1.5(e): the page-level repeat-workout handler and the
+  // page voice logger were removed — neither had any caller or UI
+  // (grep evidence in ~/workspace/phase1-grep-evidence.md). Voice
+  // logging itself lives in VoiceWorkoutLoggerModal /
+  // ActiveWorkoutScreen and is untouched.
 
   // ─── Workout logger helpers ────────────────────────────────────────────────
 
@@ -3480,11 +3350,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         />
       )}
 
-      {/* Goal Selector Modal */}
-      <GoalSelectorModal
-        isOpen={isGoalSelectorOpen}
-        onClose={() => setIsGoalSelectorOpen(false)}
-      />
+      {/* Task 1.5(f): Train's GoalSelectorModal mount was removed —
+          nothing in Train ever opened it (no trigger existed). The
+          working entry point is You → Fitness Goals (ProfileView). */}
 
       {/* Suggested Workout Plan Generator Modal */}
       <SuggestedWorkoutModal
@@ -3532,166 +3400,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         isOpen={Boolean(sharingPlan)}
         onClose={() => setSharingPlan(null)}
       />
-
-      {/* ── Change Workout Bottom Sheet / Modal ──────────────────────────── */}
-      {isChangeWorkoutOpen && (
-        <div ref={changeWorkoutRef} {...changeWorkoutDialogProps} className="modal-overlay" onClick={() => setIsChangeWorkoutOpen(false)}>
-          <div
-            className="modal-content max-w-md max-h-[85vh] flex flex-col p-0 overflow-hidden rounded-t-2xl sm:rounded-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
-              <div>
-                <h2 className="text-base font-bold text-text-primary">Change Workout</h2>
-                <p className="text-2xs text-text-muted">Choose what you want to train today</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsChangeWorkoutOpen(false)}
-                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="p-4 overflow-y-auto space-y-4">
-              {/* Option to log past/finished workout */}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsChangeWorkoutOpen(false);
-                  setIsLogPastModalOpen(true);
-                }}
-                className="w-full p-3 rounded-xl bg-accent/10 border border-accent/30 hover:border-accent/60 flex items-center justify-between text-left transition-colors cursor-pointer group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-accent/20 text-accent flex items-center justify-center">
-                    <Calendar className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-text-primary block group-hover:text-accent-text transition-colors">
-                      Log Finished / Past Workout
-                    </span>
-                    <span className="text-2xs text-text-muted">
-                      Already completed your session? Record weights and reps now
-                    </span>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-accent transition-colors" />
-              </button>
-              {/* My Workouts & Weekly Schedule */}
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-2xs font-mono font-bold uppercase tracking-wider text-accent-text">
-                    MY WORKOUTS &amp; SCHEDULE
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsChangeWorkoutOpen(false);
-                        setIsScheduleModalOpen(true);
-                      }}
-                      className="text-xs font-semibold text-text-muted hover:text-accent-text flex items-center gap-1 transition-colors"
-                      title="Customize which day you train which workout"
-                    >
-                      <Calendar className="w-3.5 h-3.5 text-accent" />
-                      <span>Schedule Days</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsChangeWorkoutOpen(false);
-                        openCreatePlan();
-                      }}
-                      className="text-xs font-semibold text-accent-text hover:underline flex items-center gap-1"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>New Plan</span>
-                    </button>
-                  </div>
-                </div>
-
-                {plannedWorkouts.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-2">
-                    {plannedWorkouts.map((plan) => {
-                      const bodyParts = getWorkoutBodyParts(plan.exercises);
-                      const scheduledDays = Object.entries(weeklySchedule || {})
-                        .filter(([_, d]) => d.workoutPlanId === plan.id)
-                        .map(([day]) => DAY_DISPLAY_INFO[day as keyof typeof DAY_DISPLAY_INFO]?.short || day);
-
-                      return (
-                        <button
-                          key={plan.id}
-                          type="button"
-                          onClick={() => {
-                            setIsChangeWorkoutOpen(false);
-                            handleStartPlan(plan);
-                          }}
-                          className="p-3 rounded-xl bg-bg-secondary border border-border/80 hover:border-accent/50 hover:bg-accent/5 text-left flex items-center justify-between transition-colors group"
-                        >
-                          <div className="min-w-0 pr-2">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-bold text-sm text-text-primary block group-hover:text-accent-text">
-                                {plan.name}
-                              </span>
-                              {scheduledDays.length > 0 && (
-                                <span className="px-1.5 py-0.2 rounded bg-bg-card border border-border text-2xs font-mono font-bold text-text-muted">
-                                  {scheduledDays.join(', ')}
-                                </span>
-                              )}
-                            </div>
-                            {bodyParts.length > 0 ? (
-                              <span className="text-2xs text-accent-text font-medium block mt-0.5">
-                                {bodyParts.join(' • ')}
-                              </span>
-                            ) : null}
-                            <span className="text-xs text-text-muted line-clamp-1 mt-0.5">
-                              {plan.exercises.map((e) => e.name).join(', ')}
-                            </span>
-                          </div>
-                          <Play className="w-4 h-4 text-accent shrink-0" />
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-xs text-text-muted italic py-1">No custom workouts created yet.</p>
-                )}
-              </div>
-
-              {/* Quick Utility Links */}
-              <div className="pt-2 border-t border-border/50 space-y-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsChangeWorkoutOpen(false);
-                    setIsExerciseLibraryOpen(true);
-                  }}
-                  className="w-full p-2.5 rounded-xl bg-bg-secondary/50 border border-border/60 hover:border-accent/40 text-left text-xs font-semibold text-text-primary flex items-center gap-2.5 transition-colors"
-                >
-                  <BookOpen className="w-4 h-4 text-accent" />
-                  <span>Browse Exercise Library</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsChangeWorkoutOpen(false);
-                    openBlankLogger();
-                  }}
-                  className="w-full p-2.5 rounded-xl bg-bg-secondary/50 border border-border/60 hover:border-accent/40 text-left text-xs font-semibold text-text-primary flex items-center gap-2.5 transition-colors"
-                >
-                  <Plus className="w-4 h-4 text-text-muted" />
-                  <span>{t('train.startEmptyWorkout')}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Training Tools & Actions Drawer / Sheet ── */}
       {isToolsMenuOpen && (

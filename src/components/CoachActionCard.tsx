@@ -16,6 +16,7 @@ import {
   undoMacroGoals,
 } from '@/lib/coach-action-executor';
 import { buildIntakePrefill } from '@/lib/block-intake';
+import { hasRealBodyStats } from '@/lib/body-stats';
 import type { BlockProposal } from '@/lib/block-engine';
 import type {
   CoachActionReceipt,
@@ -134,7 +135,12 @@ export function applyMacroFromCard(
         ? { ...liveGoals }
         : null;
   const result = applyMacroGoalsAction(action, base);
-  if (!result.ok) return { actionBase: base, actionState: 'stale' };
+  if (!result.ok) {
+    // Blocked (needs real body stats): no patch — the component
+    // renders the honest blocked state and offers no Apply.
+    if ('blocked' in result) return {};
+    return { actionBase: base, actionState: 'stale' };
+  }
   return {
     actionBase: base,
     actionState: 'applied',
@@ -155,7 +161,10 @@ export function rebaseMacroFromCard(
   if (!action || action.type !== 'set_macro_goals') return {};
   const base = liveGoals ? { ...liveGoals } : null;
   const result = applyMacroGoalsAction(action, base);
-  if (!result.ok) return { actionBase: base, ts: now, actionState: 'stale' };
+  if (!result.ok) {
+    if ('blocked' in result) return {};
+    return { actionBase: base, ts: now, actionState: 'stale' };
+  }
   return {
     actionBase: base,
     ts: now,
@@ -246,6 +255,7 @@ export default function CoachActionCard({
 }: CoachActionCardProps) {
   const { t } = useTranslation();
   const storeGoals = useStore((s) => s.macroGoals);
+  const profile = useStore((s) => s.profile);
   const liveGoals = liveMacroGoals !== undefined ? liveMacroGoals : storeGoals;
   const [undoStale, setUndoStale] = useState(false);
   const [applyFailed, setApplyFailed] = useState(false);
@@ -377,20 +387,36 @@ export default function CoachActionCard({
     // Pending, base intact (or not captured yet — first paint falls
     // back to the live goals, which the capture effect then persists).
     const baseForDiff = base !== undefined ? base : liveGoals;
+    // Task 1.1: with no stored goals and placeholder body stats, the
+    // executor cannot complete this goal set without deriving numbers
+    // from stats the user never entered — unless the action names
+    // both required fields itself. Show the honest blocked state
+    // (mirrors the program-refusal pattern: no Apply offered).
+    const applyBlocked =
+      !liveGoals &&
+      !hasRealBodyStats(profile) &&
+      (action.calories === undefined || action.proteinG === undefined);
     return (
       <div className="rounded-xl border border-border bg-bg-secondary/60 p-3 space-y-2">
         <p className="text-xs font-bold text-text-primary">{t('coachChat.actionMacroTitle')}</p>
         <MacroRows rows={macroDiffRows(action, baseForDiff)} />
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => onPatch(applyMacroFromCard(message, liveGoals))}
-            className="btn-primary px-3 py-1.5 text-xs font-bold cursor-pointer"
-          >
-            {t('coachChat.actionApply')}
-          </button>
-          {dismissButton}
-        </div>
+        {applyBlocked ? (
+          <>
+            <p className="text-xs text-text-secondary">{t('coachChat.actionNeedsBodyStats')}</p>
+            <div className="flex gap-2">{dismissButton}</div>
+          </>
+        ) : (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => onPatch(applyMacroFromCard(message, liveGoals))}
+              className="btn-primary px-3 py-1.5 text-xs font-bold cursor-pointer"
+            >
+              {t('coachChat.actionApply')}
+            </button>
+            {dismissButton}
+          </div>
+        )}
       </div>
     );
   }
