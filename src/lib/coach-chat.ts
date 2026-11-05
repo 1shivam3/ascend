@@ -612,11 +612,13 @@ function round1(n: number): number {
  * Serializes stored form-check summaries into compact context lines:
  * per exercise, the latest session in full (date, valid reps, the
  * exercise's own metrics — depth split and min-knee-angle range for
- * squats, lockout count and min-hip-angle range for deadlifts — max
- * torso lean, avg tempo, observation titles) plus a trend line over
- * up to the last 5 sessions. Pure and deterministic — sessions are
- * sorted newest-first here, never trusted to arrive in order.
- * Numbers only ever come from the summaries.
+ * squats, lockout count and min-hip-angle range for deadlifts, hold
+ * time and alignment for planks, lockout / elbow-or-knee range /
+ * peak wrist height for the other graded exercises — max torso
+ * lean, avg tempo, observation titles) plus a trend line over up to
+ * the last 5 sessions. Pure and deterministic — sessions are sorted
+ * newest-first here, never trusted to arrive in order. Numbers only
+ * ever come from the summaries.
  */
 export function serializeFormChecks(sessions: FormSessionSummary[]): {
   lines: string[];
@@ -643,14 +645,30 @@ export function serializeFormChecks(sessions: FormSessionSummary[]): {
     // angle. (Rendering a deadlift through the depth split would print
     // "below parallel 0 of N" — a squat claim about a hinge lift.)
     const isDeadlift = latest.exerciseId === 'deadlift';
+    const isPlank = latest.exerciseId === 'plank';
     const below = reps.filter((r) => r.estimatedDepth === 'below_parallel').length;
     const parallel = reps.filter((r) => r.estimatedDepth === 'parallel').length;
     const above = reps.filter((r) => r.estimatedDepth === 'above_parallel').length;
     const lockouts = reps.filter((r) => r.lockoutAchieved).length;
+    const titles = [...new Set(latest.observations.map((o) => o.title))];
 
-    if (reps.length > 0) {
+    if (isPlank) {
+      // A plank session has no reps by construction — its numbers are
+      // the hold itself, carried on the summary's hold fields.
+      const hold = latest.holdDurationSeconds ?? 0;
+      const aligned = latest.alignedHoldPercent ?? 0;
+      lines.push(
+        `${name} — latest ${formSessionDate(latest.startedAt)}: hold ${hold}s; ` +
+          `body line in line ${aligned}% of the hold; ` +
+          `observations: ${titles.length > 0 ? titles.join(', ') : 'none'}`
+      );
+      if (!evidenceLine) {
+        evidenceLine =
+          `Latest form check: ${name} on ${formSessionDate(latest.startedAt)} — ` +
+          `${hold}s hold, body line in line ${aligned}% of the hold (camera-measured)`;
+      }
+    } else if (reps.length > 0) {
       const maxTorso = Math.max(...reps.map((r) => r.maxTorsoInclinationDeg));
-      const titles = [...new Set(latest.observations.map((o) => o.title))];
       if (isDeadlift) {
         const hipAngles = reps.map((r) => r.minHipAngleDeg ?? r.minKneeAngleDeg);
         lines.push(
@@ -665,7 +683,7 @@ export function serializeFormChecks(sessions: FormSessionSummary[]): {
             `Latest form check: ${name} on ${formSessionDate(latest.startedAt)} — ` +
             `${latest.totalValidReps} valid reps, full lockout on ${lockouts} of ${reps.length} reps (camera-measured)`;
         }
-      } else {
+      } else if (latest.exerciseId === 'squat') {
         const kneeAngles = reps.map((r) => r.minKneeAngleDeg);
         lines.push(
           `${name} — latest ${formSessionDate(latest.startedAt)}: ${latest.totalValidReps} valid reps; ` +
@@ -678,6 +696,53 @@ export function serializeFormChecks(sessions: FormSessionSummary[]): {
           evidenceLine =
             `Latest form check: ${name} on ${formSessionDate(latest.startedAt)} — ` +
             `${latest.totalValidReps} valid reps, below parallel on ${below} of ${reps.length} reps (camera-measured)`;
+        }
+      } else {
+        // Batch A+B exercises: render the metrics each analyzer
+        // actually stamps — lockout where it is judged, elbow or knee
+        // range for the cycle, peak wrist height for raises, torso
+        // lean everywhere it is measured.
+        const fragments: string[] = [];
+        if (reps.some((r) => r.lockoutAchieved !== undefined)) {
+          fragments.push(`full lockout on ${lockouts} of ${reps.length} reps`);
+        }
+        if (latest.exerciseId === 'lateral-raise') {
+          const peaks = reps
+            .map((r) => r.peakWristHeightRatio)
+            .filter((v): v is number => v !== undefined)
+            .map((v) => Math.round((1 + v) * 100));
+          if (peaks.length > 0) {
+            fragments.push(
+              `peak wrist height ${Math.min(...peaks)}–${Math.max(...peaks)}% of the way to shoulder height`
+            );
+          }
+        } else if (latest.exerciseId === 'lunge') {
+          const kneeAngles = reps.map((r) => r.minKneeAngleDeg);
+          fragments.push(`min knee angle ${Math.min(...kneeAngles)}–${Math.max(...kneeAngles)}°`);
+        } else {
+          const elbowAngles = reps
+            .map((r) => r.minElbowAngleDeg)
+            .filter((v): v is number => v !== undefined);
+          if (elbowAngles.length > 0) {
+            fragments.push(
+              `min elbow angle ${Math.round(Math.min(...elbowAngles))}–${Math.round(Math.max(...elbowAngles))}°`
+            );
+          }
+        }
+        fragments.push(`max torso lean ${maxTorso}°`);
+        lines.push(
+          `${name} — latest ${formSessionDate(latest.startedAt)}: ${latest.totalValidReps} valid reps; ` +
+            `${fragments.join('; ')}; avg tempo ${round1(latest.averageRepDurationSeconds)}s/rep; ` +
+            `observations: ${titles.length > 0 ? titles.join(', ') : 'none'}`
+        );
+        if (!evidenceLine) {
+          evidenceLine =
+            `Latest form check: ${name} on ${formSessionDate(latest.startedAt)} — ` +
+            `${latest.totalValidReps} valid reps` +
+            (reps.some((r) => r.lockoutAchieved !== undefined)
+              ? `, full lockout on ${lockouts} of ${reps.length} reps`
+              : '') +
+            ` (camera-measured)`;
         }
       }
     } else {
@@ -701,11 +766,24 @@ export function serializeFormChecks(sessions: FormSessionSummary[]): {
                 tempoWeight
             )
           : 0;
-      lines.push(
-        isDeadlift
-          ? `${name} — last ${recent.length} checks: full lockout on ${trendLockouts} of ${trendReps.length} reps; avg tempo ${trendTempo}s/rep`
-          : `${name} — last ${recent.length} checks: below parallel on ${trendBelow} of ${trendReps.length} reps; avg tempo ${trendTempo}s/rep`
-      );
+      if (isPlank) {
+        const holds = recent.map((s) => s.holdDurationSeconds ?? 0);
+        lines.push(
+          `${name} — last ${recent.length} checks: longest hold ${Math.max(...holds)}s; ` +
+            `avg hold ${round1(holds.reduce((a, b) => a + b, 0) / holds.length)}s`
+        );
+      } else if (isDeadlift || latest.exerciseId === 'squat') {
+        lines.push(
+          isDeadlift
+            ? `${name} — last ${recent.length} checks: full lockout on ${trendLockouts} of ${trendReps.length} reps; avg tempo ${trendTempo}s/rep`
+            : `${name} — last ${recent.length} checks: below parallel on ${trendBelow} of ${trendReps.length} reps; avg tempo ${trendTempo}s/rep`
+        );
+      } else {
+        const trendValid = recent.reduce((acc, s) => acc + s.totalValidReps, 0);
+        lines.push(
+          `${name} — last ${recent.length} checks: ${trendValid} valid reps of ${trendReps.length}; avg tempo ${trendTempo}s/rep`
+        );
+      }
     }
   }
 

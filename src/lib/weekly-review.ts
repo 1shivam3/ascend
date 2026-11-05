@@ -441,7 +441,53 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
                 weekFormSessions.length
             );
       const scope = `${label}${sessionWord}`;
-      if (deadliftReps.length === 0) {
+      // Batch A+B: when the week's sessions reach beyond squat and
+      // deadlift, the three fixed compositions above no longer cover
+      // the data (a curl rep must not land in the below-parallel
+      // denominator either). Those weeks render one segment per
+      // exercise instead; pure squat/deadlift weeks keep the pinned
+      // three compositions untouched.
+      const plankSessions = weekFormSessions.filter((s) => s.exerciseId === 'plank');
+      const otherSessions = weekFormSessions.filter(
+        (s) => s.exerciseId !== 'squat' && s.exerciseId !== 'deadlift' && s.exerciseId !== 'plank'
+      );
+      const onlySquatDeadlift = otherSessions.length === 0 && plankSessions.length === 0;
+      if (!onlySquatDeadlift) {
+        const segments: string[] = [];
+        if (squatReps.length > 0) {
+          segments.push(`depth below parallel on ${below} of ${squatReps.length} squat reps`);
+        }
+        if (deadliftReps.length > 0) {
+          segments.push(`full lockout on ${lockouts} of ${deadliftReps.length} deadlift reps`);
+        }
+        const byExerciseId = new Map<string, typeof otherSessions>();
+        for (const s of otherSessions) {
+          const group = byExerciseId.get(s.exerciseId) ?? [];
+          group.push(s);
+          byExerciseId.set(s.exerciseId, group);
+        }
+        for (const [exerciseId, group] of byExerciseId) {
+          const groupReps = group.flatMap((s) => s.reps);
+          const groupValid = group.reduce((acc, s) => acc + s.totalValidReps, 0);
+          segments.push(`${exerciseId}: ${groupValid} valid of ${groupReps.length} reps`);
+        }
+        if (plankSessions.length > 0) {
+          const maxHold = Math.max(...plankSessions.map((s) => s.holdDurationSeconds ?? 0));
+          segments.push(`longest plank hold ${maxHold}s`);
+        }
+        coachLines.push(
+          `Form checks: ${weekFormSessions.length} ${scope} · ${segments.join(' · ')} · avg tempo ${avgTempo}s/rep`
+        );
+        coachLinesI18n.push({
+          key: 'weeklyReview.coachFormChecksGeneric',
+          params: {
+            count: weekFormSessions.length,
+            scope,
+            segments: segments.join(' · '),
+            tempo: avgTempo,
+          },
+        });
+      } else if (deadliftReps.length === 0) {
         coachLines.push(
           `Form checks: ${weekFormSessions.length} ${scope} · depth below parallel on ${below} of ${formReps.length} reps · avg tempo ${avgTempo}s/rep`
         );
@@ -486,6 +532,19 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
           },
         });
       }
+    } else if (
+      weekFormSessions.every((s) => s.exerciseId === 'plank')
+    ) {
+      // A plank-only week has no reps by construction — its measured
+      // content is the holds themselves.
+      const maxHold = Math.max(...weekFormSessions.map((s) => s.holdDurationSeconds ?? 0));
+      coachLines.push(
+        `Form checks: ${weekFormSessions.length} ${label}${sessionWord} · longest hold ${maxHold}s`
+      );
+      coachLinesI18n.push({
+        key: 'weeklyReview.coachFormChecksPlank',
+        params: { count: weekFormSessions.length, scope: `${label}${sessionWord}`, hold: maxHold },
+      });
     } else {
       coachLines.push(
         `Form checks: ${weekFormSessions.length} ${label}${sessionWord} · no valid reps measured`
