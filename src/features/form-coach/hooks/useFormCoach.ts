@@ -8,6 +8,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { PoseLandmarkerService } from '../services/pose/PoseLandmarkerService';
 import { PoseLandmarksSmoother } from '../services/analysis/LandmarkSmoothing';
+import { PoseSubjectTracker } from '../services/pose/PoseSubjectTracker';
 import { SquatAnalyzer } from '../analyzers/SquatAnalyzer';
 import { ExerciseAnalyzer, MovementSignature } from '../analyzers/ExerciseAnalyzer';
 import { NormalizedLandmark, DetectedSide } from '../models/pose.types';
@@ -89,6 +90,9 @@ export function useFormCoach({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const poseServiceRef = useRef<PoseLandmarkerService>(new PoseLandmarkerService());
   const smootherRef = useRef<PoseLandmarksSmoother>(new PoseLandmarksSmoother());
+  // Deep audit: picks the lifter among detected people (a spotter standing
+  // closer to the camera must not become the analyzed subject).
+  const subjectTrackerRef = useRef<PoseSubjectTracker>(new PoseSubjectTracker());
   const analyzerRef = useRef<ExerciseAnalyzer>(new SquatAnalyzer(initialConfig));
 
   const animFrameRef = useRef<number | null>(null);
@@ -105,6 +109,7 @@ export function useFormCoach({
       animFrameRef.current = null;
     }
     isAnalyzingRef.current = false;
+    subjectTrackerRef.current.reset();
     if (uploadedVideoUrlRef.current) {
       URL.revokeObjectURL(uploadedVideoUrlRef.current);
       uploadedVideoUrlRef.current = null;
@@ -180,6 +185,7 @@ export function useFormCoach({
         // Reset analyzers for new set
         analyzerRef.current.reset();
         smootherRef.current.reset();
+        subjectTrackerRef.current.reset();
 
         // Start video playback for analysis
         video.currentTime = 0;
@@ -237,9 +243,23 @@ export function useFormCoach({
           }
 
           poseServiceRef.current.processVideoFrame(video, frameTimeMs, (inferenceResult) => {
-            let landmarks = inferenceResult.landmarks;
+            // Subject selection: among all detected people, analyze the
+            // one whose hips actually travel (the lifter), not pose [0] —
+            // in the owner's front-view video pose [0] was the spotter,
+            // standing still in front of the lifter.
+            const candidates =
+              inferenceResult.poses && inferenceResult.poses.length > 0
+                ? inferenceResult.poses
+                : inferenceResult.landmarks
+                  ? [inferenceResult.landmarks]
+                  : [];
+            const selection = subjectTrackerRef.current.select(candidates);
+            let landmarks = selection?.landmarks ?? null;
 
             if (landmarks && landmarks.length > 0) {
+              // A subject flip must not smear the previous person's
+              // landmarks into the new subject's stream.
+              if (selection?.subjectSwitched) smootherRef.current.reset();
               landmarks = smootherRef.current.smooth(landmarks, frameTimeMs);
             }
 

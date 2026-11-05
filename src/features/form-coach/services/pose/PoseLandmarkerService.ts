@@ -13,6 +13,15 @@ import { NormalizedLandmark } from '../../models/pose.types';
 export interface PoseInferenceResult {
   landmarks: NormalizedLandmark[] | null;
   worldLandmarks: NormalizedLandmark[] | null;
+  /**
+   * Every detected person this frame (pose order as MediaPipe returns
+   * them). `landmarks` stays the compatibility alias of poses[0]; callers
+   * that need the actual lifter among multiple people (a spotter standing
+   * closer to the camera, a gym-mate walking by) must run these candidates
+   * through subject selection (deep-audit commit 2) instead of trusting
+   * pose [0].
+   */
+  poses: NormalizedLandmark[][] | null;
   timestampMs: number;
 }
 
@@ -120,7 +129,7 @@ export class PoseLandmarkerService {
             delegate: 'GPU',
           },
           runningMode: 'VIDEO',
-          numPoses: 1,
+          numPoses: 2, // deep audit: detect up to 2 people so subject selection can reject a spotter standing closer to camera (was 1)
           minPoseDetectionConfidence: 0.5,
           minPosePresenceConfidence: 0.5,
           minTrackingConfidence: 0.5,
@@ -132,7 +141,7 @@ export class PoseLandmarkerService {
             delegate: 'CPU',
           },
           runningMode: 'VIDEO',
-          numPoses: 1,
+          numPoses: 2, // deep audit: detect up to 2 people so subject selection can reject a spotter standing closer to camera (was 1)
           minPoseDetectionConfidence: 0.5,
           minPosePresenceConfidence: 0.5,
           minTrackingConfidence: 0.5,
@@ -200,6 +209,9 @@ export class PoseLandmarkerService {
               this.currentFrameCallback({
                 landmarks: payload.landmarks,
                 worldLandmarks: payload.worldLandmarks,
+                poses:
+                  payload.poses ??
+                  (payload.landmarks ? [payload.landmarks] : null),
                 timestampMs: payload.timestampMs,
               });
             }
@@ -318,6 +330,7 @@ export class PoseLandmarkerService {
         onResult({
           landmarks: (detection.landmarks?.[0] as NormalizedLandmark[]) ?? null,
           worldLandmarks: (detection.worldLandmarks?.[0] as NormalizedLandmark[]) ?? null,
+          poses: (detection.landmarks as NormalizedLandmark[][] | undefined) ?? null,
           timestampMs: safeTimestamp,
         });
         return true;
