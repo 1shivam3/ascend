@@ -322,6 +322,97 @@ export function shouldAdoptCoachBlocks(args: {
 }
 
 /**
+ * S3 (sync convergence): stamp-gated coach-blocks adoption.
+ *
+ * shouldAdoptCoachBlocks above never adopts when both sides are
+ * non-empty, so two devices with a block each diverged silently —
+ * whichever pushed last won the row, and the other device never
+ * learned. The gate below keeps the F-11 cases (no remote → keep;
+ * cross-account → adopt; empty local → adopt) and adds ordering for
+ * the both-non-empty case, driven by a small persisted baseline:
+ *
+ * CoachBlocksSyncMeta records, as of the last settled sync, the
+ * local state's signature, the remote row's updated_at, and when
+ * the local state last diverged from that signature (maintained by
+ * the engine's store subscription). With a baseline:
+ *  - local unchanged → adopt iff the remote stamp moved;
+ *  - remote unchanged → keep local (the push carries it up);
+ *  - both changed → the newer stamp wins; a tie, or a remote stamp
+ *    at least as new as the local edit, adopts (devices converge on
+ *    the server copy instead of flip-flopping). An untimed local
+ *    divergence is NEVER adopted over — keep local is the safe side.
+ * With NO baseline (first sync after this ships) both-non-empty
+ * keeps local — exactly the pre-S3 behaviour — and the baseline is
+ * seeded from that settled state, so later divergence is gated.
+ */
+export interface CoachBlocksSyncMeta {
+  /** Signature of the local coach-blocks state at the last settled sync. */
+  sig: string;
+  /** The remote row's updated_at at the last settled sync (null = no row seen). */
+  remoteStamp: string | null;
+  /** When the local state last diverged from `sig` (ISO), null while it matches. */
+  localEditedAt: string | null;
+}
+
+export const COACH_BLOCKS_SYNC_META_KEY = 'ascend_coach_blocks_sync_meta';
+
+/** Content signature for the singleton state (JSON, key order is stable for store-produced states). */
+export function coachBlocksSignature(state: CoachBlocksState | null | undefined): string {
+  return JSON.stringify(state ?? null);
+}
+
+export function readCoachBlocksSyncMeta(): CoachBlocksSyncMeta | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    const raw = localStorage.getItem(COACH_BLOCKS_SYNC_META_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<CoachBlocksSyncMeta>;
+    if (typeof parsed.sig !== 'string') return null;
+    return {
+      sig: parsed.sig,
+      remoteStamp: typeof parsed.remoteStamp === 'string' ? parsed.remoteStamp : null,
+      localEditedAt: typeof parsed.localEditedAt === 'string' ? parsed.localEditedAt : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function writeCoachBlocksSyncMeta(meta: CoachBlocksSyncMeta): void {
+  try {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(COACH_BLOCKS_SYNC_META_KEY, JSON.stringify(meta));
+  } catch {
+    // Best-effort — a missing baseline fails safe to keep-local.
+  }
+}
+
+export function decideCoachBlocksSync(args: {
+  isCrossAccountSwitch: boolean;
+  local: CoachBlocksState | null | undefined;
+  remote: CoachBlocksState | null;
+  remoteUpdatedAt: string | null;
+  localSignature: string;
+  meta: CoachBlocksSyncMeta | null;
+}): 'adopt' | 'keep-local' {
+  const { isCrossAccountSwitch, local, remote, remoteUpdatedAt, localSignature, meta } = args;
+  if (!remote || isCoachBlocksStateEmpty(remote)) return 'keep-local';
+  if (isCrossAccountSwitch) return 'adopt';
+  if (isCoachBlocksStateEmpty(local)) return 'adopt';
+  if (!meta) return 'keep-local';
+  const localChanged = localSignature !== meta.sig;
+  const remoteChanged = remoteUpdatedAt !== meta.remoteStamp;
+  if (!localChanged) return remoteChanged ? 'adopt' : 'keep-local';
+  if (!remoteChanged) return 'keep-local';
+  const localMs = meta.localEditedAt ? Date.parse(meta.localEditedAt) : NaN;
+  const remoteMs = remoteUpdatedAt ? Date.parse(remoteUpdatedAt) : NaN;
+  if (!Number.isNaN(localMs) && !Number.isNaN(remoteMs)) {
+    return remoteMs >= localMs ? 'adopt' : 'keep-local';
+  }
+  return 'keep-local';
+}
+
+/**
  * The coach tables exist only after the §16 migration is applied to
  * a deployment; until then PostgREST answers with a table-not-found
  * error. Tolerate exactly that (the DI-02 ship-before-migration
@@ -703,6 +794,22 @@ class SupabaseSyncEngine {
     // a reference fast path, so unrelated state churn costs ~nothing.
     useStore.subscribe((state, prevState) => {
       if (!this.initialized || this.isSyncing) return;
+      // S3: track WHEN the coach-blocks state diverges from the last
+      // settled sync baseline — the adoption gate's local stamp. Runs
+      // before the online/leader guards: recording a stamp is not a
+      // write to the server, and offline edits are exactly the ones
+      // whose time matters. (isSyncing above excludes the engine's
+      // own pull-applied changes; adoptions settle the baseline
+      // before applying, so they never land here as "edits".)
+      if (state.coachBlocks !== prevState.coachBlocks) {
+        const meta = readCoachBlocksSyncMeta();
+        if (meta && coachBlocksSignature(state.coachBlocks) !== meta.sig) {
+          writeCoachBlocksSyncMeta({
+            ...meta,
+            localEditedAt: new Date().toISOString(),
+          });
+        }
+      }
       if (!navigator.onLine) return;
       // QA4-010: a follower tab never pushes — its in-memory state is
       // not the source of truth and pushing it would clobber the
@@ -1282,6 +1389,8 @@ class SupabaseSyncEngine {
       // must never be able to fail the whole sync. Any error or
       // unexpected client behavior reads as "no remote state".
       let remoteCoachBlocksState: CoachBlocksState | null = null;
+      // S3: the row's updated_at is the adoption gate's remote stamp.
+      let remoteCoachBlocksUpdatedAt: string | null = null;
       try {
         const remoteCoachBlocks = await supabase
           .from('coach_blocks')
@@ -1290,9 +1399,14 @@ class SupabaseSyncEngine {
           .maybeSingle();
         if (remoteCoachBlocks && !remoteCoachBlocks.error) {
           remoteCoachBlocksState = coachBlocksStateFromPayload(remoteCoachBlocks.data?.payload);
+          remoteCoachBlocksUpdatedAt =
+            typeof remoteCoachBlocks.data?.updated_at === 'string'
+              ? remoteCoachBlocks.data.updated_at
+              : null;
         }
       } catch {
         remoteCoachBlocksState = null;
+        remoteCoachBlocksUpdatedAt = null;
       }
 
       // S1/S2: the server tombstone layer (deletions made on other
@@ -1754,15 +1868,40 @@ class SupabaseSyncEngine {
       // or proposed mid-sync is never overwritten by the pull. On a
       // cross-account switch this overrides the reset's initial
       // coachBlocks with the new account's own row when one exists.
-      if (
-        remoteCoachBlocksState &&
-        shouldAdoptCoachBlocks({
+      // S3: the decision is stamp-gated (decideCoachBlocksSync) — when
+      // both sides hold a block, the side that changed since the last
+      // settled sync wins, ordered by stamps, instead of the local
+      // side silently winning every push.
+      if (remoteCoachBlocksState) {
+        const cbMeta = readCoachBlocksSyncMeta();
+        const cbDecision = decideCoachBlocksSync({
           isCrossAccountSwitch,
           local: freshState.coachBlocks,
           remote: remoteCoachBlocksState,
-        })
-      ) {
-        updates.coachBlocks = remoteCoachBlocksState;
+          remoteUpdatedAt: remoteCoachBlocksUpdatedAt,
+          localSignature: coachBlocksSignature(freshState.coachBlocks),
+          meta: cbMeta,
+        });
+        if (cbDecision === 'adopt') {
+          updates.coachBlocks = remoteCoachBlocksState;
+          // Settle the baseline BEFORE the setState below applies the
+          // adoption, so the engine's own store subscription does not
+          // read the adopted state as a local edit.
+          writeCoachBlocksSyncMeta({
+            sig: coachBlocksSignature(remoteCoachBlocksState),
+            remoteStamp: remoteCoachBlocksUpdatedAt,
+            localEditedAt: null,
+          });
+        } else if (!cbMeta && !isCrossAccountSwitch) {
+          // Bootstrap: both sides settled without a baseline — seed
+          // one from this state so future divergence is stamp-gated.
+          // (Local wins this round: the pre-S3 behaviour.)
+          writeCoachBlocksSyncMeta({
+            sig: coachBlocksSignature(freshState.coachBlocks),
+            remoteStamp: remoteCoachBlocksUpdatedAt,
+            localEditedAt: null,
+          });
+        }
       }
       // S1/S2 post-pass: apply the server tombstone layer to the
       // slices the recompute actually produced (some of its branches
@@ -2276,18 +2415,35 @@ class SupabaseSyncEngine {
       try {
         const { data: existingCb, error: cbReadError } = await supabase
           .from('coach_blocks')
-          .select('payload')
+          .select('payload,updated_at')
           .eq('user_id', userId)
           .maybeSingle();
         if (cbReadError) {
           if (!isMissingCoachBlocksTable(cbReadError)) record(cbReadError);
         } else if (JSON.stringify(existingCb?.payload ?? null) !== JSON.stringify(state.coachBlocks)) {
+          const cbRow = coachBlocksRowForPush(state.coachBlocks, userId);
           const { error: cbUpsertError } = await supabase
             .from('coach_blocks')
-            .upsert(coachBlocksRowForPush(state.coachBlocks, userId), { onConflict: 'id' });
+            .upsert(cbRow, { onConflict: 'id' });
           if (cbUpsertError && !isMissingCoachBlocksTable(cbUpsertError)) {
             record(cbUpsertError);
+          } else if (!cbUpsertError) {
+            // S3: settle the adoption baseline at the pushed state.
+            writeCoachBlocksSyncMeta({
+              sig: coachBlocksSignature(state.coachBlocks),
+              remoteStamp: typeof cbRow.updated_at === 'string' ? cbRow.updated_at : null,
+              localEditedAt: null,
+            });
           }
+        } else {
+          // Payload already identical: the local state IS the settled
+          // remote state — refresh the baseline's remote stamp.
+          writeCoachBlocksSyncMeta({
+            sig: coachBlocksSignature(state.coachBlocks),
+            remoteStamp:
+              typeof existingCb?.updated_at === 'string' ? existingCb.updated_at : null,
+            localEditedAt: null,
+          });
         }
       } catch (err: any) {
         // Defensive (same fail-safe posture as the pull): an
