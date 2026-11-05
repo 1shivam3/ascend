@@ -21,7 +21,7 @@ interface AuthModalProps {
 export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
-  const { user, signInWithGoogle, signOut, signInWithPassword, signUpWithPassword, accountHasCloudData, syncNow } = useSupabaseSync();
+  const { user, signInWithGoogle, signOut, signInWithPassword, signUpWithPassword, accountHasCloudData, syncNow, suppressMergeGateFor } = useSupabaseSync();
   const { t } = useTranslation();
   const toast = useToast();
   const { registerBackHandler } = useAppNavigation();
@@ -126,6 +126,10 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         setView('merge');
         return;
       }
+      // S4: this flow just made the merge decision itself (one-sided
+      // → no choice needed) — record it so a still-fresh OAuth/OTP
+      // intent flag cannot re-gate the sync below in the engine.
+      suppressMergeGateFor(res.user.id);
       await syncNow();
       toast.success(t('auth.welcomeBackMsg'), t('auth.loggedIn'));
       onClose();
@@ -156,6 +160,11 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           return;
         }
       }
+      // S4: record this choice as the resolution for the engine's
+      // OAuth/OTP gate too — the same decision must not be asked
+      // twice (the archive above already reset the device data, so
+      // the recorded signature matches the post-choice state).
+      if (user?.id) suppressMergeGateFor(user.id);
       await syncNow();
       setLoading(false);
       toast.success(

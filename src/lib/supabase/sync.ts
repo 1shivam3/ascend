@@ -25,7 +25,8 @@ import {
   type StampedTombstone,
   type TombstoneCollection,
 } from './reconcile';
-import { isCrossAccountSwitch as isCrossAccountSwitchFn, decideStartFreshGate } from '../start-fresh-guard';
+import { isCrossAccountSwitch as isCrossAccountSwitchFn, decideStartFreshGate, isGuestProfileId } from '../start-fresh-guard';
+import { hasRetainedHistory } from '../history-fork';
 import { DEFAULT_BODYWEIGHT_KG } from '../defaults';
 import { getInitialCoachBlocksState, type CoachBlocksState } from '../block-engine';
 
@@ -413,6 +414,139 @@ export function decideCoachBlocksSync(args: {
 }
 
 /**
+ * S4 (sync convergence): OAuth / email-OTP sign-ins route through
+ * the SAME merge choice as the Phase 1 email/password login
+ * (Task 1.4). Those flows complete inside onAuthStateChange /
+ * verifyEmailOtp, which used to call triggerSyncNow unconditionally
+ * — silently merging this device's guest data into the account.
+ *
+ * Mechanism: the entry points that START such a flow
+ * (signInWithGoogle, signInWithApple, sendEmailOtp) persist a
+ * short-lived intent flag. When a sync begins with a fresh flag,
+ * the engine evaluates the gate below: pause only when the device
+ * holds guest data AND the account holds cloud data AND this exact
+ * (user, device-data) pair has not already resolved a choice.
+ * While paused, NO sync runs (and pushLocalData refuses to run, so
+ * the debounced push path cannot slip a silent merge past the
+ * pause); the app shows the merge choice (MergeChoiceModal — same
+ * strings and semantics as AuthModal's Task 1.4 view).
+ * resolveMergeChoice runs the chosen path and records the
+ * resolution. One-sided cases proceed exactly as before, and the
+ * evaluation is remembered for the intent's lifetime so the cloud
+ * probe runs at most once per sign-in.
+ */
+export const SIGN_IN_INTENT_KEY = 'ascend_signin_intent';
+export const MERGE_CHOICE_RESOLVED_KEY = 'ascend_merge_choice_resolved';
+export const SIGN_IN_INTENT_MAX_AGE_MS = 60 * 60 * 1000;
+
+export function writeSignInIntent(): void {
+  try {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(SIGN_IN_INTENT_KEY, JSON.stringify({ at: Date.now() }));
+  } catch {
+    // Best-effort — no flag means no gate (pre-S4 behaviour).
+  }
+}
+
+export function readSignInIntentAt(): number | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    const raw = localStorage.getItem(SIGN_IN_INTENT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { at?: unknown };
+    return typeof parsed.at === 'number' && Number.isFinite(parsed.at) ? parsed.at : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearSignInIntent(): void {
+  try {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(SIGN_IN_INTENT_KEY);
+  } catch {
+    // Best-effort.
+  }
+}
+
+/**
+ * Which device data a merge-choice resolution applies to, by
+ * retained-history shape (counts + id sets of the five synced
+ * collections). A resolution never covers DIFFERENT data the user
+ * accumulates afterwards.
+ */
+export function mergeChoiceDataSignature(input: {
+  workouts?: { id: string }[];
+  meals?: { id: string }[];
+  plannedWorkouts?: { id: string }[];
+  prs?: { id: string }[];
+  bodyMetrics?: { id: string }[];
+}): string {
+  const ids = (rows?: { id: string }[]) => (rows || []).map((r) => r.id).sort().join(',');
+  return [
+    ids(input.workouts),
+    ids(input.meals),
+    ids(input.plannedWorkouts),
+    ids(input.prs),
+    ids(input.bodyMetrics),
+  ].join('|');
+}
+
+export function readMergeChoiceResolved(): string | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(MERGE_CHOICE_RESOLVED_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function writeMergeChoiceResolved(userId: string, dataSignature: string): void {
+  try {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(MERGE_CHOICE_RESOLVED_KEY, `${userId}:${dataSignature}`);
+  } catch {
+    // Best-effort — worst case the choice is offered once more.
+  }
+}
+
+/**
+ * The S4 gate verdict. Pure, in the style of decideCoachBlocksSync:
+ * every input is passed in, so the whole matrix is unit-testable.
+ * 'gate' requires ALL of: a fresh intent, a non-anonymous user,
+ * local guest data, cloud data, no matching resolution, and a
+ * device profile that is a guest profile (or none) — a profile
+ * belonging to a DIFFERENT account follows cross-account replace
+ * semantics instead, and an already-linked profile is not a guest.
+ */
+export function evaluateSignInMergeGate(args: {
+  intentAt: number | null;
+  now: number;
+  isAnonymous: boolean;
+  profileId: string | null | undefined;
+  userId: string;
+  localHasData: boolean;
+  cloudHasData: boolean;
+  resolvedMarker: string | null;
+  dataSignature: string;
+}): 'gate' | 'proceed' {
+  if (args.isAnonymous) return 'proceed';
+  if (args.intentAt === null) return 'proceed';
+  if (args.now < args.intentAt || args.now - args.intentAt > SIGN_IN_INTENT_MAX_AGE_MS) {
+    return 'proceed';
+  }
+  if (args.resolvedMarker === `${args.userId}:${args.dataSignature}`) return 'proceed';
+  // A profile already linked to THIS account means the device data
+  // is the account's own — a normal sync, nothing to choose.
+  if (args.profileId && args.profileId === args.userId) return 'proceed';
+  if (args.profileId && !isGuestProfileId(args.profileId)) {
+    // A different account's profile — cross-account replace semantics.
+    return 'proceed';
+  }
+  return args.localHasData && args.cloudHasData ? 'gate' : 'proceed';
+}
+
+/**
  * The coach tables exist only after the §16 migration is applied to
  * a deployment; until then PostgREST answers with a table-not-found
  * error. Tolerate exactly that (the DI-02 ship-before-migration
@@ -692,6 +826,16 @@ class SupabaseSyncEngine {
    * network round-trip instead of racing against each other.
    */
   private pendingSyncPromise: Promise<void> | null = null;
+  /**
+   * S4: while set, an OAuth/OTP sign-in has completed but the user
+   * has not yet made the merge choice — sync is paused (no pull, and
+   * pushLocalData refuses to run) until resolveMergeChoice. Holds
+   * the user id the choice belongs to.
+   */
+  private pendingMergeChoiceFor: string | null = null;
+  /** S4: `${userId}:${intentAt}` of the last gate evaluation that
+   *  proceeded, so the cloud probe runs at most once per sign-in. */
+  private mergeGateEvaluatedKey: string | null = null;
 
   public subscribe(cb: SyncListener) {
     this.listeners.add(cb);
@@ -711,6 +855,8 @@ class SupabaseSyncEngine {
       lastSyncedAt: this.lastSyncedAt,
       error: this.errorMessage,
       user: this.currentUser,
+      // S4: a merge choice is waiting on the user (MergeChoiceModal).
+      pendingMergeChoice: this.pendingMergeChoiceFor !== null,
     };
   }
 
@@ -782,6 +928,8 @@ class SupabaseSyncEngine {
         }
       } else {
         this.currentUser = null;
+        // S4: session gone — a pending merge choice dies with it.
+        this.pendingMergeChoiceFor = null;
         this.notify();
       }
     });
@@ -842,6 +990,9 @@ class SupabaseSyncEngine {
         localStorage.removeItem('ascend_logged_out');
       } catch {}
     }
+    // S4: record the intent so the completing sign-in routes through
+    // the merge choice instead of an unconditional sync.
+    writeSignInIntent();
     const supabase = getSupabase();
     if (!supabase) {
       console.warn('[ascend] Google sign-in: Supabase client is not configured.');
@@ -872,6 +1023,8 @@ class SupabaseSyncEngine {
         localStorage.removeItem('ascend_logged_out');
       } catch {}
     }
+    // S4: same intent routing as Google sign-in.
+    writeSignInIntent();
     const supabase = getSupabase();
     if (!supabase) {
       return {
@@ -1032,6 +1185,92 @@ class SupabaseSyncEngine {
     }
   }
 
+  /**
+   * S4 gate, evaluated at the top of a sync — before any pull or
+   * push — for a just-completed OAuth/OTP sign-in. Returns true when
+   * the sync must PAUSE for the merge choice. One-sided evaluations
+   * are remembered for the intent's lifetime (mergeGateEvaluatedKey)
+   * so the cloud probe runs at most once per sign-in.
+   */
+  private async shouldGateForMergeChoice(user: {
+    id: string;
+    is_anonymous?: boolean;
+  }): Promise<boolean> {
+    if (this.pendingMergeChoiceFor === user.id) return true;
+    const intentAt = readSignInIntentAt();
+    if (intentAt === null) return false;
+    const evalKey = `${user.id}:${intentAt}`;
+    if (this.mergeGateEvaluatedKey === evalKey) return false;
+    const state = useStore.getState();
+    const localHasData = hasRetainedHistory(state);
+    // Cheap local half first: with no guest data on this device
+    // there is nothing to choose about — skip the cloud probe.
+    const cloudHasData = localHasData ? await this.accountHasCloudData(user.id) : false;
+    const verdict = evaluateSignInMergeGate({
+      intentAt,
+      now: Date.now(),
+      isAnonymous: Boolean(user.is_anonymous),
+      profileId: state.profile?.id,
+      userId: user.id,
+      localHasData,
+      cloudHasData,
+      resolvedMarker: readMergeChoiceResolved(),
+      dataSignature: mergeChoiceDataSignature(state),
+    });
+    if (verdict === 'gate') {
+      this.pendingMergeChoiceFor = user.id;
+      this.status = 'idle';
+      this.notify();
+      return true;
+    }
+    this.mergeGateEvaluatedKey = evalKey;
+    return false;
+  }
+
+  /**
+   * S4: run the user's merge choice (MergeChoiceModal). 'merge'
+   * simply unpauses — the sync that follows folds this device's data
+   * into the account. 'archive' archives this device's data FIRST
+   * via startFreshFromRetainedHistory (restorable in Settings →
+   * Data & Account), then syncs the account's data down. If the
+   * archive write fails, NOT syncing is the whole point: syncing
+   * anyway would silently merge, the opposite of the choice — the
+   * choice stays pending so the user can retry (AuthModal Task 1.4
+   * semantics, verbatim).
+   */
+  public async resolveMergeChoice(
+    choice: 'merge' | 'archive',
+  ): Promise<{ error?: string }> {
+    const userId = this.pendingMergeChoiceFor;
+    if (!userId) return {};
+    if (choice === 'archive') {
+      const archived = useStore.getState().startFreshFromRetainedHistory();
+      if (!archived) {
+        this.errorMessage = "Could not archive this device's data";
+        this.status = 'error';
+        this.notify();
+        return { error: 'archive_failed' };
+      }
+    }
+    writeMergeChoiceResolved(userId, mergeChoiceDataSignature(useStore.getState()));
+    this.pendingMergeChoiceFor = null;
+    clearSignInIntent();
+    this.errorMessage = null;
+    this.notify();
+    await this.triggerSyncNow();
+    return {};
+  }
+
+  /**
+   * S4: AuthModal's email/password flow already presented the choice
+   * itself (Task 1.4, deferred sync) — record the resolution so a
+   * still-fresh intent flag from an earlier OAuth/OTP attempt in the
+   * same window cannot re-gate the sync AuthModal is about to run.
+   */
+  public suppressMergeGateFor(userId: string): void {
+    writeMergeChoiceResolved(userId, mergeChoiceDataSignature(useStore.getState()));
+  }
+
   public async resetPasswordForEmail(email: string): Promise<{ error?: string; success?: boolean }> {
     const supabase = getSupabase();
     if (!supabase) {
@@ -1055,6 +1294,10 @@ class SupabaseSyncEngine {
         localStorage.removeItem('ascend_logged_out');
       } catch {}
     }
+    // S4: covers both completions of this flow — verifyEmailOtp and
+    // the emailRedirectTo magic link (onAuthStateChange) — each lands
+    // in triggerSyncNow, where the gate reads this intent.
+    writeSignInIntent();
     const supabase = getSupabase();
     if (!supabase) return { error: 'Supabase is not configured' };
 
@@ -1108,6 +1351,11 @@ class SupabaseSyncEngine {
     clearTimeout(this.debounceTimer);
     this.isSyncing = false;
     this.currentUser = null;
+    // S4: a pending merge choice belongs to the signed-in session;
+    // the next sign-in re-evaluates from its own intent flag.
+    this.pendingMergeChoiceFor = null;
+    this.mergeGateEvaluatedKey = null;
+    clearSignInIntent();
     this.status = 'unconfigured';
     this.notify();
 
@@ -1370,6 +1618,14 @@ class SupabaseSyncEngine {
         avatarUrl: user.user_metadata?.avatar_url || user.user_metadata?.picture,
         provider: user.app_metadata?.provider || 'google',
         isAnonymous: Boolean(user.is_anonymous),
+      };
+
+      // S4: an OAuth/OTP sign-in that just completed may owe the
+      // user the merge choice BEFORE anything syncs (Phase 1 Task
+      // 1.4 covered email/password only). Pausing here leaves both
+      // the pull and the push untouched until resolveMergeChoice.
+      if (await this.shouldGateForMergeChoice(user)) {
+        return;
       };
 
       // 2. Pull remote records (DI2-1: the five collection reads page
@@ -2201,6 +2457,12 @@ class SupabaseSyncEngine {
   private async pushLocalData(userId: string) {
     const supabase = getSupabase();
     if (!supabase) return;
+
+    // S4: while a merge choice is pending for this user, no push may
+    // run — the debounced push path (syncPush) bypasses the
+    // triggerSyncNow gate, and pushing now would silently merge the
+    // guest data the user has not yet decided about.
+    if (this.pendingMergeChoiceFor && this.pendingMergeChoiceFor === userId) return;
 
     const state = useStore.getState();
 

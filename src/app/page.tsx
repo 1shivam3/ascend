@@ -22,6 +22,7 @@ import OfflineState from '@/components/OfflineState';
 import HomePage from '@/components/HomePage';
 import TabSkeleton from '@/components/TabSkeleton';
 import TabGuardBanner from '@/components/ui/TabGuardBanner';
+import MergeChoiceModal from '@/components/MergeChoiceModal';
 import SyncErrorBanner from '@/components/SyncErrorBanner';
 
 // Non-home tabs are code-split: on a 2 GB phone the old single chunk
@@ -376,6 +377,9 @@ export default function AppPage() {
       return (
         <main id="main-content" className="w-full min-h-[100dvh]">
           <TabGuardBanner />
+          {/* S4: an OAuth/OTP sign-in can pause sync for the merge
+              choice on any landing surface — self-gating modal. */}
+          <MergeChoiceModal />
           <HistoryForkScreen
             counts={retainedHistoryCounts(retainedInput)}
             onContinue={() => setForkResolved(true)}
@@ -407,6 +411,7 @@ export default function AppPage() {
     return (
       <main id="main-content" className="w-full min-h-[100dvh]">
         <TabGuardBanner />
+        <MergeChoiceModal />
         <OnboardingScreen />
       </main>
     );
@@ -441,6 +446,8 @@ export default function AppPage() {
   return (
     <div className="min-h-[100dvh] bg-bg-primary text-text-primary relative selection:bg-accent/20">
       <TabGuardBanner />
+      {/* S4: merge-choice host for OAuth/OTP sign-ins (self-gating). */}
+      <MergeChoiceModal />
       {/* Gauntlet R3: persistent sync-failure banner (all tabs). */}
       <SyncErrorBanner />
             {showChrome && (
