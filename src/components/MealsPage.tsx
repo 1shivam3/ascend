@@ -3263,11 +3263,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                               {/* Ghee/oil honesty prompt — one tap, adjusts
                                   fat/calories against the DB assumption. */}
                               {food.oilAssumedTsp !== undefined && (
-                                <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-border/40">
+                                <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t border-border/40">
                                   <span className="text-2xs text-text-muted font-mono shrink-0">
                                     {t('meals.gheeOilHeading')}
                                   </span>
-                                  <div className="flex gap-1">
+                                  <div className="flex flex-wrap justify-end gap-1">
                                     {OIL_LEVELS.map((level) => (
                                       <button
                                         key={level.id}

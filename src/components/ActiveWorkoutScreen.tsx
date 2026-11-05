@@ -2982,16 +2982,19 @@ export default function ActiveWorkoutScreen({
                   </div>
                 </div>
 
-                {/* Beginner Mode Effort (RPE) Picker Button */}
+                {/* Beginner Mode Effort (RPE) Picker Button — 360px:
+                    the pill may wrap its label onto a second line
+                    (Hindi label is ~33 chars) instead of forcing the
+                    row wider than the screen. */}
                 <div className="flex items-center justify-center pt-0.5 pb-1">
                   <button
                     type="button"
                     onClick={() => setActiveRpePickerSetIdx(activeSetIdx)}
-                    className="inline-flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-xl bg-bg-secondary hover:bg-bg-tertiary border border-border/70 hover:border-accent/40 text-xs font-mono font-bold text-text-secondary hover:text-text-primary active:scale-95 transition-all cursor-pointer"
+                    className="inline-flex flex-wrap justify-center max-w-full items-center gap-2 px-3 py-2 min-h-[44px] rounded-xl bg-bg-secondary hover:bg-bg-tertiary border border-border/70 hover:border-accent/40 text-xs font-mono font-bold text-text-secondary hover:text-text-primary active:scale-95 transition-all cursor-pointer"
                     title="Tap to select target effort / RPE"
                   >
                     <span className="text-accent-text font-black text-xs sm:text-sm">{currentExercise.sets[activeSetIdx]?.rpe ? `@${currentExercise.sets[activeSetIdx].rpe}` : 'RPE'}</span>
-                    <span className="text-text-muted text-2xs font-sans">
+                    <span className="text-text-muted text-2xs font-sans whitespace-normal text-center leading-snug">
                       {t('workout.effortRpe')}
                     </span>
                   </button>
@@ -3978,7 +3981,10 @@ export default function ActiveWorkoutScreen({
               <p className="text-xs text-text-secondary leading-relaxed">
                 {t('workout.discardMsg')}
               </p>
-              <div className="flex gap-2 pt-2">
+              {/* 360px: the middle button's Hindi label ('रोकें और
+                  ड्राफ़्ट सेव करें', 26 chars) cannot fit a ~100px
+                  third of this row — stack the three actions. */}
+              <div className="flex flex-col gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsDiscardConfirmOpen(false)}
@@ -4109,11 +4115,13 @@ export default function ActiveWorkoutScreen({
                 </div>
               </div>
 
-              <div className="flex gap-2 pt-1">
+              {/* 360px: 'Save & finish' in Hindi is 24 chars — let the
+                  pair wrap to full-width rows instead of squeezing. */}
+              <div className="flex flex-wrap gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => setIsFinishModalOpen(false)}
-                  className="btn-secondary flex-1 py-2.5 text-xs"
+                  className="btn-secondary flex-1 min-w-[9rem] py-2.5 text-xs"
                 >
                   {t('workout.resume')}
                 </button>
@@ -4121,7 +4129,7 @@ export default function ActiveWorkoutScreen({
                   type="button"
                   onClick={handleConfirmFinish}
                   disabled={isFinishing}
-                  className="btn-primary flex-1 py-2.5 text-xs font-bold shadow-md shadow-accent/25 disabled:opacity-50"
+                  className="btn-primary flex-1 min-w-[9rem] py-2.5 text-xs font-bold shadow-md shadow-accent/25 disabled:opacity-50"
                 >
                   {isFinishing ? t('workout.saving') : t('workout.saveFinish')}
                 </button>
