@@ -13,6 +13,7 @@ import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { useTranslation } from '@/lib/i18n';
 import { localizeDay, renderLocalizedSentence } from '@/lib/coach-i18n';
+import { formatNumber } from '@/lib/formatters';
 import type { WeeklyReview } from '@/lib/weekly-review';
 import { CalendarRange, Check, TrendingUp, X } from 'lucide-react';
 
@@ -105,7 +106,7 @@ export default function CoachWeeklyReviewModal({ isOpen, onClose, review }: Coac
               {t('weeklyReview.tonnage')}
             </p>
             <p className="text-lg font-black text-text-primary">
-              {(review.tonnageKg / 1000).toFixed(1)}t
+              {formatNumber(Math.round(review.tonnageKg))} kg
             </p>
             {review.tonnageDeltaPct !== null && (
               <p className="text-2xs text-text-muted flex items-center gap-1">

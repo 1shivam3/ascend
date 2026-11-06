@@ -300,6 +300,27 @@ export const formatLocalDate = (
 };
 
 /**
+ * Audit phase 4 (2026-11-06), Task 4.8 (P3-1): the shared
+ * user-facing number/date formatters. formatNumber groups thousands
+ * the same way on every surface (Today rendered the fuel target as
+ * "2,592" while Fuel rendered it "2592"); formatDate renders the
+ * History style ("Fri, Nov 6, 2026") so coach surfaces stop leaking
+ * raw ISO dates ("2026-11-09") into sentences. Pass the app locale
+ * ('en-US' / 'hi-IN') where the component has it; the runtime locale
+ * is the fallback, matching formatLocalDate.
+ */
+export const formatNumber = (n: number, locale?: string): string =>
+  new Intl.NumberFormat(locale).format(n);
+
+export const formatDate = (dateStr: string, locale?: string): string =>
+  parseLocalDate(dateStr).toLocaleDateString(locale, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+/**
  * Single source of truth for cm → imperial height display.
  * 175 → `5' 9"`. Returns '—' for missing/invalid input.
  */

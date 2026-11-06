@@ -31,7 +31,7 @@ import { Sparkles } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useCoachDigest } from '@/lib/use-coach-digest';
 import { earliestDataDate, getScheduledPlanEntries } from '@/lib/scheduled-days';
-import { getLocalTodayStr, getWeekDateStrings, getWeekRange, parseLocalDate } from '@/lib/formatters';
+import { getLocalTodayStr, getWeekDateStrings, getWeekRange, parseLocalDate, formatDate } from '@/lib/formatters';
 import { useToday } from '@/lib/use-today';
 import {
   adjustSession,
@@ -636,7 +636,7 @@ export default function CoachChatTab({
                         actually starts instead. */}
                     {getLocalTodayStr() < coachBlocks.activeBlock.startMonday
                       ? t('coachBlock.startsOnShort', {
-                          date: coachBlocks.activeBlock.startMonday,
+                          date: formatDate(coachBlocks.activeBlock.startMonday),
                         })
                       : t('coachBlock.weekOf', {
                           n: Math.min(

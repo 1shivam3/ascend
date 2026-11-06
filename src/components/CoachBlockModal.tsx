@@ -13,6 +13,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { useTranslation } from '@/lib/i18n';
+import { formatDate } from '@/lib/formatters';
 import { useToast } from './ui/Toast';
 import {
   buildIntakePrefill,
@@ -657,7 +658,7 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
                 ))}
               </div>
               <p className="text-2xs text-text-muted mt-1">
-                {t('coachBlock.startsOn', { date: proposal.startMonday })}
+                {t('coachBlock.startsOn', { date: formatDate(proposal.startMonday) })}
               </p>
             </div>
 
