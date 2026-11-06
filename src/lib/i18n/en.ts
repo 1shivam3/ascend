@@ -710,6 +710,8 @@ export const en = {
   'scan.checkingDb': 'Checking regional database & ingredients',
   'scan.cancelScan': 'Cancel Scan',
   'scan.instantOffline': 'Instant Offline Estimate',
+  // Audit phase 3, task 3.3 (2026-11-06): analyzing-step elapsed time.
+  'scan.elapsed': '{sec}s elapsed',
   'scan.noFoodDetected': 'No Food or Supplement Detected',
   'scan.noFoodHint': 'No identifiable food, drink, or workout supplement was detected in this image. Try taking a photo with clearer lighting or framing.',
   'scan.tipsTitle': 'Tips for accurate detection:',

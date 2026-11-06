@@ -719,6 +719,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'scan.checkingDb': 'क्षेत्रीय डेटाबेस और सामग्री जाँच हो रही है',
   'scan.cancelScan': 'स्कैन रद्द करें',
   'scan.instantOffline': 'तुरंत ऑफ़लाइन अनुमान',
+  // Audit phase 3, task 3.3 (2026-11-06): machine translation — Hindi review parked.
+  'scan.elapsed': '{sec} सेकंड बीते',
   'scan.noFoodDetected': 'कोई खाना या सप्लीमेंट नहीं मिला',
   'scan.noFoodHint': 'इस फ़ोटो में कोई पहचान योग्य खाना, पेय या वर्कआउट सप्लीमेंट नहीं मिला। साफ़ रोशनी या बेहतर फ़्रेमिंग के साथ फ़ोटो लें।',
   'scan.tipsTitle': 'सही पहचान के लिए टिप्स:',
