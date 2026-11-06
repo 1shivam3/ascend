@@ -2553,6 +2553,8 @@ export const en = {
   'habit.protein': 'PROT',
   'habit.prevWeek': 'Previous week',
   'habit.nextWeek': 'Next week',
+  // Audit phase 4 (2026-11-06): done-state suffix for matrix cell aria-labels.
+  'habit.done': 'Done',
   'sched.title': 'Weekly Training Schedule',
   'sched.subtitle': 'Choose which day of the week you train which body parts',
   'sched.presets': 'PRESETS:',

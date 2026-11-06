@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useTranslation, weekdayNames } from '@/lib/i18n';
 import { useToday } from '@/lib/use-today';
 import SegmentedControl from '@/components/ui/SegmentedControl';
@@ -14,6 +14,7 @@ import {
   type MatrixHabitId,
   type MatrixInputs,
 } from '@/lib/home-matrix';
+import { HABIT_FILL, HABIT_ON_FILL } from '@/lib/habit-tokens';
 
 export type MatrixView = 'weekly' | 'monthly';
 
@@ -22,12 +23,9 @@ interface HomeMatrixProps extends MatrixInputs {
   defaultView: MatrixView;
 }
 
-const ROW_COLORS: Record<MatrixHabitId, string> = {
-  workout: '#FF6A1A',
-  water: '#38BDF8',
-  creatine: '#F5B301',
-  protein: '#22C55E',
-};
+// Phase 4, Task 4.4 (P2-3): fills come from the shared habit tokens
+// (workout = accent, water/creatine/protein = --habit-* vars) — the
+// local hard-coded hex table is gone. See src/lib/habit-tokens.ts.
 
 /**
  * Homepage habit + workout matrix. Quiet by design: no popups, no
@@ -178,7 +176,7 @@ export default function HomeMatrix({
       {view === 'weekly' ? (
         <div className="space-y-1.5 text-xs font-mono">
           <div className="flex items-center gap-1.5">
-            <span className="w-14 shrink-0" aria-hidden="true" />
+            <span className="w-16 shrink-0" aria-hidden="true" />
             <div className="flex items-center gap-1 flex-1">
               {week.map((d) => {
                 const ds = toDateStr(d);
@@ -206,7 +204,7 @@ export default function HomeMatrix({
           </div>
           {rowIds.map((id) => (
             <div key={id} className="flex items-center gap-1.5">
-              <span className={`w-14 shrink-0 text-[0.625rem] uppercase font-bold matrix-row-label-${id}`}>
+              <span className={`w-16 shrink-0 text-2xs font-sans uppercase font-bold matrix-row-label-${id}`}>
                 {rowLabel[id]}
               </span>
               <div className="flex items-center gap-1 flex-1">
@@ -221,14 +219,20 @@ export default function HomeMatrix({
                       key={ds}
                       type="button"
                       onClick={() => toggleDate(ds)}
-                      aria-label={`${rowLabel[id]} — ${ds}`}
-                      className={`h-6 flex-1 rounded cursor-pointer ${
+                      aria-label={`${rowLabel[id]} — ${ds}${done ? ` — ${t('homeMatrix.done')}` : ''}`}
+                      className={`h-6 flex-1 rounded cursor-pointer flex items-center justify-center ${
                         done ? '' : 'bg-bg-secondary border border-border/40'
                       } ${isToday && !done ? 'ring-1 ring-accent/60' : ''} ${
                         ds === selected ? 'ring-1 ring-accent' : ''
                       }`}
-                      style={done ? { backgroundColor: ROW_COLORS[id] } : undefined}
-                    />
+                      style={done ? { backgroundColor: HABIT_FILL[id] } : undefined}
+                    >
+                      {/* Phase 4, Task 4.4: done is not colour alone —
+                          a check glyph rides the fill. */}
+                      {done && (
+                        <Check className="w-3.5 h-3.5" strokeWidth={3.5} style={{ color: HABIT_ON_FILL[id] }} aria-hidden="true" />
+                      )}
+                    </button>
                   );
                 })}
               </div>
@@ -252,13 +256,17 @@ export default function HomeMatrix({
                 const s = getDaySummary(ds, inputs);
                 const isToday = ds === todayStr;
                 const isSelected = ds === selected;
+                // Phase 4, Task 4.4: the monthly dots are colour-only
+                // visually, so the accessible name carries the state —
+                // the day's done habits are named, not just dotted.
+                const doneLabels = s.habits.filter((h) => h.done).map((h) => rowLabel[h.id]);
                 return (
                   <button
                     key={ds}
                     type="button"
                     onClick={() => toggleDate(ds)}
                     aria-pressed={isSelected}
-                    aria-label={ds}
+                    aria-label={doneLabels.length ? `${ds}: ${doneLabels.join(', ')}` : ds}
                     className={`min-h-[44px] rounded-lg flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
                       isSelected
                         ? 'bg-accent/15 ring-1 ring-accent'
@@ -277,7 +285,7 @@ export default function HomeMatrix({
                           <span
                             key={h.id}
                             className="w-1.5 h-1.5 rounded-full"
-                            style={{ backgroundColor: ROW_COLORS[h.id] }}
+                            style={{ backgroundColor: HABIT_FILL[h.id] }}
                           />
                         ))}
                     </span>
@@ -362,7 +370,7 @@ export default function HomeMatrix({
                     <li key={h.id} className="flex items-center gap-2 text-2xs">
                       <span
                         className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: h.done ? ROW_COLORS[h.id] : 'transparent' }}
+                        style={{ backgroundColor: h.done ? HABIT_FILL[h.id] : 'transparent' }}
                       />
                       <span className={h.done ? 'text-text-primary font-semibold' : 'text-text-muted'}>
                         {rowLabel[h.id]}

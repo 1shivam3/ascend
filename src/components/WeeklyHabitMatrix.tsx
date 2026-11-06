@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toLocalDateString } from '@/lib/habits';
 import { useToday } from '@/lib/use-today';
 import type { WorkoutEntry, MealEntry, CreatineLog } from '@/lib/types';
 import { useTranslation, weekdayNames } from '@/lib/i18n';
+import { HABIT_FILL, HABIT_LABEL_CLASS, HABIT_ON_FILL, type HabitId } from '@/lib/habit-tokens';
 
 interface WeeklyHabitMatrixProps {
   workouts: WorkoutEntry[];
@@ -91,23 +92,18 @@ export default function WeeklyHabitMatrix({
     return map;
   }, [meals]);
 
-  // Gauntlet A11Y-04: row-label text uses the light/dark label classes
-  // (see globals.css) instead of the bright fill colour, which fails
-  // on light chalk. Unknown colours fall back to the inline style.
-  const LABEL_CLASS_BY_COLOR: Record<string, string> = {
-    '#FF6A1A': 'matrix-row-label-workout',
-    '#38BDF8': 'matrix-row-label-water',
-    '#F5B301': 'matrix-row-label-creatine',
-    '#22C55E': 'matrix-row-label-protein',
-  };
-
-  const rows: { label: string; color: string; done: (dateStr: string) => boolean }[] = [
-    { label: t('habit.gym'), color: '#FF6A1A', done: (d) => workoutDays.has(d) },
-    { label: t('habit.water'), color: '#38BDF8', done: (d) => (waterLogs[d] || 0) >= waterTargetMl * 0.85 },
+  // Phase 4, Task 4.4 (P2-3): rows key into the shared habit tokens
+  // (src/lib/habit-tokens.ts) — fills and label classes come from
+  // there, not a local hex table. Gauntlet A11Y-04 still holds: label
+  // TEXT uses the per-theme .matrix-row-label-* classes, never the
+  // bright fill colour.
+  const rows: { id: HabitId; label: string; done: (dateStr: string) => boolean }[] = [
+    { id: 'workout', label: t('habit.gym'), done: (d) => workoutDays.has(d) },
+    { id: 'water', label: t('habit.water'), done: (d) => (waterLogs[d] || 0) >= waterTargetMl * 0.85 },
     ...(showCreatine
-      ? [{ label: t('habit.creatine'), color: '#F5B301', done: (d: string) => !!creatineLogs[d]?.taken }]
+      ? [{ id: 'creatine' as HabitId, label: t('habit.creatine'), done: (d: string) => !!creatineLogs[d]?.taken }]
       : []),
-    { label: t('habit.protein'), color: '#22C55E', done: (d) => proteinTargetG !== null && (proteinMap.get(d) || 0) >= proteinTargetG * 0.85 },
+    { id: 'protein', label: t('habit.protein'), done: (d) => proteinTargetG !== null && (proteinMap.get(d) || 0) >= proteinTargetG * 0.85 },
   ];
 
   const rangeLabel = `${days[0].date.toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { month: 'short', day: 'numeric' })} – ${days[days.length - 1].date.toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { month: 'short', day: 'numeric' })}`;
@@ -138,7 +134,7 @@ export default function WeeklyHabitMatrix({
 
       {/* Days header strip */}
       <div className="flex items-center gap-1.5">
-        <span className="w-14 shrink-0" aria-hidden="true" />
+        <span className="w-16 shrink-0" aria-hidden="true" />
         <div className="flex items-center gap-1 flex-1">
           {days.map((d) => (
             <div
@@ -154,8 +150,7 @@ export default function WeeklyHabitMatrix({
       {rows.map((row) => (
         <div key={row.label} className="flex items-center gap-1.5">
           <span
-            className={`w-14 shrink-0 text-[0.625rem] uppercase font-bold ${LABEL_CLASS_BY_COLOR[row.color] ?? ''}`}
-            style={LABEL_CLASS_BY_COLOR[row.color] ? undefined : { color: row.color }}
+            className={`w-16 shrink-0 text-2xs font-sans uppercase font-bold ${HABIT_LABEL_CLASS[row.id]}`}
           >
             {row.label}
           </span>
@@ -163,9 +158,14 @@ export default function WeeklyHabitMatrix({
             {days.map((d) => {
               const done = row.done(d.dateStr);
               const isToday = d.dateStr === todayStr;
-              const cellClass = `${compact ? 'h-5' : 'h-6'} ${singleDay ? 'w-10 shrink-0' : 'flex-1'} rounded ${
+              const cellClass = `${compact ? 'h-5' : 'h-6'} ${singleDay ? 'w-10 shrink-0' : 'flex-1'} rounded flex items-center justify-center ${
                 onSelectDate ? 'cursor-pointer' : ''
               } ${done ? '' : 'bg-bg-secondary border border-border/40'} ${isToday && !done ? 'ring-1 ring-accent/60' : ''}`;
+              // Phase 4, Task 4.4: done is not colour alone — a check
+              // glyph rides the fill, and the accessible name states it.
+              const glyph = done ? (
+                <Check className="w-3 h-3" strokeWidth={3.5} style={{ color: HABIT_ON_FILL[row.id] }} aria-hidden="true" />
+              ) : null;
               // Gauntlet A11Y-01: date cells were mouse-only <span
               // onClick> — invisible to keyboard and screen-reader users.
               // Clickable cells are real buttons now (with an accessible
@@ -175,18 +175,22 @@ export default function WeeklyHabitMatrix({
                   key={d.dateStr}
                   type="button"
                   onClick={() => onSelectDate(d.dateStr)}
-                  aria-label={`${row.label} — ${d.dateStr}`}
+                  aria-label={`${row.label} — ${d.dateStr}${done ? ` — ${t('habit.done')}` : ''}`}
                   title={`${row.label} — ${d.dateStr}`}
                   className={cellClass}
-                  style={done ? { backgroundColor: row.color } : undefined}
-                />
+                  style={done ? { backgroundColor: HABIT_FILL[row.id] } : undefined}
+                >
+                  {glyph}
+                </button>
               ) : (
                 <span
                   key={d.dateStr}
                   className={cellClass}
-                  style={done ? { backgroundColor: row.color } : undefined}
+                  style={done ? { backgroundColor: HABIT_FILL[row.id] } : undefined}
                   title={`${row.label} — ${d.dateStr}`}
-                />
+                >
+                  {glyph}
+                </span>
               );
             })}
           </div>

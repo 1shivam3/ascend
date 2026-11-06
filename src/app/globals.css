@@ -18,6 +18,13 @@
   --border-hover: 160 156 148;    /* #A09C94 */
   --accent: 228 68 39;            /* #E44427 — Exact ASCEND Vermilion Accent */
   --accent-dim: 199 53 27;        /* #C7351B */
+  /* Audit phase 4 (2026-11-06), Task 4.4 (P2-3): habit-matrix fills.
+     Same values in both themes (the fills are bright by design);
+     workout takes --accent. Consumed via tailwind.config (water /
+     protein / creatine utilities) and src/lib/habit-tokens.ts. */
+  --habit-water: 56 189 248;      /* #38BDF8 */
+  --habit-creatine: 245 179 1;    /* #F5B301 */
+  --habit-protein: 34 197 94;     /* #22C55E */
   --accent-glow: rgba(228, 68, 39, 0.16);
 
   /* Direct CSS Specification Tokens */
@@ -78,6 +85,10 @@
   --border-hover: 82 90 79;       /* #525A4F */
   --accent: 235 78 48;            /* #EB4E30 — brightened Vermilion for dark bg */
   --accent-dim: 199 53 27;        /* #C7351B */
+  /* Phase 4, Task 4.4: habit fills — identical to the light theme. */
+  --habit-water: 56 189 248;      /* #38BDF8 */
+  --habit-creatine: 245 179 1;    /* #F5B301 */
+  --habit-protein: 34 197 94;     /* #22C55E */
   --accent-glow: rgba(235, 78, 48, 0.28);
 
   /* Direct CSS Specification Tokens */
