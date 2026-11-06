@@ -8,7 +8,7 @@
 import { ExerciseAnalyzer, AnalyzerFrameResult, MovementAssessment } from './ExerciseAnalyzer';
 import { NormalizedLandmark, PoseLandmarkIndex, DetectedSide } from '../models/pose.types';
 import { FormCue, FormObservation, MovementPhase } from '../models/form-feedback.types';
-import { FormRep, FormSessionSummary } from '../models/form-session.types';
+import { FormRep, FormSessionSummary, getRepStatus } from '../models/form-session.types';
 import {
   calculateJointAngle,
   calculateSegmentInclination,
@@ -17,6 +17,7 @@ import {
 } from '../services/analysis/LandmarkGeometry';
 import { RepStateMachine, RepStateMachineConfig, DEFAULT_SQUAT_CONFIG } from '../services/analysis/RepStateMachine';
 import { FormFeedbackEngine, FeedbackRule, RuleEvaluationContext } from '../services/analysis/FormFeedbackEngine';
+import { computeTempoSeconds } from '../services/analysis/tempo';
 import { safeRandomId } from '@/lib/formatters';
 
 export const SQUAT_ANALYZER_VERSION = '1.0.0';
@@ -616,9 +617,11 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
       durationSeconds,
       totalDetectedReps: this.completedReps.length,
       totalValidReps: validReps.length,
+      totalUnverifiedReps: this.completedReps.filter((r) => getRepStatus(r) === 'unverified').length,
       analysedRepCount: this.completedReps.length,
       averageTrackingConfidence: avgConfidence,
       averageRepDurationSeconds: avgRepDurationSeconds,
+      tempoSeconds: computeTempoSeconds(this.completedReps, durationSeconds),
       reps: this.completedReps,
       observations,
       depthTargetDeg,

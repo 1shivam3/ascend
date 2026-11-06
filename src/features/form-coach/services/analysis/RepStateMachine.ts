@@ -233,6 +233,7 @@ export class RepStateMachine {
               trackingConfidence: Math.round(avgConfidence * 100) / 100,
               observations: Array.from(this.repObservations),
               isValid: true,
+              status: 'valid',
             };
           }
 

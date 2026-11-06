@@ -7,7 +7,9 @@
  */
 
 import React, { useState } from 'react';
-import { FormSessionSummary } from '../models/form-session.types';
+import { FormSessionSummary, SquatDepthClassification, getRepStatus } from '../models/form-session.types';
+import { useTranslation } from '@/lib/i18n';
+import type { StringKey } from '@/lib/i18n/en';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -21,15 +23,25 @@ import {
 import { FormSessionRepository } from '../repositories/FormSessionRepository';
 import { useToast } from '@/components/ui/Toast';
 
+/** UI-string map for the depth classification enum (P1-1): the raw
+ * values ('below_parallel', …) never render — not even with the
+ * underscores swapped for spaces. */
+const DEPTH_LABEL_KEYS: Record<SquatDepthClassification, StringKey> = {
+  below_parallel: 'formCoach.depthBelowParallel',
+  parallel: 'formCoach.depthParallel',
+  above_parallel: 'formCoach.depthAboveParallel',
+  unknown: 'formCoach.depthUnknown',
+};
+
 interface FormSessionSummaryModalProps {
   summary: FormSessionSummary;
   workoutName?: string;
   /** How the exercise was chosen, e.g. "Detected: Conventional
    * Deadlift" — composed by the caller (already localized). */
   detectionNote?: string | null;
-  /** Correction controls ("Re-run as Barbell Back Squat", …) — one
-   * per other supported exercise, present only when detection chose
-   * the exercise. */
+  /** Correction options for the "Wrong exercise? Change" picker —
+   * one per other supported exercise (label = the exercise's name),
+   * present only when detection chose the exercise. */
   rerunOptions?: { id: string; label: string }[];
   onRerunAs?: (id: string) => void;
   onClose: () => void;
@@ -47,9 +59,11 @@ export default function FormSessionSummaryModal({
   onAnalyzeAnother,
 }: FormSessionSummaryModalProps) {
   const toast = useToast();
+  const { t } = useTranslation();
   const [correctedReps, setCorrectedReps] = useState<number>(summary.totalValidReps);
   const [isEditingReps, setIsEditingReps] = useState(false);
   const [showRepDetails, setShowRepDetails] = useState(false);
+  const [showRerunPicker, setShowRerunPicker] = useState(false);
   const [isSaved, setIsSaved] = useState(summary.savedToWorkout);
 
   const handleSaveToWorkout = () => {
@@ -86,21 +100,44 @@ export default function FormSessionSummaryModal({
             </span>
             <h2 className="text-xl font-bold tracking-tight">{summary.exerciseName}</h2>
             {detectionNote && (
-              <div className="mt-1 space-y-1">
+              <div className="mt-1 space-y-1.5">
                 <span className="text-2xs font-medium text-text-secondary block">{detectionNote}</span>
                 {onRerunAs && rerunOptions && rerunOptions.length > 0 && (
-                  <span className="flex flex-wrap gap-x-2.5 gap-y-0.5">
-                    {rerunOptions.map((opt) => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => onRerunAs(opt.id)}
-                        className="text-2xs font-semibold text-accent-text underline underline-offset-2 cursor-pointer"
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </span>
+                  <div>
+                    {/* P1-1: ONE clear correction control instead of
+                        a cluster of tiny underlined links. The picker
+                        rows are full-width, ≥44px touch targets. */}
+                    <button
+                      type="button"
+                      onClick={() => setShowRerunPicker((prev) => !prev)}
+                      aria-expanded={showRerunPicker}
+                      className="inline-flex items-center gap-1.5 min-h-[44px] px-3 py-2 rounded-xl border border-border-subtle bg-surface-elevated text-xs font-semibold text-accent-text cursor-pointer"
+                    >
+                      {t('formCoach.wrongExercise')}
+                      {showRerunPicker ? (
+                        <ChevronUp className="w-3.5 h-3.5" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                    {showRerunPicker && (
+                      <div className="mt-1.5 rounded-xl border border-border-subtle bg-surface-elevated overflow-hidden">
+                        <span className="block px-3 pt-2.5 text-2xs font-mono uppercase tracking-wider text-text-muted">
+                          {t('formCoach.rerunPickerTitle')}
+                        </span>
+                        {rerunOptions.map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => onRerunAs(opt.id)}
+                            className="w-full min-h-[44px] px-3 py-2.5 flex items-center text-left text-sm font-medium text-text-primary hover:bg-surface-highlight transition-colors cursor-pointer"
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -157,7 +194,19 @@ export default function FormSessionSummaryModal({
                 </button>
               </div>
             )}
-            <span className="text-2xs text-text-secondary">Detected: {summary.totalDetectedReps}</span>
+            {/* P0-3: the tile reads "X valid, Y unverified of Z
+                detected" — the big number is the (user-correctable)
+                valid count, the caption carries the unverified and
+                detected counts so an unjudgeable rep is never
+                silently lumped in with failures. */}
+            <span className="text-2xs text-text-secondary">
+              {(summary.totalUnverifiedReps ?? 0) > 0
+                ? t('formCoach.unverifiedOfDetected', {
+                    unverified: summary.totalUnverifiedReps ?? 0,
+                    detected: summary.totalDetectedReps,
+                  })
+                : t('formCoach.detectedLine', { detected: summary.totalDetectedReps })}
+            </span>
           </div>
           )}
 
@@ -168,13 +217,20 @@ export default function FormSessionSummaryModal({
             <span className="text-2xs text-text-secondary">Total set</span>
           </div>
 
-          {/* Avg Rep Cadence */}
+          {/* Tempo — the report's one per-rep time figure: the mean
+              per-rep duration from the reps' own timestamps when it
+              reconstructs the set, "Tempo unavailable" when it does
+              not (P0-3; see services/analysis/tempo.ts). */}
           <div className="p-3 rounded-2xl bg-surface-elevated border border-border-subtle flex flex-col items-center justify-center text-center">
             <span className="text-2xs uppercase font-mono text-text-muted">Tempo</span>
             <span className="text-2xl font-black text-text-primary my-1">
-              {summary.averageRepDurationSeconds}s
+              {summary.tempoSeconds != null ? `${summary.tempoSeconds}s` : '—'}
             </span>
-            <span className="text-2xs text-text-secondary">Avg / rep</span>
+            <span className="text-2xs text-text-secondary">
+              {summary.tempoSeconds != null
+                ? t('formCoach.avgPerRep')
+                : t('formCoach.tempoUnavailable')}
+            </span>
           </div>
         </div>
 
@@ -253,7 +309,9 @@ export default function FormSessionSummaryModal({
               <div className="flex items-center space-x-2">
                 <span className="text-xs font-bold text-text-primary">Rep-by-Rep Data</span>
                 <span className="text-2xs font-mono px-1.5 py-0.5 rounded bg-surface-highlight text-text-muted">
-                  {summary.reps.length} reps
+                  {t(summary.reps.length === 1 ? 'formCoach.repOne' : 'formCoach.repOther', {
+                    count: summary.reps.length,
+                  })}
                 </span>
               </div>
               {showRepDetails ? (
@@ -280,7 +338,12 @@ export default function FormSessionSummaryModal({
                             Hip: {rep.minHipAngleDeg ?? '—'}°
                           </span>
                           <span className="text-2xs text-text-muted block">
-                            Lockout: {rep.lockoutAchieved ? 'Full' : 'Not reached'}
+                            Lockout:{' '}
+                            {getRepStatus(rep) === 'unverified'
+                              ? t('formCoach.lockoutUnverifiedShort')
+                              : rep.lockoutAchieved
+                                ? 'Full'
+                                : 'Not reached'}
                           </span>
                         </div>
                       ) : summary.exerciseId === 'squat' ? (
@@ -289,7 +352,7 @@ export default function FormSessionSummaryModal({
                             Knee: {rep.minKneeAngleDeg}°
                           </span>
                           <span className="text-2xs text-text-muted block">
-                            Depth: {rep.estimatedDepth.replace('_', ' ')}
+                            Depth: {t(DEPTH_LABEL_KEYS[rep.estimatedDepth])}
                           </span>
                         </div>
                       ) : summary.exerciseId === 'lunge' ? (

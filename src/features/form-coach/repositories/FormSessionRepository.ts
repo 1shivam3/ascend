@@ -115,8 +115,8 @@ export class FormSessionRepository {
         ...ex,
         sets,
         notes: ex.notes
-          ? `${ex.notes}\n[Form Coach: ${session.totalValidReps} valid reps, avg ${session.averageRepDurationSeconds}s/rep]`
-          : `[Form Coach: ${session.totalValidReps} valid reps, avg ${session.averageRepDurationSeconds}s/rep]`,
+          ? `${ex.notes}\n[Form Coach: ${session.totalValidReps} valid ${session.totalValidReps === 1 ? 'rep' : 'reps'}, avg ${session.averageRepDurationSeconds}s/rep]`
+          : `[Form Coach: ${session.totalValidReps} valid ${session.totalValidReps === 1 ? 'rep' : 'reps'}, avg ${session.averageRepDurationSeconds}s/rep]`,
       };
     });
 

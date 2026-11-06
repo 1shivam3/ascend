@@ -145,6 +145,11 @@ export class CycleRepStateMachine {
       observations: [],
       isValid,
       invalidReason: isValid ? undefined : this.config.incompleteReason,
+      // P0-3 verdict: a cycle record exists only when the driving
+      // signal was measurable through the cycle (a signal gap
+      // abandons the cycle with no record), so an invalid cycle rep
+      // is a measured failure, never 'unverified'.
+      status: isValid ? 'valid' : 'failed',
       // "Lockout" for a cycle lift = the cycle genuinely completed
       // (with its top gate, when one is required), independent of the
       // duration validity check. Press/bench read this field; the

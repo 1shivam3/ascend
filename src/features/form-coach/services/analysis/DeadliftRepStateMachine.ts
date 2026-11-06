@@ -163,6 +163,10 @@ export class DeadliftRepStateMachine {
       invalidReason: isValid
         ? undefined
         : (invalidReason ?? 'Lockout not reached'),
+      // Provisional P0-3 verdict from the measured criteria; the
+      // analyzer upgrades a no-lockout 'failed' to 'unverified' when
+      // the ankle/foot landmarks were too invisible to judge lockout.
+      status: isValid ? 'valid' : 'failed',
       minHipAngleDeg: Math.round(this.minHipAngle),
       lockoutAchieved,
       hipsRoseFirst: this.hipsRoseFirst,

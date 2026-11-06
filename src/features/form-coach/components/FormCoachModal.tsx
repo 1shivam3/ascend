@@ -19,6 +19,7 @@ import {
   FORM_EXERCISE_NAMES,
 } from '../analyzers/ExerciseAnalyzer';
 import type { StringKey } from '@/lib/i18n/en';
+import type { MovementPhase } from '../models/form-feedback.types';
 import PoseOverlay from './PoseOverlay';
 import FormSessionSummaryModal from './FormSessionSummaryModal';
 import {
@@ -67,6 +68,19 @@ const EXERCISE_INITIALS: Record<FormExerciseId, string> = {
   'lateral-raise': 'LR',
   plank: 'PL',
   'bench-press': 'BP',
+};
+
+/** UI-string map for the engine's MovementPhase values (P1-1): the
+ * raw enum ('tracking_lost', 'rep_completed', …) must never reach
+ * the screen — every phase renders through this map, en+hi. */
+const PHASE_LABEL_KEYS: Record<MovementPhase, StringKey> = {
+  standing: 'formCoach.phaseStanding',
+  descending: 'formCoach.phaseDescending',
+  bottom: 'formCoach.phaseBottom',
+  ascending: 'formCoach.phaseAscending',
+  lockout: 'formCoach.phaseLockout',
+  rep_completed: 'formCoach.phaseRepCompleted',
+  tracking_lost: 'formCoach.phaseTrackingLost',
 };
 
 /** Scope line shown on the select card for a preset exercise. */
@@ -157,12 +171,93 @@ export default function FormCoachModal({
   // label must say so: deadlift attempts are "pulls" (the word its
   // report uses); every other exercise gets the neutral "Detected",
   // matching the report's "Detected: N" line.
+  //
+  // Why the live count and the report's final count can differ
+  // (P0-3): (1) the live count includes attempts the report splits
+  // into valid / failed / unverified — it is a "detected" tally, not
+  // a valid tally; (2) in auto mode the HUD follows the classifier's
+  // current leaning, which can switch mid-stream, so cycles closed by
+  // a previously-followed analyzer were counted live but belong to a
+  // different exercise's tally; (3) finishing early ("View Report
+  // Now") discards any cycle still in flight. The report is built
+  // solely from the winning analyzer's finishSet counts, and it is
+  // the only count the report shows.
   const hudCountLabel =
     hudExerciseId === 'deadlift'
       ? t('formCoach.livePullsDetected')
       : t('formCoach.liveDetected');
   const hudCountNoun =
     hudExerciseId === 'deadlift' ? t('formCoach.livePulls') : t('formCoach.liveDetected');
+
+  // Overlay badge count, pluralized (P1-1): "1 pull", "2 pulls".
+  // The non-deadlift tally is labelled with the adjective "Detected"
+  // ("3 Detected"), which does not inflect.
+  const hudBadgeCount =
+    hudExerciseId === 'deadlift'
+      ? t(repCount === 1 ? 'formCoach.pullOne' : 'formCoach.pullOther', { count: repCount })
+      : `${repCount} ${hudCountNoun}`;
+
+  // Angle tile (P1-1): "Joint angle" until the exercise is actually
+  // known (preset chosen, or the classifier is leaning somewhere);
+  // after that, the metric that drives the exercise — hip for the
+  // hinge pattern, knee for the squat pattern. A deadlift can never
+  // be labelled "Min Knee Angle" again: before detection the HUD
+  // silently followed the squat analyzer, which is how the audit's
+  // deadlift got a knee-angle tile.
+  const hudExerciseKnown = presetExerciseId != null || leaningExerciseId != null;
+  const hudAngleMetric: 'hip' | 'knee' | 'joint' = !hudExerciseKnown
+    ? 'joint'
+    : hudExerciseId === 'deadlift'
+      ? 'hip'
+      : hudExerciseId === 'squat' || hudExerciseId === 'lunge'
+        ? 'knee'
+        : 'joint';
+  const hudAngleLabel =
+    hudAngleMetric === 'hip'
+      ? t('formCoach.minHipAngle')
+      : hudAngleMetric === 'knee'
+        ? t('formCoach.minKneeAngle')
+        : t('formCoach.jointAngle');
+  const hudAngleValue =
+    hudAngleMetric === 'hip'
+      ? minHipAngleDeg
+      : hudAngleMetric === 'knee'
+        ? minKneeAngleDeg
+        : (minKneeAngleDeg ?? minHipAngleDeg);
+
+  // Tracking tile and overlay phase badge read the SAME state
+  // (currentPhase) — the audit caught the badge saying
+  // "Tracking_lost" while this tile claimed "Active", because the
+  // tile was a hard-coded string. Lost tracking now shows on both.
+  const hudTrackingLost = currentPhase === 'tracking_lost';
+
+  // Video preview sizing (P1-1): the analyzing container takes the
+  // video's own aspect ratio once metadata lands, capped by height,
+  // so a vertical video is not pillarboxed inside a wide black box.
+  const [videoAspect, setVideoAspect] = useState<number | null>(null);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const update = () => {
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        setVideoAspect(video.videoWidth / video.videoHeight);
+      }
+    };
+    update();
+    video.addEventListener('loadedmetadata', update);
+    return () => video.removeEventListener('loadedmetadata', update);
+  }, [videoRef, state]);
+
+  // Touch devices have no drag-and-drop (P2-5): the upload prompt
+  // says "Choose a video" on a coarse pointer and keeps the
+  // drag-and-drop wording only where a fine pointer exists. Read
+  // once at first render (client-only modal; guarded for SSR).
+  const [isCoarsePointer] = useState<boolean>(
+    () =>
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(pointer: coarse)').matches
+  );
 
   // Handle hardware / browser back button safely
   useEffect(() => {
@@ -236,7 +331,24 @@ export default function FormCoachModal({
     >
       <div className="bg-surface sm:bg-surface-elevated border border-border-subtle rounded-2xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl relative max-h-[92vh]">
         {/* Hidden persistent video element for reliable MediaPipe frame pipeline */}
-        <div className={state === 'analyzing' ? 'relative w-full aspect-video bg-black rounded-t-2xl overflow-hidden' : 'hidden'}>
+        <div
+          className={
+            state === 'analyzing'
+              ? 'relative mx-auto w-full bg-black rounded-t-2xl overflow-hidden'
+              : 'hidden'
+          }
+          style={
+            state === 'analyzing'
+              ? {
+                  aspectRatio: videoAspect ?? 16 / 9,
+                  // Cap the height; the width follows from the aspect
+                  // ratio so vertical videos render at their own
+                  // shape instead of inside a wide black box.
+                  maxWidth: videoAspect ? `calc(58vh * ${videoAspect})` : undefined,
+                }
+              : undefined
+          }
+        >
           <video
             ref={videoRef}
             playsInline
@@ -255,15 +367,15 @@ export default function FormCoachModal({
           <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
             <span className="px-2.5 py-1 rounded-full text-2xs font-mono font-bold bg-black/70 backdrop-blur-md text-accent border border-accent/30 flex items-center gap-1.5">
               <Activity className="w-3 h-3 text-accent" />
-              <span>{repCount} {hudCountNoun}</span>
+              <span>{hudBadgeCount}</span>
             </span>
             {currentKneeAngleDeg !== null && (
               <span className="px-2.5 py-1 rounded-full text-2xs font-mono font-bold bg-black/70 backdrop-blur-md text-sky-400 border border-sky-400/30">
                 {Math.round(currentKneeAngleDeg)}° Knee
               </span>
             )}
-            <span className="px-2.5 py-1 rounded-full text-2xs font-mono capitalize bg-black/70 backdrop-blur-md text-text-primary border border-border-subtle">
-              {currentPhase}
+            <span className="px-2.5 py-1 rounded-full text-2xs font-mono bg-black/70 backdrop-blur-md text-text-primary border border-border-subtle">
+              {t(PHASE_LABEL_KEYS[currentPhase])}
             </span>
           </div>
         </div>
@@ -341,38 +453,56 @@ export default function FormCoachModal({
                 <Upload className="w-6 h-6 group-hover:-translate-y-0.5 transition-transform" />
               </div>
               <h3 className="text-sm font-bold text-text-primary">Upload Workout Video</h3>
-              <p className="text-xs text-text-secondary mt-1 max-w-xs">
-                Drag and drop your exercise video here, or <span className="text-accent-text font-medium underline">browse files</span>
-              </p>
+              {isCoarsePointer ? (
+                <p className="text-xs font-semibold text-accent-text mt-1">
+                  {t('formCoach.chooseVideo')}
+                </p>
+              ) : (
+                <p className="text-xs text-text-secondary mt-1 max-w-xs">
+                  {t('formCoach.dragDropPrefix')}{' '}
+                  <span className="text-accent-text font-medium underline">
+                    {t('formCoach.browseFiles')}
+                  </span>
+                </p>
+              )}
               <span className="text-2xs text-text-muted mt-2 font-mono">
                 Supports MP4, MOV, or WebM
               </span>
             </div>
 
-            {/* Privacy & Recording Tips */}
-            <div className="space-y-2.5">
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-2.5 text-xs text-emerald-400">
-                <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
-                <div className="text-2xs leading-relaxed text-text-secondary">
-                  <span className="font-semibold text-emerald-400 block">100% On-Device & Private</span>
-                  Video frames are analyzed locally in your browser using WebAssembly. Your video is never uploaded to any cloud server.
-                </div>
+            {/* Privacy, filming, safety — ONE neutral card (P2-5).
+                Same content as the previous three stacked colored
+                callouts, without the three competing colors. The
+                privacy line no longer names the tech (WebAssembly):
+                it says what the user cares about — the video is
+                analyzed on their phone and never uploaded. */}
+            <div className="p-3.5 rounded-xl bg-surface-elevated border border-border-subtle space-y-2.5 text-2xs text-text-secondary">
+              <div className="flex items-start gap-2.5">
+                <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-text-secondary" />
+                <p className="leading-relaxed">
+                  <span className="font-semibold text-text-primary">
+                    {t('formCoach.privacyLead')}
+                  </span>{' '}
+                  {t('formCoach.privacyLine')}
+                </p>
               </div>
-
-              <div className="p-3 rounded-xl bg-surface-elevated border border-border-subtle flex items-start gap-2.5 text-2xs text-text-secondary">
-                <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-semibold text-text-primary block">Filming Recommendation</span>
-                  Film from a side-profile angle at hip height. Ensure your head, hips, knees, and feet remain in frame throughout the set.
-                </div>
+              <div className="flex items-start gap-2.5">
+                <Info className="w-4 h-4 shrink-0 mt-0.5 text-text-secondary" />
+                <p className="leading-relaxed">
+                  <span className="font-semibold text-text-primary">
+                    {t('formCoach.filmingLead')}
+                  </span>{' '}
+                  {t('formCoach.filmingLine')}
+                </p>
               </div>
-
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2.5 text-2xs text-text-secondary">
-                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-semibold text-amber-400 block">Lift Safely</span>
-                  Stop the set if you feel pain or discomfort. Form Coach gives technique feedback from video measurements — it is not medical advice. If pain persists, see a qualified professional.
-                </div>
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-text-secondary" />
+                <p className="leading-relaxed">
+                  <span className="font-semibold text-text-primary">
+                    {t('formCoach.safetyLead')}
+                  </span>{' '}
+                  {t('formCoach.safetyLine')}
+                </p>
               </div>
             </div>
           </div>
@@ -415,24 +545,27 @@ export default function FormCoachModal({
               </div>
               <div className="p-2.5 rounded-xl bg-surface-elevated border border-border-subtle">
                 <span className="text-2xs uppercase font-mono text-text-muted block">
-                  {hudExerciseId === 'deadlift' ? t('formCoach.minHipAngle') : 'Min Knee Angle'}
+                  {hudAngleLabel}
                 </span>
                 <span className="text-xl font-bold font-mono text-text-primary">
-                  {hudExerciseId === 'deadlift'
-                    ? minHipAngleDeg !== null
-                      ? `${Math.round(minHipAngleDeg)}°`
-                      : '--'
-                    : minKneeAngleDeg !== null
-                      ? `${Math.round(minKneeAngleDeg)}°`
-                      : '--'}
+                  {hudAngleValue !== null ? `${Math.round(hudAngleValue)}°` : '--'}
                 </span>
               </div>
               <div className="p-2.5 rounded-xl bg-surface-elevated border border-border-subtle">
-                <span className="text-2xs uppercase font-mono text-text-muted block">Tracking</span>
-                <span className="text-xs font-semibold text-emerald-400 flex items-center justify-center gap-1 mt-1">
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  Active
+                <span className="text-2xs uppercase font-mono text-text-muted block">
+                  {t('formCoach.tracking')}
                 </span>
+                {hudTrackingLost ? (
+                  <span className="text-xs font-semibold text-amber-400 flex items-center justify-center gap-1 mt-1">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {t('formCoach.phaseTrackingLost')}
+                  </span>
+                ) : (
+                  <span className="text-xs font-semibold text-emerald-400 flex items-center justify-center gap-1 mt-1">
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    {t('formCoach.trackingActive')}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -464,7 +597,10 @@ export default function FormCoachModal({
             detectionNote={detectionNote}
             rerunOptions={rerunOptions.map((id) => ({
               id,
-              label: t('formCoach.rerunAs', { exercise: EXERCISE_NAMES[id] }),
+              // Picker rows show the exercise name itself; the
+              // "Wrong exercise? Change" button above them carries
+              // the action wording (P1-1).
+              label: EXERCISE_NAMES[id],
             }))}
             onRerunAs={(id) => rerunAs(id as FormExerciseId)}
             onClose={handleSafeClose}

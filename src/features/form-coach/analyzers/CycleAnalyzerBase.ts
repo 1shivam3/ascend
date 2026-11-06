@@ -21,7 +21,7 @@ import {
 } from '../analyzers/ExerciseAnalyzer';
 import { NormalizedLandmark, PoseLandmarkIndex, DetectedSide } from '../models/pose.types';
 import { FormObservation } from '../models/form-feedback.types';
-import { FormRep, FormSessionSummary } from '../models/form-session.types';
+import { FormRep, FormSessionSummary, getRepStatus } from '../models/form-session.types';
 import {
   calculateDistance,
   calculateJointAngle,
@@ -33,6 +33,7 @@ import {
   CycleRepStateMachineConfig,
 } from '../services/analysis/CycleRepStateMachine';
 import { FormFeedbackEngine, FeedbackRule } from '../services/analysis/FormFeedbackEngine';
+import { computeTempoSeconds } from '../services/analysis/tempo';
 import { safeRandomId } from '@/lib/formatters';
 
 /** Same per-rep view discipline as the squat/deadlift analyzers (D1). */
@@ -529,9 +530,11 @@ export abstract class CycleAnalyzerBase implements ExerciseAnalyzer {
       durationSeconds,
       totalDetectedReps: this.completedReps.length,
       totalValidReps: validReps.length,
+      totalUnverifiedReps: this.completedReps.filter((r) => getRepStatus(r) === 'unverified').length,
       analysedRepCount: this.completedReps.length,
       averageTrackingConfidence: avgConfidence,
       averageRepDurationSeconds: avgRepDurationSeconds,
+      tempoSeconds: computeTempoSeconds(this.completedReps, durationSeconds),
       reps: this.completedReps,
       observations,
       savedToWorkout: false,
