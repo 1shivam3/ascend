@@ -206,6 +206,10 @@ export const hi: Partial<Record<StringKey, string>> = {
   'formCoach.analyseAnyway': 'फिर भी {exercise} के रूप में विश्लेषण करें',
   'formCoach.analyzingTitle': 'मूवमेंट का विश्लेषण हो रहा है…',
   'formCoach.detecting': 'पहचान हो रही है: {exercise}…',
+  // Phone-polish live counter (2026-11-06): machine translations — Hindi review parked.
+  'formCoach.liveDetected': 'पहचाने गए',
+  'formCoach.livePullsDetected': 'पुल पहचाने गए',
+  'formCoach.livePulls': 'पुल',
   'formCoach.minHipAngle': 'न्यूनतम हिप कोण',
   'formCoach.autoCardTitle': 'व्यायाम अपने आप पहचानें',
   'formCoach.autoCardBadge': 'ऑटो-डिटेक्ट',
