@@ -399,23 +399,27 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* No entrance fade on the overlay: opacity on this container
+     composites the ENTIRE subtree, so mid-animation the backdrop is
+     barely dimmed AND the sheet inside is translucent — the page
+     behind ghosts through the sheet and labels collide (Daily Macro
+     Targets sheet, phone recording 2026-11-06). The backdrop now
+     renders at full strength immediately; only the sheet moves. */
   .modal-overlay {
     @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-50;
     @apply flex items-end sm:items-center justify-center p-0 sm:p-4;
-    @apply animate-fade-in;
   }
 
   /* Centered variant: camera-style modals stay centered on all breakpoints */
   .modal-overlay-centered {
     @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-50;
     @apply flex items-center justify-center p-4;
-    @apply animate-fade-in;
   }
 
   .modal-content {
     @apply bg-bg-card rounded-t-2xl sm:rounded-2xl w-full max-w-[520px] max-h-[90vh] sm:max-h-[85vh] overflow-y-auto;
     @apply border border-border shadow-2xl;
-    @apply animate-slide-up;
+    @apply animate-slide-up-opaque;
     @apply pb-[max(env(safe-area-inset-bottom),1.25rem)];
   }
 
