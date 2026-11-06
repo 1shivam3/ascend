@@ -80,6 +80,14 @@ module.exports = {
         water: 'rgb(var(--habit-water) / <alpha-value>)',
         protein: 'rgb(var(--habit-protein) / <alpha-value>)',
         creatine: 'rgb(var(--habit-creatine) / <alpha-value>)',
+        // Phase 4, Task 4.5: the macro set (Fuel labels + bars, meal
+        // detail, coach surfaces). Calories is NOT here — it stays
+        // the accent token by design.
+        macro: {
+          protein: 'rgb(var(--macro-protein) / <alpha-value>)',
+          carbs: 'rgb(var(--macro-carbs) / <alpha-value>)',
+          fat: 'rgb(var(--macro-fat) / <alpha-value>)',
+        },
         weight: '#A78BFA',
         // D2 fix (UX redesign): success is NO LONGER sage. Light #157347
         // on #E6F4EA, dark #4ADE80 on rgba(74,222,128,0.15) — see

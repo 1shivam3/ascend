@@ -1278,7 +1278,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                     </div>
 
                     <div className="flex items-center gap-2 text-xs font-semibold text-text-secondary pt-0.5">
-                      <span className="text-emerald-500 font-bold">{t('scan.proteinSuffix', { amount: analysis.totalProtein })}</span>
+                      <span className="text-macro-protein font-bold">{t('scan.proteinSuffix', { amount: analysis.totalProtein })}</span>
                       <span>•</span>
                       <span className="text-text-primary">{t('scan.carbsSuffix', { amount: analysis.totalCarbs })}</span>
                       <span>•</span>

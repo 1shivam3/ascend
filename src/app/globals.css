@@ -25,6 +25,14 @@
   --habit-water: 56 189 248;      /* #38BDF8 */
   --habit-creatine: 245 179 1;    /* #F5B301 */
   --habit-protein: 34 197 94;     /* #22C55E */
+  /* Audit phase 4 (2026-11-06), Task 4.5 (P2-9): ONE macro colour
+     set — labels AND bars in Fuel / meal detail / coach surfaces.
+     Light values are the AA shades (>=4.5:1 on card, page and sunken
+     surfaces); calories deliberately has NO macro var: it stays the
+     accent (label text-accent-text, bar bg-accent). */
+  --macro-protein: 22 101 52;     /* #166534 */
+  --macro-carbs: 3 105 161;       /* #0369A1 */
+  --macro-fat: 146 64 14;         /* #92400E */
   --accent-glow: rgba(228, 68, 39, 0.16);
 
   /* Direct CSS Specification Tokens */
@@ -89,6 +97,10 @@
   --habit-water: 56 189 248;      /* #38BDF8 */
   --habit-creatine: 245 179 1;    /* #F5B301 */
   --habit-protein: 34 197 94;     /* #22C55E */
+  /* Phase 4, Task 4.5: macro set, bright dark-theme shades. */
+  --macro-protein: 74 222 128;    /* #4ADE80 */
+  --macro-carbs: 56 189 248;      /* #38BDF8 */
+  --macro-fat: 251 191 36;        /* #FBBF24 */
   --accent-glow: rgba(235, 78, 48, 0.28);
 
   /* Direct CSS Specification Tokens */

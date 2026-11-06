@@ -1893,7 +1893,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <div className="w-full grid grid-cols-3 gap-2 pt-2 border-t border-border/60">
               {/* Protein */}
               <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/50 text-center space-y-1">
-                <span className="text-2xs uppercase font-bold text-accent-text tracking-wider block">{t('meals.protein')}</span>
+                <span className="text-2xs uppercase font-bold text-macro-protein tracking-wider block">{t('meals.protein')}</span>
                 <span className="text-base font-extrabold text-text-primary tabular-nums block">
                   {Math.round(todayMacros.proteinG)}g
                 </span>
@@ -1906,7 +1906,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
               {/* Carbs */}
               <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/50 text-center space-y-1">
-                <span className="text-2xs uppercase font-bold text-text-secondary tracking-wider block">{t('meals.carbs')}</span>
+                <span className="text-2xs uppercase font-bold text-macro-carbs tracking-wider block">{t('meals.carbs')}</span>
                 <span className="text-base font-extrabold text-text-primary tabular-nums block">
                   {Math.round(todayMacros.carbsG)}g
                 </span>
@@ -1919,7 +1919,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
               {/* Fat */}
               <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/50 text-center space-y-1">
-                <span className="text-2xs uppercase font-bold text-text-muted tracking-wider block">{t('meals.fat')}</span>
+                <span className="text-2xs uppercase font-bold text-macro-fat tracking-wider block">{t('meals.fat')}</span>
                 <span className="text-base font-extrabold text-text-primary tabular-nums block">
                   {Math.round(todayMacros.fatG)}g
                 </span>
@@ -2313,7 +2313,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           <div className="text-2xs font-mono font-bold">
             <span className="text-accent">{todayMeals.length === 0 ? '' : tildeForFoods(todayMeals.flatMap((m) => m.foods))}{Math.round(todayMacros.calories)} kcal</span>
             <span className="text-text-muted mx-1">•</span>
-            <span className="text-emerald-400">{todayMeals.length === 0 ? '' : tildeForFoods(todayMeals.flatMap((m) => m.foods))}{Math.round(todayMacros.proteinG)}g P</span>
+            <span className="text-macro-protein">{todayMeals.length === 0 ? '' : tildeForFoods(todayMeals.flatMap((m) => m.foods))}{Math.round(todayMacros.proteinG)}g P</span>
             {todayMeals.length > 0 && !foodsAllExact(todayMeals.flatMap((m) => m.foods)) && (
               <span className="ml-1.5 px-1 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 font-sans font-bold">{t('common.estimatedShort')}</span>
             )}
@@ -2348,7 +2348,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                         <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent-text">
                           {tildeForFoods(meal.foods)}{Math.round(mMacros.calories)} kcal
                         </span>
-                        <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">
+                        <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-macro-protein/15 text-macro-protein">
                           {tildeForFoods(meal.foods)}{Math.round(mMacros.proteinG)}g P
                         </span>
                         {!foodsAllExact(meal.foods) && (
@@ -2423,7 +2423,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                   green Exact chip and the number must agree. */}
                               <span className="text-accent font-semibold">{isExactFoodItem(food) ? '' : '~'}{Math.round(food.calories)} kcal</span>
                               <span className="mx-1">•</span>
-                              <span className="text-emerald-400 font-semibold">P: {isExactFoodItem(food) ? '' : '~'}{Math.round(food.proteinG)}g</span>
+                              <span className="text-macro-protein font-semibold">P: {isExactFoodItem(food) ? '' : '~'}{Math.round(food.proteinG)}g</span>
                             </div>
                             {/* FND-03: per-item edit — opens the meal in the
                                 LOG MEAL form, where this item's row edits. */}
@@ -2575,7 +2575,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                               <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent-text">
                                 {tildeForFoods(meal.foods)}{Math.round(mMacros.calories)} cal
                               </span>
-                              <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">
+                              <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-macro-protein/15 text-macro-protein">
                                 {tildeForFoods(meal.foods)}{Math.round(mMacros.proteinG)}g P
                               </span>
                               {!foodsAllExact(meal.foods) && (
@@ -2648,7 +2648,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                     {/* Live-fix L8: same exact/estimated rule as the today list. */}
                                     <span className="text-accent font-semibold">{isExactFoodItem(food) ? '' : '~'}{Math.round(food.calories)} cal</span>
                                     <span className="mx-1">•</span>
-                                    <span className="text-emerald-400 font-semibold">P: {isExactFoodItem(food) ? '' : '~'}{Math.round(food.proteinG)}g</span>
+                                    <span className="text-macro-protein font-semibold">P: {isExactFoodItem(food) ? '' : '~'}{Math.round(food.proteinG)}g</span>
                                   </div>
                                   {/* FND-03: per-item edit — opens the meal in the
                                       LOG MEAL form, where this item's row edits. */}
@@ -2722,8 +2722,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <span className="text-2xs text-text-muted">cal</span>
           </div>
           <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
-            <span className="text-2xs uppercase font-bold text-accent-text block">{t('meals.protein')}</span>
-            <span className="text-lg font-black text-accent tabular-nums block font-mono">
+            <span className="text-2xs uppercase font-bold text-macro-protein block">{t('meals.protein')}</span>
+            <span className="text-lg font-black text-macro-protein tabular-nums block font-mono">
               {macroGoals?.proteinG || proteinTargetG}g
             </span>
             <span className="text-2xs text-text-muted">
@@ -2731,7 +2731,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             </span>
           </div>
           <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
-            <span className="text-2xs uppercase font-bold text-text-secondary block">{t('meals.carbs')}</span>
+            <span className="text-2xs uppercase font-bold text-macro-carbs block">{t('meals.carbs')}</span>
             <span className="text-lg font-black text-text-primary tabular-nums block font-mono">
               {displayGoals?.carbsG || splitFallback.carbsG}g
             </span>
@@ -2740,7 +2740,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             </span>
           </div>
           <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
-            <span className="text-2xs uppercase font-bold text-text-muted block">{t('meals.fat')}</span>
+            <span className="text-2xs uppercase font-bold text-macro-fat block">{t('meals.fat')}</span>
             <span className="text-lg font-black text-text-primary tabular-nums block font-mono">
               {displayGoals?.fatG || splitFallback.fatG}g
             </span>
@@ -2759,17 +2759,17 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           <div className="h-2 rounded-full overflow-hidden flex bg-bg-secondary">
             <div
               style={{ width: `${macroSplit.proteinPct}%` }}
-              className="bg-accent h-full"
+              className="bg-macro-protein h-full"
               title={t('meals.protein')}
             />
             <div
               style={{ width: `${macroSplit.carbsPct}%` }}
-              className="bg-sky-400 h-full"
+              className="bg-macro-carbs h-full"
               title={t('meals.carbs')}
             />
             <div
               style={{ width: `${macroSplit.fatPct}%` }}
-              className="bg-amber-400 h-full"
+              className="bg-macro-fat h-full"
               title={t('meals.fat')}
             />
           </div>
@@ -2789,7 +2789,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           {/* Calorie Bar */}
           <div className="space-y-1">
             <div className="flex justify-between text-2xs font-mono">
-              <span className="font-semibold text-text-primary">{t('meals.calories')}</span>
+              <span className="font-semibold text-accent-text">{t('meals.calories')}</span>
               <span className="text-text-muted">
                 {Math.round(todayMacros.calories)} / {displayGoals?.calories || splitFallback.calories} cal ({Math.round((todayMacros.calories / (displayGoals?.calories || splitFallback.calories)) * 100)}%)
               </span>
@@ -2805,14 +2805,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           {/* Protein Bar */}
           <div className="space-y-1">
             <div className="flex justify-between text-2xs font-mono">
-              <span className="font-semibold text-accent">{t('meals.protein')}</span>
+              <span className="font-semibold text-macro-protein">{t('meals.protein')}</span>
               <span className="text-text-muted">
                 {Math.round(todayMacros.proteinG)}g / {macroGoals?.proteinG || proteinTargetG}g ({Math.round((todayMacros.proteinG / (macroGoals?.proteinG || proteinTargetG)) * 100)}%)
               </span>
             </div>
             <div className="h-1.5 rounded-full bg-bg-secondary overflow-hidden">
               <div
-                className="h-full bg-emerald-400 transition-all duration-500 rounded-full"
+                className="h-full bg-macro-protein transition-all duration-500 rounded-full"
                 style={{ width: `${Math.min(100, (todayMacros.proteinG / (macroGoals?.proteinG || proteinTargetG)) * 100)}%` }}
               />
             </div>
@@ -2821,14 +2821,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           {/* Carbs Bar */}
           <div className="space-y-1">
             <div className="flex justify-between text-2xs font-mono">
-              <span className="font-semibold text-text-primary">{t('meals.carbohydrates')}</span>
+              <span className="font-semibold text-macro-carbs">{t('meals.carbohydrates')}</span>
               <span className="text-text-muted">
                 {Math.round(todayMacros.carbsG)}g / {displayGoals?.carbsG || splitFallback.carbsG}g ({Math.round((todayMacros.carbsG / (displayGoals?.carbsG || splitFallback.carbsG)) * 100)}%)
               </span>
             </div>
             <div className="h-1.5 rounded-full bg-bg-secondary overflow-hidden">
               <div
-                className="h-full bg-sky-400 transition-all duration-500 rounded-full"
+                className="h-full bg-macro-carbs transition-all duration-500 rounded-full"
                 style={{ width: `${Math.min(100, (todayMacros.carbsG / (displayGoals?.carbsG || splitFallback.carbsG)) * 100)}%` }}
               />
             </div>
@@ -2837,14 +2837,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           {/* Fat Bar */}
           <div className="space-y-1">
             <div className="flex justify-between text-2xs font-mono">
-              <span className="font-semibold text-text-primary">{t('meals.dietaryFat')}</span>
+              <span className="font-semibold text-macro-fat">{t('meals.dietaryFat')}</span>
               <span className="text-text-muted">
                 {Math.round(todayMacros.fatG)}g / {displayGoals?.fatG || splitFallback.fatG}g ({Math.round((todayMacros.fatG / (displayGoals?.fatG || splitFallback.fatG)) * 100)}%)
               </span>
             </div>
             <div className="h-1.5 rounded-full bg-bg-secondary overflow-hidden">
               <div
-                className="h-full bg-amber-400 transition-all duration-500 rounded-full"
+                className="h-full bg-macro-fat transition-all duration-500 rounded-full"
                 style={{ width: `${Math.min(100, (todayMacros.fatG / (displayGoals?.fatG || splitFallback.fatG)) * 100)}%` }}
               />
             </div>
@@ -3624,7 +3624,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     <p className="text-2xs text-text-muted mt-0.5">
                       {fav.defaultQuantity ? `${fav.defaultQuantity} ${fav.unit}` : fav.unit} •{' '}
                       <span className="text-accent font-semibold">~{fav.calories} kcal</span> •{' '}
-                      <span className="text-emerald-600 font-semibold">~{fav.proteinG}g P</span>
+                      <span className="text-macro-protein font-semibold">~{fav.proteinG}g P</span>
                       {fav.carbsG ? ` • ~${fav.carbsG}g C` : ''}
                       {fav.fatG ? ` • ~${fav.fatG}g F` : ''}
                     </p>
@@ -3816,7 +3816,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   />
                 </div>
                 <div>
-                  <label htmlFor="pinned-food-protein" className="text-2xs font-bold text-emerald-600 uppercase block mb-1">
+                  <label htmlFor="pinned-food-protein" className="text-2xs font-bold text-macro-protein uppercase block mb-1">
                     {t('scan.proteinLabel')}
                   </label>
                   <input
