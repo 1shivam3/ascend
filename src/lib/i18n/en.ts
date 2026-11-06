@@ -50,8 +50,8 @@ export const en = {
   'home.quote': 'Quote',
   'home.calories': 'Calories',
   'home.readiness': 'Readiness',
-  'home.mealScan': 'Meal Scan',
-  'home.scan': 'Scan',
+  'home.mealScan': 'Scan Meal',
+  'home.scan': 'Scan Barcode',
   'home.weight': 'Weight',
   'home.formCheck': 'Form Check',
   'home.hydration': 'Hydration',
@@ -64,6 +64,9 @@ export const en = {
   'home.resumeWorkout': 'Resume Workout',
   'home.viewCompletedWorkout': 'View Completed Workout',
   'home.viewInTrain': 'View in Train',
+  // Audit phase 5, task 5.1(j): rest-day secondary action — opens the
+  // plan picker (Change Today's Workout) instead of starting blindly.
+  'home.trainAnyway': 'Train anyway',
   'home.notificationSettings': 'Notification Settings',
   'home.coachNotes': 'Coach notes',
   'home.coachNotesMissed': 'Missed sessions',
@@ -388,6 +391,12 @@ export const en = {
 
   // ── Progress: muscle volume & recovery ──────────────────────────────
   'progress.muscleVolume': 'Muscle Volume',
+  // Audit phase 5, task 5.1(i): the week-over-week comparisons get
+  // explicit labels (the Muscle Volume legend previously hard-coded
+  // English "this week / last week" for lack of these keys).
+  'progress.thisWeek': 'This week',
+  'progress.lastWeek': 'Last week',
+  'progress.weekCompare': 'This week vs last week: {thisSessions} vs {lastSessions} sessions · {thisVolume} vs {lastVolume}',
   'progress.setsThisWeek': 'sets this week',
   'progress.recoveryMap': 'Recovery',
   'progress.recoveryFresh': 'Fresh',
@@ -643,7 +652,7 @@ export const en = {
   'prs.toastRemovedTitle': 'PR Removed',
 
   // ── Meal scan (ScanMealModal) ───────────────────────────────────────
-  'scan.title': 'Meal Scan',
+  'scan.title': 'Scan Meal',
   'scan.subtitle': 'Photo → Macro Estimate',
   'scan.notice': 'Scan Notice',
   'scan.cameraNotice': 'Camera Notice',
@@ -1405,7 +1414,7 @@ export const en = {
   'meals.takePhoto': 'Take a photo',
   'meals.scanBarcode': 'Scan Barcode',
   'meals.packagedProducts': 'Packaged products',
-  'meals.scanMeal': 'Scan Meal',
+  'meals.scanMeal': 'Scan Meal (Photo)',
   'meals.addManually': 'Add Manually',
   'meals.quickLogAria': 'Describe foods and quantities to log meal',
   'meals.log': 'Log',
@@ -2636,6 +2645,10 @@ export const en = {
   'coachBlock.topLiftsHint': 'Estimated from your logged lifts — edit any number that looks off. Starting loads are set from these.',
   'coachBlock.buildButton': 'Build my block',
   'coachBlock.buildNext': 'Build next block',
+  // Audit phase 5, task 5.1(e): while a block is active the card's
+  // action views that block (its plans live in Plans) — building the
+  // NEXT block happens at block end via the debrief hand-off.
+  'coachBlock.viewCurrent': 'View current block',
   'coachBlock.weekLabel': 'Week {n}',
   'coachBlock.week_build': 'build',
   'coachBlock.week_deload': 'deload',

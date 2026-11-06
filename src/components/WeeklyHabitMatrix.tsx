@@ -29,7 +29,7 @@ interface WeeklyHabitMatrixProps {
   showCreatine?: boolean;
 }
 
-const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const DAY_LETTERS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
 /**
  * One-week habit matrix (Mon–Sun): Gym / Water / Creatine / Protein rows.

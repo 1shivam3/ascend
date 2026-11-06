@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, GripVertical } from 'lucide-react';
 import Sheet from '@/components/ui/Sheet';
 import { useTranslation } from '@/lib/i18n';
 
@@ -11,9 +11,16 @@ import { useTranslation } from '@/lib/i18n';
  *
  * Presentational only: sections arrive in current order (workout card
  * first, locked), visibility arrives resolved, and every change is a
- * callback to the store owner. No drag editor — up/down buttons only.
- * The workout card is locked on and pinned first; it never enters the
- * order array, so all listed sections are movable.
+ * callback to the store owner. The workout card is locked on and
+ * pinned first; it never enters the order array, so all listed
+ * sections are movable.
+ *
+ * Audit phase 5, task 5.1(k): rows carry a drag handle (HTML5
+ * drag-and-drop) when the owner supplies onReorder — the new order is
+ * computed locally and committed in ONE callback, so a multi-row drag
+ * never replays single swaps against a stale snapshot. The up/down
+ * buttons remain as the keyboard/touch-accessible fallback (HTML5 DnD
+ * is pointer-only). Dragging is an enhancement, never the only path.
  */
 export interface CustomizeSectionItem {
   id: string;
@@ -30,6 +37,8 @@ export interface CustomizeSheetProps {
   shown: Record<string, boolean>;
   onToggle: (id: string, shown: boolean) => void;
   onMove: (id: string, dir: -1 | 1) => void;
+  /** Full new order of the movable section ids after a drag. */
+  onReorder?: (orderedIds: string[]) => void;
   onRestore: () => void;
 }
 
@@ -40,10 +49,26 @@ export default function CustomizeSheet({
   shown,
   onToggle,
   onMove,
+  onReorder,
   onRestore,
 }: CustomizeSheetProps) {
   const { t } = useTranslation();
   const movable = sections.filter((s) => !s.locked);
+  const [dragId, setDragId] = React.useState<string | null>(null);
+
+  const handleDrop = (targetId: string) => {
+    if (onReorder && dragId && dragId !== targetId) {
+      const ids = movable.map((s) => s.id);
+      const from = ids.indexOf(dragId);
+      const to = ids.indexOf(targetId);
+      if (from >= 0 && to >= 0) {
+        ids.splice(from, 1);
+        ids.splice(to, 0, dragId);
+        onReorder(ids);
+      }
+    }
+    setDragId(null);
+  };
 
   return (
     <Sheet
@@ -69,8 +94,16 @@ export default function CustomizeSheet({
           return (
             <li
               key={section.id}
-              className="flex items-center gap-2 rounded-xl px-2 py-1.5"
+              draggable={!section.locked && !!onReorder}
+              onDragStart={!section.locked && onReorder ? () => setDragId(section.id) : undefined}
+              onDragOver={!section.locked && onReorder ? (e) => e.preventDefault() : undefined}
+              onDrop={!section.locked && onReorder ? () => handleDrop(section.id) : undefined}
+              onDragEnd={onReorder ? () => setDragId(null) : undefined}
+              className={`flex items-center gap-2 rounded-xl px-2 py-1.5 ${dragId === section.id ? 'opacity-50' : ''}`}
             >
+              {!section.locked && onReorder && (
+                <GripVertical aria-hidden className="h-4 w-4 shrink-0 cursor-grab text-text-muted" />
+              )}
               <button
                 type="button"
                 role="checkbox"

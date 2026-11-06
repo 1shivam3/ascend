@@ -127,10 +127,13 @@ describe('Google Play Store Launch Readiness Verification', () => {
       // and the modal renders it via t('scan.title').
       // Slop-tail (2026-11-02): the coined name 'Macro Lens' was itself
       // retired by the slop audit as a buzzword product-name; the title
-      // is now the plain 'Meal Scan'.
+      // was the plain 'Meal Scan'.
+      // Audit phase 5, task 5.1(d) (2026-11-06): renamed to 'Scan Meal'
+      // so the modal, Today's quick action and Fuel's entry share one
+      // name — closing the dual-name item Phase 3 left open.
       const enDict = fs.readFileSync(
         path.join(rootDir, 'src', 'lib', 'i18n', 'en.ts'), 'utf8');
-      expect(enDict).toContain("'scan.title': 'Meal Scan'");
+      expect(enDict).toContain("'scan.title': 'Scan Meal'");
       expect(scanContent).toContain("t('scan.title')");
     });
   });

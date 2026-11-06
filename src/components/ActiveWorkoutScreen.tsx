@@ -2487,7 +2487,11 @@ export default function ActiveWorkoutScreen({
           the Swap/Keep banner below are unchanged). */}
 
       {/* ── Main Exercise Focus Workspace (Radically simplified) ───────── */}
-      <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 max-w-[480px] mx-auto w-full pb-16">
+      {/* Audit phase 5, task 5.1(m): bottom padding is mode-aware.
+          Beginner mode's action bar is IN FLOW below this main, so a
+          fixed pb-16 left a dead 64px gap above it; advanced mode
+          keeps pb-16 as clearance for the floating rest-timer pill. */}
+      <main className={`flex-1 overflow-y-auto px-4 sm:px-6 py-4 max-w-[480px] mx-auto w-full ${workoutMode === 'beginner' ? 'pb-6' : 'pb-16'}`}>
         {/* Crowded-gym swap banner for the current exercise */}
         {gymPacked &&
           currentExercise &&

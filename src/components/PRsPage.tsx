@@ -27,7 +27,6 @@ import {
   Edit3,
   ChevronDown,
   ChevronUp,
-  ChevronLeft,
   Dumbbell,
   Search,
   TrendingUp,
@@ -688,7 +687,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
   const gender = profile?.gender || 'male';
   const toast = useToast();
   const { t } = useTranslation();
-  const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
+  const { registerBackHandler } = useAppNavigation();
 
   // F19 (audit): the single PR-delete handler for all four render
   // spots below. A PR deleted in a follower tab never reached storage
@@ -1106,17 +1105,11 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
       {/* Top Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {canGoBack && (
-            <button
-              type="button"
-              onClick={goBack}
-              className="p-1.5 -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
-              aria-label={t('prs.goBack')}
-              title={t('prs.goBack')}
-            >
-              <ChevronLeft className="w-5 h-5 text-accent" />
-            </button>
-          )}
+          {/* Audit phase 5, task 5.1(a): no chevron here — PRsPage is
+              a pushed sub-view inside Progress, whose own header
+              (directly above) already carries the back-to-overview
+              chevron. This one popped the whole app tab stack,
+              duplicating it with the wrong target. */}
           <div>
             <div className="text-[0.625rem] font-mono font-bold tracking-widest text-accent-text uppercase">{t('prs.personalBests')}</div>
             <h1 className="display-title uppercase">

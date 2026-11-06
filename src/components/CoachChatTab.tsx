@@ -55,6 +55,8 @@ interface CoachChatTabProps {
   onReviewBlock: () => void;
   onOpenWeeklyReview: () => void;
   onOpenDebrief: () => void;
+  /** Audit phase 5, task 5.1(e): jump to the active block's plans. */
+  onViewBlock?: () => void;
 }
 
 const MINUTES_OPTIONS = [15, 30, 45, 60];
@@ -127,6 +129,7 @@ export default function CoachChatTab({
   onReviewBlock,
   onOpenWeeklyReview,
   onOpenDebrief,
+  onViewBlock,
 }: CoachChatTabProps) {
   const { t } = useTranslation();
   const profile = useStore((s) => s.profile);
@@ -671,10 +674,15 @@ export default function CoachChatTab({
             </div>
             <button
               type="button"
-              onClick={onBuildBlock}
+              onClick={coachBlocks.activeBlock ? (onViewBlock ?? onBuildBlock) : onBuildBlock}
               className="btn-primary py-1.5 px-3 text-xs font-bold shrink-0 cursor-pointer"
             >
-              {coachBlocks.activeBlock ? t('coachBlock.buildNext') : t('coachBlock.buildButton')}
+              {/* Audit phase 5, task 5.1(e): with a block active this
+                  slot views it (its plans live in Plans) — "Build next
+                  block" invited building a competing block mid-block.
+                  Building the next block is the debrief hand-off's job
+                  once this block ends. */}
+              {coachBlocks.activeBlock ? t('coachBlock.viewCurrent') : t('coachBlock.buildButton')}
             </button>
           </div>
         )}

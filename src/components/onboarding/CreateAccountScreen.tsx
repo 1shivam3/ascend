@@ -143,7 +143,7 @@ export default function CreateAccountScreen({
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="alex@example.com"
+                placeholder="you@email.com"
                 required
                 className="w-full px-4 py-3 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary placeholder:text-text-muted/60 outline-none transition"
               />

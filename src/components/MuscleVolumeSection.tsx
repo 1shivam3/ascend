@@ -59,7 +59,12 @@ export default function MuscleVolumeSection({ workouts }: { workouts: WorkoutEnt
         </span>
       </div>
 
-      {/* Weekly sets per muscle, with previous week ghost bar */}
+      {/* Weekly sets per muscle, with previous week ghost bar.
+          Audit phase 5, task 5.1(i): caption names the comparison so
+          each row's "X vs Y (±Z)" figures are self-explanatory. */}
+      <p className="text-2xs font-semibold text-text-muted -mb-1">
+        {t('progress.thisWeek')} vs {t('progress.lastWeek')}
+      </p>
       <div className="space-y-2.5">
         {volume.rows.map((row) => (
           <div key={row.muscle} className="space-y-1">
@@ -94,14 +99,16 @@ export default function MuscleVolumeSection({ workouts }: { workouts: WorkoutEnt
         ))}
         {/* Live-fix L7: legend swatches mirror the bar colors (accent +
             border) instead of naming "Orange" — the accent may be Cobalt
-            or a custom color, and the words would then lie. The words
-            themselves stay English: no thisWeek/lastWeek i18n keys exist,
-            and inventing translations is out of scope. */}
+            or a custom color, and the words would then lie.
+            Audit phase 5, task 5.1(i): the legend words now use the
+            progress.thisWeek / progress.lastWeek keys (added for this),
+            and a caption above names the per-row comparison — the bare
+            "X vs Y" figures were unlabeled before. */}
         <p className="text-2xs text-text-muted flex items-center gap-1.5">
           <span aria-hidden="true" className="inline-block w-2.5 h-2.5 rounded-full bg-accent shrink-0" />
-          this week
+          {t('progress.thisWeek')}
           <span aria-hidden="true" className="inline-block w-2.5 h-2.5 rounded-full bg-border shrink-0" />
-          last week
+          {t('progress.lastWeek')}
         </p>
       </div>
 

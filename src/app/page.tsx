@@ -321,6 +321,38 @@ export default function AppPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Audit phase 5, task 5.1(n): warm the code-split tab chunks during
+  // idle time after first paint. The tab screens render LOCAL store
+  // data only, so the multi-second skeleton on first tab tap was pure
+  // chunk fetch+parse (measured ~1.7 s tap-to-content under a throttled
+  // phone profile; worse on real 2 GB devices). Preloading after first
+  // paint makes the first tap land on real content; the TabSkeleton
+  // remains only for a tap that races the preload.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const preloadTabs = () => {
+      void import('@/components/WorkoutPage');
+      void import('@/components/ProgressPage');
+      void import('@/components/MealsPage');
+      void import('@/components/ProfileView');
+      void import('@/components/SettingsView');
+    };
+    const ric = (
+      window as unknown as {
+        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+        cancelIdleCallback?: (id: number) => void;
+      }
+    ).requestIdleCallback;
+    if (typeof ric === 'function') {
+      const id = ric(preloadTabs, { timeout: 3000 });
+      return () => {
+        (window as unknown as { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback?.(id);
+      };
+    }
+    const id = setTimeout(preloadTabs, 1500);
+    return () => clearTimeout(id);
+  }, []);
+
   // Forced visual test states for Screen 25 (Error), Screen 26 (Loading), Screen 27 (Offline)
   if (forcedState === 'error') {
     return (

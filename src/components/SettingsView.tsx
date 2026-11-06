@@ -308,6 +308,11 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     [order[idx], order[next]] = [order[next], order[idx]];
     setUiPreferences({ todayLayout: { ...rawTodayLayoutForSheet, order } });
   };
+  // Audit phase 5, task 5.1(k): drag reorder — same one-write contract
+  // as HomePage's handler.
+  const handleReorderSections = (orderedIds: string[]) => {
+    setUiPreferences({ todayLayout: { ...rawTodayLayoutForSheet, order: [...orderedIds] } });
+  };
   const handleRestoreLayout = () => {
     setUiPreferences({ todayLayout: { ...DEFAULT_TODAY_LAYOUT, order: [...DEFAULT_TODAY_LAYOUT.order] } });
     toast.success(t('customize.layoutRestored'));
@@ -585,14 +590,19 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       {/* ── Top Header ────────────────────────────────────────────────────── */}
       <header className="flex items-center justify-between pt-1">
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleBack}
-            className="p-2 min-h-[44px] min-w-[44px] -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
-            aria-label={t('common.back')}
-          >
-            <ChevronLeft className="w-5 h-5 text-accent" />
-          </button>
+          {/* Audit phase 5, task 5.1(a): chevron only in modal mode
+              (onBack supplied); Settings as a tab root has no screen
+              above it. */}
+          {onBack && (
+            <button
+              type="button"
+              onClick={handleBack}
+              className="p-2 min-h-[44px] min-w-[44px] -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
+              aria-label={t('common.back')}
+            >
+              <ChevronLeft className="w-5 h-5 text-accent" />
+            </button>
+          )}
           <h1 className="text-2xl sm:text-3xl font-bold font-sans text-text-primary tracking-tight">
             {t('settings.title')}
           </h1>
@@ -1622,6 +1632,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         shown={{ 'workout-card': true, ...Object.fromEntries(resolvedTodayForSheet.map((s) => [s.id, s.shown])) }}
         onToggle={handleToggleSection}
         onMove={handleMoveSection}
+        onReorder={handleReorderSections}
         onRestore={handleRestoreLayout}
       />
 

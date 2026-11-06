@@ -21,11 +21,9 @@ import {
   X,
   ChevronDown,
   ChevronUp,
-  ChevronLeft,
   ChevronRight,
   Calendar,
   Trash2,
-  ArrowLeft,
   Timer,
   Play,
   Pause,
@@ -121,7 +119,8 @@ import {
   getWorkoutBodyParts,
   getScheduledWorkoutForDay,
 } from '@/lib/workout-schedule';
-import { plural, safeRandomId, getLocalTodayStr, formatLocalDate, parseLocalDate } from '@/lib/formatters';
+import { plural, safeRandomId, getLocalTodayStr, formatLocalDate, parseLocalDate, formatNumber, formatDuration } from '@/lib/formatters';
+import { calculateWorkoutVolumeKg } from '@/lib/volume';
 import { planPRChangesAfterSetEdit } from '@/lib/pr-reevaluation';
 import { getSessionDuration } from '@/lib/workout-elapsed';
 import { useAppNavigation } from '@/lib/navigation';
@@ -1167,7 +1166,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   );
   const [activeRunSession, setActiveRunSession] = useState<RunSession | null>(null);
   const toast = useToast();
-  const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
+  const { registerBackHandler } = useAppNavigation();
 
   const userUnit = profile?.unit || 'kg';
   const availableExercises = getExerciseList();
@@ -2408,16 +2407,10 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       <header className="pt-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {canGoBack && (
-              <button
-                type="button"
-                onClick={goBack}
-                className="w-11 h-11 rounded-full bg-bg-card border border-border/80 flex items-center justify-center text-text-primary hover:border-accent/40 transition-colors cursor-pointer"
-                aria-label="Go back"
-              >
-                <ChevronLeft className="w-5 h-5 text-accent" />
-              </button>
-            )}
+            {/* Audit phase 5, task 5.1(a): no back chevron on a tab
+                root — Train is a bottom-tab destination, not a pushed
+                screen. System/gesture back still pops the app stack
+                via the navigation provider. */}
             <h1 className="text-2xl sm:text-3xl font-bold font-sans text-text-primary tracking-tight">
               Train
             </h1>
@@ -2940,6 +2933,23 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                 (e) => e.sets.some((s) => isSetCompleted(s) || s.status === 'skipped')
               );
               const displayExercises = performedExercises.length > 0 ? performedExercises : workout.exercises;
+              // Audit phase 5, task 5.1(h): the collapsed row leads
+              // with the workout's own title and carries volume +
+              // duration — previously it showed only the date and an
+              // exercise/set count, so sessions were indistinguishable.
+              const rowTitle = workout.name?.trim() || null;
+              const rowDate = parseLocalDate(workout.date).toLocaleDateString(dateLocale, {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              });
+              const volumeKg = calculateWorkoutVolumeKg(workout);
+              const volumeDisplay = volumeKg > 0
+                ? `${formatNumber(Math.round(userUnit === 'lbs' ? kgToLbs(volumeKg) : volumeKg))} ${userUnit}`
+                : null;
+              const durationSeconds = workout.durationSeconds ?? (workout.durationMinutes ? workout.durationMinutes * 60 : undefined);
+              const durationDisplay = durationSeconds && durationSeconds > 0 ? formatDuration(durationSeconds) : null;
 
               return (
                 <div key={workout.id} className="card">
@@ -2948,19 +2958,14 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     className="w-full flex justify-between items-center text-left cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/40 rounded-lg p-0.5"
                     onClick={() => toggleExpand(workout.id)}
                     aria-expanded={isExpanded}
-                    aria-label={`Workout on ${parseLocalDate(workout.date).toLocaleDateString(dateLocale)}`}
+                    aria-label={rowTitle ? `${rowTitle}, ${rowDate}` : `Workout on ${rowDate}`}
                   >
                     <div>
                       <h3 className="font-semibold text-text-primary">
-                        {parseLocalDate(workout.date).toLocaleDateString(dateLocale, {
-                          weekday: 'short',
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
+                        {rowTitle || rowDate}
                       </h3>
                       <p className="text-label text-text-secondary mt-0.5 tabular-nums">
-                        {plural(displayExercises.length, 'exercise')} • {plural(totalSets, 'set')}
+                        {rowTitle ? `${rowDate} • ` : ''}{plural(displayExercises.length, 'exercise')} • {plural(totalSets, 'set')}{volumeDisplay ? ` • ${volumeDisplay}` : ''}{durationDisplay ? ` • ${durationDisplay}` : ''}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -3161,6 +3166,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               onReviewBlock={() => { setCoachBlockAtReview(true); setIsCoachBlockOpen(true); }}
               onOpenWeeklyReview={() => setIsReviewOpen(true)}
               onOpenDebrief={() => setIsDebriefOpen(true)}
+              onViewBlock={() => enterTrainSubTab('plans')}
             />
           </div>
           {/* Conversational coach chat (not a drawer; the removed
