@@ -594,6 +594,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     [order[idx], order[next]] = [order[next], order[idx]];
     setUiPreferences({ todayLayout: { ...rawTodayLayout, order } });
   };
+  // Audit phase 5, task 5.1(k): drag reorder commits the full movable
+  // order in one write (the stored order IS the resolved movable list).
+  const handleReorderSections = (orderedIds: string[]) => {
+    setUiPreferences({ todayLayout: { ...rawTodayLayout, order: [...orderedIds] } });
+  };
   const handleRestoreLayout = () => {
     setUiPreferences({ todayLayout: { ...DEFAULT_TODAY_LAYOUT, order: [...DEFAULT_TODAY_LAYOUT.order] } });
     toast.success(t('customize.layoutRestored'));
@@ -1206,7 +1211,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     /* ── QUOTE — its own section, last in the Simple default order ── */
     'quote': (
       <div className={shown('quote') ? undefined : 'hidden'}>
-      <div className="text-center pt-1 pb-2">
+      {/* Audit phase 5, task 5.1(g): quote sits in a proper card like
+          every other Today section (surface, radius, padding) —
+          previously bare text floating on the page background. Card
+          chrome comes from theme tokens, per the Do-Not-Change rule
+          on the Chalk/Graphite palette. */}
+      <div className="bg-bg-card border border-border/80 rounded-2xl p-5 shadow-xs text-center">
         <p className="text-xs text-text-muted italic leading-relaxed">&ldquo;{dailyQuote.text}&rdquo;</p>
         <p className="text-2xs text-text-muted mt-1 font-mono">— {dailyQuote.author}</p>
       </div>
@@ -1298,11 +1308,19 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             if (activeWorkoutDraft) {
               onNavigate('workout');
             } else if (sessionInfo.status === 'completed') {
-              if (completedWorkoutForToday && uiPreferences.coachEnabled) {
+              // Audit phase 5, task 5.1(j): completed day → always
+              // open the completed-workout view. The old branch made
+              // both the label and the destination depend on
+              // coachEnabled AND a second derivation
+              // (completedWorkoutForToday), so a completed day with
+              // the coach off read "View in Train" and navigated away
+              // — the P2-8 label bug. The take modal renders the
+              // summary without coach content when coach is off (its
+              // coachEnabled prop), so the modal is always the right
+              // destination when today's workout exists.
+              if (completedWorkoutForToday) {
                 setIsCompletedWorkoutModalOpen(true);
               } else {
-                // Coach off: the Take modal is a coach surface — go to
-                // the training history instead of a dead tap.
                 onNavigate('workout');
               }
             } else {
@@ -1314,14 +1332,22 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           {activeWorkoutDraft
             ? t('home.resumeWorkout')
             : sessionInfo.status === 'completed'
-            // UX #10: with Coach off the tap goes to Train history, not
-            // to the completed-workout modal — so the label must say
-            // that instead of promising a view it will not open.
-            ? (completedWorkoutForToday && uiPreferences.coachEnabled
-              ? t('home.viewCompletedWorkout')
-              : t('home.viewInTrain'))
+            ? t('home.viewCompletedWorkout')
             : t('train.startWorkout')}
         </button>
+        {/* Audit phase 5, task 5.1(j): rest-day secondary — primary
+            stays "Start Workout" (starts the next planned session);
+            this opens the plan picker so a rest day can still become
+            a training day by choice. */}
+        {sessionInfo.isRestDay && sessionInfo.status !== 'completed' && !activeWorkoutDraft && (
+          <button
+            type="button"
+            onClick={() => setIsChangeWorkoutOpen(true)}
+            className="btn-secondary w-full mt-3 py-3 px-4 rounded-xl text-sm font-bold active:scale-[0.99] transition-all cursor-pointer"
+          >
+            {t('home.trainAnyway')}
+          </button>
+        )}
         {/* Quick Log — one tap to log a session that already happened. */}
         <div className="text-center mt-3">
           <button
@@ -1361,6 +1387,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         shown={{ 'workout-card': true, ...Object.fromEntries(resolvedToday.map((s) => [s.id, s.shown])) }}
         onToggle={handleToggleSection}
         onMove={handleMoveSection}
+        onReorder={handleReorderSections}
         onRestore={handleRestoreLayout}
       />
 
@@ -1542,10 +1569,16 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       )}
 
       {/* ── COMPLETED WORKOUT DETAIL MODAL (Coach's Take surface) ────────── */}
-      {uiPreferences.coachEnabled && isCompletedWorkoutModalOpen && completedWorkoutForToday && (
+      {/* Audit phase 5, task 5.1(j): no longer gated on coachEnabled —
+          with the coach off the modal renders the workout summary
+          without any take (its coachEnabled prop), which is what makes
+          "View Completed Workout" the always-correct completed-day
+          CTA label. */}
+      {isCompletedWorkoutModalOpen && completedWorkoutForToday && (
         <PostWorkoutTakeModal
           isOpen={isCompletedWorkoutModalOpen}
           onClose={() => setIsCompletedWorkoutModalOpen(false)}
+          coachEnabled={uiPreferences.coachEnabled}
           completedWorkout={{
             name: completedWorkoutForToday.name || routineDisplayName || 'Completed Session',
             durationMinutes: completedWorkoutForToday.durationMinutes ?? 0,

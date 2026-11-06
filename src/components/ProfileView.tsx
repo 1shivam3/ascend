@@ -153,14 +153,20 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
       {/* ── Top Header ────────────────────────────────────────────────────── */}
       <header className="flex items-center justify-between pt-1">
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleBack}
-            className="p-2 min-h-[44px] min-w-[44px] -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
-            aria-label={t('profile.back')}
-          >
-            <ChevronLeft className="w-5 h-5 text-accent" />
-          </button>
+          {/* Audit phase 5, task 5.1(a): the back chevron renders
+              only in pushed/modal mode (onBack supplied). As a tab
+              root (the "You" destination) there is no screen above
+              Profile, so no chevron. */}
+          {onBack && (
+            <button
+              type="button"
+              onClick={handleBack}
+              className="p-2 min-h-[44px] min-w-[44px] -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
+              aria-label={t('profile.back')}
+            >
+              <ChevronLeft className="w-5 h-5 text-accent" />
+            </button>
+          )}
           <h1 className="text-2xl sm:text-3xl font-bold font-sans text-text-primary tracking-tight">
             {t('profile.title')}
           </h1>

@@ -84,6 +84,15 @@ export default function LoginScreen({
 
       {/* Main Elevated Form Card */}
       <div className="w-full max-w-md mx-auto my-auto py-4">
+        {/* Audit phase 5, task 5.1(l): the approved ASCEND logo mark
+            (owner's orange icon, PR #55) sits above the form — the
+            sign-in screen previously carried only the text wordmark. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/ascend-logo.png"
+          alt="ASCEND"
+          className="w-16 h-16 mx-auto mb-5 rounded-2xl shadow-sm"
+        />
         <div className="bg-bg-card rounded-2xl p-6 sm:p-8 border border-border shadow-xs space-y-6">
           {/* Header */}
           <div className="text-left space-y-1">
@@ -116,7 +125,7 @@ export default function LoginScreen({
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="alex@example.com"
+                placeholder="you@email.com"
                 required
                 className="w-full px-4 py-3 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary placeholder:text-text-muted/60 outline-none transition"
               />

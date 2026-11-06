@@ -38,7 +38,6 @@ import {
   Sparkles,
   Edit3,
   Search,
-  ChevronLeft,
   ChevronRight,
   Barcode as BarcodeIcon,
   Star,
@@ -208,7 +207,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const deleteFavoriteFood    = useStore((state) => state.deleteFavoriteFood);
   const clearAllFavoriteFoods = useStore((state) => state.clearAllFavoriteFoods);
   const toast              = useToast();
-  const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
+  const { registerBackHandler } = useAppNavigation();
 
   // Habit store state
   const waterLogs          = useStore((state) => state.waterLogs || {});
@@ -1699,18 +1698,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       {/* ── Header ── */}
       <header className="flex justify-between items-center mb-1">
         <div className="flex items-center gap-2">
-          {canGoBack && (
-            <button
-              type="button"
-              onClick={goBack}
-              className="p-1.5 -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
-              aria-label={t('prs.goBack')}
-              title={t('prs.goBack')}
-            >
-              <ChevronLeft className="w-5 h-5 text-accent" />
-            </button>
-          )}
           <div>
+            {/* Audit phase 5, task 5.1(a): no back chevron on a tab
+                root — Fuel is a bottom-tab destination, not a pushed
+                screen (its old chevron popped the app tab stack). */}
             {/* P2-2 (UI/UX audit phase 3): one name per feature — the
                 screen title is "Fuel", matching the tab. The old
                 "MEALS" title under a "NUTRITION & FUEL" kicker named
@@ -2045,7 +2036,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 <Camera className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-xs font-bold text-text-primary block">{t('meals.scanFood')}</span>
+                <span className="text-xs font-bold text-text-primary block">{t('meals.scanMeal')}</span>
                 <span className="text-2xs text-text-muted">{t('meals.takePhoto')}</span>
               </div>
             </button>
@@ -2067,25 +2058,19 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
           <section className="card p-4 sm:p-5 bg-bg-card border border-border space-y-4">
 
-        {/* ── Primary Action Buttons: Scan Meal & Add Manually ── */}
+        {/* ── Primary Action Button: Add Manually ── */}
+        {/* Audit phase 5, task 5.1(d): the duplicate "Scan Meal"
+            button that lived here is gone — the scanner tiles above
+            are Fuel's single photo-scan + barcode entries. */}
         <div className="pt-2 border-t border-border/60 space-y-2.5">
-          <div className="grid grid-cols-2 gap-2.5">
-            <button
-              type="button"
-              onClick={() => setIsScanModalOpen(true)}
-              className="btn-primary py-3 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-sm hover:brightness-105 active:scale-95 transition-all cursor-pointer"
-            >
-              <Camera className="w-4 h-4 stroke-[2.5]" />
-              <span>{t('meals.scanMeal')}</span>
-            </button>
-
+          <div>
             <button
               type="button"
               onClick={() => {
                 if (foods.length === 0) handleAddFood();
                 setIsModalOpen(true);
               }}
-              className="btn-secondary py-3 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 border border-border hover:border-accent/40 active:scale-95 transition-all cursor-pointer"
+              className="btn-secondary w-full py-3 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 border border-border hover:border-accent/40 active:scale-95 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4 stroke-[2.5] text-accent" />
               <span>{t('meals.addManually')}</span>
@@ -2156,17 +2141,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </button>
               {isMoreToolsOpen && (
                 <div className="absolute right-0 bottom-full mb-2 w-48 rounded-xl bg-bg-card border border-border p-1.5 shadow-xl z-30 space-y-1 animate-scale-in">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsMoreToolsOpen(false);
-                      setIsBarcodeModalOpen(true);
-                    }}
-                    className="w-full flex items-center gap-2 p-2 rounded-lg text-xs font-semibold text-text-primary hover:bg-bg-secondary text-left cursor-pointer"
-                  >
-                    <BarcodeIcon className="w-4 h-4 text-accent" />
-                    <span>{t('meals.scanBarcode')}</span>
-                  </button>
+                  {/* Audit phase 5, task 5.1(d): no barcode item here —
+                      the barcode tile above is Fuel's one barcode
+                      entry; this menu keeps the non-scan tools. */}
                   <button
                     type="button"
                     onClick={() => {
@@ -2480,14 +2457,19 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           <p className="text-2xs text-text-muted">{t('meals.historySubtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsScanModalOpen(true)}
-            className="py-1.5 px-3 rounded-xl bg-accent text-accent-on text-xs font-bold hover:brightness-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
-          >
-            <Camera className="w-3.5 h-3.5" />
-            <span>{t('meals.scanMeal')}</span>
-          </button>
+          {/* Audit phase 5, task 5.1(d): hidden while the list is
+              empty — the empty state's own scan CTA is then this
+              view's single photo-scan entry. */}
+          {groupedMeals.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setIsScanModalOpen(true)}
+              className="py-1.5 px-3 rounded-xl bg-accent text-accent-on text-xs font-bold hover:brightness-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <Camera className="w-3.5 h-3.5" />
+              <span>{t('meals.scanMeal')}</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {

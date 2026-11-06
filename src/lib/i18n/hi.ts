@@ -49,7 +49,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'home.calories': 'कैलोरी',
   'home.readiness': 'रेडीनेस',
   'home.mealScan': 'मील स्कैन',
-  'home.scan': 'स्कैन',
+  'home.scan': 'बारकोड स्कैन',
   'home.weight': 'वज़न',
   'home.formCheck': 'फ़ॉर्म चेक',
   'home.hydration': 'हाइड्रेशन',
@@ -63,6 +63,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'home.viewCompletedWorkout': 'पूरा हुआ वर्कआउट देखें',
   // Token-reuse composition only — flagged for native-speaker review.
   'home.viewInTrain': 'ट्रेनिंग में देखें',
+  // Audit phase 5, task 5.1(j) (2026-11-06): machine translation — Hindi review parked.
+  'home.trainAnyway': 'फिर भी ट्रेनिंग करें',
   'home.notificationSettings': 'नोटिफ़िकेशन सेटिंग्स',
   'home.coachNotes': 'कोच नोट्स',
   'home.coachNotesMissed': 'छूटे हुए सत्र',
@@ -397,6 +399,10 @@ export const hi: Partial<Record<StringKey, string>> = {
 
   // ── Progress: muscle volume & recovery ──────────────────────────────
   'progress.muscleVolume': 'मसल वॉल्यूम',
+  // Audit phase 5, task 5.1(i) (2026-11-06): machine translations — Hindi review parked.
+  'progress.thisWeek': 'इस सप्ताह',
+  'progress.lastWeek': 'पिछले सप्ताह',
+  'progress.weekCompare': 'इस सप्ताह बनाम पिछले सप्ताह: {thisSessions} बनाम {lastSessions} सेशन · {thisVolume} बनाम {lastVolume}',
   'progress.setsThisWeek': 'इस हफ़्ते के सेट',
   'progress.recoveryMap': 'रिकवरी',
   'progress.recoveryFresh': 'फ्रेश',
@@ -652,7 +658,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'prs.toastRemovedTitle': 'PR हट गया',
 
   // ── Meal scan (ScanMealModal) ───────────────────────────────────────
-  'scan.title': 'खाना स्कैन',
+  'scan.title': 'मील स्कैन',
   'scan.subtitle': 'फ़ोटो → मैक्रो अनुमान',
   'scan.notice': 'स्कैन सूचना',
   'scan.cameraNotice': 'कैमरा सूचना',
@@ -1411,7 +1417,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'meals.takePhoto': 'फ़ोटो लें',
   'meals.scanBarcode': 'बारकोड स्कैन करें',
   'meals.packagedProducts': 'पैकेट वाले उत्पाद',
-  'meals.scanMeal': 'खाना स्कैन करें',
+  'meals.scanMeal': 'मील स्कैन (फ़ोटो)',
   'meals.addManually': 'मैन्युअल जोड़ें',
   'meals.quickLogAria': 'खाना दर्ज करने के लिए खाद्य और मात्रा बताएं',
   'meals.log': 'दर्ज करें',
@@ -2644,6 +2650,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'coachBlock.topLiftsHint': 'आपकी लॉग की गई लिफ़्ट से अनुमानित — जो नंबर ग़लत लगे, बदल दें। शुरुआती वज़न इन्हीं से तय होते हैं।',
   'coachBlock.buildButton': 'मेरा ब्लॉक बनाएँ',
   'coachBlock.buildNext': 'अगला ब्लॉक बनाएँ',
+  // Audit phase 5, task 5.1(e) (2026-11-06): machine translation — Hindi review parked.
+  'coachBlock.viewCurrent': 'मौजूदा ब्लॉक देखें',
   'coachBlock.weekLabel': 'हफ़्ता {n}',
   'coachBlock.week_build': 'बिल्ड',
   'coachBlock.week_deload': 'डीलोड',

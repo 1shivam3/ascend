@@ -40,7 +40,7 @@ import PRsPage from '@/components/PRsPage';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import MeetAttemptPlannerModal from '@/components/MeetAttemptPlannerModal';
 import WeeklyRecapModal from '@/components/WeeklyRecapModal';
-import { plural, safeRandomId, getLocalTodayStr, getWeekDateStrings } from '@/lib/formatters';
+import { plural, safeRandomId, getLocalTodayStr, getWeekDateStrings, formatNumber } from '@/lib/formatters';
 import { buildActiveDays, calculateStreak } from '@/lib/streak-freeze';
 import { useToday } from '@/lib/use-today';
 import { useAppNavigation } from '@/lib/navigation';
@@ -50,6 +50,7 @@ import { resizeAndCompressImage } from '@/lib/image-processing';
 import ConfirmationModal from '@/components/ConfirmationModal';
 import type { ProgressPhoto } from '@/lib/types';
 import { kgToLbs } from '@/lib/units';
+import { calculateWorkoutVolumeKg } from '@/lib/volume';
 
 function formatProgressDate(dateStr: string): string {
   try {
@@ -340,7 +341,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     return `${Math.round(kg * 10) / 10} kg`;
   };
 
-  const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
+  const { registerBackHandler } = useAppNavigation();
 
   // Back Handlers
   useEffect(() => {
@@ -700,7 +701,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     // Audit-3 FE-18: "Last 7 Days" is a true trailing window — today plus
     // the previous 6 days (was: the current Mon–Sun calendar week, which
     // included future days early in the week).
-    const weekdayLetters = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    // Audit phase 5, task 5.1(i): two-letter day labels — the
+    // single letters (S S M T W T F) were ambiguous at a glance.
+    const weekdayLetters = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
     let thisWeekCompleted = 0;
     const dayBars = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(today);
@@ -747,6 +750,23 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     const fourWeeksTarget = weeklyTarget * 4;
     const consistencyPct = Math.round((fourWeeksCompleted / fourWeeksTarget) * 100);
 
+    // Audit phase 5, task 5.1(i): compact week-over-week comparison
+    // (Mon–Sun sessions + total volume, current week vs previous).
+    const weekCompare = [0, 1].map((w) => {
+      const anchor = new Date(today);
+      anchor.setDate(today.getDate() - w * 7);
+      const days = new Set(getWeekDateStrings(anchor));
+      let sessions = 0;
+      let volumeKg = 0;
+      for (const wk of normalizedWorkouts) {
+        if (days.has(wk.date)) {
+          sessions++;
+          volumeKg += calculateWorkoutVolumeKg(wk);
+        }
+      }
+      return { sessions, volumeKg };
+    });
+
     return {
       streakDays,
       thisWeekCompleted,
@@ -756,6 +776,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       consistencyPct,
       dayBars,
       fourWeeksBreakdown,
+      weekCompare,
     };
   }, [workouts, meals, streak?.freezesAvailable, trainingProfile?.daysPerWeek, todayStr, t]);
 
@@ -856,31 +877,20 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       {/* ── TOP HEADER ────────────────────────────────────────────────────── */}
       <header className="flex justify-between items-center mb-1">
         <div className="flex items-center gap-2">
-          {/* Back button logic */}
+          {/* Back button logic — Audit phase 5, task 5.1(a): a
+              chevron belongs only to a pushed sub-view (Strength
+              analytics/records → overview). The Body and Consistency
+              sub-tabs are sibling roots reached by the segmented
+              control, and the Progress tab root itself has no screen
+              above it, so neither shows a chevron anymore (the old
+              middle branch implied Consistency sat "below" Strength,
+              and the last branch popped the app tab stack). */}
           {activeTab === 'strength' && strengthSubView !== 'overview' ? (
             <button
               type="button"
               onClick={() => setStrengthSubView('overview')}
               className="p-2 min-h-[44px] min-w-[44px] -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
               aria-label={t('progress.backProgress')}
-            >
-              <ChevronLeft className="w-5 h-5 text-accent" />
-            </button>
-          ) : activeTab !== 'strength' ? (
-            <button
-              type="button"
-              onClick={() => setActiveTab('strength')}
-              className="p-2 min-h-[44px] min-w-[44px] -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
-              aria-label={t('progress.backStrength')}
-            >
-              <ChevronLeft className="w-5 h-5 text-accent" />
-            </button>
-          ) : canGoBack ? (
-            <button
-              type="button"
-              onClick={goBack}
-              className="p-2 min-h-[44px] min-w-[44px] -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
-              aria-label={t('progress.goBack')}
             >
               <ChevronLeft className="w-5 h-5 text-accent" />
             </button>
@@ -1830,6 +1840,17 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     </div>
                   ))}
                 </div>
+
+                {/* Audit phase 5, task 5.1(i): one compact line —
+                    this week vs last week (sessions + volume). */}
+                <p className="text-xs text-text-secondary tabular-nums border-t border-border/60 pt-3">
+                  {t('progress.weekCompare', {
+                    thisSessions: consistencyStats.weekCompare[0].sessions,
+                    lastSessions: consistencyStats.weekCompare[1].sessions,
+                    thisVolume: displayWeight(consistencyStats.weekCompare[0].volumeKg),
+                    lastVolume: displayWeight(consistencyStats.weekCompare[1].volumeKg),
+                  })}
+                </p>
               </div>
 
               {/* Card 3b: Muscle Volume + Recovery (toggleable in Settings) */}
