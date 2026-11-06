@@ -248,6 +248,17 @@ export default function FormCoachModal({
     return () => video.removeEventListener('loadedmetadata', update);
   }, [videoRef, state]);
 
+  // Touch devices have no drag-and-drop (P2-5): the upload prompt
+  // says "Choose a video" on a coarse pointer and keeps the
+  // drag-and-drop wording only where a fine pointer exists. Read
+  // once at first render (client-only modal; guarded for SSR).
+  const [isCoarsePointer] = useState<boolean>(
+    () =>
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(pointer: coarse)').matches
+  );
+
   // Handle hardware / browser back button safely
   useEffect(() => {
     if (!isOpen) return;
@@ -442,38 +453,56 @@ export default function FormCoachModal({
                 <Upload className="w-6 h-6 group-hover:-translate-y-0.5 transition-transform" />
               </div>
               <h3 className="text-sm font-bold text-text-primary">Upload Workout Video</h3>
-              <p className="text-xs text-text-secondary mt-1 max-w-xs">
-                Drag and drop your exercise video here, or <span className="text-accent-text font-medium underline">browse files</span>
-              </p>
+              {isCoarsePointer ? (
+                <p className="text-xs font-semibold text-accent-text mt-1">
+                  {t('formCoach.chooseVideo')}
+                </p>
+              ) : (
+                <p className="text-xs text-text-secondary mt-1 max-w-xs">
+                  {t('formCoach.dragDropPrefix')}{' '}
+                  <span className="text-accent-text font-medium underline">
+                    {t('formCoach.browseFiles')}
+                  </span>
+                </p>
+              )}
               <span className="text-2xs text-text-muted mt-2 font-mono">
                 Supports MP4, MOV, or WebM
               </span>
             </div>
 
-            {/* Privacy & Recording Tips */}
-            <div className="space-y-2.5">
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-2.5 text-xs text-emerald-400">
-                <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
-                <div className="text-2xs leading-relaxed text-text-secondary">
-                  <span className="font-semibold text-emerald-400 block">100% On-Device & Private</span>
-                  Video frames are analyzed locally in your browser using WebAssembly. Your video is never uploaded to any cloud server.
-                </div>
+            {/* Privacy, filming, safety — ONE neutral card (P2-5).
+                Same content as the previous three stacked colored
+                callouts, without the three competing colors. The
+                privacy line no longer names the tech (WebAssembly):
+                it says what the user cares about — the video is
+                analyzed on their phone and never uploaded. */}
+            <div className="p-3.5 rounded-xl bg-surface-elevated border border-border-subtle space-y-2.5 text-2xs text-text-secondary">
+              <div className="flex items-start gap-2.5">
+                <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-text-secondary" />
+                <p className="leading-relaxed">
+                  <span className="font-semibold text-text-primary">
+                    {t('formCoach.privacyLead')}
+                  </span>{' '}
+                  {t('formCoach.privacyLine')}
+                </p>
               </div>
-
-              <div className="p-3 rounded-xl bg-surface-elevated border border-border-subtle flex items-start gap-2.5 text-2xs text-text-secondary">
-                <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-semibold text-text-primary block">Filming Recommendation</span>
-                  Film from a side-profile angle at hip height. Ensure your head, hips, knees, and feet remain in frame throughout the set.
-                </div>
+              <div className="flex items-start gap-2.5">
+                <Info className="w-4 h-4 shrink-0 mt-0.5 text-text-secondary" />
+                <p className="leading-relaxed">
+                  <span className="font-semibold text-text-primary">
+                    {t('formCoach.filmingLead')}
+                  </span>{' '}
+                  {t('formCoach.filmingLine')}
+                </p>
               </div>
-
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2.5 text-2xs text-text-secondary">
-                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-semibold text-amber-400 block">Lift Safely</span>
-                  Stop the set if you feel pain or discomfort. Form Coach gives technique feedback from video measurements — it is not medical advice. If pain persists, see a qualified professional.
-                </div>
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-text-secondary" />
+                <p className="leading-relaxed">
+                  <span className="font-semibold text-text-primary">
+                    {t('formCoach.safetyLead')}
+                  </span>{' '}
+                  {t('formCoach.safetyLine')}
+                </p>
               </div>
             </div>
           </div>

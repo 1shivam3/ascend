@@ -61,8 +61,15 @@ describe('Form Coach — Streamlined Video Upload Architecture & Isolation', () 
     expect(modalSrc).toContain("state === 'report'");
     expect(modalSrc).toContain('<FormSessionSummaryModal');
 
-    // 100% on-device privacy
-    expect(modalSrc).toContain('100% On-Device & Private');
+    // 100% on-device privacy (audit phase 2, P2-5: the callout copy
+    // moved into the i18n dictionary — the modal renders
+    // formCoach.privacyLead/privacyLine via t(), and the privacy line
+    // no longer mentions WebAssembly; en.ts carries the copy itself).
+    expect(modalSrc).toContain("t('formCoach.privacyLine')");
+    expect(modalSrc).not.toContain('using WebAssembly');
+    const enSrc = readSrc('src/lib/i18n/en.ts');
+    expect(enSrc).toContain('100% On-Device & Private');
+    expect(enSrc).toContain('Your video is analyzed on your phone and never uploaded.');
     expect(modalSrc).not.toContain('CameraSetupGuide');
     expect(modalSrc).not.toContain('LiveAnalysisHUD');
   });
