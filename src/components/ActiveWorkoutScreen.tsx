@@ -2247,7 +2247,7 @@ export default function ActiveWorkoutScreen({
             <X className="w-4 h-4" />
           </button>
           <div className="min-w-0">
-            <h1 className="text-xs sm:text-sm font-bold text-text-primary tracking-tight truncate max-w-[200px] sm:max-w-md font-sans">
+            <h1 className="text-xs sm:text-sm font-bold text-text-primary tracking-tight line-clamp-2 leading-snug font-sans">
               {workoutName}
             </h1>
             <div className="flex items-center gap-1.5 text-2xs font-mono text-text-muted">
@@ -2258,16 +2258,9 @@ export default function ActiveWorkoutScreen({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            type="button"
-            onClick={handlePauseWorkout}
-            className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg bg-bg-secondary hover:bg-bg-tertiary text-text-muted hover:text-text-primary border border-border/80 flex items-center justify-center transition-all cursor-pointer"
-            title={t('workout.pauseDraft')}
-            aria-label={t('workout.pauseDraft')}
-          >
-            <Pause className="w-3.5 h-3.5" />
-          </button>
-
+          {/* P1-3 (UI/UX audit 2026-11-06): Pause moved into the ⋯ menu
+              (it was duplicated there anyway) — the header keeps only
+              Finish + the menu so the title gets its two lines back. */}
           <button
             type="button"
             onClick={() => setIsFinishModalOpen(true)}
@@ -2279,47 +2272,11 @@ export default function ActiveWorkoutScreen({
             <span className="hidden sm:inline">{t('common.finish')}</span>
           </button>
 
-          {/* Form cues + Warm-up: the two things a beginner needs MOST
-              were buried 4th/6th in the overflow menu. They get visible
-              header buttons (the menu entries stay for discoverability). */}
-          {/* ASCEND Form Coach — video-upload form analysis. Shown only
-              for squat- and deadlift-family exercises: the movements the
-              analyzers support (see formCoachPresetForExercise). */}
-          {isFormCoachSupported && (
-          <button
-            type="button"
-            onClick={() => setShowFormCoach(true)}
-            className="px-2.5 py-1.5 min-h-[44px] rounded-lg bg-accent/15 hover:bg-accent/25 border border-accent/40 text-accent font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer"
-            title="ASCEND Form Coach — Video Form Analysis"
-            aria-label={t('tools.formCoachTitle')}
-          >
-            <Camera className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{t('workout.formCoach')}</span>
-          </button>
-          )}
-
-          {hasFormSurface && (
-            <button
-              type="button"
-              onClick={() => setShowFormCues((prev) => !prev)}
-              className="px-2.5 py-1.5 min-h-[44px] rounded-lg bg-bg-secondary hover:bg-accent/15 border border-border/80 hover:border-accent/40 text-text-secondary hover:text-accent-text font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer"
-              title={t('workout.formCuesTitle')}
-              aria-label={t('workout.formCuesAria')}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{t('workout.formCuesHeading')}</span>
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setIsWarmupModalOpen(true)}
-            className="px-2.5 py-1.5 min-h-[44px] rounded-lg bg-bg-secondary hover:bg-amber-500/15 border border-border/80 hover:border-amber-500/40 text-text-secondary hover:text-amber-400 font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer"
-            title={t('workout.warmupTitle')}
-            aria-label={t('workout.warmupSets')}
-          >
-            <Flame className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{t('workout.warmup')}</span>
-          </button>
+          {/* P1-3: the Form Coach / Form Cues / Warm-up header buttons
+              are gone — all three live in the ⋯ menu below (they were
+              duplicates, and the Form Coach button's accent fill read
+              as a "selected" state it never had). This reverses the
+              earlier promote-for-beginners call per the audit brief. */}
 
           {/* Secondary ⋯ Tools Menu (Available for quick tools & helper sheets) */}
           <div className="relative">
@@ -2440,6 +2397,19 @@ export default function ActiveWorkoutScreen({
                   <ArrowRightLeft className="w-3.5 h-3.5 text-accent" />
                   <span>{t('workout.swapExercise')}</span>
                 </button>
+                {/* P1-3: the crowded-gym toggle moved here from its own
+                    bar under the header; the Swap/Keep banner it arms
+                    still appears in the workout when relevant. */}
+                <button
+                  type="button"
+                  onClick={() => setGymPacked((v) => !v)}
+                  aria-pressed={gymPacked}
+                  className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5 text-text-muted" />
+                  <span>{t('workout.swapBusyEquipment')}</span>
+                  {gymPacked && <Check className="w-3.5 h-3.5 text-accent ml-auto" />}
+                </button>
               </div>
             )}
           </div>
@@ -2511,37 +2481,9 @@ export default function ActiveWorkoutScreen({
         </div>
       </nav>
 
-      {/* ── Crowded-gym toggle (per session) ──────────────────────────── */}
-      <div className="bg-bg-card border-b border-border/80 px-4 py-1.5 shrink-0">
-        <div className="max-w-[480px] mx-auto flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <span className="text-xs font-semibold text-text-secondary block">{t('packed.toggle')}</span>
-            {/* Micro-gloss (declutter PR 2): the plan-detail toggle
-                explains what this swaps; the in-workout row was a bare
-                label. Same explainer string, no new copy.
-                DEV-1 (final certification): no `truncate` — the 363px
-                sentence was ellipsized at every phone width. Like the
-                plan-detail sibling (WorkoutDetailsView), it wraps. */}
-            <span className="text-2xs text-text-muted block leading-relaxed">{t('packed.previewHint')}</span>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={gymPacked}
-            aria-label={t('packed.toggle')}
-            onClick={() => setGymPacked((v) => !v)}
-            className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer shrink-0 ${
-              gymPacked ? 'bg-accent' : 'bg-border'
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
-                gymPacked ? 'left-[22px]' : 'left-0.5'
-              }`}
-            />
-          </button>
-        </div>
-      </div>
+      {/* P1-3: the crowded-gym toggle bar that lived here moved into
+          the ⋯ menu as "Swap for busy equipment" (gymPacked state and
+          the Swap/Keep banner below are unchanged). */}
 
       {/* ── Main Exercise Focus Workspace (Radically simplified) ───────── */}
       <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 max-w-[480px] mx-auto w-full pb-16">
@@ -2784,48 +2726,43 @@ export default function ActiveWorkoutScreen({
             )}
           </div>
 
-          {/* Context & Target Card (Clean Minimal Comparison) */}
-          <div className="p-3.5 rounded-2xl bg-bg-card border border-border/80 mt-2">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <span className="text-2xs font-semibold uppercase tracking-wider text-text-muted block">
-                  {t('workout.todaysTarget')}
-                </span>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-base sm:text-lg font-bold font-sans text-accent">
-                    {targetDisplay.text}
-                  </span>
-                  {workoutMode === 'advanced' && targetDisplay.targetRpe !== undefined && (
-                    <span className="text-xs font-mono text-text-muted">
-                      @{targetDisplay.targetRpe}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="text-right space-y-0.5">
-                <span className="text-2xs font-semibold uppercase tracking-wider text-text-muted block">
-                  {t('workout.lastTime')}
-                </span>
-                <span className="text-xs font-semibold text-text-secondary block">
-                  {prescription?.lastPerformance
-                    ? t('workout.lastPerformance', {
-                        weight: prescription.lastPerformance.weight,
-                        unit: userUnit,
-                        reps: prescription.lastPerformance.reps,
-                      })
-                    : lastPerf
-                    ? lastPerf.summary
-                    : fallbackPR
-                    ? t('workout.baseline', {
-                        weight: userUnit === 'lbs' ? fallbackPR.weightLbs : fallbackPR.weightKg,
-                        unit: userUnit,
-                        reps: fallbackPR.reps,
-                      })
-                    : t('workout.firstExposure')}
-                </span>
-              </div>
-            </div>
+          {/* Context & Target — P1-3: one line, "Target 60 kg × 8 ·
+              Last 60 kg × 10", so the beginner viewport holds name +
+              target + set pills + Weight/Reps cards together. */}
+          <div className="px-3 py-2 rounded-xl bg-bg-card border border-border/80 mt-2 flex items-center gap-x-2 gap-y-0.5 flex-wrap">
+            <span className="text-xs font-bold text-text-primary whitespace-nowrap">
+              {targetDisplay.isUnconfigured
+                ? targetDisplay.text
+                : `${t('workout.targetShort')} ${targetDisplay.text}`}
+            </span>
+            {workoutMode === 'advanced' && targetDisplay.targetRpe !== undefined && (
+              <span className="text-xs font-mono text-text-muted">
+                @{targetDisplay.targetRpe}
+              </span>
+            )}
+            <span aria-hidden="true" className="text-text-muted">·</span>
+            <span className="text-xs font-semibold text-text-secondary whitespace-nowrap">
+              {(() => {
+                const lastText = prescription?.lastPerformance
+                  ? t('workout.lastPerformance', {
+                      weight: prescription.lastPerformance.weight,
+                      unit: userUnit,
+                      reps: prescription.lastPerformance.reps,
+                    })
+                  : lastPerf
+                  ? lastPerf.summary
+                  : fallbackPR
+                  ? t('workout.baseline', {
+                      weight: userUnit === 'lbs' ? fallbackPR.weightLbs : fallbackPR.weightKg,
+                      unit: userUnit,
+                      reps: fallbackPR.reps,
+                    })
+                  : null;
+                return lastText
+                  ? `${t('workout.lastShort')} ${lastText}`
+                  : t('workout.firstExposure');
+              })()}
+            </span>
           </div>
         </section>
 
@@ -3001,8 +2938,10 @@ export default function ActiveWorkoutScreen({
                 </div>
               </div>
             ) : (
-              /* The One Set Focus Card */
-              <div className="card p-5 sm:p-6 bg-bg-card border border-border/80 shadow-md space-y-6 animate-fade-in">
+              /* The One Set Focus Card — P1-3: padding tightened (not
+                 the numerals) so name + target line + pills + both
+                 stepper cards fit one 360×740 viewport. */
+              <div className="card p-4 sm:p-5 bg-bg-card border border-border/80 shadow-md space-y-4 animate-fade-in">
                 <div className="space-y-4">
                   {/* F3: a completed set selected via its pill is being
                       EDITED, not logged anew — say so, or the athlete
@@ -3017,7 +2956,7 @@ export default function ActiveWorkoutScreen({
                     </div>
                   )}
                   {/* Weight Stepper Row (Reference: Screen 12 & Screen 6) */}
-                  <div className="p-4 sm:p-5 rounded-2xl bg-bg-secondary/40 border border-border/70 flex flex-col items-center gap-2">
+                  <div className="p-3 sm:p-4 rounded-2xl bg-bg-secondary/40 border border-border/70 flex flex-col items-center gap-2">
                     <span className="text-2xs font-bold uppercase tracking-wider text-text-muted">
                       {isCurrentBodyweight ? t('workout.addedWeight', { unit: userUnit }) : isCurrentDumbbell ? t('workout.weightPerDb', { unit: userUnit }) : t('workout.weight', { unit: userUnit })}
                     </span>
@@ -3109,7 +3048,7 @@ export default function ActiveWorkoutScreen({
                   </div>
 
                   {/* Reps Stepper Row (Reference: Screen 12 & Screen 6) */}
-                  <div className="p-4 sm:p-5 rounded-2xl bg-bg-secondary/40 border border-border/70 flex flex-col items-center gap-2">
+                  <div className="p-3 sm:p-4 rounded-2xl bg-bg-secondary/40 border border-border/70 flex flex-col items-center gap-2">
                     <span className="text-2xs font-bold uppercase tracking-wider text-text-muted">
                       {t('workout.reps')}
                     </span>
@@ -3169,34 +3108,9 @@ export default function ActiveWorkoutScreen({
                   </button>
                 </div>
 
-                {/* Screen 12 Action Buttons: Skip (~35%) and Complete Set (~65%) */}
-                <div className="flex items-center gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => handleSkipSet(activeSetIdx)}
-                    className={`w-[35%] py-3.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 transition-all border cursor-pointer active:scale-95 ${
-                      currentExercise.sets[activeSetIdx]?.status === 'skipped'
-                        ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 hover:bg-amber-500/25'
-                        : 'bg-bg-secondary hover:bg-bg-tertiary border-border/80 text-text-secondary hover:text-text-primary'
-                    }`}
-                  >
-                    <span>{currentExercise.sets[activeSetIdx]?.status === 'skipped' ? t('workout.unskip') : t('workout.skip')}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={isCompletingSet}
-                    onClick={() => handleCompleteActiveSet(activeSetIdx)}
-                    className={`w-[65%] py-3.5 rounded-xl text-sm sm:text-base font-bold tracking-wide flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] cursor-pointer ${
-                      isActiveSetCompleted(currentExercise.sets[activeSetIdx])
-                        ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/25'
-                        : 'bg-accent hover:bg-accent-dim text-accent-on shadow-accent/25'
-                    }`}
-                  >
-                    <Check className="w-5 h-5 stroke-[3]" />
-                    <span>{isActiveSetCompleted(currentExercise.sets[activeSetIdx]) ? t('workout.setDone', { n: activeSetIdx + 1 }) : t('workout.completeSet')}</span>
-                  </button>
-                </div>
+                {/* P1-3: Skip / Complete Set moved OUT of the scroll
+                    flow into the fixed bottom action bar (rendered
+                    after </main> below) — always visible, one-handed. */}
               </div>
 
             )}
@@ -3480,13 +3394,56 @@ export default function ActiveWorkoutScreen({
         )}
       </main>
 
+      {/* P1-3: beginner bottom action bar — Skip / Complete Set are
+          always visible above the safe area instead of living at the
+          bottom of the scroll flow. Hidden while the post-exercise
+          effort prompt is up (it carries its own Next/Finish CTA). */}
+      {workoutMode === 'beginner' && !showEffortPrompt && currentExercise && (
+        <div
+          className="shrink-0 border-t border-border/80 bg-bg-card px-4 pt-2.5"
+          style={{ paddingBottom: 'max(0.625rem, env(safe-area-inset-bottom, 0px))' }}
+        >
+          <div className="max-w-[480px] mx-auto flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => handleSkipSet(activeSetIdx)}
+              className={`w-[35%] py-3.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 transition-all border cursor-pointer active:scale-95 ${
+                currentExercise.sets[activeSetIdx]?.status === 'skipped'
+                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 hover:bg-amber-500/25'
+                  : 'bg-bg-secondary hover:bg-bg-tertiary border-border/80 text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <span>{currentExercise.sets[activeSetIdx]?.status === 'skipped' ? t('workout.unskip') : t('workout.skip')}</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isCompletingSet}
+              onClick={() => handleCompleteActiveSet(activeSetIdx)}
+              className={`w-[65%] py-3.5 rounded-xl text-sm sm:text-base font-bold tracking-wide flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] cursor-pointer ${
+                isActiveSetCompleted(currentExercise.sets[activeSetIdx])
+                  ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/25'
+                  : 'bg-accent hover:bg-accent-dim text-accent-on shadow-accent/25'
+              }`}
+            >
+              <Check className="w-5 h-5 stroke-[3]" />
+              <span>{isActiveSetCompleted(currentExercise.sets[activeSetIdx]) ? t('workout.setDone', { n: activeSetIdx + 1 }) : t('workout.completeSet')}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Single Small Floating Rest Timer Button ───────────────────────── */}
       {/* Open-items J2.1: render only while a rest timer is genuinely
           active (running, paused with time left, or just finished) —
           before the first completed set this pill showed a "1:30"
           countdown the user never started. */}
       {(isRestRunning || isRestFinished || restSecondsLeft > 0) && (
-      <div className="fixed bottom-5 right-4 z-40 flex flex-col items-end gap-1.5 select-none pointer-events-auto">
+      <div className={`fixed right-4 z-40 flex flex-col items-end gap-1.5 select-none pointer-events-auto ${
+        workoutMode === 'beginner' && !showEffortPrompt
+          ? 'bottom-[calc(env(safe-area-inset-bottom,0px)+96px)]'
+          : 'bottom-5'
+      }`}>
         {/* A11Y-06 (final certification): screen-reader rest-end
             announcement. The countdown readouts carry role="timer"
             (implicit aria-live="off", so no per-second spam); this
