@@ -26,7 +26,7 @@ import {
   Activity,
   Calendar,
 } from 'lucide-react';
-import { getExerciseList, getExerciseEquipment } from '@/lib/strength-standards';
+import { getExerciseList, getExerciseEquipment, isBodyweightExercise } from '@/lib/strength-standards';
 import { PlannedExercise, PlannedWorkout, useStore } from '@/lib/store';
 import { generateSplitWeeklySchedule } from '@/lib/workout-schedule';
 import { prepareGeneratedPlans } from '@/lib/workout-engine';
@@ -327,7 +327,11 @@ export function generateExercisesFromSelection(
       name,
       targetSets,
       targetReps,
-      targetWeight: 0,
+      // P0-1 (UI/UX audit 2026-11-06): never stamp a placeholder 0 on a
+      // loaded exercise — it flowed into every set as a fabricated
+      // "0 kg" start. Unset means the active workout pre-fills from
+      // history or asks. Bodyweight work keeps 0 (= no added load).
+      targetWeight: isBodyweightExercise(name) ? 0 : undefined,
       targetUnit: userUnit,
       notes: '',
     };

@@ -52,6 +52,9 @@ import {
   finalizeWorkoutExercises,
   getExecutedExercises,
   getNextSessionTarget,
+  setNeedsWeightPrompt,
+  prefillUnsetSetsFromHistory,
+  getWorkingSetWeight,
   applyExerciseEffortRating,
   clampWorkoutWeight,
   clampWorkoutReps,
@@ -99,6 +102,27 @@ function getPlateSummary(targetWeight: number, unit: 'kg' | 'lbs' = 'kg'): strin
   if (!res.plates || res.plates.length === 0) return null;
   const parts = res.plates.map((p) => (p.count > 1 ? `${p.count}×${p.weight}` : `${p.weight}`));
   return `${parts.join(' + ')} /side`;
+}
+
+/**
+ * P0-1 priority (a): once a set is completed with a real weight, the
+ * remaining untouched sets of the same exercise inherit its weight
+ * and reps — the athlete should never face a second blank set.
+ */
+function propagateCompletedSetValues(sets: WorkoutSet[], completedIdx: number): WorkoutSet[] {
+  const done = sets[completedIdx];
+  if (!done || !isActiveSetCompleted(done)) return sets;
+  const w = done.weight;
+  if (typeof w !== 'number' || isNaN(w) || w <= 0) return sets;
+  let changed = false;
+  const next = sets.map((s, j) => {
+    if (j > completedIdx && !isActiveSetCompleted(s) && s.status !== 'skipped' && s.weight === undefined) {
+      changed = true;
+      return { ...s, weight: w, reps: done.reps };
+    }
+    return s;
+  });
+  return changed ? next : sets;
 }
 
 function triggerHaptic(type: 'set_complete' | 'rest_done' | 'pr_hit') {
@@ -275,10 +299,7 @@ export default function ActiveWorkoutScreen({
         const rawSets = (e.sets && e.sets.length > 0) ? e.sets : [
           { weight: isBW ? 0 : undefined, reps: defaultReps, unit: userUnit, completed: false, rpe: 8 },
         ];
-        return {
-          ...e,
-          name: exName,
-          sets: rawSets.map((s) => {
+        const normalizedSets = rawSets.map((s) => {
             let finalWeight: number | undefined = undefined;
             if (typeof s.weight === 'number' && !isNaN(s.weight)) {
               finalWeight = s.weight;
@@ -317,7 +338,32 @@ export default function ActiveWorkoutScreen({
               prescribedUnit,
               appliedDecisionId,
             };
-          }),
+          });
+        // P0-1 (UI/UX audit 2026-11-06): heal + prefill.
+        // Heal: a PENDING loaded set stored at 0 with no real (> 0)
+        // prescription behind it is the old fabricated placeholder —
+        // it is UNSET, not "0 kg". Completed sets keep their record.
+        const healedSets = isBW
+          ? normalizedSets
+          : normalizedSets.map((s) =>
+              !isActiveSetCompleted(s) &&
+              s.weight === 0 &&
+              !(typeof s.prescribedWeight === 'number' && s.prescribedWeight > 0)
+                ? { ...s, weight: undefined }
+                : s
+            );
+        // Prefill priority (b): unset sets inherit weight + reps from
+        // the matching set of the last session for this exercise.
+        const lastPerfForExercise = isBW
+          ? null
+          : getLastExercisePerformance(exName, workouts);
+        const finalSets = isBW
+          ? healedSets
+          : prefillUnsetSetsFromHistory(healedSets, lastPerfForExercise?.sets);
+        return {
+          ...e,
+          name: exName,
+          sets: finalSets,
         };
       });
     }
@@ -534,6 +580,11 @@ export default function ActiveWorkoutScreen({
     rpe?: number;
   } | null>(null);
   const [isCompletingSet, setIsCompletingSet] = useState(false);
+  // P0-1: one-time-per-exercise "Log without weight?" confirm. The ref
+  // remembers which exercises already asked this session; the state
+  // carries the pending completion so "Log anyway" can replay it.
+  const [weightPrompt, setWeightPrompt] = useState<{ setIdx: number; mode: 'beginner' | 'toggle' } | null>(null);
+  const weightPromptShownRef = useRef<Set<string>>(new Set());
 
   // Live-fix L4: dismissing the Set Complete overlay pauses the rest
   // timer (remaining time stays resumable from the pill) — it must never
@@ -1181,11 +1232,15 @@ export default function ActiveWorkoutScreen({
           return { text: `+${firstSet.prescribedWeight} ${firstSet.prescribedUnit || userUnit} × ${targetReps} reps`, isUnconfigured: false, targetRpe };
         }
       }
-      return {
-        text: `${firstSet.prescribedWeight} ${firstSet.prescribedUnit || userUnit} × ${targetReps} reps`,
-        isUnconfigured: false,
-        targetRpe,
-      };
+      if (firstSet.prescribedWeight > 0) {
+        return {
+          text: `${firstSet.prescribedWeight} ${firstSet.prescribedUnit || userUnit} × ${targetReps} reps`,
+          isUnconfigured: false,
+          targetRpe,
+        };
+      }
+      // P0-1: a prescribed 0 on a loaded exercise is the old
+      // placeholder, not a target — fall through to "unconfigured".
     }
 
     // 2. Bodyweight exercise without explicit extra load:
@@ -1195,11 +1250,11 @@ export default function ActiveWorkoutScreen({
 
     // 3. Unconfigured non-bodyweight exercise:
     return {
-      text: `Unconfigured load × ${targetReps} reps`,
+      text: t('workout.logWeightedForTarget'),
       isUnconfigured: true,
       targetRpe: undefined,
     };
-  }, [currentExercise, userUnit]);
+  }, [currentExercise, userUnit, language]);
 
   const formCues = useMemo(() => {
     if (!currentExercise?.name) return [];
@@ -1249,8 +1304,13 @@ export default function ActiveWorkoutScreen({
       const target = getNextSessionTarget(
         ex.name,
         validSets.map((s) => ({
-          weight: parseFloat(String(s.weight)) || 0,
-          reps: parseInt(String(s.reps), 10) || 0,
+          // P0-1: pass the weight through untouched — coercing an
+          // unset weight to 0 here is what fed the old "0 kg"
+          // adaptations. getNextSessionTarget now excludes weightless
+          // sets on loaded exercises and returns null when nothing
+          // weighted was logged.
+          weight: s.weight,
+          reps: s.reps,
           rpe: s.rpe,
           unit: (s.unit as Unit) || userUnit,
         })),
@@ -1270,19 +1330,23 @@ export default function ActiveWorkoutScreen({
         improved.push(`${ex.name}: moved with reserve — ready for more load`);
       } else if (target.directive === 'hold') {
         steady.push(`${ex.name}: hard session — consolidating at ${target.weight} ${userUnit}`);
+      } else if (isBodyweightExercise(ex.name)) {
+        steady.push(`${ex.name}: building reps at bodyweight`);
       } else {
         steady.push(`${ex.name}: building reps at ${target.weight} ${userUnit}`);
       }
       nextRules.push({ summary: target.summaryText, rationale: target.rationale });
     }
 
+    // P0-1 / P1-10: NO fabricated fallbacks. A session with no valid
+    // weighted data gets no invented "improved"/"stays"/"next" lines —
+    // hasData=false and the finish sheet shows "Not enough data yet".
+    const hasData = improved.length > 0 || steady.length > 0 || nextRules.length > 0;
     return {
-      improved: improved.length > 0 ? improved.slice(0, 2) : ['First session calibration completed'],
-      steady: steady.length > 0 ? steady.slice(0, 2) : ['Movement quality & baseline established'],
-      nextRules:
-        nextRules.length > 0
-          ? nextRules.slice(0, 2)
-          : [{ summary: 'Follow prescribed target progression' }],
+      improved: improved.slice(0, 2),
+      steady: steady.slice(0, 2),
+      nextRules: nextRules.slice(0, 2),
+      hasData,
     };
   }, [exercises, userUnit]);
 
@@ -1339,10 +1403,34 @@ export default function ActiveWorkoutScreen({
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
         const editedSet = ex.sets[setIdx];
-        const baseW = typeof editedSet?.weight === 'number' && !isNaN(editedSet.weight)
+        const currentW = typeof editedSet?.weight === 'number' && !isNaN(editedSet.weight)
           ? editedSet.weight
-          : (typeof editedSet?.prescribedWeight === 'number' && !isNaN(editedSet.prescribedWeight) ? editedSet.prescribedWeight : 0);
-        const newW = clampWorkoutWeight(Math.round((baseW + step) * 10) / 10, userUnit);
+          : undefined;
+        const prescribedW = typeof editedSet?.prescribedWeight === 'number' && !isNaN(editedSet.prescribedWeight) && editedSet.prescribedWeight > 0
+          ? editedSet.prescribedWeight
+          : undefined;
+        // P0-1: stepping from UNSET starts from a sensible value —
+        // the set's own weight, else its prescription, else (no
+        // history at all) the empty bar for barbell work or 0 for
+        // other kit (first + tap then lands on the smallest plate
+        // step). From an unset bar start, the first tap in either
+        // direction simply reveals the bar weight.
+        const wasUnset = currentW === undefined;
+        const baseW = currentW !== undefined
+          ? currentW
+          : prescribedW !== undefined
+          ? prescribedW
+          : isCurrentBodyweight
+          ? 0
+          : isCurrentBarbell
+          ? (userUnit === 'lbs' ? 45 : 20)
+          : 0;
+        // Reveal-only applies to the invisible start (no value, no
+        // prescription — just the bar). A visible prescription steps
+        // from itself, like a set value does.
+        const newW = wasUnset && prescribedW === undefined && baseW > 0
+          ? baseW
+          : clampWorkoutWeight(Math.round((baseW + step) * 10) / 10, userUnit);
         const oldWeight = editedSet?.weight;
         // F3: no pre-fill sync when the stepped set is already completed.
         const sourceCompleted = editedSet ? isActiveSetCompleted(editedSet) : false;
@@ -1428,17 +1516,42 @@ export default function ActiveWorkoutScreen({
     );
   };
 
+  // P0-1: "Log anyway" marks the exercise as asked and replays the
+  // pending completion through the same handler that raised the
+  // prompt; "Add weight" just dismisses (the set stays pending and
+  // the weight field is right there).
+  const handleWeightPromptAnyway = () => {
+    if (!weightPrompt) return;
+    weightPromptShownRef.current.add(currentExercise.name);
+    const { setIdx, mode } = weightPrompt;
+    setWeightPrompt(null);
+    if (mode === 'beginner') handleCompleteActiveSet(setIdx);
+    else handleToggleSetComplete(setIdx);
+  };
+  const handleWeightPromptCancel = () => setWeightPrompt(null);
+
   const handleToggleSetComplete = (setIdx: number) => {
     setWeightInputStr(null);
     const wasCompleted = isActiveSetCompleted(currentExercise.sets[setIdx]);
     const isNowCompleted = !wasCompleted;
+
+    // P0-1: completing a loaded exercise with no weight asks once per
+    // exercise per session; "Log anyway" replays through this handler.
+    if (
+      isNowCompleted &&
+      setNeedsWeightPrompt(currentExercise.name, currentExercise.sets[setIdx]) &&
+      !weightPromptShownRef.current.has(currentExercise.name)
+    ) {
+      setWeightPrompt({ setIdx, mode: 'toggle' });
+      return;
+    }
 
     setExercises((prev) =>
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
         return {
           ...ex,
-          sets: ex.sets.map((s, j) => {
+          sets: propagateCompletedSetValues(ex.sets.map((s, j) => {
             if (j !== setIdx) return s;
             const finalW = (s.weight === undefined && isCurrentBodyweight) ? 0 : s.weight;
             return {
@@ -1447,7 +1560,7 @@ export default function ActiveWorkoutScreen({
               completed: isNowCompleted,
               status: isNowCompleted ? 'completed' : 'pending',
             };
-          }),
+          }), setIdx),
         };
       })
     );
@@ -1591,12 +1704,22 @@ export default function ActiveWorkoutScreen({
     const wasCompleted = isActiveSetCompleted(targetSet);
     const isNowCompleted = !wasCompleted;
 
+    // P0-1: same one-time no-weight confirm as the advanced toggle.
+    if (
+      isNowCompleted &&
+      setNeedsWeightPrompt(currentExercise.name, targetSet) &&
+      !weightPromptShownRef.current.has(currentExercise.name)
+    ) {
+      setWeightPrompt({ setIdx, mode: 'beginner' });
+      return;
+    }
+
     setExercises((prev) =>
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
         return {
           ...ex,
-          sets: ex.sets.map((s, j) => {
+          sets: propagateCompletedSetValues(ex.sets.map((s, j) => {
             if (j !== setIdx) return s;
             const finalW = (s.weight === undefined && isCurrentBodyweight) ? 0 : s.weight;
             return {
@@ -1605,7 +1728,7 @@ export default function ActiveWorkoutScreen({
               completed: isNowCompleted,
               status: isNowCompleted ? 'completed' : 'pending',
             };
-          }),
+          }), setIdx),
         };
       })
     );
@@ -1753,8 +1876,14 @@ export default function ActiveWorkoutScreen({
 
   // Warm-up sets generator preview
   const generatedWarmupPreview = useMemo(() => {
-    const firstWorkingSet = currentExercise?.sets.find((s) => (parseFloat(String(s.weight)) || 0) > 0) || currentExercise?.sets[0];
-    const workingWeight = firstWorkingSet ? (parseFloat(String(firstWorkingSet.weight)) || 0) : (userUnit === 'lbs' ? 135 : 60);
+    // P0-1: the working weight must be REAL. The old code invented
+    // 60 kg / 135 lbs when no set carried a weight and built a ramp
+    // to a load the athlete never chose. Null = no ramp; the modal
+    // disables Insert and asks for a working weight first.
+    const workingWeight = getWorkingSetWeight(currentExercise?.sets ?? []);
+    if (workingWeight === null) {
+      return { workingWeight: null as number | null, warmups: [] as (WorkoutSet & { label: string })[] };
+    }
     const barWeight = userUnit === 'lbs' ? 45 : 20;
 
     const roundStep = (w: number) => {
@@ -1838,6 +1967,8 @@ export default function ActiveWorkoutScreen({
 
   // Warm-up sets generator
   const handleGenerateWarmupSets = () => {
+    // P0-1: no working weight → no ramp to insert (button is disabled too).
+    if (generatedWarmupPreview.workingWeight === null) return;
     const warmupsToInsert: WorkoutSet[] = generatedWarmupPreview.warmups.map((w) => ({
       weight: w.weight,
       reps: w.reps,
@@ -3590,6 +3721,11 @@ export default function ActiveWorkoutScreen({
                 {t('workout.warmupDesc')}
               </p>
 
+              {generatedWarmupPreview.workingWeight === null ? (
+                <p className="text-xs font-semibold text-text-secondary p-3 rounded-xl bg-bg-secondary border border-border/80">
+                  {t('workout.addWorkingWeightFirst')}
+                </p>
+              ) : (
               <div className="p-3 rounded-xl bg-bg-secondary border border-border/80 space-y-2 font-mono text-2xs">
                 <div className="flex items-center justify-between text-accent font-bold">
                   <span>{t('workout.plannedWarmup')}</span>
@@ -3613,6 +3749,7 @@ export default function ActiveWorkoutScreen({
                   ))}
                 </div>
               </div>
+              )}
 
               <div className="flex gap-2 pt-2">
                 <button
@@ -3625,7 +3762,8 @@ export default function ActiveWorkoutScreen({
                 <button
                   type="button"
                   onClick={handleGenerateWarmupSets}
-                  className="btn-primary flex-1 py-2 text-xs font-bold"
+                  disabled={generatedWarmupPreview.workingWeight === null}
+                  className="btn-primary flex-1 py-2 text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {t('workout.insertSets')}
                 </button>
@@ -3643,6 +3781,19 @@ export default function ActiveWorkoutScreen({
           onClose={() => setShowFormCues(false)}
         />
       )}
+
+      {/* P0-1: one-time "Log without weight?" confirm */}
+      <ConfirmationModal
+        isOpen={weightPrompt !== null}
+        onClose={handleWeightPromptCancel}
+        onConfirm={handleWeightPromptAnyway}
+        title={t('workout.logWithoutWeightTitle')}
+        message={t('workout.logWithoutWeightMsg')}
+        confirmText={t('workout.logAnyway')}
+        cancelText={t('workout.addWeight')}
+        variant="warning"
+        icon="alert"
+      />
 
       {/* ── ASCEND Form Coach Modal (video-upload analysis, exercise
           preset from the current workout exercise) ─────────────────── */}
@@ -4102,13 +4253,23 @@ export default function ActiveWorkoutScreen({
                 </div>
               </div>
 
-              {/* Post-Workout Adaptation Ledger */}
+              {/* Post-Workout Adaptation Ledger — P0-1/P1-10: each
+                  block renders only with real data behind it; with no
+                  valid weighted set the whole ledger collapses to the
+                  honest "Not enough data yet" line. */}
               <div className="space-y-2 pt-1 text-left">
                 <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
                   {t('workout.adaptationSummary')}
                 </span>
 
+                {!postWorkoutLedger.hasData ? (
+                  <p className="text-2xs text-text-muted leading-snug">
+                    {t('workout.notEnoughData')}
+                  </p>
+                ) : (
+                  <>
                 {/* 1. What improved */}
+                {postWorkoutLedger.improved.length > 0 && (
                 <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 space-y-1">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
                     <Check className="w-3.5 h-3.5 stroke-[3]" />
@@ -4120,8 +4281,10 @@ export default function ActiveWorkoutScreen({
                     ))}
                   </ul>
                 </div>
+                )}
 
                 {/* 2. What stays the same */}
+                {postWorkoutLedger.steady.length > 0 && (
                 <div className="p-2.5 rounded-xl bg-bg-secondary border border-border/80 space-y-1">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-text-primary">
                     <Layers className="w-3.5 h-3.5 text-text-muted" />
@@ -4133,8 +4296,10 @@ export default function ActiveWorkoutScreen({
                     ))}
                   </ul>
                 </div>
+                )}
 
                 {/* 3. What changes next time */}
+                {postWorkoutLedger.nextRules.length > 0 && (
                 <div className="p-2.5 rounded-xl bg-accent/10 border border-accent/30 space-y-1">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-accent-text">
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -4153,6 +4318,9 @@ export default function ActiveWorkoutScreen({
                     ))}
                   </ul>
                 </div>
+                )}
+                  </>
+                )}
               </div>
 
               {/* 360px: 'Save & finish' in Hindi is 24 chars — let the

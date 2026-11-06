@@ -203,8 +203,23 @@ export function getNextSessionTarget(
   userUnit: Unit = 'kg',
   opts?: { hadPain?: boolean }
 ): NextSessionTarget | null {
-  const done = (completedSets || []).filter((s) => s.reps > 0);
+  let done = (completedSets || []).filter((s) => s.reps > 0);
   if (done.length === 0) return null;
+
+  // P0-1 (UI/UX audit 2026-11-06): a loaded exercise whose sets were
+  // logged with no weight (unset or 0) must never produce a target —
+  // the old code fell into the bodyweight branch below and prescribed
+  // "0kg × N+1 next session". Weightless sets are excluded; if none
+  // remain, there is no target. Two deliberate carve-outs keep their
+  // existing behavior: true bodyweight exercises (rep progression IS
+  // their progression) and explosive movements (their directive is a
+  // quality hold that never names a load).
+  if (!isBodyweightExercise(exerciseName) && !EXPLOSIVE_EXERCISE_PATTERN.test(exerciseName)) {
+    done = done.filter(
+      (s) => typeof s.weight === 'number' && !isNaN(s.weight) && s.weight > 0
+    );
+    if (done.length === 0) return null;
+  }
 
   const step = userUnit === 'lbs' ? 5 : 2.5;
   const maxW = Math.max(...done.map((s) => (typeof s.weight === 'number' && !isNaN(s.weight) ? s.weight : 0)));
@@ -256,7 +271,7 @@ export function getNextSessionTarget(
         weight: 0,
         reps: topReps,
         directive: 'hold',
-        summaryText: `${exerciseName}: hold 0${userUnit} × ${topReps} next session`,
+        summaryText: `${exerciseName}: hold BW × ${topReps} next session`,
         rationale: `${rpeStr} — hard session. Hold and consolidate before adding reps.`,
       };
     }
@@ -265,7 +280,7 @@ export function getNextSessionTarget(
       weight: 0,
       reps: topReps + 1,
       directive: 'add_rep',
-      summaryText: `${exerciseName}: 0${userUnit} × ${topReps + 1} next session`,
+      summaryText: `${exerciseName}: BW × ${topReps + 1} next session`,
       rationale: rpeStr
         ? `${rpeStr} — solid work. Add a rep before adding load.`
         : 'Solid work. Add a rep — bodyweight progress is rep progress.',
@@ -305,6 +320,53 @@ export function getNextSessionTarget(
       ? `${rpeStr} — solid work. Add a rep before adding load.`
       : 'Solid work. Add a rep before adding load.',
   };
+}
+
+/**
+ * P0-1 (UI/UX audit 2026-11-06): does completing this set need the
+ * "Log without weight?" confirm? Only loaded (non-bodyweight)
+ * exercises with an unset or 0 weight qualify — bodyweight work is
+ * exempt by design, and a weighted set never prompts.
+ */
+export function setNeedsWeightPrompt(exerciseName: string, set: WorkoutSet): boolean {
+  if (isBodyweightExercise(exerciseName)) return false;
+  return !(typeof set.weight === 'number' && !isNaN(set.weight) && set.weight > 0);
+}
+
+/**
+ * P0-1: initial-value priority (b) — an unset set inherits weight AND
+ * reps from the matching set of the last session (same index; the
+ * last recorded set repeats when the last session had fewer sets).
+ * Sets that already carry a value (plan target, coach decision, user
+ * entry) are never overwritten. Returns the input array unchanged
+ * when there is nothing to prefill.
+ */
+export function prefillUnsetSetsFromHistory(
+  sets: WorkoutSet[],
+  lastSets: WorkoutSet[] | null | undefined
+): WorkoutSet[] {
+  if (!lastSets || lastSets.length === 0) return sets;
+  let changed = false;
+  const next = sets.map((s, i) => {
+    if (s.weight !== undefined) return s;
+    const src = lastSets[Math.min(i, lastSets.length - 1)];
+    if (!src || typeof src.weight !== 'number' || isNaN(src.weight)) return s;
+    changed = true;
+    return { ...s, weight: src.weight, reps: src.reps };
+  });
+  return changed ? next : sets;
+}
+
+/**
+ * P0-1: the working weight for warm-up generation — the first set
+ * with a real load. Null when no set carries one (the generator must
+ * ask for a working weight instead of inventing one).
+ */
+export function getWorkingSetWeight(sets: WorkoutSet[]): number | null {
+  for (const s of sets || []) {
+    if (typeof s.weight === 'number' && !isNaN(s.weight) && s.weight > 0) return s.weight;
+  }
+  return null;
 }
 
 /**
@@ -408,7 +470,13 @@ export function createWorkoutExercisesFromPlan(
 
   return (plan.exercises || []).map((pe, idx) => {
     const isBW = isBodyweightExercise(pe.name);
-    const hasConfiguredWeight = typeof pe.targetWeight === 'number';
+    // P0-1 (UI/UX audit 2026-11-06): a stored targetWeight of 0 on a
+    // LOADED exercise is not a configuration — it is the old suggested-
+    // workout placeholder that made every set start at "0 kg". Only a
+    // positive weight (or any weight on a bodyweight exercise, where 0
+    // means "no added load") counts as configured.
+    const hasConfiguredWeight =
+      typeof pe.targetWeight === 'number' && (isBW || (pe.targetWeight as number) > 0);
     const hasConfiguredRpe = typeof pe.targetRpe === 'number';
 
     // Target load:
