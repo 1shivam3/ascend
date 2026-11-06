@@ -98,6 +98,7 @@ import { useToast } from '@/components/ui/Toast';
 import ActiveWorkoutScreen from '@/components/ActiveWorkoutScreen';
 import { resolveWorkoutMode } from '@/lib/workout-mode';
 import SegmentedControl from '@/components/ui/SegmentedControl';
+import Switch from '@/components/ui/Switch';
 import RunSessionScreen from '@/components/RunSessionScreen';
 import {
   getRunProgramProgress,
@@ -367,22 +368,11 @@ function PlanModal({
           <div className="border border-border rounded-xl p-3.5 bg-bg-elevated/40 space-y-2">
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs font-semibold text-text-primary">{t('plan.intensityPercent')}</span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={intensityMode === 'percent'}
-                aria-label={t('plan.intensityPercent')}
-                onClick={() => setIntensityMode(intensityMode === 'percent' ? 'rpe' : 'percent')}
-                className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer shrink-0 ${
-                  intensityMode === 'percent' ? 'bg-accent' : 'bg-bg-secondary border border-border'
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
-                    intensityMode === 'percent' ? 'left-[22px]' : 'left-0.5'
-                  }`}
-                />
-              </button>
+              <Switch
+                checked={intensityMode === 'percent'}
+                onChange={(next) => setIntensityMode(next ? 'percent' : 'rpe')}
+                ariaLabel={t('plan.intensityPercent')}
+              />
             </div>
             <p className="text-2xs text-text-muted leading-relaxed">{t('plan.intensityPercentHint')}</p>
             {intensityMode === 'percent' &&

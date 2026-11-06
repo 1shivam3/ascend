@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { PlannedWorkout } from '@/lib/types';
 import FormCuesSheet, { hasExerciseFormSurface } from '@/components/FormCuesSheet';
+import Switch from '@/components/ui/Switch';
 import { useStore } from '@/lib/store';
 import { getLastExercisePerformance, estimateSessionMinutes } from '@/lib/workout-engine';
 import { buildPercentSuggestions } from '@/lib/percent-1rm';
@@ -211,22 +212,11 @@ export default function WorkoutDetailsView({
                   : t('packed.previewHint')}
               </p>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={gymPacked}
-              aria-label={t('packed.toggle')}
-              onClick={() => setGymPacked((v) => !v)}
-              className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer shrink-0 ${
-                gymPacked ? 'bg-accent' : 'bg-[#2A2E29] border border-[#2C302B]'
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 h-5 w-5 rounded-full bg-[#F3F0E7] shadow transition-all ${
-                  gymPacked ? 'left-[22px]' : 'left-0.5'
-                }`}
-              />
-            </button>
+            <Switch
+              checked={gymPacked}
+              onChange={(next) => setGymPacked(next)}
+              ariaLabel={t('packed.toggle')}
+            />
           </div>
 
           <div className="space-y-2.5">

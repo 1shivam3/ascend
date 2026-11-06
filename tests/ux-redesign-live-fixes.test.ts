@@ -245,7 +245,9 @@ describe('L9 clipping/overlap (static)', () => {
 
   it('toasts sit above the bottom nav, never over headings', () => {
     const toast = src('src/components/ui/Toast.tsx');
-    expect(toast).toContain('fixed bottom-24');
+    // Phase 4 (Task 4.1): the offset is an inline calc — 6rem above
+    // the bottom PLUS the device safe-area inset.
+    expect(toast).toContain("bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))'");
     expect(toast).not.toContain('fixed top-3');
   });
 });

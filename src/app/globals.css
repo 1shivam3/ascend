@@ -531,13 +531,27 @@ input[type="number"]::-webkit-outer-spin-button {
    deepened vermilion (accent-dim #C7351B) — that pairing computes to
    4.66:1, while chalk on the bright Graphite accent (#EB4E30) is only
    3.25:1 and the near-black accent-on read as muddy dark-on-red on
-   dark cards. Applies to the primary CTA, the segmented control's
-   active pill, and every utility-paired bg-accent + text-accent-on
-   control. The light theme keeps its proven pairing (near-black on
-   vermilion, 5.15:1) untouched. */
+   dark cards. Applies to the primary CTA and every utility-paired
+   bg-accent + text-accent-on control. The light theme keeps its
+   proven pairing (near-black on vermilion, 5.15:1) untouched.
+   (Phase 4: the segmented control's active pill left this pairing —
+   see the .dark .segmented-item.active rule below.) */
 .dark .btn-primary,
-.dark .segmented-item.active,
 .dark .bg-accent.text-accent-on {
   background-color: rgb(var(--accent-dim));
   color: #F3F0E7;
+}
+
+/* Phase 4 (Task 4.1): the segmented control's selected pill is NOT
+   part of the D-UX-4 filled-accent pairing above. One segmented style
+   per theme, same logic: a raised NEUTRAL surface pill on the sunken
+   track — light uses bg-card + subtle shadow (components layer),
+   dark uses bg-elevated + a deeper shadow here. Before this, dark
+   mode filled the selected segment with accent-dim, so the same
+   control read as a neutral selector in light mode and as a primary
+   CTA in dark mode. */
+.dark .segmented-item.active {
+  background-color: rgb(var(--bg-elevated));
+  color: rgb(var(--text-primary));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }

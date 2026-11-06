@@ -84,11 +84,17 @@ describe('QA4-020 remainder — label association + keyboard activation', () => 
       expect(src).toContain(`htmlFor="${id}"`);
       expect(src).toContain(`id="${id}"`);
     }
-    // Gender / Units are button groups: named via aria-labelledby spans
+    // Gender / Units are button groups: named via aria-labelledby spans.
+    // Phase 4 (Task 4.1): both groups render through the shared
+    // SegmentedControl, which takes the label id as its ariaLabelledBy
+    // prop and emits the aria-labelledby attribute itself — the pin
+    // follows the association into the shared component.
     expect(src).toContain('id="edit-profile-gender-label"');
-    expect(src).toContain('aria-labelledby="edit-profile-gender-label"');
+    expect(src).toContain('ariaLabelledBy="edit-profile-gender-label"');
     expect(src).toContain('id="edit-profile-units-label"');
-    expect(src).toContain('aria-labelledby="edit-profile-units-label"');
+    expect(src).toContain('ariaLabelledBy="edit-profile-units-label"');
+    const segmented = read('src/components/ui/SegmentedControl.tsx');
+    expect(segmented).toContain('aria-labelledby={ariaLabelledBy}');
     // No bare unassociated <label> remains in the form
     expect(src).not.toMatch(/<label className=/);
   });

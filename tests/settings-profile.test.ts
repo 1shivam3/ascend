@@ -323,9 +323,12 @@ describe('Phase 6 — Settings, Profile & Navigation Verification', () => {
       expect(html).toContain('Full Name');
       expect(html).toContain('Age');
       expect(html).toContain('Gender Identity');
-      expect(html).toContain('male');
-      expect(html).toContain('female');
-      expect(html).toContain('other');
+      // Phase 4 (Task 4.1): gender options render through the shared
+      // SegmentedControl with LOCALIZED labels (editProfile.gender*)
+      // instead of the raw enum values the old ad-hoc grid printed.
+      expect(html).toContain('Male');
+      expect(html).toContain('Female');
+      expect(html).toContain('Other');
       expect(html).toContain('Height');
       expect(html).toContain('Bodyweight');
       expect(html).toContain('Save Changes');

@@ -189,7 +189,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
                           </span>
                           {setComp.isWarmup && (
                             <span
-                              className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-purple-500/20 text-purple-400 font-bold border border-purple-500/30"
+                              className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-accent-subtle text-accent-text font-bold border border-accent/30"
                               title={t('pva.warmupTitle')}
                             >
                               {t('pva.warmup')}

@@ -46,6 +46,7 @@ import DietPreferencePicker from '@/components/DietPreferencePicker';
 import ThemePicker from '@/components/ThemePicker';
 import CustomizeSheet from '@/components/CustomizeSheet';
 import SegmentedControl from '@/components/ui/SegmentedControl';
+import Switch from '@/components/ui/Switch';
 import FeedbackModal from '@/components/FeedbackModal';
 import { ACCENT_PRESETS, deriveCustomAccent, normalizeHex, isCustomAccentUsable } from '@/lib/accent-themes';
 import { resolveTodayLayout, sanitizeTodayLayout, DEFAULT_TODAY_LAYOUT } from '@/lib/today-layout';
@@ -78,22 +79,9 @@ import {
 } from '@/lib/health-connect';
 import { syncHealthConnectIfEnabled } from '@/lib/health-sync';
 
-function SettingsToggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      aria-label={label}
-      onClick={onToggle}
-      className={`tap-44 w-11 h-6 rounded-full transition-colors shrink-0 cursor-pointer relative ${on ? 'bg-accent' : 'bg-border'}`}
-    >
-      <span
-        className={`block w-5 h-5 rounded-full bg-white shadow absolute top-0.5 transition-all ${on ? 'left-[22px]' : 'left-0.5'}`}
-      />
-    </button>
-  );
-}
+// Phase 4 (Task 4.1): the settings switch is the shared ui/Switch —
+// the local SettingsToggle that lived here was deleted so there is
+// exactly one switch implementation.
 
 export interface SettingsViewProps {
   onBack?: () => void;
@@ -942,36 +930,26 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.units')}</span>
               <span className="text-2xs font-mono text-text-muted uppercase">{profile?.unit === 'kg' ? t('settings.unitKg') : profile?.unit === 'lbs' ? t('settings.unitLbs') : (profile?.unit || 'kg')}</span>
             </div>
-            <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-bg-secondary border border-border">
-              <button
-                type="button"
-                onClick={() => {
+            {/* Phase 4 (Task 4.1): Unit System renders through the one
+                SegmentedControl; the per-choice toast is preserved in
+                onChange. */}
+            <SegmentedControl
+              ariaLabel={t('settings.units')}
+              value={profile?.unit === 'lbs' ? 'lbs' : 'kg'}
+              options={[
+                { value: 'lbs', label: t('settings.unitsImperial') },
+                { value: 'kg', label: t('settings.unitsMetric') },
+              ]}
+              onChange={(v) => {
+                if (v === 'lbs') {
                   if (profile) setProfile({ ...profile, unit: 'lbs' });
                   toast.info(t('settings.unitsImperialMsg'), t('settings.unitsUpdatedTitle'));
-                }}
-                className={`py-1.5 min-h-[44px] rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  profile?.unit === 'lbs'
-                    ? 'bg-bg-card text-text-primary shadow-xs border border-border'
-                    : 'text-text-muted hover:text-text-primary'
-                }`}
-              >
-                {t('settings.unitsImperial')}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
+                } else {
                   if (profile) setProfile({ ...profile, unit: 'kg' });
                   toast.info(t('settings.unitsMetricMsg'), t('settings.unitsUpdatedTitle'));
-                }}
-                className={`py-1.5 min-h-[44px] rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  profile?.unit === 'kg'
-                    ? 'bg-bg-card text-text-primary shadow-xs border border-border'
-                    : 'text-text-muted hover:text-text-primary'
-                }`}
-              >
-                {t('settings.unitsMetric')}
-              </button>
-            </div>
+                }
+              }}
+            />
           </div>
 
           {/* Language */}
@@ -1056,10 +1034,10 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               <p className="text-xs font-bold text-text-primary">{t('settings.gamification')}</p>
               <p className="text-2xs text-text-muted leading-relaxed">{t('settings.gamificationHint')}</p>
             </div>
-            <SettingsToggle
-              label={t('settings.toggleGamification')}
-              on={uiPreferences.gamificationEnabled}
-              onToggle={() => setUiPreferences({ gamificationEnabled: !uiPreferences.gamificationEnabled })}
+            <Switch
+              ariaLabel={t('settings.toggleGamification')}
+              checked={uiPreferences.gamificationEnabled}
+              onChange={() => (() => setUiPreferences({ gamificationEnabled: !uiPreferences.gamificationEnabled }))()}
             />
           </div>
 
@@ -1069,10 +1047,10 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               <p className="text-xs font-bold text-text-primary">{t('settings.coach')}</p>
               <p className="text-2xs text-text-muted leading-relaxed">{t('settings.coachHint')}</p>
             </div>
-            <SettingsToggle
-              label={t('settings.toggleCoach')}
-              on={uiPreferences.coachEnabled}
-              onToggle={() => setUiPreferences({ coachEnabled: !uiPreferences.coachEnabled })}
+            <Switch
+              ariaLabel={t('settings.toggleCoach')}
+              checked={uiPreferences.coachEnabled}
+              onChange={() => (() => setUiPreferences({ coachEnabled: !uiPreferences.coachEnabled }))()}
             />
           </div>
 
@@ -1082,10 +1060,10 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               <p className="text-xs font-bold text-text-primary">{t('settings.habitMatrix')}</p>
               <p className="text-2xs text-text-muted leading-relaxed">{t('settings.habitMatrixHint')}</p>
             </div>
-            <SettingsToggle
-              label={t('settings.toggleHabitMatrix')}
-              on={uiPreferences.showHabitMatrix}
-              onToggle={() => setUiPreferences({ showHabitMatrix: !uiPreferences.showHabitMatrix })}
+            <Switch
+              ariaLabel={t('settings.toggleHabitMatrix')}
+              checked={uiPreferences.showHabitMatrix}
+              onChange={() => (() => setUiPreferences({ showHabitMatrix: !uiPreferences.showHabitMatrix }))()}
             />
           </div>
 
@@ -1112,10 +1090,10 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               <p className="text-xs font-bold text-text-primary">{t('progress.muscleVolume')}</p>
               <p className="text-2xs text-text-muted leading-relaxed">{t('settings.muscleVolumeHint')}</p>
             </div>
-            <SettingsToggle
-              label={t('settings.toggleMuscleVolume')}
-              on={uiPreferences.showMuscleVolume !== false}
-              onToggle={() => setUiPreferences({ showMuscleVolume: uiPreferences.showMuscleVolume === false })}
+            <Switch
+              ariaLabel={t('settings.toggleMuscleVolume')}
+              checked={uiPreferences.showMuscleVolume !== false}
+              onChange={() => (() => setUiPreferences({ showMuscleVolume: uiPreferences.showMuscleVolume === false }))()}
             />
           </div>
 
@@ -1127,11 +1105,11 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                   <p className="text-xs font-bold text-text-primary">{t('health.title')}</p>
                   <p className="text-2xs text-text-muted leading-relaxed">{t('health.hint')}</p>
                 </div>
-                <SettingsToggle
-                  label={t('settings.toggleHealth')}
-                  on={uiPreferences.healthConnectEnabled === true}
-                  onToggle={handleHealthConnectToggle}
-                />
+                <Switch
+              ariaLabel={t('settings.toggleHealth')}
+              checked={uiPreferences.healthConnectEnabled === true}
+              onChange={() => (handleHealthConnectToggle)()}
+            />
               </div>
               {uiPreferences.healthConnectEnabled === true && (
                 <p className="text-2xs text-text-muted">

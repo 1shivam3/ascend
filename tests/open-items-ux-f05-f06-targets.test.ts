@@ -5,6 +5,9 @@
  *    SegmentedControl) gains min-h-[44px].
  *  - SettingsToggle keeps its 44×24 visual track but gains a 44×44
  *    hit area via the new .tap-44 utility (same pattern as .tap-40).
+ *    (Phase 4, Task 4.1: SettingsToggle was replaced by the shared
+ *    ui/Switch — same track, same .tap-44 hit area; the pin now reads
+ *    the shared component.)
  *  - Settings section chips and the segmented-style Settings grid
  *    pickers (units, language, diet, workout view) gain min-h-[44px].
  *  - Active-workout set inputs rise min-h-[40px] → min-h-[44px], and
@@ -30,10 +33,14 @@ describe('open-items UX F-05/F-06: 44px touch targets', () => {
     expect(block).toContain('height: 44px');
   });
 
-  it('SettingsToggle uses the expanded hit area, visual track unchanged', () => {
-    const src = read('src/components/SettingsView.tsx');
+  it('the shared Switch uses the expanded hit area, visual track unchanged', () => {
+    const src = read('src/components/ui/Switch.tsx');
     expect(src).toContain('tap-44 w-11 h-6 rounded-full');
     expect(src).toContain('role="switch"');
+    // Settings renders the shared component — its local toggle is gone.
+    const settings = read('src/components/SettingsView.tsx');
+    expect(settings).toContain("from '@/components/ui/Switch'");
+    expect(settings).not.toContain('function SettingsToggle');
   });
 
   it('Settings section chips are ≥44px tall targets', () => {

@@ -1660,6 +1660,7 @@ export const en = {
   'progress.closeDots': 'Close DOTS info',
   'progress.addPhoto': 'Add progress photo',
   'progress.poseAria': 'Pose for next photo',
+  'progress.rangeAria': 'Chart time range',
   'progress.deletePhotoTitle': 'Delete this photo?',
   'progress.deletePhotoMsg': "This progress photo will be permanently removed from this device. This can't be undone.",
   'progress.photoNotSavedTitle': 'Photo Not Saved',

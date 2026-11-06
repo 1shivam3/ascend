@@ -57,9 +57,15 @@ describe('onboarding injuries dropdown', () => {
     for (const area of ['Lower back', 'Knees', 'Shoulders', 'Wrists']) {
       expect(html).toContain(`value="${area}"`);
     }
-    // The old chip group used aria-pressed toggles; nothing on this
-    // screen does, so any aria-pressed here would be an injury chip.
-    expect(html).not.toContain('aria-pressed');
+    // The old injury chip group used aria-pressed toggles; the injury
+    // areas must never come back as toggle buttons. (Phase 4, Task
+    // 4.1: the gender SegmentedControl legitimately uses aria-pressed
+    // on this screen now, so the blanket ban is scoped to the injury
+    // areas: none of them may appear as a pressed-toggle button.)
+    for (const area of ['Lower back', 'Knees', 'Shoulders', 'Wrists']) {
+      expect(html).not.toContain(`aria-pressed="true">${area}<`);
+      expect(html).not.toContain(`aria-pressed="false">${area}<`);
+    }
     expect(html).toContain('Continue');
     // Continue passes limitations straight through in the details
     // payload — no guard on them.

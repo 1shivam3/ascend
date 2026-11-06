@@ -30,6 +30,7 @@ import {
 import { useStore } from '@/lib/store';
 import { prepareGeneratedPlans } from '@/lib/workout-engine';
 import { useToast } from '@/components/ui/Toast';
+import Chip from '@/components/ui/Chip';
 import ConfirmationModal from '@/components/ConfirmationModal';
 import { useTranslation } from '@/lib/i18n';
 
@@ -343,18 +344,14 @@ export default function WeeklyScheduleModal({
                         {AVAILABLE_BODY_PARTS.map((part) => {
                           const isSelected = dayConfig.bodyParts?.includes(part);
                           return (
-                            <button
+                            <Chip
                               key={part}
-                              type="button"
+                              selected={!!isSelected}
                               onClick={() => handleToggleBodyPart(day, part)}
-                              className={`px-2 py-0.5 rounded-full text-2xs font-semibold border transition-all ${
-                                isSelected
-                                  ? 'bg-accent/15 border-accent text-accent-text'
-                                  : 'bg-bg-card border-border/70 text-text-muted hover:border-border'
-                              }`}
+                              className="px-2 py-0.5"
                             >
                               {part}
-                            </button>
+                            </Chip>
                           );
                         })}
                       </div>

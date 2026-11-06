@@ -2,6 +2,7 @@
 
 import { useTranslation } from '@/lib/i18n';
 import type { Language } from '@/lib/i18n/en';
+import SegmentedControl from '@/components/ui/SegmentedControl';
 
 /**
  * English / हिंदी segmented picker. Writes straight to the persisted
@@ -15,6 +16,12 @@ import type { Language } from '@/lib/i18n/en';
  *
  * LIVE-P1-03: option labels come from i18n keys, so in Hindi mode the
  * picker itself localizes (English → अंग्रेज़ी) instead of leaking English.
+ *
+ * Phase 4 (Task 4.1): the 'theme' variant renders through the ONE
+ * SegmentedControl. The 'light' variant keeps its fixed-palette
+ * markup on purpose: the onboarding welcome screen is a fixed light
+ * surface even when the app theme is dark, so theme tokens would be
+ * wrong there — it is a documented exception, not a second style.
  */
 export default function LanguagePicker({
   variant = 'theme',
@@ -29,18 +36,21 @@ export default function LanguagePicker({
     { id: 'hi', label: t('language.hindi') },
   ];
 
+  if (variant === 'theme') {
+    return (
+      <SegmentedControl
+        ariaLabel="Language / भाषा"
+        value={language}
+        options={OPTIONS.map((opt) => ({ value: opt.id, label: opt.label }))}
+        onChange={(v) => setLanguage(v as Language)}
+      />
+    );
+  }
+
   const container =
-    variant === 'light'
-      ? 'grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-white border border-[#E2DFD6]'
-      : 'grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-bg-secondary border border-border';
-  const activeCls =
-    variant === 'light'
-      ? 'bg-[#171916] text-white shadow-xs'
-      : 'bg-bg-card text-text-primary shadow-xs border border-border';
-  const idleCls =
-    variant === 'light'
-      ? 'text-[#5E615A] hover:text-[#171916]'
-      : 'text-text-muted hover:text-text-primary';
+    'grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-white border border-[#E2DFD6]';
+  const activeCls = 'bg-[#171916] text-white shadow-xs';
+  const idleCls = 'text-[#5E615A] hover:text-[#171916]';
 
   return (
     <div className={container} role="group" aria-label="Language / भाषा">

@@ -128,6 +128,10 @@ describe('i18n wiring coverage (pinned)', () => {
     'src/components/ui/EmptyState.tsx',
     'src/components/ui/Section.tsx',
     'src/components/ui/SegmentedControl.tsx',
+    // Phase 4 (Task 4.1): Switch + Chip are presentational like
+    // SegmentedControl — labels arrive via ariaLabel / children props.
+    'src/components/ui/Chip.tsx',
+    'src/components/ui/Switch.tsx',
     // TabGuardBanner wired in Round 5 (tabGuard.* keys).
     // App shells: error/loading delegate to the wired state components;
     // layout + legal pages carry metadata / formal legal text only.

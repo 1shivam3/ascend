@@ -30,6 +30,8 @@ import {
 } from '@/lib/local-notifications';
 import PermissionHelp from '@/components/ui/PermissionHelp';
 import { useTranslation, weekdayNames } from '@/lib/i18n';
+import Switch from '@/components/ui/Switch';
+import Chip from '@/components/ui/Chip';
 
 interface ReminderCenterModalProps {
   isOpen: boolean;
@@ -56,37 +58,10 @@ function formatTimeLabel(hhmm: string): string {
   return `${hour12}:${String(m).padStart(2, '0')} ${suffix}`;
 }
 
-/** iOS-style switch used across every reminder row. */
-function Toggle({
-  checked,
-  onChange,
-  label,
-  accentClass = 'bg-accent',
-}: {
-  checked: boolean;
-  onChange: (next: boolean) => void;
-  label: string;
-  accentClass?: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={`w-11 h-6 rounded-full transition-colors relative shrink-0 cursor-pointer ${
-        checked ? accentClass : 'bg-bg-secondary border border-border'
-      }`}
-    >
-      <div
-        className={`w-5 h-5 rounded-full bg-white shadow transition-transform absolute top-0.5 ${
-          checked ? 'translate-x-[22px]' : 'translate-x-0.5'
-        }`}
-      />
-    </button>
-  );
-}
+// Phase 4 (Task 4.1): reminder switches are the shared ui/Switch.
+// The local Toggle that lived here took a per-row colour override
+// (purple / emerald / blue / indigo one-offs) — deleted so every
+// switch is accent-when-on, neutral-when-off.
 
 export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
@@ -340,10 +315,10 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            <Toggle
+            <Switch
               checked={prefs.enabled}
               onChange={handleMasterToggle}
-              label={t('rem.allNotifications')}
+              ariaLabel={t('rem.allNotifications')}
             />
             <button
               type="button"
@@ -373,10 +348,10 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
           />
         )}
         {(permissionState === 'default') && (
-          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2">
+          <div className="p-3 rounded-xl bg-warning/10 border border-warning/30 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
-              <BellRing className="w-4 h-4 text-amber-400 shrink-0" />
-              <div className="text-2xs text-amber-200 leading-relaxed">
+              <BellRing className="w-4 h-4 text-warning shrink-0" />
+              <div className="text-2xs text-text-secondary leading-relaxed">
                 <span className="font-bold block">{t('rem.permNeeded')}</span>
                 <span>{t('rem.permNeededBody')}</span>
               </div>
@@ -391,9 +366,9 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
           </div>
         )}
         {permissionState === 'granted' && (
-          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            <p className="text-2xs text-emerald-200 leading-relaxed">
+          <div className="p-3 rounded-xl bg-success/10 border border-success/30 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
+            <p className="text-2xs text-text-secondary leading-relaxed">
               {isNative
                 ? t('rem.grantedNative')
                 : hasSubscription
@@ -425,7 +400,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                     </span>
                   </div>
                 </div>
-                <Toggle
+                <Switch
                   checked={prefs.workoutReminders.enabled}
                   onChange={(on) =>
                     persist({
@@ -434,7 +409,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                       workoutReminders: { ...prefs.workoutReminders, enabled: on },
                     })
                   }
-                  label={t('rem.toggleWorkout')}
+                  ariaLabel={t('rem.toggleWorkout')}
                 />
               </div>
 
@@ -485,8 +460,8 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
             <Card variant="default" padding="sm" className="space-y-2.5">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-purple-500/15 flex items-center justify-center shrink-0">
-                    <Calendar className="w-4 h-4 text-purple-400" />
+                  <div className="w-8 h-8 rounded-lg bg-accent-subtle flex items-center justify-center shrink-0">
+                    <Calendar className="w-4 h-4 text-accent-text" />
                   </div>
                   <div className="min-w-0">
                     <span className="text-xs font-bold text-text-primary block">{t('rem.weeklyReport')}</span>
@@ -500,7 +475,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                     </span>
                   </div>
                 </div>
-                <Toggle
+                <Switch
                   checked={prefs.weeklyReport.enabled}
                   onChange={(on) =>
                     persist({
@@ -509,8 +484,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                       weeklyReport: { ...prefs.weeklyReport, enabled: on },
                     })
                   }
-                  label={t('rem.toggleWeekly')}
-                  accentClass="bg-purple-500"
+                  ariaLabel={t('rem.toggleWeekly')}
                 />
               </div>
 
@@ -518,20 +492,16 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                 <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-2">
                   <div className="flex flex-wrap gap-1.5">
                     {(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const).map((day) => (
-                      <button
+                      <Chip
                         key={day}
-                        type="button"
+                        selected={prefs.weeklyReport.reportDay === day}
                         onClick={() =>
                           persist({ ...prefs, weeklyReport: { ...prefs.weeklyReport, reportDay: day } })
                         }
-                        className={`px-2.5 py-1 rounded-lg text-2xs font-mono capitalize transition-colors cursor-pointer ${
-                          prefs.weeklyReport.reportDay === day
-                            ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40 font-bold'
-                            : 'bg-bg-secondary text-text-muted border border-border'
-                        }`}
+                        className="rounded-lg capitalize"
                       >
                         {weekdayNames(language, 'full')[(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const).indexOf(day)]}
-                      </button>
+                      </Chip>
                     ))}
                   </div>
                   <input
@@ -556,8 +526,8 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
             <Card variant="default" padding="sm" className="space-y-2.5">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
-                    <Utensils className="w-4 h-4 text-emerald-400" />
+                  <div className="w-8 h-8 rounded-lg bg-protein/15 flex items-center justify-center shrink-0">
+                    <Utensils className="w-4 h-4 text-protein" />
                   </div>
                   <div className="min-w-0">
                     <span className="text-xs font-bold text-text-primary block">{t('rem.meals')}</span>
@@ -572,7 +542,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                     </span>
                   </div>
                 </div>
-                <Toggle
+                <Switch
                   checked={prefs.mealReminders.enabled}
                   onChange={(on) =>
                     persist({
@@ -581,8 +551,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                       mealReminders: { ...prefs.mealReminders, enabled: on },
                     })
                   }
-                  label={t('rem.toggleMeals')}
-                  accentClass="bg-emerald-500"
+                  ariaLabel={t('rem.toggleMeals')}
                 />
               </div>
 
@@ -626,8 +595,8 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
             <Card variant="default" padding="sm" className="space-y-2.5">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-blue-500/15 flex items-center justify-center shrink-0">
-                    <Droplets className="w-4 h-4 text-blue-400" />
+                  <div className="w-8 h-8 rounded-lg bg-water/15 flex items-center justify-center shrink-0">
+                    <Droplets className="w-4 h-4 text-water" />
                   </div>
                   <div className="min-w-0">
                     <span className="text-xs font-bold text-text-primary block">{t('rem.water')}</span>
@@ -638,7 +607,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                     </span>
                   </div>
                 </div>
-                <Toggle
+                <Switch
                   checked={prefs.waterReminders.enabled}
                   onChange={(on) =>
                     persist({
@@ -647,8 +616,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                       waterReminders: { ...prefs.waterReminders, enabled: on },
                     })
                   }
-                  label={t('rem.toggleWater')}
-                  accentClass="bg-blue-500"
+                  ariaLabel={t('rem.toggleWater')}
                 />
               </div>
 
@@ -657,23 +625,19 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                   <span className="text-2xs text-text-muted">{t('rem.interval')}</span>
                   <div className="flex gap-1.5">
                     {[1, 2, 3].map((hours) => (
-                      <button
+                      <Chip
                         key={hours}
-                        type="button"
+                        selected={prefs.waterReminders.intervalHours === hours}
                         onClick={() =>
                           persist({
                             ...prefs,
                             waterReminders: { ...prefs.waterReminders, intervalHours: hours },
                           })
                         }
-                        className={`px-2.5 py-1 rounded-lg text-2xs font-mono font-semibold transition-colors cursor-pointer ${
-                          prefs.waterReminders.intervalHours === hours
-                            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40 font-bold'
-                            : 'bg-bg-secondary text-text-muted border border-border'
-                        }`}
+                        className="rounded-lg"
                       >
                         {t(hours === 1 ? 'rem.everyHour' : 'rem.everyHours', { hours })}
-                      </button>
+                      </Chip>
                     ))}
                   </div>
                 </div>
@@ -695,8 +659,8 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                   className="flex items-center gap-2.5 min-w-0 cursor-pointer text-left"
                   aria-expanded={quietHoursExpanded}
                 >
-                  <div className="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center shrink-0">
-                    <Moon className="w-4 h-4 text-indigo-400" />
+                  <div className="w-8 h-8 rounded-lg bg-accent-subtle flex items-center justify-center shrink-0">
+                    <Moon className="w-4 h-4 text-accent-text" />
                   </div>
                   <div className="min-w-0">
                     <span className="text-xs font-bold text-text-primary block">{t('rem.quiet')}</span>
@@ -707,13 +671,12 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                     </span>
                   </div>
                 </button>
-                <Toggle
+                <Switch
                   checked={prefs.quietHours.enabled}
                   onChange={(on) =>
                     persist({ ...prefs, quietHours: { ...prefs.quietHours, enabled: on } })
                   }
-                  label={t('rem.toggleQuiet')}
-                  accentClass="bg-indigo-500"
+                  ariaLabel={t('rem.toggleQuiet')}
                 />
               </div>
 
@@ -748,8 +711,8 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
 
               <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
-                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <div className="w-8 h-8 rounded-lg bg-success/15 flex items-center justify-center shrink-0">
+                    <ShieldCheck className="w-4 h-4 text-success" />
                   </div>
                   <div className="min-w-0">
                     <span className="text-xs font-bold text-text-primary block">{t('rem.lockPrivacy')}</span>
@@ -758,11 +721,10 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                     </span>
                   </div>
                 </div>
-                <Toggle
+                <Switch
                   checked={prefs.lockScreenPrivacy}
                   onChange={(on) => persist({ ...prefs, lockScreenPrivacy: on })}
-                  label={t('rem.toggleLock')}
-                  accentClass="bg-emerald-500"
+                  ariaLabel={t('rem.toggleLock')}
                 />
               </div>
             </Card>
