@@ -51,7 +51,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'home.mealScan': 'मील स्कैन',
   'home.scan': 'स्कैन',
   'home.weight': 'वज़न',
-  'home.formCheck': 'स्क्वाट फ़ॉर्म चेक',
+  'home.formCheck': 'फ़ॉर्म चेक',
   'home.hydration': 'हाइड्रेशन',
   // Micro-fix L2 (round 2): composed from dictionary words (आज + की +
   // आदतें, as in habitsThisWeek) — flagged for native review.

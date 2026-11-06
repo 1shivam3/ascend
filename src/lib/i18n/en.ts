@@ -53,7 +53,7 @@ export const en = {
   'home.mealScan': 'Meal Scan',
   'home.scan': 'Scan',
   'home.weight': 'Weight',
-  'home.formCheck': 'Squat Form Check',
+  'home.formCheck': 'Form Check',
   'home.hydration': 'Hydration',
   // Micro-fix L2 (round 2): Simple-mode habit heading. Flagged for
   // native review with the ~94 other new Hindi keys.
