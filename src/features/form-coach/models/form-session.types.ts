@@ -69,6 +69,12 @@ export interface FormSessionSummary {
   totalValidReps: number;
   analysedRepCount: number;
   averageTrackingConfidence: number;
+  /**
+   * Average set time per valid rep: durationSeconds / totalValidReps
+   * (0 when no rep was valid). NOT a mean of per-rep machine windows —
+   * that excluded setup/rest and incomplete attempts and could report
+   * e.g. 0.7s for a 27s set (phone-polish fix, 2026-11-06).
+   */
   averageRepDurationSeconds: number;
   reps: FormRep[];
   observations: FormObservation[];

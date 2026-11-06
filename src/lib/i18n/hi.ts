@@ -51,7 +51,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'home.mealScan': 'मील स्कैन',
   'home.scan': 'स्कैन',
   'home.weight': 'वज़न',
-  'home.formCheck': 'स्क्वाट फ़ॉर्म चेक',
+  'home.formCheck': 'फ़ॉर्म चेक',
   'home.hydration': 'हाइड्रेशन',
   // Micro-fix L2 (round 2): composed from dictionary words (आज + की +
   // आदतें, as in habitsThisWeek) — flagged for native review.
@@ -206,6 +206,10 @@ export const hi: Partial<Record<StringKey, string>> = {
   'formCoach.analyseAnyway': 'फिर भी {exercise} के रूप में विश्लेषण करें',
   'formCoach.analyzingTitle': 'मूवमेंट का विश्लेषण हो रहा है…',
   'formCoach.detecting': 'पहचान हो रही है: {exercise}…',
+  // Phone-polish live counter (2026-11-06): machine translations — Hindi review parked.
+  'formCoach.liveDetected': 'पहचाने गए',
+  'formCoach.livePullsDetected': 'पुल पहचाने गए',
+  'formCoach.livePulls': 'पुल',
   'formCoach.minHipAngle': 'न्यूनतम हिप कोण',
   'formCoach.autoCardTitle': 'व्यायाम अपने आप पहचानें',
   'formCoach.autoCardBadge': 'ऑटो-डिटेक्ट',

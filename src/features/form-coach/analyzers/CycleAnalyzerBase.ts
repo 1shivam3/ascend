@@ -498,9 +498,11 @@ export abstract class CycleAnalyzerBase implements ExerciseAnalyzer {
           ) / 100
         : 0;
 
-    const totalRepTime = validReps.reduce((acc, r) => acc + r.durationSeconds, 0);
+    // Average set time per valid rep (total set duration / valid
+    // reps) — see DeadliftAnalyzer.finishSet for why the old
+    // per-rep-window mean was untruthful. Phone-polish fix, 2026-11-06.
     const avgRepDurationSeconds =
-      validReps.length > 0 ? Math.round((totalRepTime / validReps.length) * 10) / 10 : 0;
+      validReps.length > 0 ? Math.round((durationSeconds / validReps.length) * 10) / 10 : 0;
 
     const observations: FormObservation[] = [
       ...this.feedbackEngine.getAggregatedObservations(),

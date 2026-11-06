@@ -34,15 +34,56 @@ interface ToastContextType {
   info: (message: string, title?: string) => void;
 }
 
+/**
+ * Coalescing (phone-polish, 2026-11-06): rapid repeat taps used to
+ * stack identical toasts — two "+500 ml logged" hydration taps showed
+ * two indistinguishable "Hydration Updated" cards at once. A new
+ * PLAIN toast whose type + title + message exactly match a visible
+ * plain toast replaces it in place (fresh id, so its lifetime and
+ * fade restart) instead of stacking a duplicate. Action toasts are
+ * never coalesced in either direction: an Undo carries unique state
+ * and must not be silently replaced, and a new action toast must not
+ * hide behind an identical-looking plain one. Distinct notifications
+ * (any field differs) always stack normally.
+ */
+export function upsertToast(prev: ToastMessage[], next: ToastMessage): ToastMessage[] {
+  if (!next.action) {
+    const idx = prev.findIndex(
+      (t) => !t.action && t.type === next.type && t.title === next.title && t.message === next.message
+    );
+    if (idx >= 0) {
+      const copy = [...prev];
+      copy[idx] = next;
+      return copy;
+    }
+  }
+  return [...prev, next];
+}
+
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  // Pending auto-dismiss timers by toast id, so a coalesced toast's
+  // stale timer can be cancelled instead of firing into a no-op.
+  const timersRef = React.useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
-  const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+  const clearTimer = useCallback((id: string) => {
+    const handle = timersRef.current.get(id);
+    if (handle) {
+      clearTimeout(handle);
+      timersRef.current.delete(id);
+    }
   }, []);
+
+  const removeToast = useCallback(
+    (id: string) => {
+      clearTimer(id);
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    },
+    [clearTimer]
+  );
 
   const showToast = useCallback(
     (type: ToastType, message: string, title?: string, durationMs?: number, action?: ToastAction) => {
@@ -50,13 +91,25 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       // Action toasts (e.g. Undo) live longer by default so the action
       // is reachable; an explicit durationMs always wins.
       const effectiveDuration = durationMs ?? (action ? 6000 : 3500);
-      setToasts((prev) => [...prev, { id, type, title, message, durationMs: effectiveDuration, action }]);
+      const next: ToastMessage = { id, type, title, message, durationMs: effectiveDuration, action };
+      setToasts((prev) => {
+        const merged = upsertToast(prev, next);
+        // A replaced toast's pending dismissal is stale — cancel it.
+        const kept = new Set(merged.map((toast) => toast.id));
+        for (const toast of prev) {
+          if (!kept.has(toast.id)) clearTimer(toast.id);
+        }
+        return merged;
+      });
 
-      setTimeout(() => {
-        removeToast(id);
-      }, effectiveDuration);
+      timersRef.current.set(
+        id,
+        setTimeout(() => {
+          removeToast(id);
+        }, effectiveDuration)
+      );
     },
-    [removeToast]
+    [removeToast, clearTimer]
   );
 
   const success = useCallback(

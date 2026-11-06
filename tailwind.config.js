@@ -117,6 +117,7 @@ module.exports = {
       animation: {
         'fade-in': 'fadeIn 0.25s ease-out',
         'slide-up': 'slideUp 0.25s ease-out',
+        'slide-up-opaque': 'slideUpOpaque 0.25s ease-out',
         'scale-in': 'scaleIn 0.2s ease-out',
         'tab-enter': 'tabEnter 0.22s ease-out',
       },
@@ -132,6 +133,14 @@ module.exports = {
         slideUp: {
           '0%': { opacity: '0', transform: 'translateY(8px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        // Sheet entrance WITHOUT opacity: a sheet that fades in is
+        // translucent mid-animation, so the page behind ghosts through
+        // it and labels collide (phone recording, 2026-11-06). Motion
+        // only — the sheet is fully opaque from the first frame.
+        slideUpOpaque: {
+          '0%': { transform: 'translateY(8px)' },
+          '100%': { transform: 'translateY(0)' },
         },
         scaleIn: {
           '0%': { opacity: '0', transform: 'scale(0.96)' },

@@ -409,9 +409,16 @@ export class DeadliftAnalyzer implements ExerciseAnalyzer {
         ? Math.round((this.trackingConfidences.reduce((a, b) => a + b, 0) / this.trackingConfidences.length) * 100) / 100
         : 0;
 
-    const totalRepTime = validReps.reduce((acc, r) => acc + r.durationSeconds, 0);
+    // Average set time per valid rep: total measured set duration
+    // divided by valid reps. (This used to average the state machine's
+    // per-rep window durations over valid reps only — a window spans
+    // just the machine's rep anchor to lockout, excluding setup/rest
+    // and every incomplete attempt, so a 27s set with 1 valid rep
+    // reported "Avg / repetition 0.7s": the single rep's window, which
+    // is the machine's minimum valid duration. Phone-polish fix,
+    // 2026-11-06.)
     const avgRepDurationSeconds =
-      validReps.length > 0 ? Math.round((totalRepTime / validReps.length) * 10) / 10 : 0;
+      validReps.length > 0 ? Math.round((durationSeconds / validReps.length) * 10) / 10 : 0;
 
     const observations: FormObservation[] = this.feedbackEngine.getAggregatedObservations();
 

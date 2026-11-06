@@ -150,6 +150,20 @@ export default function FormCoachModal({
   const hudExerciseId: FormExerciseId =
     presetExerciseId ?? leaningExerciseId ?? 'squat';
 
+  // The live counter tallies movement cycles the followed analyzer has
+  // closed so far — attempts, not validated reps (validation happens
+  // in finishSet: e.g. deadlift pulls that never lock out are counted
+  // here live but land as incomplete attempts in the report). The
+  // label must say so: deadlift attempts are "pulls" (the word its
+  // report uses); every other exercise gets the neutral "Detected",
+  // matching the report's "Detected: N" line.
+  const hudCountLabel =
+    hudExerciseId === 'deadlift'
+      ? t('formCoach.livePullsDetected')
+      : t('formCoach.liveDetected');
+  const hudCountNoun =
+    hudExerciseId === 'deadlift' ? t('formCoach.livePulls') : t('formCoach.liveDetected');
+
   // Handle hardware / browser back button safely
   useEffect(() => {
     if (!isOpen) return;
@@ -241,7 +255,7 @@ export default function FormCoachModal({
           <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
             <span className="px-2.5 py-1 rounded-full text-2xs font-mono font-bold bg-black/70 backdrop-blur-md text-accent border border-accent/30 flex items-center gap-1.5">
               <Activity className="w-3 h-3 text-accent" />
-              <span>{repCount} Reps</span>
+              <span>{repCount} {hudCountNoun}</span>
             </span>
             {currentKneeAngleDeg !== null && (
               <span className="px-2.5 py-1 rounded-full text-2xs font-mono font-bold bg-black/70 backdrop-blur-md text-sky-400 border border-sky-400/30">
@@ -396,7 +410,7 @@ export default function FormCoachModal({
             {/* Telemetry Preview Card */}
             <div className="grid grid-cols-3 gap-2 pt-1 text-center">
               <div className="p-2.5 rounded-xl bg-surface-elevated border border-border-subtle">
-                <span className="text-2xs uppercase font-mono text-text-muted block">Reps Found</span>
+                <span className="text-2xs uppercase font-mono text-text-muted block">{hudCountLabel}</span>
                 <span className="text-xl font-bold font-mono text-text-primary">{repCount}</span>
               </div>
               <div className="p-2.5 rounded-xl bg-surface-elevated border border-border-subtle">
