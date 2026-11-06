@@ -174,7 +174,7 @@ export default function FormSessionSummaryModal({
             <span className="text-2xl font-black text-text-primary my-1">
               {summary.averageRepDurationSeconds}s
             </span>
-            <span className="text-2xs text-text-secondary">Avg / repetition</span>
+            <span className="text-2xs text-text-secondary">Avg / rep</span>
           </div>
         </div>
 
