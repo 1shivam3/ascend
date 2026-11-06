@@ -720,7 +720,7 @@ export default function LogPastWorkoutModal({
                           onClick={() => setExercises((prev) => prev.map((e, i) => i === exIdx ? { ...e, reportsPain: !e.reportsPain } : e))}
                           title={t('lp.painToggleHint')}
                             aria-label={t('lp.painToggleHint')}
-                          className={`text-xs font-semibold px-2 py-1 rounded-lg transition-colors cursor-pointer ${ex.reportsPain ? 'text-red-400 bg-red-500/10' : 'text-text-muted hover:text-red-400 hover:bg-red-500/10'}`}
+                          className={`text-xs font-semibold px-2 py-1 rounded-lg transition-colors cursor-pointer ${ex.reportsPain ? 'text-warning bg-warning/10' : 'text-text-muted hover:text-warning hover:bg-warning/10'}`}
                         >
                           {ex.reportsPain ? '✓ ' : ''}{t('lp.painToggle')}
                         </button>

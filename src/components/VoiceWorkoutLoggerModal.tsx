@@ -410,7 +410,7 @@ export default function VoiceWorkoutLoggerModal({
                 }}
                 className={`w-16 h-16 rounded-full flex items-center justify-center transition-all ${
                   isListening
-                    ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/40 scale-105'
+                    ? 'bg-accent text-accent-on shadow-lg shadow-accent/40 scale-105'
                     : 'bg-accent/20 text-accent hover:bg-accent/30 border-2 border-accent'
                 }`}
                 title={isListening ? t('voice.finishTitle') : t('voice.startTitle')}

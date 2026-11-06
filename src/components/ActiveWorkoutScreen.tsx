@@ -2898,11 +2898,11 @@ export default function ActiveWorkoutScreen({
                     onClick={() => handleLogExerciseEffort(9.5, 'hard')}
                     className={`p-3 rounded-xl border active:scale-95 transition-all text-center cursor-pointer ${
                       effortChosen === 'hard'
-                        ? 'bg-danger/20 border-danger text-danger'
-                        : 'bg-bg-secondary border-border/80 hover:border-danger/60'
+                        ? 'bg-warning/20 border-warning text-warning'
+                        : 'bg-bg-secondary border-border/80 hover:border-warning/60'
                     }`}
                   >
-                    <span className="w-7 h-7 rounded-lg bg-danger/15 text-danger flex items-center justify-center mx-auto mb-1.5 font-mono font-bold text-[0.6875rem]">
+                    <span className="w-7 h-7 rounded-lg bg-warning/15 text-warning flex items-center justify-center mx-auto mb-1.5 font-mono font-bold text-[0.6875rem]">
                       @9.5
                     </span>
                     <span className="text-xs font-bold text-text-primary block">{t('workout.hard')}</span>

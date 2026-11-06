@@ -889,7 +889,7 @@ function HistorySetChip({
       <div className="flex items-center gap-1 shrink-0">
         {isSkipped && (
           <span
-            className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold"
+            className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-warning/20 text-warning font-bold"
             title="Skipped Set"
           >
             SKIPPED
@@ -925,7 +925,7 @@ function HistorySetChip({
   );
   const chipClassName = `px-2.5 py-1.5 rounded border flex items-center justify-between gap-1.5 ${
     isSkipped
-      ? 'bg-rose-500/5 border-rose-500/20 opacity-75'
+      ? 'bg-warning/5 border-warning/20 opacity-75'
       : isNotAttempted
       ? 'bg-bg-primary/50 border-border/60 opacity-60'
       : 'bg-bg-primary border-border'
