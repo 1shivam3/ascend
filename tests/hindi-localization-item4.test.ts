@@ -451,7 +451,11 @@ describe('item-4 renderer wiring (source pins)', () => {
       expect(aws, label).not.toContain(label);
     }
     expect(aws).toContain("aria-label={t('tools.formCoachTitle')}");
-    expect(aws).toContain("{t('workout.formCoach')}");
+    // P1-3 (UI/UX audit phase 1): the header Form Coach button — the
+    // only user of the workout.formCoach short label — was removed;
+    // Form Coach now lives in the overflow menu under
+    // tools.formCoachTitle only.
+    expect(aws).not.toContain("{t('workout.formCoach')}");
     expect(aws).toContain("<span>{t('tools.formCoachTitle')}</span>");
     expect(aws).toContain('Math.round(kgToLbs(sessionStats.totalVolumeKg))');
     expect(aws).not.toContain('{sessionStats.totalVolumeKg} kg');

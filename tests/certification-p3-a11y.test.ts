@@ -72,11 +72,19 @@ describe('certification P3 a11y/design sweep', () => {
     expect(en['workout.completeSet']).toBe('Complete Set');
   });
 
-  it('DEV-1: the in-workout "Gym packed?" explainer is no longer truncated', () => {
-    const src = read('src/components/ActiveWorkoutScreen.tsx');
-    const line = src.split('\n').find((l) => l.includes("t('packed.previewHint')"));
+  it('DEV-1: the "Gym packed?" explainer is no longer truncated (P1-3: in-workout toggle moved to the menu)', () => {
+    // The explainer still renders in plan detail — untruncated there.
+    const detail = read('src/components/WorkoutDetailsView.tsx');
+    const line = detail.split('\n').find((l) => l.includes("t('packed.previewHint')"));
     expect(line).toBeDefined();
     expect(line!).not.toContain('truncate');
+    // UI/UX audit phase 1, task 1.2 (P1-3): the in-workout toggle BAR
+    // was removed — the toggle now lives in the overflow menu as
+    // "Swap for busy equipment", so the workout screen no longer
+    // renders the explainer at all.
+    const src = read('src/components/ActiveWorkoutScreen.tsx');
+    expect(src).not.toContain("t('packed.previewHint')");
+    expect(src).toContain("t('workout.swapBusyEquipment')");
   });
 
   it('UI-1b-06: Today renders sections in resolved DOM order (no flex order)', () => {
