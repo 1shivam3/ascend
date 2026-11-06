@@ -60,7 +60,9 @@ describe('360px overflow — finish-modal footer wraps', () => {
 });
 
 describe('360px overflow — RPE pill wraps its label', () => {
-  const pill = region(aws, 'Beginner Mode Effort (RPE) Picker Button', 'Screen 12 Action Buttons');
+  // P1-3 moved Skip/Complete Set out of the card into the bottom action
+  // bar; the pill region now ends at that move-out comment.
+  const pill = region(aws, 'Beginner Mode Effort (RPE) Picker Button', 'P1-3: Skip / Complete Set moved OUT');
 
   it('the pill is wrap-safe and capped at the row width', () => {
     expect(pill).toContain('inline-flex flex-wrap justify-center max-w-full');

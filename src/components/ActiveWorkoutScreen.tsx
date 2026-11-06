@@ -2326,6 +2326,7 @@ export default function ActiveWorkoutScreen({
                 {isFormCoachSupported && (
                 <button
                   type="button"
+                  aria-label={t('tools.formCoachTitle')}
                   onClick={() => {
                     setIsMoreMenuOpen(false);
                     setShowFormCoach(true);
