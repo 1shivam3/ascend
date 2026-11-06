@@ -90,7 +90,7 @@ export default function CustomizeSheet({
                   <Check className="h-3.5 w-3.5" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium text-text-primary">
+                  <span className="block text-sm font-medium text-text-primary">
                     {section.title}
                   </span>
                   {section.locked && (

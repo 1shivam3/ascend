@@ -1951,7 +1951,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   <span className="text-2xs font-bold uppercase tracking-wider text-text-muted block">
                     {t('settings.dietPreference')}
                   </span>
-                  <span className="text-xs font-bold text-text-primary block truncate">
+                  <span className="text-xs font-bold text-text-primary block">
                     {t(({
                       vegetarian: 'settings.dietVegetarian',
                       eggitarian: 'settings.dietEggetarian',
@@ -2337,7 +2337,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-bold text-xs sm:text-sm text-text-primary truncate" title={displayMealName(meal.name)}>
+                        <h3 className="font-bold text-xs sm:text-sm text-text-primary break-words" title={displayMealName(meal.name)}>
                           {displayMealName(meal.name)}
                         </h3>
                         {/* Live-fix L8: exact meals render no "~"; mixed
@@ -2395,8 +2395,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     <div className="pt-2 border-t border-border/50 space-y-1.5 animate-fade-in">
                       {meal.foods.map((food, idx) => (
                         <div key={idx} className="flex justify-between items-center text-2xs py-1 px-2 rounded-lg bg-bg-card border border-border/40">
-                          <div className="flex items-center gap-1.5 truncate">
-                            <span className="text-text-primary font-medium truncate" title={food.name}>{food.name}</span>
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            <span className="text-text-primary font-medium break-words" title={food.name}>{food.name}</span>
                             {language === 'hi' && (() => {
                               const hiName = getFoodHindiName(food.name);
                               return hiName ? (
@@ -2566,7 +2566,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                         >
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="font-bold text-xs text-text-primary truncate" title={displayMealName(meal.name)}>
+                              <h4 className="font-bold text-xs text-text-primary break-words" title={displayMealName(meal.name)}>
                                 {displayMealName(meal.name)}
                               </h4>
                               <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent-text">
@@ -2621,8 +2621,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                           <div className="pt-2 border-t border-border/50 space-y-1.5 animate-fade-in">
                             {meal.foods.map((food, idx) => (
                               <div key={idx} className="flex justify-between items-center text-2xs py-1 px-2 rounded-lg bg-bg-card border border-border/40">
-                                <div className="flex items-center gap-1.5 truncate">
-                                  <span className="text-text-primary font-medium truncate" title={food.name}>{food.name}</span>
+                                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                  <span className="text-text-primary font-medium break-words" title={food.name}>{food.name}</span>
                             {language === 'hi' && (() => {
                               const hiName = getFoodHindiName(food.name);
                               return hiName ? (
@@ -3617,7 +3617,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   className="p-3 rounded-xl bg-bg-card border border-border flex items-center justify-between gap-2 shadow-xs"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="font-bold text-xs text-text-primary truncate" title={fav.name}>{fav.name}</p>
+                    <p className="font-bold text-xs text-text-primary break-words" title={fav.name}>{fav.name}</p>
                     <p className="text-2xs text-text-muted mt-0.5">
                       {fav.defaultQuantity ? `${fav.defaultQuantity} ${fav.unit}` : fav.unit} •{' '}
                       <span className="text-accent font-semibold">~{fav.calories} kcal</span> •{' '}

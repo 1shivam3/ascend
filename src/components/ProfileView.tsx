@@ -194,7 +194,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               <h2 className="text-xl font-bold font-sans text-text-primary tracking-tight leading-snug">
                 {athleteName}
               </h2>
-              <p className="text-xs text-text-muted font-medium font-sans truncate max-w-[190px]">
+              <p className="text-xs text-text-muted font-medium font-sans break-all">
                 {athleteEmail}
               </p>
               <div className="pt-1">

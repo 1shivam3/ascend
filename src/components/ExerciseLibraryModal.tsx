@@ -291,7 +291,7 @@ export default function ExerciseLibraryModal({
                   <div className="py-3 px-2 flex items-center justify-between">
                   <div className="space-y-1 min-w-0 pr-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-text-primary truncate font-sans">
+                      <span className="text-xs font-bold text-text-primary break-words min-w-0 font-sans">
                         {ex.name}
                       </span>
                       {/* SIM-P1-05 Round 3: Devanagari name under the

@@ -855,7 +855,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             {coachDigest.nextAdjustments.map((adj) => (
               <div key={adj.exercise}>
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-xs font-bold text-text-primary truncate">{language === 'hi' ? (getExerciseHindiName(adj.exercise) ?? adj.exercise) : adj.exercise}</p>
+                  <p className="text-xs font-bold text-text-primary flex-1 min-w-0 break-words">{language === 'hi' ? (getExerciseHindiName(adj.exercise) ?? adj.exercise) : adj.exercise}</p>
                   <span className="text-xs font-bold text-text-primary tabular-nums shrink-0">
                     {adj.oldTarget.weight} → {adj.newTarget.weight}
                     {adj.newTarget.unit}
@@ -961,7 +961,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
             <Camera className="w-4 h-4" />
           </span>
-          <span className="text-2xs font-semibold text-text-secondary truncate">{t('home.mealScan')}</span>
+          <span className="text-2xs font-semibold text-text-secondary w-full text-center leading-tight break-words">{t('home.mealScan')}</span>
         </button>
         <button
           type="button"
@@ -971,7 +971,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
             <Barcode className="w-4 h-4" />
           </span>
-          <span className="text-2xs font-semibold text-text-secondary truncate">{t('home.scan')}</span>
+          <span className="text-2xs font-semibold text-text-secondary w-full text-center leading-tight break-words">{t('home.scan')}</span>
         </button>
         <button
           type="button"
@@ -981,7 +981,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
             <Scale className="w-4 h-4" />
           </span>
-          <span className="text-2xs font-semibold text-text-secondary truncate">{t('home.weight')}</span>
+          <span className="text-2xs font-semibold text-text-secondary w-full text-center leading-tight break-words">{t('home.weight')}</span>
         </button>
         <button
           type="button"
@@ -991,7 +991,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
             <Video className="w-4 h-4" />
           </span>
-          <span className="text-2xs font-semibold text-text-secondary truncate">{t('home.formCheck')}</span>
+          <span className="text-2xs font-semibold text-text-secondary w-full text-center leading-tight break-words">{t('home.formCheck')}</span>
         </button>
       </div>
 

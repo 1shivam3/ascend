@@ -114,7 +114,7 @@ export default function ShareProgramModal({ plan, isOpen, onClose }: ShareProgra
           </div>
           <div className="text-2xs text-text-secondary font-mono space-y-0.5 max-h-24 overflow-y-auto pr-1">
             {plan.exercises.map((ex, i) => (
-              <div key={i} className="truncate">
+              <div key={i} className="break-words">
                 • {ex.name}: {ex.targetSets} × {ex.targetReps}
                 {ex.targetWeight ? ` @ ${ex.targetWeight}${ex.targetUnit || 'kg'}` : ''}
               </div>

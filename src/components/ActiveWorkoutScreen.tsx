@@ -2605,7 +2605,7 @@ export default function ActiveWorkoutScreen({
                           >
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
-                                <span className={`text-xs font-bold truncate ${isHighlighted ? 'text-accent-text' : 'text-text-primary'}`}>
+                                <span className={`text-xs font-bold break-words min-w-0 ${isHighlighted ? 'text-accent-text' : 'text-text-primary'}`}>
                                   {item.name}
                                 </span>
                                 {isCurrent && (
@@ -2652,7 +2652,7 @@ export default function ActiveWorkoutScreen({
                           >
                             <div className="flex items-center gap-2 min-w-0">
                               <Plus className="w-3.5 h-3.5 shrink-0" />
-                              <span className="text-xs font-bold truncate">
+                              <span className="text-xs font-bold break-words min-w-0">
                                 {t('workout.useCustomName', { name: localExerciseName.trim() })}
                               </span>
                             </div>
@@ -2703,7 +2703,7 @@ export default function ActiveWorkoutScreen({
                   aria-label={t('workout.changeAria', { name: currentExercise.name || t('workout.untitled') })}
                   title={t('workout.changeTitle')}
                 >
-                  <h2 className="display-title font-display uppercase tracking-tight text-3xl sm:text-4xl text-text-primary group-hover:text-accent transition-colors truncate">
+                  <h2 className="display-title font-display uppercase tracking-tight text-3xl sm:text-4xl text-text-primary group-hover:text-accent transition-colors min-w-0 break-words">
                     {(currentExercise.name || t('workout.untitled')).toUpperCase()}
                   </h2>
                   <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-bg-secondary group-hover:bg-accent/15 border border-border/60 group-hover:border-accent/40 text-text-muted group-hover:text-accent transition-all shrink-0">
@@ -3619,7 +3619,7 @@ export default function ActiveWorkoutScreen({
                         {isDone ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : idx + 1}
                       </span>
                       <div className="min-w-0">
-                        <div className="font-bold text-xs truncate font-sans">
+                        <div className="font-bold text-xs font-sans break-words">
                           {ex.name}
                         </div>
                         <div className="text-2xs font-mono text-text-muted">
@@ -3702,7 +3702,7 @@ export default function ActiveWorkoutScreen({
                           {w.weight} {w.unit} × {t('prs.repsWord', { reps: w.reps })}
                         </span>
                       </div>
-                      <span className="text-2xs text-text-muted truncate max-w-[130px]">{w.label}</span>
+                      <span className="text-2xs text-text-muted text-right break-words">{w.label}</span>
                     </div>
                   ))}
                 </div>
@@ -4368,8 +4368,8 @@ export default function ActiveWorkoutScreen({
                         {t(item.rirKey as StringKey)}
                       </span>
                     </div>
-                    <div className="text-2xs font-bold truncate">{t(item.labelKey as StringKey)}</div>
-                    <div className="text-2xs text-text-muted truncate">{t(item.descKey as StringKey)}</div>
+                    <div className="text-2xs font-bold leading-tight">{t(item.labelKey as StringKey)}</div>
+                    <div className="text-2xs text-text-muted leading-tight mt-0.5">{t(item.descKey as StringKey)}</div>
                   </button>
                 );
               })}

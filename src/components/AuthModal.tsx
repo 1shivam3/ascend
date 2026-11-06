@@ -234,7 +234,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
                 <span className="text-xs font-bold">{t('auth.connected')}</span>
               </div>
-              <p className="text-2xs text-text-primary font-mono truncate">
+              <p className="text-2xs text-text-primary font-mono break-all">
                 {user.email}
               </p>
               <p className="text-2xs text-text-muted leading-relaxed">
