@@ -211,6 +211,12 @@ export const hi: Partial<Record<StringKey, string>> = {
   'formCoach.livePullsDetected': 'पुल पहचाने गए',
   'formCoach.livePulls': 'पुल',
   'formCoach.minHipAngle': 'न्यूनतम हिप कोण',
+  // Audit phase 2 (2026-11-06): machine translations — Hindi review parked.
+  'formCoach.unverifiedOfDetected': '{unverified} असत्यापित, कुल {detected} पहचाने गए',
+  'formCoach.detectedLine': 'पहचाने गए: {detected}',
+  'formCoach.tempoUnavailable': 'टेम्पो उपलब्ध नहीं',
+  'formCoach.avgPerRep': 'औसत / रेप',
+  'formCoach.lockoutUnverifiedShort': 'सत्यापित नहीं हो सका',
   'formCoach.autoCardTitle': 'व्यायाम अपने आप पहचानें',
   'formCoach.autoCardBadge': 'ऑटो-डिटेक्ट',
   'formCoach.autoScope': 'किसी भी ऐसे व्यायाम का सेट अपलोड करें जिसे फ़ॉर्म कोच ग्रेड करता है — स्क्वाट, डेडलिफ़्ट, ओवरहेड प्रेस, बेंट-ओवर रो, बाइसेप कर्ल, लंज, पुश-अप, लैटरल रेज़, प्लैंक या बेंच प्रेस — साइड से फ़िल्माया गया (प्रेस, कर्ल और रेज़ के लिए सामने का व्यू भी चलता है)। फ़ॉर्म कोच व्यायाम को पहचानकर उसे ग्रेड करता है। जिस वीडियो को यह पहचान नहीं पाएगा उसका कोई रिपोर्ट नहीं बनेगा।',

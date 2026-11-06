@@ -204,6 +204,12 @@ export const en = {
   'formCoach.livePullsDetected': 'Pulls Detected',
   'formCoach.livePulls': 'Pulls',
   'formCoach.minHipAngle': 'Min Hip Angle',
+  // ── Form Coach report truthfulness (audit phase 2, 2026-11-06) ──
+  'formCoach.unverifiedOfDetected': '{unverified} unverified of {detected} detected',
+  'formCoach.detectedLine': 'Detected: {detected}',
+  'formCoach.tempoUnavailable': 'Tempo unavailable',
+  'formCoach.avgPerRep': 'Avg / rep',
+  'formCoach.lockoutUnverifiedShort': 'Could not verify',
   'formCoach.autoCardTitle': 'Auto-Detect Exercise',
   'formCoach.autoCardBadge': 'Auto-detect',
   'formCoach.autoScope': 'Upload a set of any exercise Form Coach grades — squat, deadlift, overhead press, bent-over row, bicep curl, lunge, push-up, lateral raise, plank, or bench press — filmed from the side (front view works for presses, curls and raises). Form Coach detects the exercise and grades it. A video it cannot identify will not produce a report.',

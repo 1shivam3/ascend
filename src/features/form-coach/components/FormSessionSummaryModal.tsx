@@ -7,7 +7,8 @@
  */
 
 import React, { useState } from 'react';
-import { FormSessionSummary } from '../models/form-session.types';
+import { FormSessionSummary, getRepStatus } from '../models/form-session.types';
+import { useTranslation } from '@/lib/i18n';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -47,6 +48,7 @@ export default function FormSessionSummaryModal({
   onAnalyzeAnother,
 }: FormSessionSummaryModalProps) {
   const toast = useToast();
+  const { t } = useTranslation();
   const [correctedReps, setCorrectedReps] = useState<number>(summary.totalValidReps);
   const [isEditingReps, setIsEditingReps] = useState(false);
   const [showRepDetails, setShowRepDetails] = useState(false);
@@ -157,7 +159,19 @@ export default function FormSessionSummaryModal({
                 </button>
               </div>
             )}
-            <span className="text-2xs text-text-secondary">Detected: {summary.totalDetectedReps}</span>
+            {/* P0-3: the tile reads "X valid, Y unverified of Z
+                detected" — the big number is the (user-correctable)
+                valid count, the caption carries the unverified and
+                detected counts so an unjudgeable rep is never
+                silently lumped in with failures. */}
+            <span className="text-2xs text-text-secondary">
+              {(summary.totalUnverifiedReps ?? 0) > 0
+                ? t('formCoach.unverifiedOfDetected', {
+                    unverified: summary.totalUnverifiedReps ?? 0,
+                    detected: summary.totalDetectedReps,
+                  })
+                : t('formCoach.detectedLine', { detected: summary.totalDetectedReps })}
+            </span>
           </div>
           )}
 
@@ -168,13 +182,20 @@ export default function FormSessionSummaryModal({
             <span className="text-2xs text-text-secondary">Total set</span>
           </div>
 
-          {/* Avg Rep Cadence */}
+          {/* Tempo — the report's one per-rep time figure: the mean
+              per-rep duration from the reps' own timestamps when it
+              reconstructs the set, "Tempo unavailable" when it does
+              not (P0-3; see services/analysis/tempo.ts). */}
           <div className="p-3 rounded-2xl bg-surface-elevated border border-border-subtle flex flex-col items-center justify-center text-center">
             <span className="text-2xs uppercase font-mono text-text-muted">Tempo</span>
             <span className="text-2xl font-black text-text-primary my-1">
-              {summary.averageRepDurationSeconds}s
+              {summary.tempoSeconds != null ? `${summary.tempoSeconds}s` : '—'}
             </span>
-            <span className="text-2xs text-text-secondary">Avg / rep</span>
+            <span className="text-2xs text-text-secondary">
+              {summary.tempoSeconds != null
+                ? t('formCoach.avgPerRep')
+                : t('formCoach.tempoUnavailable')}
+            </span>
           </div>
         </div>
 
@@ -280,7 +301,12 @@ export default function FormSessionSummaryModal({
                             Hip: {rep.minHipAngleDeg ?? '—'}°
                           </span>
                           <span className="text-2xs text-text-muted block">
-                            Lockout: {rep.lockoutAchieved ? 'Full' : 'Not reached'}
+                            Lockout:{' '}
+                            {getRepStatus(rep) === 'unverified'
+                              ? t('formCoach.lockoutUnverifiedShort')
+                              : rep.lockoutAchieved
+                                ? 'Full'
+                                : 'Not reached'}
                           </span>
                         </div>
                       ) : summary.exerciseId === 'squat' ? (

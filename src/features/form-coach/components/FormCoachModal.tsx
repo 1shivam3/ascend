@@ -157,6 +157,17 @@ export default function FormCoachModal({
   // label must say so: deadlift attempts are "pulls" (the word its
   // report uses); every other exercise gets the neutral "Detected",
   // matching the report's "Detected: N" line.
+  //
+  // Why the live count and the report's final count can differ
+  // (P0-3): (1) the live count includes attempts the report splits
+  // into valid / failed / unverified — it is a "detected" tally, not
+  // a valid tally; (2) in auto mode the HUD follows the classifier's
+  // current leaning, which can switch mid-stream, so cycles closed by
+  // a previously-followed analyzer were counted live but belong to a
+  // different exercise's tally; (3) finishing early ("View Report
+  // Now") discards any cycle still in flight. The report is built
+  // solely from the winning analyzer's finishSet counts, and it is
+  // the only count the report shows.
   const hudCountLabel =
     hudExerciseId === 'deadlift'
       ? t('formCoach.livePullsDetected')

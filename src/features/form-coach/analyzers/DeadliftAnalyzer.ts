@@ -10,8 +10,9 @@
 
 import { ExerciseAnalyzer, AnalyzerFrameResult } from './ExerciseAnalyzer';
 import { NormalizedLandmark, PoseLandmarkIndex, DetectedSide } from '../models/pose.types';
-import { FormObservation } from '../models/form-feedback.types';
-import { FormRep, FormSessionSummary } from '../models/form-session.types';
+import { FormObservation, MovementPhase } from '../models/form-feedback.types';
+import { FormRep, FormSessionSummary, getRepStatus } from '../models/form-session.types';
+import { computeTempoSeconds } from '../services/analysis/tempo';
 import {
   calculateJointAngle,
   calculateSegmentInclination,
@@ -38,6 +39,16 @@ const VISIBILITY_BAD_SHARE = 0.6;
 // frames.
 const FRONT_CONFIDENT_MIN_VOTES = 4;
 const FRONT_CONFIDENT_SHARE = 0.6;
+
+/**
+ * P0-3: lockout is judged from hip AND knee extension at the top of
+ * the pull, and the knee angle needs a visible ankle. If the
+ * ankle/foot landmarks were in frame and reliable on fewer than this
+ * share of an attempt's frames, the attempt's lockout is UNVERIFIED —
+ * a no-lockout record from invisible landmarks is not evidence the
+ * lifter failed to lock out.
+ */
+const LOCKOUT_JUDGEABLE_MIN_SHARE = 0.5;
 
 /** Majority view over classified votes; front must win outright. */
 function majorityView(votes: DetectedSide[]): DetectedSide {
@@ -87,6 +98,12 @@ export class DeadliftAnalyzer implements ExerciseAnalyzer {
   private anklesVisibilityWindow: VisibilitySample[] = [];
   private framesProcessed = 0;
   private framesTracked = 0;
+  // P0-3: per-attempt lockout judgeability — frames of the current
+  // attempt, and how many of them had the ankle/foot landmarks lockout
+  // judging depends on. Reset each time an attempt completes.
+  private attemptFrames = 0;
+  private attemptJudgeableFrames = 0;
+  private lastPhase: MovementPhase = 'standing';
 
   constructor(config: Partial<DeadliftRepStateMachineConfig> = {}) {
     this.stateMachine = new DeadliftRepStateMachine({
@@ -172,6 +189,9 @@ export class DeadliftAnalyzer implements ExerciseAnalyzer {
     this.anklesVisibilityWindow = [];
     this.framesProcessed = 0;
     this.framesTracked = 0;
+    this.attemptFrames = 0;
+    this.attemptJudgeableFrames = 0;
+    this.lastPhase = 'standing';
   }
 
   getTrackingStats(): { framesProcessed: number; framesTracked: number } {
@@ -227,6 +247,15 @@ export class DeadliftAnalyzer implements ExerciseAnalyzer {
   ): AnalyzerFrameResult {
     this.framesProcessed += 1;
     if (!landmarks || landmarks.length < 33) {
+      // P0-3: a pose-less frame inside an attempt is a frame on which
+      // lockout could not have been judged either.
+      if (
+        this.lastPhase === 'descending' ||
+        this.lastPhase === 'bottom' ||
+        this.lastPhase === 'ascending'
+      ) {
+        this.attemptFrames += 1;
+      }
       const activeCue = this.feedbackEngine.evaluate({
         exerciseId: this.exerciseId,
         phase: 'tracking_lost',
@@ -322,6 +351,7 @@ export class DeadliftAnalyzer implements ExerciseAnalyzer {
       readinessReason = 'Improve lighting or adjust distance to improve tracking.';
     }
 
+    const phaseBefore = this.stateMachine.getCurrentPhase();
     const completedRep = this.stateMachine.update(
       hipAngleDeg,
       kneeAngleDeg,
@@ -334,9 +364,37 @@ export class DeadliftAnalyzer implements ExerciseAnalyzer {
 
     const currentPhase = this.stateMachine.getCurrentPhase();
 
+    // P0-3: sample this frame into the current attempt's lockout
+    // judgeability — frames while an attempt is in flight, plus the
+    // frame that completes it. Judgeable means the ankle and foot
+    // were in frame and reliable: without them the knee angle at the
+    // top does not exist and lockout cannot be judged.
+    const attemptActive =
+      phaseBefore === 'descending' || phaseBefore === 'bottom' || phaseBefore === 'ascending';
+    if (attemptActive || completedRep) {
+      this.attemptFrames += 1;
+      if (anklesInFrame && feetInFrame) {
+        this.attemptJudgeableFrames += 1;
+      }
+    }
+    this.lastPhase = currentPhase;
+
     // Per-rep view votes (D1 discipline): only frames belonging to an
     // attempt vote; the completing frame votes before the view is set.
     if (completedRep) {
+      // P0-3: a no-lockout attempt whose lockout landmarks were
+      // mostly invisible is UNVERIFIED, not failed — the absence of a
+      // measured lockout is not evidence the lifter didn't reach one.
+      if (!completedRep.lockoutAchieved && completedRep.status === 'failed') {
+        const judgeableShare =
+          this.attemptFrames > 0 ? this.attemptJudgeableFrames / this.attemptFrames : 1;
+        if (judgeableShare < LOCKOUT_JUDGEABLE_MIN_SHARE) {
+          completedRep.status = 'unverified';
+          completedRep.invalidReason = 'Lockout could not be verified (feet out of frame)';
+        }
+      }
+      this.attemptFrames = 0;
+      this.attemptJudgeableFrames = 0;
       this.currentRepViewVotes.push(side);
       this.completedRepViews.push(majorityView(this.currentRepViewVotes));
       this.currentRepViewVotes = [];
@@ -402,7 +460,14 @@ export class DeadliftAnalyzer implements ExerciseAnalyzer {
     const now = Date.now();
     const durationSeconds = Math.max(1, Math.round((now - this.sessionStartTimeMs) / 1000));
     const validReps = this.completedReps.filter((r) => r.isValid);
-    const incompleteReps = this.completedReps.filter((r) => !r.lockoutAchieved);
+    // P0-3: "incomplete lockout" is claimed only for attempts whose
+    // lockout was judged on visible landmarks and not reached.
+    // Attempts whose lockout could not be judged are reported
+    // separately as unverified — never as failures.
+    const incompleteReps = this.completedReps.filter(
+      (r) => !r.lockoutAchieved && getRepStatus(r) === 'failed'
+    );
+    const unverifiedReps = this.completedReps.filter((r) => getRepStatus(r) === 'unverified');
 
     const avgConfidence =
       this.trackingConfidences.length > 0
@@ -439,6 +504,23 @@ export class DeadliftAnalyzer implements ExerciseAnalyzer {
         limitation: 'Estimated from 2D landmarks — a cue to check against the video, not a measurement of bar path.',
       });
     }
+    if (unverifiedReps.length > 0) {
+      observations.push({
+        id: 'rule-lockout-unverified',
+        ruleId: 'rule-lockout-unverified',
+        title: 'Lockout Could Not Be Verified',
+        message: `Could not verify lockout (feet out of frame) on ${unverifiedReps.length} ${
+          unverifiedReps.length === 1 ? 'rep' : 'reps'
+        }.`,
+        severity: 'info',
+        count: unverifiedReps.length,
+        evidence:
+          'Ankle and foot landmarks were below the visibility threshold during these pulls, so knee extension at the top could not be measured.',
+        repsTriggered: unverifiedReps.map((r) => r.repNumber),
+        limitation:
+          'These pulls are counted as detected attempts, not as failed reps — refilm with your feet in frame to get a lockout verdict.',
+      });
+    }
     if (incompleteReps.length > 0) {
       observations.push({
         id: 'rule-incomplete-lockout',
@@ -473,9 +555,11 @@ export class DeadliftAnalyzer implements ExerciseAnalyzer {
       durationSeconds,
       totalDetectedReps: this.completedReps.length,
       totalValidReps: validReps.length,
+      totalUnverifiedReps: unverifiedReps.length,
       analysedRepCount: this.completedReps.length,
       averageTrackingConfidence: avgConfidence,
       averageRepDurationSeconds: avgRepDurationSeconds,
+      tempoSeconds: computeTempoSeconds(this.completedReps, durationSeconds),
       reps: this.completedReps,
       observations,
       savedToWorkout: false,
