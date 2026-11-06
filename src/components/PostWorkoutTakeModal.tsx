@@ -214,7 +214,7 @@ export default function PostWorkoutTakeModal({
               <h3 className="font-black text-base text-text-primary leading-tight">
                 {t('take.title')}
               </h3>
-              <p className="text-2xs text-text-muted truncate max-w-[220px]">
+              <p className="text-2xs text-text-muted break-words">
                 {t('take.loggedTo', { name: completedWorkout.name || t('take.workoutFallback') })}
               </p>
             </div>

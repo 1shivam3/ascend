@@ -719,10 +719,10 @@ export default function SuggestedWorkoutModal({
                         <Icon className="w-3.5 h-3.5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <span className={`text-xs block font-bold truncate ${isSelected ? 'text-accent-text' : 'text-text-primary'}`}>
+                        <span className={`text-xs block font-bold leading-tight ${isSelected ? 'text-accent-text' : 'text-text-primary'}`}>
                           {t(bp.labelKey)}
                         </span>
-                        <span className="text-[0.625rem] text-text-muted truncate block">
+                        <span className="text-[0.625rem] text-text-muted block leading-tight mt-0.5">
                           {t(bp.descKey)}
                         </span>
                       </div>
@@ -762,7 +762,7 @@ export default function SuggestedWorkoutModal({
                       <span className={`text-xs font-bold block ${isSelected ? 'text-accent-text' : 'text-text-primary'}`}>
                         {s.name}
                       </span>
-                      <span className="text-2xs text-text-muted line-clamp-1 mt-0.5">
+                      <span className="text-2xs text-text-muted line-clamp-2 mt-0.5">
                         {s.description}
                       </span>
                     </button>
@@ -840,7 +840,7 @@ export default function SuggestedWorkoutModal({
                     }`}
                   >
                     <span className="text-xs font-bold block">{t(int.labelKey)}</span>
-                    <span className="text-[0.5625rem] text-text-muted font-mono block mt-0.5 truncate">
+                    <span className="text-[0.5625rem] text-text-muted font-mono block mt-0.5 leading-tight">
                       {t(int.tagKey)}
                     </span>
                   </button>
@@ -851,28 +851,32 @@ export default function SuggestedWorkoutModal({
 
           {/* Routine Preview & Exercise List */}
           <div className="pt-2 space-y-2 border-t border-border">
-            <div className="flex items-center justify-between">
-              <div>
-                <input
-                  type="text"
-                  value={planTitle}
-                  onChange={(e) => setPlanTitle(e.target.value)}
-                  placeholder={t('sg.planNamePlaceholder')}
-                  className="font-bold text-sm text-text-primary bg-transparent border-b border-border/80 focus:border-accent outline-none pb-0.5"
-                />
-                <span className="text-2xs text-text-muted block mt-0.5 font-mono">
+            {/* P1-2 (UI/UX audit phase 3): the plan-name field gets a
+                full-width line of its own — sharing a row with the Add
+                Exercise button clipped long plan names. */}
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={planTitle}
+                onChange={(e) => setPlanTitle(e.target.value)}
+                placeholder={t('sg.planNamePlaceholder')}
+                aria-label={t('sg.planNamePlaceholder')}
+                className="w-full font-bold text-sm text-text-primary bg-transparent border-b border-border/80 focus:border-accent outline-none pb-0.5"
+              />
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-2xs text-text-muted font-mono">
                   {t('sg.configured', { count: exercises.length })}
                 </span>
-              </div>
 
-              <button
-                type="button"
-                onClick={() => setShowAddDrawer(!showAddDrawer)}
-                className="btn-secondary py-1 px-2.5 text-2xs font-semibold flex items-center gap-1 border-accent/40 text-accent-text hover:bg-accent/10"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>{t('sg.addExercise')}</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddDrawer(!showAddDrawer)}
+                  className="btn-secondary py-1 px-2.5 text-2xs font-semibold flex items-center gap-1 border-accent/40 text-accent-text hover:bg-accent/10 shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{t('sg.addExercise')}</span>
+                </button>
+              </div>
             </div>
 
             {/* Quick Add Drawer */}
@@ -911,24 +915,37 @@ export default function SuggestedWorkoutModal({
               </div>
             )}
 
-            {/* Exercise Rows */}
+            {/* Exercise Rows — P1-2 (UI/UX audit phase 3): two-line
+                layout. Line 1 carries the full exercise name (wraps,
+                never ellipsized) with the delete action right-aligned;
+                line 2 carries the Sets/Reps steppers with their text
+                labels. The old single row let the steppers squeeze the
+                name down to "B..." / "I..." at phone widths. */}
             <div className="space-y-1.5">
               {exercises.map((ex, idx) => (
                 <div
                   key={`${ex.name}-${idx}`}
-                  className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border flex items-center justify-between gap-2"
+                  className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border space-y-2"
                 >
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="flex items-start gap-2">
                     <span className="w-5 h-5 rounded-full bg-bg-elevated flex items-center justify-center text-[0.625rem] font-mono font-bold text-text-muted shrink-0">
                       {idx + 1}
                     </span>
-                    <span className="text-xs font-bold text-text-primary truncate">
+                    <span className="text-xs font-bold text-text-primary flex-1 min-w-0 leading-snug break-words">
                       {ex.name}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveExercise(idx)}
+                      className="w-8 h-8 tap-40 -mt-1.5 flex items-center justify-center rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors shrink-0"
+                      title="Remove exercise"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
 
                   {/* Steppers for Sets & Reps */}
-                  <div className="flex items-center gap-1.5 shrink-0 font-mono text-xs">
+                  <div className="flex items-center gap-1.5 flex-wrap font-mono text-xs pl-7">
                     <div className="flex items-center gap-1 bg-bg-card px-1.5 py-0.5 rounded-lg border border-border">
                       <span className="text-text-muted text-[0.625rem] pl-1">{t('sg.sets')}</span>
                       <button
@@ -970,15 +987,6 @@ export default function SuggestedWorkoutModal({
                         +
                       </button>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveExercise(idx)}
-                      className="w-8 h-8 tap-40 flex items-center justify-center rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
-                      title="Remove exercise"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
                   </div>
                 </div>
               ))}

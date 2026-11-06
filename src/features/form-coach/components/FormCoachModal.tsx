@@ -390,7 +390,7 @@ export default function FormCoachModal({
                   <Video className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-text-primary">ASCEND Form Coach</h2>
+                  <h2 className="text-lg font-bold text-text-primary">{t('tools.formCoachTitle')}</h2>
                   <p className="text-2xs text-text-secondary">On-device video movement & rep analysis</p>
                 </div>
               </div>

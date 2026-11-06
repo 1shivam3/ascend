@@ -215,7 +215,7 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
                     </div>
                   </div>
 
-                  <p className="text-2xs text-text-muted mt-0.5 line-clamp-1">{config.tagline}</p>
+                  <p className="text-2xs text-text-muted mt-0.5 line-clamp-2">{config.tagline}</p>
 
                   {/* Impact preview pills */}
                   <div className="mt-1.5 flex flex-wrap gap-1">

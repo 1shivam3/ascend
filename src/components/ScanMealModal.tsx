@@ -5,6 +5,7 @@ import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { MealAnalysisResult, ScannedFoodItem, MealEntry, FoodItem, OilLevelId } from '@/lib/types';
 import { analyzeMealPhoto, recalculateMealResult, generateOfflineMealEstimate } from '@/lib/ai-scan-meal';
+import { computeMealConfidence } from '@/lib/scan-confidence';
 import { resolveIndianMeta, householdDraftFor } from '@/lib/indian-foods';
 import { OIL_LEVELS, defaultOilForFood, applyOilDelta, tspForOilLevel, servingsForOil } from '@/lib/oil-adjust';
 import { validateImageFile, resizeAndCompressImage, captureVideoFrame, MAX_IMAGE_DIMENSION } from '@/lib/image-processing';
@@ -95,6 +96,14 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   // Result state
   const [analysis, setAnalysis] = useState<MealAnalysisResult | null>(null);
   const [showReportAI, setShowReportAI] = useState(false);
+  // P0-4: indices of items the user edited or added by hand in this
+  // result. Displayed confidence is COMPUTED (lib/scan-confidence)
+  // over the current values; this set marks which items were scored
+  // over user-supplied values (signal d).
+  const [editedIndices, setEditedIndices] = useState<ReadonlySet<number>>(new Set());
+  // P0-4: elapsed seconds on the analyzing step (progress signal next
+  // to the photo thumbnail).
+  const [scanElapsedSec, setScanElapsedSec] = useState(0);
   // Per-item ghee/oil answers in the review step (index → level). Photo AI
   // can't see absorbed ghee — this is the honesty correction, one tap.
   const [oilLevels, setOilLevels] = useState<Record<number, OilLevelId>>({});
@@ -248,6 +257,15 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     };
   }, [stopLiveCamera]);
 
+  // Elapsed-time ticker for the analyzing step. The counter itself is
+  // reset in startAnalysis (the only transition into 'analyzing') so
+  // this effect only owns the interval.
+  useEffect(() => {
+    if (step !== 'analyzing') return;
+    const id = setInterval(() => setScanElapsedSec((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [step]);
+
   const { registerBackHandler } = useAppNavigation();
 
   // If live camera is active inside the scanner, Back stops the camera
@@ -294,6 +312,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     cleanupPreview();
     setStep('select');
     setOilLevels({});
+    setEditedIndices(new Set());
     setUserNotes('');
     setSelectedHiddenIngredients([]);
     setAnalysis(null);
@@ -410,6 +429,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       );
       const result = applyLearnedPortionPreferences(rawResult);
       setOilLevels({});
+      setEditedIndices(new Set());
       setAnalysis(result);
       setMealName(result.mealName || t('scan.estimatedMealName'));
       setStep('review');
@@ -432,6 +452,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     scanAbortControllerRef.current = controller;
 
     setScanError(null);
+    setScanElapsedSec(0);
     setStep('analyzing');
     try {
       const rawResult = await analyzeMealPhoto({
@@ -444,6 +465,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
       const result = applyLearnedPortionPreferences(rawResult);
       setOilLevels({});
+      setEditedIndices(new Set());
       setAnalysis(result);
       setMealName(result.mealName || t('scan.defaultMealName'));
       setStep('review');
@@ -535,6 +557,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
     const updated = recalculateMealResult(analysis, itemsCopy);
     setAnalysis(updated);
+    setEditedIndices((prev) => new Set(prev).add(index));
     setEditingItemIndex(null);
     toast.success(
       t('scan.itemUpdated', { name: finalName, grams: finalGrams, kcal: finalCalories }),
@@ -551,6 +574,15 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     }
     const updated = recalculateMealResult(analysis, updatedItems);
     setAnalysis(updated);
+    // Keep edit flags aligned after the index shift.
+    setEditedIndices((prev) => {
+      const next = new Set<number>();
+      prev.forEach((i) => {
+        if (i < index) next.add(i);
+        else if (i > index) next.add(i - 1);
+      });
+      return next;
+    });
   };
 
   const handleAddNewItem = () => {
@@ -571,6 +603,8 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
     const updated = recalculateMealResult(analysis, [...analysis.items, newItem]);
     setAnalysis(updated);
+    // A hand-added item is user-supplied data (signal d).
+    setEditedIndices((prev) => new Set(prev).add(analysis.items.length));
     setNewItemName('');
     setNewItemGrams(100);
     setShowAddItem(false);
@@ -587,6 +621,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
     // Check if input mentions specific grams or items
     let matched = false;
+    const refinedIndices: number[] = [];
     itemsCopy.forEach((item, idx) => {
       if (inputLower.includes(item.name.toLowerCase().split(' ')[0])) {
         const gramMatch = inputLower.match(/(\d+)\s*g/);
@@ -603,6 +638,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
             fatG: est.fatG,
           };
           matched = true;
+          refinedIndices.push(idx);
         }
       }
     });
@@ -610,6 +646,11 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     if (matched) {
       const updated = recalculateMealResult(analysis, itemsCopy);
       setAnalysis(updated);
+      setEditedIndices((prev) => {
+        const next = new Set(prev);
+        refinedIndices.forEach((i) => next.add(i));
+        return next;
+      });
       // This path is a purely local edit (regex match + offline DB
       // re-estimate) — no AI call happens, so it is labelled with the
       // honest offline label, never "AI Adjusted".
@@ -629,6 +670,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
           language: getCurrentLanguage(),
         });
         setOilLevels({});
+        setEditedIndices(new Set());
         setAnalysis(refinedResult);
         toast.success(t('scan.aiRefinedMsg'), t('scan.aiRefinedTitle'));
         setRefinementInput('');
@@ -999,9 +1041,20 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         {/* ── STEP 2: ANALYZING ANIMATION ──────────────────────────────────── */}
         {step === 'analyzing' && (
           <div className="p-8 sm:p-12 text-center space-y-4">
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-accent/10 border border-accent/30 flex items-center justify-center text-accent relative">
-              <Sparkles className="w-8 h-8" />
-            </div>
+            {/* P0-4: the user's own photo stays visible while the scan
+                runs, with a live elapsed-time progress signal. */}
+            {previewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={previewUrl}
+                alt={t('scan.mealPreviewAlt')}
+                className="w-24 h-24 mx-auto rounded-2xl object-cover border border-border shadow-xs"
+              />
+            ) : (
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-accent/10 border border-accent/30 flex items-center justify-center text-accent relative">
+                <Sparkles className="w-8 h-8" />
+              </div>
+            )}
 
             <div className="space-y-1.5">
               <h3 className="font-black text-lg text-text-primary">
@@ -1015,6 +1068,8 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
             <div className="flex items-center justify-center gap-1.5 text-2xs text-text-secondary font-mono">
               <RefreshCw className="w-3.5 h-3.5 animate-spin text-accent" />
               <span>{t('scan.checkingDb')}</span>
+              <span aria-hidden="true">•</span>
+              <span>{t('scan.elapsed', { sec: scanElapsedSec })}</span>
             </div>
 
             <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-2 max-w-xs mx-auto">
@@ -1057,12 +1112,21 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
           );
           const todayStr = getLocalTodayStr();
           const isCreatineLoggedToday = !!store.creatineLogs?.[todayStr]?.taken;
+          // P0-4: displayed confidence is computed from checkable
+          // signals (DB match, portion plausibility, item-set
+          // consistency, user edits) — the model's self-reported
+          // confidence (analysis.confidence / item.confidence) is
+          // never rendered.
+          const confidence = computeMealConfidence(analysis.items, {
+            hiddenIngredients: analysis.hiddenIngredients,
+            editedIndices,
+          });
 
           return (
-            <div className="p-4 sm:p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+            <div className="p-4 sm:p-5 max-h-[80vh] flex flex-col gap-4">
               {isEmptyDetection ? (
                 /* Empty / Non-food detection state */
-                <div className="space-y-4">
+                <div className="space-y-4 overflow-y-auto min-h-0">
                   <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-center space-y-3">
                     <div className="w-12 h-12 mx-auto rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-500">
                       <AlertCircle className="w-6 h-6" />
@@ -1223,9 +1287,9 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                     <p className="text-2xs text-text-muted pt-0.5">
                       {t('scan.overallConfidence', {
                         level:
-                          analysis.confidence === 'high'
+                          confidence.level === 'high'
                             ? t('scan.confHigh')
-                            : analysis.confidence === 'medium'
+                            : confidence.level === 'medium'
                             ? t('scan.confMedium')
                             : t('scan.confLow'),
                       })}
@@ -1236,6 +1300,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                     </p>
                   </div>
 
+                  {/* P0-4: the summary card above (Estimated badge +
+                      meal total) stays pinned outside this scroll
+                      region; only the detail below scrolls. */}
+                  <div className="space-y-4 overflow-y-auto min-h-0 pr-0.5">
                   {/* Creatine Habit Quick-Action Card if detected */}
                   {hasCreatine && (
                     <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/30 space-y-2 animate-fade-in">
@@ -1346,6 +1414,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                     <div className="space-y-2">
                       {analysis.items.map((item, idx) => {
                         const isEditing = editingItemIndex === idx;
+                        const itemLevel = confidence.perItem[idx]?.level ?? 'low';
                         const oilDefault = defaultOilForFood(item.name);
                         const oilLevel = oilLevels[idx] ?? oilDefault?.level;
                         const servings = servingsForOil(item.name, undefined, undefined, item.estimatedGrams);
@@ -1366,20 +1435,22 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                   <span className="font-bold text-xs sm:text-sm text-text-primary">
                                     {item.name}
                                   </span>
-                                  {/* SIM-P3-02: the scan computes per-item
-                                      confidence but never showed it — a
-                                      low-confidence guess used to look as
-                                      certain as a clean read. */}
+                                  {/* SIM-P3-02: per-item confidence is
+                                      shown so a weak guess does not look
+                                      as certain as a clean read. P0-4:
+                                      the level is COMPUTED from
+                                      checkable signals (scan-confidence),
+                                      never the model's self-report. */}
                                   <span className={`text-2xs font-mono font-semibold uppercase tracking-wide ${
-                                    item.confidence === 'high'
+                                    itemLevel === 'high'
                                       ? 'text-emerald-500'
-                                      : item.confidence === 'medium'
+                                      : itemLevel === 'medium'
                                       ? 'text-amber-500'
                                       : 'text-danger'
                                   }`}>
-                                    {item.confidence === 'high'
+                                    {itemLevel === 'high'
                                       ? t('scan.confHigh')
-                                      : item.confidence === 'medium'
+                                      : itemLevel === 'medium'
                                       ? t('scan.confMedium')
                                       : t('scan.confLow')}
                                   </span>
@@ -1605,6 +1676,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                       <span>{analysis.coachingNote}</span>
                     </div>
                   )}
+                  </div>
 
                   {/* Bottom Actions */}
                   <div className="flex flex-col sm:flex-row gap-2.5 pt-2 border-t border-border">

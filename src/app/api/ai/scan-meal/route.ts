@@ -6,6 +6,7 @@ import { executeMultiProviderVision } from '@/lib/ai-provider';
 import { generateOfflineMealEstimate } from '@/lib/ai-scan-meal';
 import { rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit, readMultipartFormDataWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
 import { sanitizeScannedItems, recomputeMealTotals } from '@/lib/scan-meal-sanitize';
+import { stampScanConfidence } from '@/lib/scan-confidence';
 
 export const runtime = 'nodejs';
 
@@ -240,6 +241,7 @@ STRICT ANTI-HALLUCINATION & ANTI-EXTRA-FOOD RULES:
    - Accurately estimate gram weights based on standard portion sizes.
    - Calibrate Indian specialties: Roti/Chapati (~35-40g each), Paratha (~80g), Dal (~180-200g bowl), Paneer curries (~150g), Rice (~150-200g bowl), Biryani (~250g).
    - Calibrate Global fitness foods: Chicken breast (120-150g), whole egg (50g), oats (40-60g dry), Greek yogurt (150g).
+   - CANONICAL INDIAN NAMES: pigeon pea is toor/arhar — name it "Toor Dal", NEVER "Chana" and never add a "(Chana)" gloss. Chana means chickpea (kabuli chana) only. Roti, chapati and phulka are the same flatbread — name it "Roti".
 
 6. NON-FOOD OR UNRELATED IMAGES:
    - If the photo is clearly NOT food, drink, or nutritional supplements (e.g., gym weights, dumbbells, barbell, shoes, floor, wall, face, clothing, electronics):
@@ -310,17 +312,24 @@ Return ONLY valid, parseable JSON matching this schema with NO markdown ticks or
         const sanitizedItems = sanitizeScannedItems(parsed.items);
         const totals = recomputeMealTotals(sanitizedItems);
 
+        // P0-4 (UI/UX audit): confidence is COMPUTED from checkable
+        // signals (DB match, portion plausibility, item-set
+        // consistency) — the model's self-reported confidence is
+        // discarded here and never reaches any client.
+        const stamped = stampScanConfidence(
+          sanitizedItems,
+          Array.isArray(parsed.hiddenIngredients) ? parsed.hiddenIngredients : hiddenIngredients
+        );
+
         resultJson = {
           mealName: parsed.mealName || 'Scanned Meal',
-          items: sanitizedItems,
+          items: stamped.items,
           totalCalories: totals.totalCalories,
           totalProtein: totals.totalProtein,
           totalCarbs: totals.totalCarbs,
           totalFat: totals.totalFat,
           hiddenIngredients: parsed.hiddenIngredients || hiddenIngredients,
-          confidence: (['high', 'medium', 'low'].includes(parsed.confidence)
-            ? parsed.confidence
-            : 'high') as 'high' | 'medium' | 'low',
+          confidence: stamped.mealConfidence,
           coachingNote:
             parsed.coachingNote ||
             `Logged ~${totals.totalCalories} kcal and ${totals.totalProtein}g protein toward today's goals (${providerUsed}).`,

@@ -244,7 +244,7 @@ export default function WorkoutDetailsView({
                       <Dumbbell className="w-4 h-4 text-accent" />
                     </div>
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-sm text-[#F3F0E7] truncate">
+                      <h3 className="font-semibold text-sm text-[#F3F0E7] break-words">
                         {ex.name}
                       </h3>
                       <div className="flex items-center gap-2 flex-wrap text-xs text-[#A5A096] mt-0.5">

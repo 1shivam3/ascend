@@ -332,7 +332,7 @@ export default function VoiceWorkoutLoggerModal({
               <h3 className="font-bold text-sm text-text-primary leading-tight">
                 {t('voice.title')}
               </h3>
-              <p className="text-2xs text-text-muted font-mono truncate max-w-[140px]">
+              <p className="text-2xs text-text-muted font-mono break-words">
                 {currentExerciseName || t('voice.activeWorkout')}
               </p>
             </div>
@@ -488,7 +488,7 @@ export default function VoiceWorkoutLoggerModal({
 
                 {/* Target Exercise */}
                 {parsedResult.exerciseName && (
-                  <p className="text-2xs text-text-secondary font-mono truncate">
+                  <p className="text-2xs text-text-secondary font-mono break-words">
                     {t('voice.target')} <strong className="text-text-primary">{parsedResult.exerciseName}</strong>
                   </p>
                 )}

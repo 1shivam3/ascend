@@ -1,6 +1,7 @@
 import { FoodItem, MacroTotals, MacroGoals, AthleteGoal, Gender } from './types';
 import { INDIAN_FOOD_VALUES, getHouseholdUnitGrams } from './indian-foods';
 import { containsDevanagari, expandFoodQuery, transliterateDevanagari } from './devanagari';
+import { resolveFoodAlias } from './food-aliases';
 
 // Macros per 100g or 100ml (unless noted)
 const FOOD_DB_BASE: Record<string, Omit<FoodItem, 'name'>> = {
@@ -886,6 +887,15 @@ function findBestMatch(normalizedName: string): { key: string; tier: MatchTier }
 
   // 1) Exact match
   if (FOOD_DB[normalizedName]) return { key: normalizedName, tier: 'exact' };
+
+  // 1b) Alias table (P0-4): confusable Indian names resolve to their
+  // canonical entry — "pigeon peas" → toor dal (never chana),
+  // "kabuli chana" → chana, "arhar dal" → toor dal. Runs only when
+  // the name is not itself a DB key (step 1), so real entries keep
+  // their own values and piece weights ('phulka', 'chana dal',
+  // 'yellow dal').
+  const aliasKey = resolveFoodAlias(normalizedName);
+  if (aliasKey && FOOD_DB[aliasKey]) return { key: aliasKey, tier: 'exact' };
 
   // 2) Check if user input contains a known DB key
   let bestKey = '';

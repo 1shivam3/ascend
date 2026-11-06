@@ -194,7 +194,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'coachBlock.approveEmpty': 'वर्कआउट नहीं है',
   // Token-reuse compositions only — flagged for native-speaker review.
   'tools.title': 'ट्रेनिंग देखें',
-  'tools.formCoachTitle': 'ASCEND फ़ॉर्म कोच',
+  'tools.formCoachTitle': 'फ़ॉर्म कोच',
   'tools.formCoachHint': '10 व्यायाम — पोज़ विश्लेषण और रेप काउंट के लिए आपके वीडियो से अपने आप पहचाने जाते हैं',
   'workout.formCoach': 'फ़ॉर्म कोच',
   // Form Coach auto-detect (2026-11-05): machine translations — Hindi review parked.
@@ -532,7 +532,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'prs.personalBests': 'पर्सनल बेस्ट',
   'prs.title': 'पर्सनल रिकॉर्ड।',
   'prs.goBack': 'पिछले पेज पर वापस',
-  'prs.plateCalculator': 'बारबेल प्लेट कैलकुलेटर',
+  'prs.plateCalculator': 'प्लेट कैलकुलेटर',
   'prs.addPr': 'PR जोड़ें',
   'prs.scoreboardPowerlifting': 'पावरलिफ़्टिंग स्कोरबोर्ड',
   'prs.scoreboardCompounds': 'मुख्य कंपाउंड लिफ़्ट्स का कुल',
@@ -719,6 +719,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'scan.checkingDb': 'क्षेत्रीय डेटाबेस और सामग्री जाँच हो रही है',
   'scan.cancelScan': 'स्कैन रद्द करें',
   'scan.instantOffline': 'तुरंत ऑफ़लाइन अनुमान',
+  // Audit phase 3, task 3.3 (2026-11-06): machine translation — Hindi review parked.
+  'scan.elapsed': '{sec} सेकंड बीते',
   'scan.noFoodDetected': 'कोई खाना या सप्लीमेंट नहीं मिला',
   'scan.noFoodHint': 'इस फ़ोटो में कोई पहचान योग्य खाना, पेय या वर्कआउट सप्लीमेंट नहीं मिला। साफ़ रोशनी या बेहतर फ़्रेमिंग के साथ फ़ोटो लें।',
   'scan.tipsTitle': 'सही पहचान के लिए टिप्स:',
@@ -972,7 +974,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'workout.warmupTitle': 'वॉर्म-अप सेट बनाएं',
   'workout.warmupSets': 'वॉर्म-अप सेट',
   'workout.tools': 'वर्कआउट टूल और विकल्प',
-  'workout.plateHelper': 'प्लेट हेल्पर',
+  'workout.plateHelper': 'प्लेट कैलकुलेटर',
   'workout.whyTargetWeight': 'यह लक्ष्य वज़न क्यों?',
   'workout.changeRoutine': 'रूटीन / स्प्लिट बदलें',
   'workout.voiceDictation': 'वॉइस डिक्टेशन',
@@ -1395,7 +1397,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'settings.deleteFailedMsg': 'खाता हटाया नहीं जा सका।',
 
   // ── Meals (QA4-004 additions) ───────────────────────────────────────
-  'meals.title': 'खाना',
+  'meals.title': 'पोषण',
   'meals.optionsTitle': 'पोषण विकल्प और टूल',
   'meals.optionsAria': 'पोषण विकल्प',
   'meals.navAria': 'पोषण नेविगेशन',
@@ -1487,7 +1489,6 @@ export const hi: Partial<Record<StringKey, string>> = {
   'meals.viewCreatine': 'क्रिएटिन विवरण देखें',
   'meals.markCreatineNotTaken': 'क्रिएटिन नहीं लिया दर्ज करें',
   'meals.logCreatine': '{grams}g क्रिएटिन दर्ज करें',
-  'meals.eyebrow': 'पोषण और ईंधन',
   'meals.options': 'विकल्प',
   'meals.tabMeals': 'खाना',
   'meals.tabMacros': 'मैक्रो',
@@ -1930,7 +1931,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'goals.recalcTitle': 'रोज़ के पोषण लक्ष्य अपने आप फिर से गिनें',
   'goals.recalcHint': 'आपके नए मुख्य लक्ष्य के अनुसार कैलोरी और प्रोटीन तय करता है',
   'goals.apply': 'लक्ष्य लागू करें',
-  'plates.title': 'प्लेट लोडिंग कैलकुलेटर',
+  'plates.title': 'प्लेट कैलकुलेटर',
   'plates.subtitle': 'IPF ओलंपिक बारबेल स्पेक',
   'plates.profileUnitNote': 'आपकी प्रोफ़ाइल इकाई ({unit}) का उपयोग करता है — इसे You → प्रोफ़ाइल में बदलें।',
   'plates.bestSet': 'सबसे अच्छा वर्किंग सेट',

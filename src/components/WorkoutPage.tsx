@@ -1078,7 +1078,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
       <div className="flex flex-col gap-1">
         {plan.exercises.map((ex, i) => (
           <div key={i} className="flex items-center justify-between text-xs px-1">
-            <span className="text-text-secondary truncate flex-1 mr-2" title={ex.name || undefined}>{ex.name || '—'}</span>
+            <span className="text-text-secondary break-words flex-1 mr-2" title={ex.name || undefined}>{ex.name || '—'}</span>
             <span className="text-text-muted font-mono shrink-0">
               {ex.targetSets}×{ex.targetReps}
               {ex.targetWeight ? ` @ ${ex.targetWeight}${ex.targetUnit ? ` ${ex.targetUnit}` : ''}` : ''}
@@ -2592,7 +2592,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                   <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" aria-label="New" />
                 )}
               </p>
-              <p className="text-2xs text-text-muted truncate">
+              <p className="text-2xs text-text-muted line-clamp-2">
                 {renderLocalizedSentence(
                   t,
                   language,
@@ -3438,8 +3438,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     <Camera className="w-4 h-4" />
                   </div>
                   <div>
-                    <div className="text-xs font-semibold text-text-primary">ASCEND Form Coach</div>
-                    <div className="text-2xs text-text-muted">Squat & deadlift — auto-detected from your video for pose analysis & repetition counter</div>
+                    <div className="text-xs font-semibold text-text-primary">{t('tools.formCoachTitle')}</div>
+                    <div className="text-2xs text-text-muted">{t('tools.formCoachHint')}</div>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-text-primary transition-colors" />

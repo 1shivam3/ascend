@@ -14,6 +14,8 @@
  * depth on top of that review step.
  */
 
+import { canonicalDisplayName } from './food-aliases';
+
 export const MAX_ITEM_CALORIES = 5000;
 export const MAX_ITEM_MACRO_G = 1000;
 export const MAX_ITEM_GRAMS = 10000;
@@ -46,8 +48,13 @@ export function sanitizeScannedItems(items: unknown): SanitizedScannedItem[] {
   return items.map((raw: any) => {
     const it = raw && typeof raw === 'object' ? raw : {};
     const estimatedGrams = clampNum(it.estimatedGrams, MAX_ITEM_GRAMS, 100);
+    const rawName = String(it.name || 'Food Item').slice(0, 200);
     return {
-      name: String(it.name || 'Food Item').slice(0, 200),
+      // P0-4: alias-canonical display names — a model-supplied alias
+      // ("Cooked Pigeon Peas (Chana)") is replaced by the canonical
+      // item ("Toor Dal (Pigeon Pea)") at this post-processing layer,
+      // so the mislabel can never reach the UI or the meal log.
+      name: canonicalDisplayName(rawName) ?? rawName,
       quantity: String(it.quantity || `${estimatedGrams}g`).slice(0, 100),
       estimatedGrams,
       calories: Math.round(clampNum(it.calories, MAX_ITEM_CALORIES, 0)),

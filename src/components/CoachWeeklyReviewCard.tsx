@@ -46,7 +46,7 @@ export default function CoachWeeklyReviewCard() {
                 <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" aria-label="New" />
               )}
             </p>
-            <p className="text-2xs text-text-muted truncate">{renderLocalizedSentence(t, language, review.focus.headlineI18n, review.focus.headline)}</p>
+            <p className="text-2xs text-text-muted line-clamp-2">{renderLocalizedSentence(t, language, review.focus.headlineI18n, review.focus.headline)}</p>
           </div>
         </div>
         <ChevronRight className="w-4 h-4 text-text-muted shrink-0" />
