@@ -282,7 +282,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               type="button"
               onClick={handleGoogleSignIn}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-white hover:bg-zinc-100 active:scale-98 text-zinc-900 font-semibold text-xs sm:text-sm transition-all shadow-md cursor-pointer disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-white hover:bg-zinc-100 active:scale-98 text-zinc-900 font-semibold text-xs sm:text-sm transition-all shadow-md cursor-pointer disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100"
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin text-zinc-900" />

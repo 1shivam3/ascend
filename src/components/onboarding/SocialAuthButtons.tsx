@@ -71,7 +71,7 @@ export default function SocialAuthButtons({ onSuccess: _onSuccess }: SocialAuthB
           type="button"
           onClick={handleGoogle}
           disabled={loadingProvider !== null}
-          className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-bg-card hover:bg-bg-primary active:scale-[0.98] border border-border text-xs font-semibold text-text-primary transition shadow-2xs cursor-pointer disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-bg-card hover:bg-bg-primary active:scale-[0.98] border border-border text-xs font-semibold text-text-primary transition shadow-2xs cursor-pointer disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100"
         >
           {loadingProvider === 'google' ? (
             <Loader2 className="w-4 h-4 animate-spin text-text-primary" />

@@ -117,7 +117,7 @@ export default function ConfirmationModal({
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="flex-1 min-h-[44px] py-2.5 px-4 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border/80 text-xs font-bold text-text-primary transition-all cursor-pointer disabled:opacity-50"
+            className="flex-1 min-h-[44px] py-2.5 px-4 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border/80 text-xs font-bold text-text-primary transition-all cursor-pointer disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100"
           >
             {cancelText ?? t('common.cancel')}
           </button>
@@ -125,7 +125,7 @@ export default function ConfirmationModal({
             type="button"
             onClick={onConfirm}
             disabled={isConfirmDisabled}
-            className={`flex-1 min-h-[44px] py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+            className={`flex-1 min-h-[44px] py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100 ${
               variant === 'danger'
                 ? 'bg-accent hover:bg-accent-dim text-accent-on shadow-sm shadow-accent/20'
                 : 'bg-text-primary text-bg-primary hover:opacity-90'

@@ -508,7 +508,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
                     <button
                       type="submit"
                       disabled={status === 'requesting_token' || !email.trim()}
-                      className="btn-secondary w-full py-2 px-3 text-xs font-mono font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+                      className="btn-secondary w-full py-2 px-3 text-xs font-mono font-bold flex items-center justify-center gap-2"
                     >
                       {status === 'requesting_token' ? (
                         <>
@@ -551,7 +551,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={status === 'deleting' || !!sessionUser}
-                    className="w-full bg-bg-primary border border-border rounded-lg px-3 py-2 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-danger font-mono disabled:opacity-75"
+                    className="w-full bg-bg-primary border border-border rounded-lg px-3 py-2 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-danger font-mono disabled:text-text-muted"
                   />
                 </div>
 
@@ -570,7 +570,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
                       value={verificationToken}
                       onChange={(e) => setVerificationToken(e.target.value)}
                       disabled={status === 'deleting'}
-                      className="w-full bg-bg-primary border border-border rounded-lg px-3 py-2 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-danger font-mono"
+                      className="w-full bg-bg-primary border border-border rounded-lg px-3 py-2 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-danger font-mono disabled:text-text-muted"
                     />
                   </div>
                 )}
@@ -590,7 +590,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
                     value={confirmText}
                     onChange={(e) => setConfirmText(e.target.value)}
                     disabled={status === 'deleting'}
-                    className="w-full bg-bg-primary border border-border rounded-lg px-3 py-2 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-danger font-mono tracking-wider"
+                    className="w-full bg-bg-primary border border-border rounded-lg px-3 py-2 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-danger font-mono disabled:text-text-muted tracking-wider"
                   />
                 </div>
 
@@ -612,7 +612,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
                     confirmText.trim().toUpperCase() !== 'DELETE' ||
                     (!sessionUser && !verificationToken.trim())
                   }
-                  className="btn-danger w-full py-2.5 px-4 text-xs font-mono font-bold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn-danger w-full py-2.5 px-4 text-xs font-mono font-bold flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
                 >
                   {status === 'deleting' ? (
                     <>

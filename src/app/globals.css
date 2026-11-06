@@ -555,3 +555,27 @@ input[type="number"]::-webkit-outer-spin-button {
   color: rgb(var(--text-primary));
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
+
+/* Audit phase 4 (2026-11-06), Task 4.2 (P1-7): ONE disabled-button
+   style for the shared .btn-* classes — neutral sunken surface +
+   muted text + hairline border, full opacity, no shadow (replaces
+   the per-button disabled:opacity-20/30/40/50 utilities, which
+   faded accent CTAs to ~2:1). The pair (text-muted on bg-secondary)
+   is accent-independent: 5.21:1 light / ~6.6:1 dark, so it holds
+   for every accent preset and custom hex in both themes —
+   tests/audit-phase4-disabled.test.ts recomputes all 14
+   combinations from these tokens. Unlayered so it beats the
+   components-layer base styles (incl. the D-UX-4 dark pairing
+   above) and any layered disabled: utility. Ad-hoc Tailwind CTAs
+   and ui/Button carry the same tokens via disabled: variants. */
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-danger:disabled,
+.btn-outline:disabled,
+.btn-circle:disabled {
+  background-color: rgb(var(--bg-secondary));
+  color: rgb(var(--text-muted));
+  border-color: rgb(var(--border));
+  box-shadow: none;
+  opacity: 1;
+}

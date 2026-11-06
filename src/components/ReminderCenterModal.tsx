@@ -736,7 +736,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
           type="button"
           onClick={handleSendTest}
           disabled={isSendingTest}
-          className="w-full py-3 rounded-xl border border-border bg-bg-card text-text-primary text-xs font-bold flex items-center justify-center gap-2 hover:border-accent/50 transition-colors cursor-pointer disabled:opacity-50"
+          className="w-full py-3 rounded-xl border border-border bg-bg-card text-text-primary text-xs font-bold flex items-center justify-center gap-2 hover:border-accent/50 transition-colors cursor-pointer disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100"
         >
           <Send className="w-4 h-4 text-accent" />
           <span>{isSendingTest ? t('rem.sending') : t('rem.sendTest')}</span>

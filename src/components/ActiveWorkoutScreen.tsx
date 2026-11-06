@@ -2423,7 +2423,7 @@ export default function ActiveWorkoutScreen({
           type="button"
           disabled={activeExerciseIdx === 0}
           onClick={() => setActiveExerciseIdx((prev) => Math.max(0, prev - 1))}
-          className="p-2 min-h-[44px] min-w-[44px] rounded-lg text-text-muted hover:text-text-primary disabled:opacity-20 transition-all flex items-center justify-center gap-1 cursor-pointer"
+          className="p-2 min-h-[44px] min-w-[44px] rounded-lg text-text-muted hover:text-text-primary transition-all flex items-center justify-center gap-1 cursor-pointer"
           aria-label={t('workout.previousExercise')}
         >
           <ChevronLeft className="w-4 h-4" />
@@ -2473,7 +2473,7 @@ export default function ActiveWorkoutScreen({
             type="button"
             disabled={activeExerciseIdx === exercises.length - 1}
             onClick={() => setActiveExerciseIdx((prev) => Math.min(exercises.length - 1, prev + 1))}
-            className="p-2 min-h-[44px] min-w-[44px] rounded-lg text-text-muted hover:text-text-primary disabled:opacity-20 transition-all flex items-center justify-center gap-1 cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] rounded-lg text-text-muted hover:text-text-primary transition-all flex items-center justify-center gap-1 cursor-pointer"
             aria-label={t('workout.nextExercise')}
           >
             <span className="text-xs font-semibold hidden sm:inline">{t('workout.next')}</span>
@@ -3721,7 +3721,7 @@ export default function ActiveWorkoutScreen({
                   type="button"
                   onClick={handleGenerateWarmupSets}
                   disabled={generatedWarmupPreview.workingWeight === null}
-                  className="btn-primary flex-1 py-2 text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn-primary flex-1 py-2 text-xs font-bold disabled:cursor-not-allowed"
                 >
                   {t('workout.insertSets')}
                 </button>
@@ -4297,7 +4297,7 @@ export default function ActiveWorkoutScreen({
                   type="button"
                   onClick={handleConfirmFinish}
                   disabled={isFinishing}
-                  className="btn-primary flex-1 min-w-[9rem] py-2.5 text-xs font-bold shadow-md shadow-accent/25 disabled:opacity-50"
+                  className="btn-primary flex-1 min-w-[9rem] py-2.5 text-xs font-bold shadow-md shadow-accent/25"
                 >
                   {isFinishing ? t('workout.saving') : t('workout.saveFinish')}
                 </button>

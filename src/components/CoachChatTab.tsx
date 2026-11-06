@@ -829,7 +829,7 @@ export default function CoachChatTab({
               <button
                 type="submit"
                 disabled={!noteDraft.trim()}
-                className="px-4 py-2 rounded-full bg-accent text-accent-on text-sm font-bold cursor-pointer disabled:opacity-50 shrink-0"
+                className="px-4 py-2 rounded-full bg-accent text-accent-on text-sm font-bold cursor-pointer disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100 shrink-0"
               >
                 {t('coachChat.noteSend')}
               </button>
@@ -929,7 +929,7 @@ export default function CoachChatTab({
             type="button"
             onClick={startSession}
             disabled={sessionExercises.length === 0}
-            className="px-4 py-2 rounded-full bg-accent text-accent-on text-sm font-bold cursor-pointer disabled:opacity-50"
+            className="px-4 py-2 rounded-full bg-accent text-accent-on text-sm font-bold cursor-pointer disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100"
           >
             {t('coachChat.startSession')}
           </button>

@@ -420,7 +420,7 @@ export default function FeedbackModal({
               <button
                 type="submit"
                 disabled={isSubmitting || !message.trim()}
-                className="btn-primary flex-1 py-2.5 text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-40"
+                className="btn-primary flex-1 py-2.5 text-xs font-bold flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
                   <>

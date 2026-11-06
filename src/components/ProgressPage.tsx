@@ -1681,7 +1681,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     type="button"
                     onClick={() => photoInputRef.current?.click()}
                     disabled={isUploadingPhoto}
-                    className="btn-primary py-2.5 px-5 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    className="btn-primary py-2.5 px-5 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
                     <span>{isUploadingPhoto ? 'Adding…' : 'Add Progress Photo'}</span>
@@ -1707,7 +1707,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                         type="button"
                         onClick={() => photoInputRef.current?.click()}
                         disabled={isUploadingPhoto}
-                        className="btn-primary py-2 px-4 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        className="btn-primary py-2 px-4 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
                       >
                         <Plus className="w-4 h-4" />
                         <span>{isUploadingPhoto ? 'Adding…' : 'Add Photo'}</span>

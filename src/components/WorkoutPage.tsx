@@ -418,7 +418,7 @@ function PlanModal({
                       type="button"
                       onClick={() => removeExercise(i)}
                       disabled={planExercises.length === 1}
-                      className="text-text-muted hover:text-danger p-1 disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="text-text-muted hover:text-danger p-1 disabled:cursor-not-allowed"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -570,7 +570,7 @@ function PlanModal({
             type="button"
             onClick={handleSave}
             disabled={!isValid}
-            className="btn-primary flex-1 disabled:opacity-40 flex items-center justify-center gap-1.5"
+            className="btn-primary flex-1 flex items-center justify-center gap-1.5"
           >
             <CheckCircle2 className="w-4 h-4" />
             {initial ? 'Save Changes' : 'Save Plan'}
@@ -674,7 +674,7 @@ function RunDistanceRow({ workout }: { workout: WorkoutEntry }) {
           type="button"
           onClick={handleSave}
           disabled={!isValidDraft}
-          className="py-2 px-4 rounded-xl bg-accent text-accent-on text-xs font-bold flex-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          className="py-2 px-4 rounded-xl bg-accent text-accent-on text-xs font-bold flex-1 cursor-pointer disabled:cursor-not-allowed disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100"
         >
           {t('common.save')}
         </button>
@@ -868,7 +868,7 @@ function HistorySetChip({
             type="button"
             onClick={handleSave}
             disabled={!isValidDraft}
-            className="py-2 px-4 rounded-xl bg-accent text-accent-on text-xs font-bold flex-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            className="py-2 px-4 rounded-xl bg-accent text-accent-on text-xs font-bold flex-1 cursor-pointer disabled:cursor-not-allowed disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100"
           >
             {t('common.save')}
           </button>

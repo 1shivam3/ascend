@@ -121,7 +121,7 @@ export default function ForgotPasswordModal({
               <button
                 type="submit"
                 disabled={loading}
-                className="w-1/2 py-2.5 rounded-xl bg-accent hover:bg-accent-dim text-xs font-semibold text-accent-on transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="w-1/2 py-2.5 rounded-xl bg-accent hover:bg-accent-dim text-xs font-semibold text-accent-on transition flex items-center justify-center gap-1.5 cursor-pointer disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100"
               >
                 {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : t('auth.sendLink')}
               </button>

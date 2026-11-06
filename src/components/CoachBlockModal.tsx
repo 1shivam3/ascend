@@ -558,7 +558,7 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
                                   type="button"
                                   onClick={() => editExercise(di, ei, { targetSets: Math.max(1, (ex.targetSets || 3) - 1) })}
                                   disabled={(ex.targetSets || 3) <= 1}
-                                  className="px-2 py-1 min-h-[44px] min-w-[44px] rounded-lg bg-bg-secondary border border-border text-text-primary font-bold disabled:opacity-30 cursor-pointer"
+                                  className="px-2 py-1 min-h-[44px] min-w-[44px] rounded-lg bg-bg-secondary border border-border text-text-primary font-bold cursor-pointer disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100"
                                   aria-label={`Fewer sets for ${ex.name}`}
                                 >
                                   −
@@ -570,7 +570,7 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
                                   type="button"
                                   onClick={() => editExercise(di, ei, { targetSets: Math.min(10, (ex.targetSets || 3) + 1) })}
                                   disabled={(ex.targetSets || 3) >= 10}
-                                  className="px-2 py-1 min-h-[44px] min-w-[44px] rounded-lg bg-bg-secondary border border-border text-text-primary font-bold disabled:opacity-30 cursor-pointer"
+                                  className="px-2 py-1 min-h-[44px] min-w-[44px] rounded-lg bg-bg-secondary border border-border text-text-primary font-bold cursor-pointer disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100"
                                   aria-label={`More sets for ${ex.name}`}
                                 >
                                   +
@@ -587,7 +587,7 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
                                       type="button"
                                       onClick={() => editExercise(di, ei, { targetWeight: Math.max(0, Math.round((w - step) * 10) / 10) })}
                                       disabled={w <= 0}
-                                      className="px-2 py-1 min-h-[44px] min-w-[44px] rounded-lg bg-bg-secondary border border-border text-text-primary font-bold disabled:opacity-30 cursor-pointer"
+                                      className="px-2 py-1 min-h-[44px] min-w-[44px] rounded-lg bg-bg-secondary border border-border text-text-primary font-bold cursor-pointer disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100"
                                       aria-label={`Lighter load for ${ex.name}`}
                                     >
                                       −
@@ -599,7 +599,7 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
                                       type="button"
                                       onClick={() => editExercise(di, ei, { targetWeight: Math.min(cap, Math.round((w + step) * 10) / 10) })}
                                       disabled={w >= cap}
-                                      className="px-2 py-1 min-h-[44px] min-w-[44px] rounded-lg bg-bg-secondary border border-border text-text-primary font-bold disabled:opacity-30 cursor-pointer"
+                                      className="px-2 py-1 min-h-[44px] min-w-[44px] rounded-lg bg-bg-secondary border border-border text-text-primary font-bold cursor-pointer disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100"
                                       aria-label={`Heavier load for ${ex.name}`}
                                     >
                                       +
@@ -613,7 +613,7 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
                             type="button"
                             onClick={() => removeExercise(di, ei)}
                             disabled={day.exercises.length <= 1}
-                            className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 disabled:opacity-30 cursor-pointer shrink-0"
+                            className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 cursor-pointer shrink-0"
                             aria-label={`${t('coachBlock.removeExercise')} ${ex.name}`}
                             title={t('coachBlock.removeExercise')}
                           >
@@ -666,7 +666,7 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
                 type="button"
                 onClick={handleApprove}
                 disabled={approving}
-                className="btn-primary flex-1 py-2.5 font-bold disabled:opacity-50"
+                className="btn-primary flex-1 py-2.5 font-bold"
               >
                 {t('coachBlock.approveButton')}
               </button>

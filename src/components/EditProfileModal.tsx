@@ -299,7 +299,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
                 type="button"
                 onClick={() => avatarInputRef.current?.click()}
                 disabled={isUploadingAvatar}
-                className="text-xs font-bold text-accent-text hover:underline text-left cursor-pointer disabled:opacity-50"
+                className="text-xs font-bold text-accent-text hover:underline text-left cursor-pointer disabled:text-text-muted"
               >
                 {isUploadingAvatar ? t('editProfile.uploading') : avatar ? t('editProfile.changePhotoShort') : t('editProfile.addPhoto')}
               </button>

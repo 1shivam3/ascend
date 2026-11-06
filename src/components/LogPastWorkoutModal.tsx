@@ -550,7 +550,7 @@ export default function LogPastWorkoutModal({
                         type="button"
                         onClick={handleQuickLogPlan}
                         disabled={!quickPlanId}
-                        className="btn-primary px-4 py-2 text-xs font-bold disabled:opacity-40 shrink-0"
+                        className="btn-primary px-4 py-2 text-xs font-bold shrink-0"
                       >
                         {t('lp.logComplete')}
                       </button>

@@ -503,7 +503,7 @@ export default function CoachChatSection() {
           type="button"
           onClick={() => void send()}
           disabled={sending || input.trim().length === 0}
-          className="btn-primary px-4 py-2 text-sm font-bold shrink-0 cursor-pointer disabled:opacity-50"
+          className="btn-primary px-4 py-2 text-sm font-bold shrink-0 cursor-pointer"
         >
           {t('coachChat.send')}
         </button>

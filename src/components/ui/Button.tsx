@@ -29,16 +29,22 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref
   ) => {
+    // Audit phase 4 (2026-11-06), Task 4.2 (P1-7): ONE disabled style
+    // across the app — neutral sunken surface + muted text + hairline
+    // border at full opacity (5.21:1 light / ~6.6:1 dark, accent-
+    // independent), replacing. The same tokens are
+    // applied to the .btn-* classes in globals.css and to ad-hoc CTAs
+    // via the identical disabled: variant set.
     const baseStyles =
-      'inline-flex items-center justify-center font-sans font-bold select-none transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary';
+      'inline-flex items-center justify-center font-sans font-bold select-none transition-all duration-150 active:scale-[0.98] disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100 disabled:pointer-events-none disabled:active:scale-100 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary';
 
     const variants = {
       primary:
-        'bg-accent text-accent-on font-bold shadow-sm shadow-accent/25 hover:brightness-105 active:bg-accent-dim',
+        'bg-accent text-accent-on font-bold shadow-sm shadow-accent/25 hover:brightness-105 active:bg-accent-dim border border-transparent',
       secondary:
         'bg-bg-card hover:bg-bg-secondary text-text-primary border border-border/80 hover:border-border active:bg-bg-tertiary',
       ghost:
-        'text-text-secondary hover:text-text-primary hover:bg-bg-secondary/70 active:bg-bg-secondary',
+        'text-text-secondary hover:text-text-primary hover:bg-bg-secondary/70 active:bg-bg-secondary border border-transparent',
       danger:
         'bg-danger/10 hover:bg-danger/20 text-danger border border-danger/25 active:bg-danger/30',
       outline:

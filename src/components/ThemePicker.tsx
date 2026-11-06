@@ -106,7 +106,7 @@ export default function ThemePicker({
             type="button"
             onClick={onApplyCustom}
             disabled={!preview}
-            className="px-4 py-2.5 rounded-xl bg-accent text-accent-on text-xs font-bold disabled:opacity-50 cursor-pointer"
+            className="px-4 py-2.5 rounded-xl bg-accent text-accent-on text-xs font-bold cursor-pointer disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100"
           >
             {t('settings.applyTheme')}
           </button>

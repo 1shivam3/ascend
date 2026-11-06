@@ -719,7 +719,7 @@ export default function BarcodeScannerModal({
                       type="button"
                       onClick={handleManualBarcodeSubmit}
                       disabled={!manualBarcode.trim()}
-                      className="btn-primary px-3.5 py-1.5 text-xs font-mono disabled:opacity-40 flex items-center gap-1 shrink-0 rounded-xl cursor-pointer"
+                      className="btn-primary px-3.5 py-1.5 text-xs font-mono flex items-center gap-1 shrink-0 rounded-xl cursor-pointer"
                     >
                       <Search className="w-3.5 h-3.5" /> {t('scan2.lookup')}
                     </button>
@@ -782,7 +782,7 @@ export default function BarcodeScannerModal({
                         type="button"
                         onClick={() => labelInputRef.current?.click()}
                         disabled={isScanningLabel}
-                        className="w-full py-2 px-3 rounded-xl bg-accent/20 hover:bg-accent/30 border border-accent/40 text-accent-text font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                        className="w-full py-2 px-3 rounded-xl bg-accent/20 hover:bg-accent/30 border border-accent/40 text-accent-text font-bold text-xs flex items-center justify-center gap-1.5 disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100 transition-colors cursor-pointer"
                       >
                         {isScanningLabel ? (
                           <>

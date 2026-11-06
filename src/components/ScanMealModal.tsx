@@ -1193,7 +1193,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                             type="button"
                             onClick={handleAddNewItem}
                             disabled={!newItemName.trim()}
-                            className="btn-primary py-1.5 px-2.5 text-xs font-bold disabled:opacity-40"
+                            className="btn-primary py-1.5 px-2.5 text-xs font-bold"
                           >
                             {t('common.add')}
                           </button>
@@ -1402,7 +1402,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                               type="button"
                               onClick={handleAddNewItem}
                               disabled={!newItemName.trim()}
-                              className="btn-primary py-1.5 px-2.5 text-xs font-bold disabled:opacity-40"
+                              className="btn-primary py-1.5 px-2.5 text-xs font-bold"
                             >
                               {t('common.add')}
                             </button>
@@ -1661,7 +1661,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                         type="button"
                         onClick={handleRefineWithAI}
                         disabled={!refinementInput.trim() || isRefining}
-                        className="btn-secondary py-1.5 px-3 text-xs font-bold flex items-center gap-1 disabled:opacity-40"
+                        className="btn-secondary py-1.5 px-3 text-xs font-bold flex items-center gap-1"
                       >
                         <Send className={`w-3 h-3 ${isRefining ? 'animate-spin' : ''}`} />
                         <span>{t('scan.refine')}</span>

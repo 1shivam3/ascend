@@ -2108,7 +2108,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 type="submit"
                 disabled={!naturalQuery.trim() || isNaturalParsing}
                 aria-label={t('meals.logMealAria')}
-                className="px-3 py-1.5 min-h-[44px] rounded-lg bg-accent hover:bg-accent-dim text-accent-on font-bold text-xs flex items-center gap-1 disabled:opacity-40 active:scale-95 transition-all shadow-xs cursor-pointer"
+                className="px-3 py-1.5 min-h-[44px] rounded-lg bg-accent hover:bg-accent-dim text-accent-on font-bold text-xs flex items-center gap-1 disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100 active:scale-95 transition-all shadow-xs cursor-pointer"
               >
                 {isNaturalParsing ? (
                   <span className="text-2xs">...</span>
@@ -2174,7 +2174,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       handleCopyYesterday();
                     }}
                     disabled={yesterdayMeals.length === 0}
-                    className="w-full flex items-center gap-2 p-2 rounded-lg text-xs font-semibold text-text-primary hover:bg-bg-secondary text-left disabled:opacity-40 cursor-pointer"
+                    className="w-full flex items-center gap-2 p-2 rounded-lg text-xs font-semibold text-text-primary hover:bg-bg-secondary text-left cursor-pointer disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100"
                   >
                     <Copy className="w-4 h-4 text-accent" />
                     <span>{t('meals.copyYesterday')}</span>
@@ -3360,7 +3360,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                         type="button"
                         onClick={handleSaveMeal}
                         disabled={nameMissing || foods.length === 0 || !hasNamedFood || !!zeroFood}
-                        className="btn-primary flex-1 disabled:opacity-40 text-xs"
+                        className="btn-primary flex-1 text-xs"
                       >
                         {t('meals.saveMeal')}
                       </button>

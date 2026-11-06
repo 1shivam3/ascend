@@ -102,7 +102,7 @@ export default function OfflineState({
           type="button"
           onClick={handleCheckConnection}
           disabled={isChecking}
-          className="w-full min-h-[46px] py-3 px-4 rounded-xl text-xs sm:text-sm font-bold bg-accent hover:bg-accent-dim text-accent-on flex items-center justify-center gap-2 shadow-sm shadow-accent/20 transition-all cursor-pointer disabled:opacity-50"
+          className="w-full min-h-[46px] py-3 px-4 rounded-xl text-xs sm:text-sm font-bold bg-accent hover:bg-accent-dim text-accent-on flex items-center justify-center gap-2 shadow-sm shadow-accent/20 transition-all cursor-pointer disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100"
         >
           <RefreshCw className={`w-4 h-4 ${isChecking ? 'animate-spin' : ''}`} />
           <span>{isChecking ? t('offline.checking') : t('offline.check')}</span>
