@@ -41,21 +41,26 @@ describe('Stage 8 — motion system', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('tailwind keeps exactly the four spec keyframes at spec durations', () => {
+  it('tailwind keeps exactly the five spec keyframes at spec durations', () => {
     const cfg = readFileSync(join(process.cwd(), 'tailwind.config.js'), 'utf8');
     for (const [name, dur] of [
       ['fadeIn', '0.25s'],
       ['tabEnter', '0.22s'],
       ['slideUp', '0.25s'],
       ['scaleIn', '0.2s'],
+      // Phone-polish (2026-11-06): deliberate fifth keyframe — the
+      // modal sheet's entrance must move WITHOUT fading, because an
+      // opacity fade made the sheet translucent mid-open and the
+      // page ghosted through it (Daily Macro Targets recording).
+      ['slideUpOpaque', '0.25s'],
     ]) {
       expect(cfg, `${name} missing`).toContain(name);
       expect(cfg, `${name} duration`).toContain(dur);
     }
     expect(cfg).toContain('ease-out');
-    // No fifth keyframe was added.
+    // No sixth keyframe was added.
     const keyframes = cfg.slice(cfg.indexOf('keyframes:'));
-    expect(keyframes.match(/^\s{8}\w+:/gm)?.length).toBe(4);
+    expect(keyframes.match(/^\s{8}\w+:/gm)?.length).toBe(5);
   });
 
   it('the reduced-motion rule collapses animation and transition', () => {
