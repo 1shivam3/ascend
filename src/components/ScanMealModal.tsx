@@ -1193,7 +1193,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                             type="button"
                             onClick={handleAddNewItem}
                             disabled={!newItemName.trim()}
-                            className="btn-primary py-1.5 px-2.5 text-xs font-bold disabled:opacity-40"
+                            className="btn-primary py-1.5 px-2.5 text-xs font-bold"
                           >
                             {t('common.add')}
                           </button>
@@ -1278,7 +1278,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                     </div>
 
                     <div className="flex items-center gap-2 text-xs font-semibold text-text-secondary pt-0.5">
-                      <span className="text-emerald-500 font-bold">{t('scan.proteinSuffix', { amount: analysis.totalProtein })}</span>
+                      <span className="text-macro-protein font-bold">{t('scan.proteinSuffix', { amount: analysis.totalProtein })}</span>
                       <span>•</span>
                       <span className="text-text-primary">{t('scan.carbsSuffix', { amount: analysis.totalCarbs })}</span>
                       <span>•</span>
@@ -1306,10 +1306,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                   <div className="space-y-4 overflow-y-auto min-h-0 pr-0.5">
                   {/* Creatine Habit Quick-Action Card if detected */}
                   {hasCreatine && (
-                    <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/30 space-y-2 animate-fade-in">
+                    <div className="p-3.5 rounded-xl bg-creatine/10 border border-creatine/40 space-y-2 animate-fade-in">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400">
+                          <div className="w-6 h-6 rounded-lg bg-creatine/20 flex items-center justify-center text-warning">
                             <Zap className="w-3.5 h-3.5" />
                           </div>
                           <span className="font-bold text-xs text-text-primary">
@@ -1317,11 +1317,11 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                           </span>
                         </div>
                         {isCreatineLoggedToday ? (
-                          <span className="text-2xs font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-500 flex items-center gap-1">
+                          <span className="text-2xs font-semibold px-2 py-0.5 rounded bg-success/15 text-success flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3" /> {t('scan.loggedToday')}
                           </span>
                         ) : (
-                          <span className="text-2xs font-semibold px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 font-mono">
+                          <span className="text-2xs font-semibold px-2 py-0.5 rounded bg-creatine/20 text-warning font-mono">
                             {t('scan.dailyHabit')}
                           </span>
                         )}
@@ -1336,7 +1336,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                             store.toggleCreatine(todayStr, 5);
                             toast.success(t('scan.creatineTakenMsg'), t('scan.creatineTitle'));
                           }}
-                          className="w-full py-2 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                          className="w-full py-2 px-3 rounded-lg bg-accent text-accent-on hover:brightness-105 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>{t('scan.markCreatine')}</span>
@@ -1402,7 +1402,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                               type="button"
                               onClick={handleAddNewItem}
                               disabled={!newItemName.trim()}
-                              className="btn-primary py-1.5 px-2.5 text-xs font-bold disabled:opacity-40"
+                              className="btn-primary py-1.5 px-2.5 text-xs font-bold"
                             >
                               {t('common.add')}
                             </button>
@@ -1661,7 +1661,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                         type="button"
                         onClick={handleRefineWithAI}
                         disabled={!refinementInput.trim() || isRefining}
-                        className="btn-secondary py-1.5 px-3 text-xs font-bold flex items-center gap-1 disabled:opacity-40"
+                        className="btn-secondary py-1.5 px-3 text-xs font-bold flex items-center gap-1"
                       >
                         <Send className={`w-3 h-3 ${isRefining ? 'animate-spin' : ''}`} />
                         <span>{t('scan.refine')}</span>

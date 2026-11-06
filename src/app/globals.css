@@ -18,6 +18,21 @@
   --border-hover: 160 156 148;    /* #A09C94 */
   --accent: 228 68 39;            /* #E44427 — Exact ASCEND Vermilion Accent */
   --accent-dim: 199 53 27;        /* #C7351B */
+  /* Audit phase 4 (2026-11-06), Task 4.4 (P2-3): habit-matrix fills.
+     Same values in both themes (the fills are bright by design);
+     workout takes --accent. Consumed via tailwind.config (water /
+     protein / creatine utilities) and src/lib/habit-tokens.ts. */
+  --habit-water: 56 189 248;      /* #38BDF8 */
+  --habit-creatine: 245 179 1;    /* #F5B301 */
+  --habit-protein: 34 197 94;     /* #22C55E */
+  /* Audit phase 4 (2026-11-06), Task 4.5 (P2-9): ONE macro colour
+     set — labels AND bars in Fuel / meal detail / coach surfaces.
+     Light values are the AA shades (>=4.5:1 on card, page and sunken
+     surfaces); calories deliberately has NO macro var: it stays the
+     accent (label text-accent-text, bar bg-accent). */
+  --macro-protein: 22 101 52;     /* #166534 */
+  --macro-carbs: 3 105 161;       /* #0369A1 */
+  --macro-fat: 146 64 14;         /* #92400E */
   --accent-glow: rgba(228, 68, 39, 0.16);
 
   /* Direct CSS Specification Tokens */
@@ -78,6 +93,14 @@
   --border-hover: 82 90 79;       /* #525A4F */
   --accent: 235 78 48;            /* #EB4E30 — brightened Vermilion for dark bg */
   --accent-dim: 199 53 27;        /* #C7351B */
+  /* Phase 4, Task 4.4: habit fills — identical to the light theme. */
+  --habit-water: 56 189 248;      /* #38BDF8 */
+  --habit-creatine: 245 179 1;    /* #F5B301 */
+  --habit-protein: 34 197 94;     /* #22C55E */
+  /* Phase 4, Task 4.5: macro set, bright dark-theme shades. */
+  --macro-protein: 74 222 128;    /* #4ADE80 */
+  --macro-carbs: 56 189 248;      /* #38BDF8 */
+  --macro-fat: 251 191 36;        /* #FBBF24 */
   --accent-glow: rgba(235, 78, 48, 0.28);
 
   /* Direct CSS Specification Tokens */
@@ -531,13 +554,51 @@ input[type="number"]::-webkit-outer-spin-button {
    deepened vermilion (accent-dim #C7351B) — that pairing computes to
    4.66:1, while chalk on the bright Graphite accent (#EB4E30) is only
    3.25:1 and the near-black accent-on read as muddy dark-on-red on
-   dark cards. Applies to the primary CTA, the segmented control's
-   active pill, and every utility-paired bg-accent + text-accent-on
-   control. The light theme keeps its proven pairing (near-black on
-   vermilion, 5.15:1) untouched. */
+   dark cards. Applies to the primary CTA and every utility-paired
+   bg-accent + text-accent-on control. The light theme keeps its
+   proven pairing (near-black on vermilion, 5.15:1) untouched.
+   (Phase 4: the segmented control's active pill left this pairing —
+   see the .dark .segmented-item.active rule below.) */
 .dark .btn-primary,
-.dark .segmented-item.active,
 .dark .bg-accent.text-accent-on {
   background-color: rgb(var(--accent-dim));
   color: #F3F0E7;
+}
+
+/* Phase 4 (Task 4.1): the segmented control's selected pill is NOT
+   part of the D-UX-4 filled-accent pairing above. One segmented style
+   per theme, same logic: a raised NEUTRAL surface pill on the sunken
+   track — light uses bg-card + subtle shadow (components layer),
+   dark uses bg-elevated + a deeper shadow here. Before this, dark
+   mode filled the selected segment with accent-dim, so the same
+   control read as a neutral selector in light mode and as a primary
+   CTA in dark mode. */
+.dark .segmented-item.active {
+  background-color: rgb(var(--bg-elevated));
+  color: rgb(var(--text-primary));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* Audit phase 4 (2026-11-06), Task 4.2 (P1-7): ONE disabled-button
+   style for the shared .btn-* classes — neutral sunken surface +
+   muted text + hairline border, full opacity, no shadow (replaces
+   the per-button disabled:opacity-20/30/40/50 utilities, which
+   faded accent CTAs to ~2:1). The pair (text-muted on bg-secondary)
+   is accent-independent: 5.21:1 light / ~6.6:1 dark, so it holds
+   for every accent preset and custom hex in both themes —
+   tests/audit-phase4-disabled.test.ts recomputes all 14
+   combinations from these tokens. Unlayered so it beats the
+   components-layer base styles (incl. the D-UX-4 dark pairing
+   above) and any layered disabled: utility. Ad-hoc Tailwind CTAs
+   and ui/Button carry the same tokens via disabled: variants. */
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-danger:disabled,
+.btn-outline:disabled,
+.btn-circle:disabled {
+  background-color: rgb(var(--bg-secondary));
+  color: rgb(var(--text-muted));
+  border-color: rgb(var(--border));
+  box-shadow: none;
+  opacity: 1;
 }

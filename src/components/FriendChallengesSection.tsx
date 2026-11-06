@@ -316,7 +316,7 @@ export default function FriendChallengesSection({ active }: FriendChallengesSect
           type="button"
           onClick={handleJoin}
           disabled={!joinDraft.trim()}
-          className="py-2 px-3.5 rounded-xl bg-bg-secondary border border-accent/50 text-accent-text text-xs font-bold flex items-center gap-1.5 disabled:opacity-40 active:scale-95 transition-all cursor-pointer shrink-0"
+          className="py-2 px-3.5 rounded-xl bg-bg-secondary border border-accent/50 text-accent-text text-xs font-bold flex items-center gap-1.5 disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100 active:scale-95 transition-all cursor-pointer shrink-0"
         >
           <UserPlus className="w-3.5 h-3.5" />
           {t('friends.join')}
@@ -438,7 +438,7 @@ export default function FriendChallengesSection({ active }: FriendChallengesSect
                   type="button"
                   onClick={() => handleAddScore(def)}
                   disabled={!(scoreDrafts[def.id] || '').trim()}
-                  className="py-2 px-3 rounded-xl bg-bg-primary border border-accent/50 text-accent-text text-xs font-bold disabled:opacity-40 active:scale-95 transition-all cursor-pointer shrink-0"
+                  className="py-2 px-3 rounded-xl bg-bg-primary border border-accent/50 text-accent-text text-xs font-bold active:scale-95 transition-all cursor-pointer disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100 shrink-0"
                 >
                   {t('friends.addScore')}
                 </button>

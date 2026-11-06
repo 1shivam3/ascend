@@ -6,6 +6,7 @@ import { X, User, Check, Scale, Ruler, Camera, Trash2 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { localizedUserMessage } from '@/lib/user-error';
 import { useToast } from '@/components/ui/Toast';
+import SegmentedControl from '@/components/ui/SegmentedControl';
 import { useTranslation } from '@/lib/i18n';
 import { Gender, Unit, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
 import { calculateAgeFromDob, dobPickerBounds, isValidDob } from '@/lib/age';
@@ -298,7 +299,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
                 type="button"
                 onClick={() => avatarInputRef.current?.click()}
                 disabled={isUploadingAvatar}
-                className="text-xs font-bold text-accent-text hover:underline text-left cursor-pointer disabled:opacity-50"
+                className="text-xs font-bold text-accent-text hover:underline text-left cursor-pointer disabled:text-text-muted"
               >
                 {isUploadingAvatar ? t('editProfile.uploading') : avatar ? t('editProfile.changePhotoShort') : t('editProfile.addPhoto')}
               </button>
@@ -341,55 +342,35 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
             {errors.name && <p className="text-2xs text-accent-text mt-0.5">{errors.name}</p>}
           </div>
 
-          {/* Gender Selection (Supports Male, Female, Other) */}
+          {/* Gender Selection (Supports Male, Female, Other) —
+              Phase 4 (Task 4.1): renders through the ONE
+              SegmentedControl, with localized option labels. */}
           <div className="space-y-1">
             <span id="edit-profile-gender-label" className="text-xs font-semibold text-text-secondary font-sans block">{t('editProfile.genderIdentity')}</span>
-            <div className="grid grid-cols-3 gap-2" role="group" aria-labelledby="edit-profile-gender-label">
-              {(['male', 'female', 'other'] as Gender[]).map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  onClick={() => setGender(g)}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold font-sans transition-all capitalize border cursor-pointer ${
-                    gender === g
-                      ? 'bg-accent text-accent-on border-accent shadow-xs'
-                      : 'bg-bg-secondary text-text-muted border-border hover:text-text-primary'
-                  }`}
-                >
-                  {g}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              ariaLabelledBy="edit-profile-gender-label"
+              value={gender}
+              options={(['male', 'female', 'other'] as Gender[]).map((g) => ({
+                value: g,
+                label: t(g === 'male' ? 'editProfile.genderMale' : g === 'female' ? 'editProfile.genderFemale' : 'editProfile.genderOther'),
+              }))}
+              onChange={(v) => setGender(v)}
+            />
           </div>
 
           {/* Preferred Unit & Age */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <span id="edit-profile-units-label" className="text-xs font-semibold text-text-secondary font-sans block">{t('editProfile.units')}</span>
-              <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-bg-secondary border border-border" role="group" aria-labelledby="edit-profile-units-label">
-                <button
-                  type="button"
-                  onClick={() => handleUnitToggle('lbs')}
-                  className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    unit === 'lbs'
-                      ? 'bg-bg-card text-text-primary shadow-xs border border-border'
-                      : 'text-text-muted hover:text-text-primary'
-                  }`}
-                >
-                  LBS / IN
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleUnitToggle('kg')}
-                  className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    unit === 'kg'
-                      ? 'bg-bg-card text-text-primary shadow-xs border border-border'
-                      : 'text-text-muted hover:text-text-primary'
-                  }`}
-                >
-                  KG / CM
-                </button>
-              </div>
+              <SegmentedControl
+                ariaLabelledBy="edit-profile-units-label"
+                value={unit}
+                options={[
+                  { value: 'lbs' as Unit, label: 'LBS / IN' },
+                  { value: 'kg' as Unit, label: 'KG / CM' },
+                ]}
+                onChange={(v) => handleUnitToggle(v)}
+              />
             </div>
 
             <div className="space-y-1">

@@ -1666,6 +1666,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'progress.closeDots': 'DOTS जानकारी बंद करें',
   'progress.addPhoto': 'प्रगति फ़ोटो जोड़ें',
   'progress.poseAria': 'अगली फ़ोटो का पोज़',
+  // Audit phase 4 (2026-11-06): machine translation — Hindi review parked.
+  'progress.rangeAria': 'चार्ट समय सीमा',
   'progress.deletePhotoTitle': 'यह फ़ोटो हटाएं?',
   'progress.deletePhotoMsg': 'यह प्रगति फ़ोटो इस डिवाइस से हमेशा के लिए हट जाएगी। यह वापस नहीं होगा।',
   'progress.photoNotSavedTitle': 'फ़ोटो सेव नहीं हुई',
@@ -2558,6 +2560,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'habit.protein': 'प्रोटी',
   'habit.prevWeek': 'पिछला हफ़्ता',
   'habit.nextWeek': 'अगला हफ़्ता',
+  // Audit phase 4 (2026-11-06): machine translation — Hindi review parked.
+  'habit.done': 'पूरा',
   'sched.title': 'हफ़्ते का ट्रेनिंग शेड्यूल',
   'sched.subtitle': 'चुनें कि हफ़्ते के किस दिन आप किन अंगों की ट्रेनिंग करेंगे',
   'sched.presets': 'प्रीसेट:',

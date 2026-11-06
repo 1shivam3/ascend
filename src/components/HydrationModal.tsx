@@ -263,7 +263,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
           <button
             type="submit"
             disabled={!manualLogAmount}
-            className="btn-secondary px-3 py-2 text-xs font-bold disabled:opacity-50"
+            className="btn-secondary px-3 py-2 text-xs font-bold"
           >
             {t('hydration.addWater')}
           </button>

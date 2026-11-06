@@ -90,7 +90,7 @@ import { calculateMealMacros, scaleMacroGoalsToCalories } from '@/lib/macros';
 import { effectiveMacroGoals, dayScaledGoals, fallbackMacroGoals, fallbackProteinTargetG } from '@/lib/effective-goals';
 import { hasRealBodyStats } from '@/lib/body-stats';
 import { toLocalDateString, calculateHydrationTarget } from '@/lib/habits';
-import { getTimeGreeting, getWeekRange } from '@/lib/formatters';
+import { getTimeGreeting, getWeekRange, formatNumber } from '@/lib/formatters';
 import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
 import { useToast } from '@/components/ui/Toast';
 import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
@@ -653,11 +653,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <span className="text-xs font-medium text-text-muted">{t('home.nutrition')}</span>
           <div className="mt-3">
             <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums block leading-tight">
-              {fuelStats.calories.toLocaleString()} cal
+              {formatNumber(fuelStats.calories)} cal
             </span>
             {fuelStats.targetCalories !== null ? (
               <span className="text-xs text-text-muted tabular-nums block mt-1">
-                / {fuelStats.targetCalories.toLocaleString()}
+                / {formatNumber(fuelStats.targetCalories)}
               </span>
             ) : (
               <span className="text-2xs text-accent-text font-semibold block mt-1">

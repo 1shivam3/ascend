@@ -1745,7 +1745,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                     // For non-bodyweight: weight must be present
                     (!selectedIsBodyweight && !weight)
                   }
-                  className="btn-primary flex-1 disabled:opacity-40 text-xs"
+                  className="btn-primary flex-1 text-xs"
                 >
                   {t('prs.saveRecord')}
                 </button>

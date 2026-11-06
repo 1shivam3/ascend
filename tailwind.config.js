@@ -74,9 +74,20 @@ module.exports = {
           subtle: 'rgb(var(--border-subtle) / <alpha-value>)',
           hover: 'rgb(var(--border-hover) / <alpha-value>)',
         },
-        water: '#38BDF8',
-        protein: '#22C55E',
-        creatine: '#F5B301',
+        // Phase 4, Task 4.4: habit colours resolve from the globals.css
+        // tokens (same values both themes) so utilities and the matrix
+        // fills share one source — see src/lib/habit-tokens.ts.
+        water: 'rgb(var(--habit-water) / <alpha-value>)',
+        protein: 'rgb(var(--habit-protein) / <alpha-value>)',
+        creatine: 'rgb(var(--habit-creatine) / <alpha-value>)',
+        // Phase 4, Task 4.5: the macro set (Fuel labels + bars, meal
+        // detail, coach surfaces). Calories is NOT here — it stays
+        // the accent token by design.
+        macro: {
+          protein: 'rgb(var(--macro-protein) / <alpha-value>)',
+          carbs: 'rgb(var(--macro-carbs) / <alpha-value>)',
+          fat: 'rgb(var(--macro-fat) / <alpha-value>)',
+        },
         weight: '#A78BFA',
         // D2 fix (UX redesign): success is NO LONGER sage. Light #157347
         // on #E6F4EA, dark #4ADE80 on rgba(74,222,128,0.15) — see

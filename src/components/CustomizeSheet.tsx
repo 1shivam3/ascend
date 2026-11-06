@@ -107,7 +107,7 @@ export default function CustomizeSheet({
                     disabled={!canMoveUp}
                     onClick={() => onMove(section.id, -1)}
                     aria-label={t('customize.moveUp')}
-                    className="btn-circle disabled:opacity-40"
+                    className="btn-circle"
                   >
                     <ChevronUp className="h-4 w-4" />
                   </button>
@@ -116,7 +116,7 @@ export default function CustomizeSheet({
                     disabled={!canMoveDown}
                     onClick={() => onMove(section.id, 1)}
                     aria-label={t('customize.moveDown')}
-                    className="btn-circle disabled:opacity-40"
+                    className="btn-circle"
                   >
                     <ChevronDown className="h-4 w-4" />
                   </button>

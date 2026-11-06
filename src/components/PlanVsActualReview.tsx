@@ -124,7 +124,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
 
           <div className="px-2 py-1.5 rounded-lg bg-bg-primary border border-border text-center">
             <span className="text-2xs uppercase font-mono text-text-muted block whitespace-normal leading-tight">{t('pva.skipped')}</span>
-            <span className="text-xs font-bold font-mono text-rose-400 block mt-0.5 tabular-nums">
+            <span className="text-xs font-bold font-mono text-warning block mt-0.5 tabular-nums">
               {formatSetCount(adherence.skippedPrescribedSets)}
             </span>
           </div>
@@ -189,7 +189,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
                           </span>
                           {setComp.isWarmup && (
                             <span
-                              className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-purple-500/20 text-purple-400 font-bold border border-purple-500/30"
+                              className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-accent-subtle text-accent-text font-bold border border-accent/30"
                               title={t('pva.warmupTitle')}
                             >
                               {t('pva.warmup')}

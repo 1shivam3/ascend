@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { Gender, Unit, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
 import StepProgressBar from './StepProgressBar';
+import SegmentedControl from '@/components/ui/SegmentedControl';
 import DobPicker from '@/components/DobPicker';
 import { useTranslation } from '@/lib/i18n';
 import { calculateAgeFromDob, dobPickerBounds, dobPreviewAge, isValidDob } from '@/lib/age';
@@ -238,27 +239,17 @@ export default function PersonalDetailsScreen({
             <span className="block text-xs font-semibold text-text-primary">
               {t('onboarding.gender')}
             </span>
-            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-bg-primary border border-border">
-              {(['male', 'female', 'other'] as const).map((g) => {
-                const isActive = genderSelection === g;
-                const label = t(g === 'male' ? 'editProfile.genderMale' : g === 'female' ? 'editProfile.genderFemale' : 'editProfile.genderOther');
-
-                return (
-                  <button
-                    key={g}
-                    type="button"
-                    onClick={() => setGenderSelection(g)}
-                    className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
-                      isActive
-                        ? 'bg-bg-card text-text-primary shadow-2xs border border-border'
-                        : 'text-text-muted hover:text-text-primary'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
+            {/* Phase 4 (Task 4.1): gender renders through the ONE
+                SegmentedControl. */}
+            <SegmentedControl
+              ariaLabel={t('onboarding.gender')}
+              value={genderSelection}
+              options={(['male', 'female', 'other'] as const).map((g) => ({
+                value: g,
+                label: t(g === 'male' ? 'editProfile.genderMale' : g === 'female' ? 'editProfile.genderFemale' : 'editProfile.genderOther'),
+              }))}
+              onChange={(v) => setGenderSelection(v)}
+            />
           </div>
 
           {/* Date of birth — age is calculated from this, never typed.
@@ -416,7 +407,7 @@ export default function PersonalDetailsScreen({
           type="submit"
           form="personal-details-form"
           disabled={loading}
-          className="w-full py-4 px-6 rounded-xl bg-accent hover:bg-accent-dim active:scale-[0.99] text-accent-on font-semibold text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+          className="w-full py-4 px-6 rounded-xl bg-accent hover:bg-accent-dim active:scale-[0.99] text-accent-on font-semibold text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100"
         >
           {loading ? (
             <>

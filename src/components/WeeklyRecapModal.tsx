@@ -7,7 +7,7 @@ import { isSetCompleted } from '@/lib/types';
 import { calculateDOTS, getDOTSClassification } from '@/lib/dots';
 import { X, Share2, Download, MessageCircle, Trophy, Flame, Dumbbell, Sparkles } from 'lucide-react';
 import { useToast } from './ui/Toast';
-import { getWeekRange, parseLocalDate } from '@/lib/formatters';
+import { getWeekRange, parseLocalDate, formatNumber } from '@/lib/formatters';
 import { selectWeeklyRecapPRs } from '@/lib/weekly-recap';
 import { calculateWorkoutVolumeKg } from '@/lib/volume';
 import { useTranslation } from '@/lib/i18n';
@@ -232,11 +232,11 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
 
     // ── 4. Hero: giant total volume ──
     const unit = profile?.unit || 'kg';
-    // Tonnes only in kg mode — totalVolume is in the profile unit, so
-    // dividing an lbs figure by 1000 would mislabel kilopounds as tonnes.
-    const heroValue = unit === 'kg' && weeklyStats.totalVolume >= 1000
-      ? `${(weeklyStats.totalVolume / 1000).toFixed(1)}t`
-      : `${weeklyStats.totalVolume.toLocaleString()}`;
+    // Phase 4, Task 4.8 (P3-1): volume reads in the profile unit
+    // with grouped thousands ("1,200") — the unit label is drawn
+    // right below. The old "1.2t" tonnes shorthand (kg mode only)
+    // disagreed with the share text and with Fuel's kg figures.
+    const heroValue = formatNumber(weeklyStats.totalVolume);
     drawText(ctx, heroValue, width / 2, 640, '900 200px system-ui, sans-serif', INK);
     drawText(ctx, `${t('recap.totalVolume')} · ${unit.toUpperCase()}`, width / 2, 690, '700 26px ui-monospace, monospace', MUTED);
 
@@ -344,7 +344,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
   const handleShareWhatsApp = async () => {
     const text =
       `*ASCEND — ${t('recap.shareTitle')}*\n` +
-      `• *${t('recap.shareVolume')}*: ${weeklyStats.totalVolume.toLocaleString()} ${profile?.unit || 'kg'}\n` +
+      `• *${t('recap.shareVolume')}*: ${formatNumber(weeklyStats.totalVolume)} ${profile?.unit || 'kg'}\n` +
       `• *${t('recap.shareWorkouts')}*: ${weeklyStats.workoutsCount} ${weeklyStats.workoutsCount === 1 ? t('recap.sessionWord') : t('recap.sessionsWord')} (${weeklyStats.totalSets} ${weeklyStats.totalSets === 1 ? t('recap.setWord') : t('recap.setsWord')})\n` +
       (weeklyStats.dotsScore > 0 ? `• *${t('recap.shareDots')}*: ${weeklyStats.dotsScore} (${weeklyStats.tier})\n` : '') +
       `\n${t('recap.shareTracked')}\nhttps://ascendtonext.vercel.app/`;
@@ -413,16 +413,16 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
         <canvas ref={canvasRef} className="hidden" />
 
         {/* Card Live Preview */}
-        <div className="rounded-xl overflow-hidden border border-border/80 shadow-md bg-black relative max-h-[380px] flex items-center justify-center">
+        <div className="rounded-xl overflow-hidden border border-border/80 shadow-md w-fit mx-auto">
           {imagePreviewUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={imagePreviewUrl}
               alt={t('recap.previewAlt')}
-              className="w-full h-auto max-h-[380px] object-contain block"
+              className="block h-auto max-h-[380px] w-auto max-w-full"
             />
           ) : (
-            <div className="h-64 flex flex-col items-center justify-center text-text-muted text-xs font-mono gap-2">
+            <div className="h-64 min-w-[220px] flex flex-col items-center justify-center text-text-muted text-xs font-mono gap-2">
               <Sparkles className="w-5 h-5 text-accent animate-spin" />
               <span>{t('recap.generating')}</span>
             </div>

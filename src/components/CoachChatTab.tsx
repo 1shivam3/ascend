@@ -31,7 +31,7 @@ import { Sparkles } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useCoachDigest } from '@/lib/use-coach-digest';
 import { earliestDataDate, getScheduledPlanEntries } from '@/lib/scheduled-days';
-import { getLocalTodayStr, getWeekDateStrings, getWeekRange, parseLocalDate } from '@/lib/formatters';
+import { getLocalTodayStr, getWeekDateStrings, getWeekRange, parseLocalDate, formatDate } from '@/lib/formatters';
 import { useToday } from '@/lib/use-today';
 import {
   adjustSession,
@@ -636,7 +636,7 @@ export default function CoachChatTab({
                         actually starts instead. */}
                     {getLocalTodayStr() < coachBlocks.activeBlock.startMonday
                       ? t('coachBlock.startsOnShort', {
-                          date: coachBlocks.activeBlock.startMonday,
+                          date: formatDate(coachBlocks.activeBlock.startMonday),
                         })
                       : t('coachBlock.weekOf', {
                           n: Math.min(
@@ -829,7 +829,7 @@ export default function CoachChatTab({
               <button
                 type="submit"
                 disabled={!noteDraft.trim()}
-                className="px-4 py-2 rounded-full bg-accent text-accent-on text-sm font-bold cursor-pointer disabled:opacity-50 shrink-0"
+                className="px-4 py-2 rounded-full bg-accent text-accent-on text-sm font-bold cursor-pointer disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100 shrink-0"
               >
                 {t('coachChat.noteSend')}
               </button>
@@ -929,7 +929,7 @@ export default function CoachChatTab({
             type="button"
             onClick={startSession}
             disabled={sessionExercises.length === 0}
-            className="px-4 py-2 rounded-full bg-accent text-accent-on text-sm font-bold cursor-pointer disabled:opacity-50"
+            className="px-4 py-2 rounded-full bg-accent text-accent-on text-sm font-bold cursor-pointer disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100"
           >
             {t('coachChat.startSession')}
           </button>

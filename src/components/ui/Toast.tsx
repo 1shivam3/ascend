@@ -132,10 +132,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {children}
       {/* Toast Notification Container (Mobile Optimized, Fixed Bottom).
           Live-fix L9: toasts used to sit top-3, overlapping page headings
-          (and the sticky You bar). Bottom-24 clears the mobile bottom nav
-          (fixed bottom-0, ~64px) and keeps headings uncovered. */}
+          (and the sticky You bar). Bottom placement clears the mobile
+          bottom nav (fixed bottom-0, ~64px) and keeps headings uncovered.
+          Phase 4 (Task 4.1): the offset is 6rem PLUS the device safe-area
+          inset, so on gesture-nav phones the stack also clears the
+          safe area — it never covers the tab bar or a bottom CTA. */}
       <div
-        className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-sm flex flex-col gap-2 pointer-events-none transition-all"
+        className="fixed left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-sm flex flex-col gap-2 pointer-events-none transition-all"
+        style={{ bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}
         aria-live="polite"
       >
         {toasts.map((toast) => (
@@ -165,31 +169,39 @@ export function ToastItem({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  // Phase 4 (Task 4.1) — ONE toast style: the app sans typeface (the
+  // old card set its text in the monospace stack), the theme's
+  // elevated surface + primary text tokens, and a severity icon in a
+  // token-tinted chip. Variants differ ONLY in the icon chip —
+  // success = success token, error = danger token, info = accent
+  // tint — so an informational toast (e.g. "Press back again to
+  // exit", sent via toast.info) can never read as an error block in
+  // either theme. No hard-coded emerald/rose/zinc blocks.
+  const iconChip =
+    toast.type === 'success'
+      ? 'bg-success/15 text-success'
+      : toast.type === 'error'
+        ? 'bg-danger/10 text-danger'
+        : 'bg-accent-subtle text-accent-text';
   return (
-    <div
-      className={`pointer-events-none flex items-start gap-2.5 p-3.5 rounded-xl border shadow-xl backdrop-blur-md animate-fade-in transition-all ${
-        toast.type === 'success'
-          ? 'bg-emerald-950/90 border-emerald-500/40 text-emerald-200'
-          : toast.type === 'error'
-          ? 'bg-rose-950/90 border-rose-500/40 text-rose-200'
-          : 'bg-zinc-900/90 border-accent/40 text-accent'
-      }`}
-    >
-      {toast.type === 'success' ? (
-        <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-      ) : toast.type === 'error' ? (
-        <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
-      ) : (
-        <Info className="w-4 h-4 text-accent flex-shrink-0 mt-0.5" />
-      )}
+    <div className="pointer-events-none flex items-start gap-2.5 p-3.5 rounded-xl border border-border bg-bg-elevated/95 text-text-primary shadow-xl backdrop-blur-md animate-fade-in transition-all">
+      <span className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${iconChip}`}>
+        {toast.type === 'success' ? (
+          <CheckCircle2 className="w-4 h-4" />
+        ) : toast.type === 'error' ? (
+          <AlertCircle className="w-4 h-4" />
+        ) : (
+          <Info className="w-4 h-4" />
+        )}
+      </span>
 
       <div className="flex-1 min-w-0">
         {toast.title && (
-          <h5 className="text-xs font-bold font-mono tracking-tight leading-none mb-1">
+          <h5 className="text-xs font-bold font-sans tracking-tight leading-none mb-1">
             {toast.title}
           </h5>
         )}
-        <p className="text-2xs font-mono leading-relaxed opacity-90 break-words">
+        <p className="text-xs font-sans leading-relaxed opacity-90 break-words">
           {toast.message}
         </p>
         {toast.action && (
@@ -200,7 +212,7 @@ export function ToastItem({
               toast.action?.onAction();
               onClose();
             }}
-            className="pointer-events-auto mt-1.5 text-2xs font-mono font-bold underline underline-offset-2 decoration-current/60 hover:decoration-current cursor-pointer"
+            className="pointer-events-auto mt-1.5 text-xs font-sans font-bold underline underline-offset-2 decoration-current/60 hover:decoration-current cursor-pointer"
           >
             {toast.action.label}
           </button>
@@ -211,7 +223,7 @@ export function ToastItem({
         type="button"
         onClick={onClose}
         aria-label={t('common.close')}
-        className="pointer-events-auto text-white/60 hover:text-white p-2 -m-1 rounded transition-colors flex-shrink-0"
+        className="pointer-events-auto text-text-muted hover:text-text-primary p-2 -m-1 rounded transition-colors flex-shrink-0"
       >
         <X className="w-3.5 h-3.5" />
       </button>

@@ -98,6 +98,7 @@ import { useToast } from '@/components/ui/Toast';
 import ActiveWorkoutScreen from '@/components/ActiveWorkoutScreen';
 import { resolveWorkoutMode } from '@/lib/workout-mode';
 import SegmentedControl from '@/components/ui/SegmentedControl';
+import Switch from '@/components/ui/Switch';
 import RunSessionScreen from '@/components/RunSessionScreen';
 import {
   getRunProgramProgress,
@@ -367,22 +368,11 @@ function PlanModal({
           <div className="border border-border rounded-xl p-3.5 bg-bg-elevated/40 space-y-2">
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs font-semibold text-text-primary">{t('plan.intensityPercent')}</span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={intensityMode === 'percent'}
-                aria-label={t('plan.intensityPercent')}
-                onClick={() => setIntensityMode(intensityMode === 'percent' ? 'rpe' : 'percent')}
-                className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer shrink-0 ${
-                  intensityMode === 'percent' ? 'bg-accent' : 'bg-bg-secondary border border-border'
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
-                    intensityMode === 'percent' ? 'left-[22px]' : 'left-0.5'
-                  }`}
-                />
-              </button>
+              <Switch
+                checked={intensityMode === 'percent'}
+                onChange={(next) => setIntensityMode(next ? 'percent' : 'rpe')}
+                ariaLabel={t('plan.intensityPercent')}
+              />
             </div>
             <p className="text-2xs text-text-muted leading-relaxed">{t('plan.intensityPercentHint')}</p>
             {intensityMode === 'percent' &&
@@ -428,7 +418,7 @@ function PlanModal({
                       type="button"
                       onClick={() => removeExercise(i)}
                       disabled={planExercises.length === 1}
-                      className="text-text-muted hover:text-danger p-1 disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="text-text-muted hover:text-danger p-1 disabled:cursor-not-allowed"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -580,7 +570,7 @@ function PlanModal({
             type="button"
             onClick={handleSave}
             disabled={!isValid}
-            className="btn-primary flex-1 disabled:opacity-40 flex items-center justify-center gap-1.5"
+            className="btn-primary flex-1 flex items-center justify-center gap-1.5"
           >
             <CheckCircle2 className="w-4 h-4" />
             {initial ? 'Save Changes' : 'Save Plan'}
@@ -684,7 +674,7 @@ function RunDistanceRow({ workout }: { workout: WorkoutEntry }) {
           type="button"
           onClick={handleSave}
           disabled={!isValidDraft}
-          className="py-2 px-4 rounded-xl bg-accent text-accent-on text-xs font-bold flex-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          className="py-2 px-4 rounded-xl bg-accent text-accent-on text-xs font-bold flex-1 cursor-pointer disabled:cursor-not-allowed disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100"
         >
           {t('common.save')}
         </button>
@@ -878,7 +868,7 @@ function HistorySetChip({
             type="button"
             onClick={handleSave}
             disabled={!isValidDraft}
-            className="py-2 px-4 rounded-xl bg-accent text-accent-on text-xs font-bold flex-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            className="py-2 px-4 rounded-xl bg-accent text-accent-on text-xs font-bold flex-1 cursor-pointer disabled:cursor-not-allowed disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100"
           >
             {t('common.save')}
           </button>
@@ -899,7 +889,7 @@ function HistorySetChip({
       <div className="flex items-center gap-1 shrink-0">
         {isSkipped && (
           <span
-            className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold"
+            className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-warning/20 text-warning font-bold"
             title="Skipped Set"
           >
             SKIPPED
@@ -935,7 +925,7 @@ function HistorySetChip({
   );
   const chipClassName = `px-2.5 py-1.5 rounded border flex items-center justify-between gap-1.5 ${
     isSkipped
-      ? 'bg-rose-500/5 border-rose-500/20 opacity-75'
+      ? 'bg-warning/5 border-warning/20 opacity-75'
       : isNotAttempted
       ? 'bg-bg-primary/50 border-border/60 opacity-60'
       : 'bg-bg-primary border-border'

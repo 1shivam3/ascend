@@ -1338,22 +1338,12 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   </div>
 
                   {/* Range pills */}
-                  <div className="flex rounded-lg bg-bg-secondary p-0.5 border border-border/80">
-                    {(['1M', '3M', '6M', '1Y'] as const).map((r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        onClick={() => setStrengthTimeRange(r)}
-                        className={`px-2 py-0.5 text-2xs font-mono font-bold rounded transition-all cursor-pointer ${
-                          strengthTimeRange === r
-                            ? 'bg-accent text-accent-on shadow-xs'
-                            : 'text-text-muted hover:text-text-primary'
-                        }`}
-                      >
-                        {r}
-                      </button>
-                    ))}
-                  </div>
+                  <SegmentedControl
+                      ariaLabel={t('progress.rangeAria')}
+                      value={strengthTimeRange}
+                      options={(['1M', '3M', '6M', '1Y'] as const).map((r) => ({ value: r, label: r }))}
+                      onChange={(v) => setStrengthTimeRange(v)}
+                    />
                 </div>
 
                 {/* 1RM readout + delta badge */}
@@ -1538,22 +1528,12 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
                 {/* Range pills */}
                 <div className="flex justify-end">
-                  <div className="flex rounded-lg bg-bg-secondary p-0.5 border border-border/80">
-                    {(['1M', '3M', '6M', '1Y'] as const).map((r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        onClick={() => setBodyTimeRange(r)}
-                        className={`px-2 py-0.5 text-2xs font-mono font-bold rounded transition-all cursor-pointer ${
-                          bodyTimeRange === r
-                            ? 'bg-accent text-accent-on shadow-xs'
-                            : 'text-text-muted hover:text-text-primary'
-                        }`}
-                      >
-                        {r}
-                      </button>
-                    ))}
-                  </div>
+                  <SegmentedControl
+                      ariaLabel={t('progress.rangeAria')}
+                      value={bodyTimeRange}
+                      options={(['1M', '3M', '6M', '1Y'] as const).map((r) => ({ value: r, label: r }))}
+                      onChange={(v) => setBodyTimeRange(v)}
+                    />
                 </div>
 
                 {/* SVG Trend Chart */}
@@ -1701,7 +1681,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     type="button"
                     onClick={() => photoInputRef.current?.click()}
                     disabled={isUploadingPhoto}
-                    className="btn-primary py-2.5 px-5 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    className="btn-primary py-2.5 px-5 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
                     <span>{isUploadingPhoto ? 'Adding…' : 'Add Progress Photo'}</span>
@@ -1714,25 +1694,20 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       {t('progress.photos')} <span className="text-text-muted font-mono text-xs">({progressPhotos.length}/24)</span>
                     </h3>
                     <div className="flex items-center gap-2">
-                      <div className="flex rounded-full bg-bg-secondary p-0.5" role="radiogroup" aria-label={t('progress.poseAria')}>
-                        {(['Front', 'Side', 'Back'] as const).map((pose) => (
-                          <button
-                            key={pose}
-                            type="button"
-                            role="radio"
-                            aria-checked={photoPose === pose}
-                            onClick={() => setPhotoPose(pose)}
-                            className={`px-2.5 py-1 rounded-full text-2xs font-bold cursor-pointer transition-all ${photoPose === pose ? 'bg-accent text-accent-on' : 'text-text-muted hover:text-text-primary'}`}
-                          >
-                            {pose}
-                          </button>
-                        ))}
-                      </div>
+                      {/* Phase 4 (Task 4.1): pose renders through the
+                          ONE SegmentedControl (was an ad-hoc accent
+                          radiogroup). */}
+                      <SegmentedControl
+                        ariaLabel={t('progress.poseAria')}
+                        value={photoPose}
+                        options={(['Front', 'Side', 'Back'] as const).map((pose) => ({ value: pose, label: pose }))}
+                        onChange={(v) => setPhotoPose(v)}
+                      />
                       <button
                         type="button"
                         onClick={() => photoInputRef.current?.click()}
                         disabled={isUploadingPhoto}
-                        className="btn-primary py-2 px-4 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        className="btn-primary py-2 px-4 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
                       >
                         <Plus className="w-4 h-4" />
                         <span>{isUploadingPhoto ? 'Adding…' : 'Add Photo'}</span>
@@ -1961,30 +1936,19 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   <h4 className="text-xs font-bold text-text-primary">{t('progress.displayUnits')}</h4>
                   <p className="text-2xs text-text-muted">{t('progress.displayUnitsHint', { unit: userUnit.toUpperCase() })}</p>
                 </div>
-                <div className="flex rounded-lg bg-bg-card p-0.5 border border-border/80">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (profile) setProfile({ ...profile, unit: 'lbs' });
-                    }}
-                    className={`px-3 py-1 text-2xs font-mono font-bold rounded transition-all cursor-pointer ${
-                      userUnit === 'lbs' ? 'bg-accent text-accent-on shadow-xs' : 'text-text-muted hover:text-text-primary'
-                    }`}
-                  >
-                    LBS
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (profile) setProfile({ ...profile, unit: 'kg' });
-                    }}
-                    className={`px-3 py-1 text-2xs font-mono font-bold rounded transition-all cursor-pointer ${
-                      userUnit === 'kg' ? 'bg-accent text-accent-on shadow-xs' : 'text-text-muted hover:text-text-primary'
-                    }`}
-                  >
-                    KG
-                  </button>
-                </div>
+                {/* Phase 4 (Task 4.1): display-units renders through
+                    the ONE SegmentedControl. */}
+                <SegmentedControl
+                  ariaLabel={t('progress.displayUnits')}
+                  value={userUnit}
+                  options={[
+                    { value: 'lbs' as const, label: 'LBS' },
+                    { value: 'kg' as const, label: 'KG' },
+                  ]}
+                  onChange={(v) => {
+                    if (profile) setProfile({ ...profile, unit: v });
+                  }}
+                />
               </div>
 
               <button

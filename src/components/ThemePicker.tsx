@@ -26,6 +26,15 @@ export interface ThemePickerSwatch {
 export interface ThemePickerProps {
   swatches: ThemePickerSwatch[];
   selectedId: string;
+  /**
+   * Audit phase 4 (2026-11-06), Task 4.3 (P1-8): hex of the accent
+   * CURRENTLY in effect for the current appearance mode (resolved by
+   * the parent — preset variant or corrected custom variant). Shown
+   * as the custom field's placeholder: the field used to hard-code
+   * "#E44427", so it displayed Vermilion's hex even while another
+   * preset was active. Updates whenever a preset is selected.
+   */
+  activeHex: string;
   customHex: string;
   customError: string | null;
   /** Derived variant for the draft hex (current mode), or null when the draft is empty/invalid. */
@@ -42,6 +51,7 @@ export interface ThemePickerProps {
 export default function ThemePicker({
   swatches,
   selectedId,
+  activeHex,
   customHex,
   customError,
   preview,
@@ -98,7 +108,7 @@ export default function ThemePicker({
             type="text"
             value={customHex}
             onChange={(e) => onCustomHexChange(e.target.value)}
-            placeholder="#E44427"
+            placeholder={activeHex}
             aria-label={t('settings.customAccent')}
             className="flex-1 min-w-0 rounded-xl border border-border bg-bg-secondary px-3 py-2.5 text-sm font-mono text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent"
           />
@@ -106,7 +116,7 @@ export default function ThemePicker({
             type="button"
             onClick={onApplyCustom}
             disabled={!preview}
-            className="px-4 py-2.5 rounded-xl bg-accent text-accent-on text-xs font-bold disabled:opacity-50 cursor-pointer"
+            className="px-4 py-2.5 rounded-xl bg-accent text-accent-on text-xs font-bold cursor-pointer disabled:bg-bg-secondary disabled:text-text-muted disabled:border-border disabled:shadow-none disabled:opacity-100"
           >
             {t('settings.applyTheme')}
           </button>

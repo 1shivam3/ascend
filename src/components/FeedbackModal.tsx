@@ -267,7 +267,7 @@ export default function FeedbackModal({
                   onClick={() => setCategory('bug')}
                   className={`p-2.5 rounded-xl border text-center transition-all ${
                     category === 'bug'
-                      ? 'bg-red-500/15 border-red-500 text-red-400 font-bold shadow-sm'
+                      ? 'bg-accent/15 border-accent text-accent-text font-bold shadow-sm'
                       : 'bg-bg-elevated/50 border-border text-text-secondary hover:text-text-primary'
                   }`}
                 >
@@ -420,7 +420,7 @@ export default function FeedbackModal({
               <button
                 type="submit"
                 disabled={isSubmitting || !message.trim()}
-                className="btn-primary flex-1 py-2.5 text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-40"
+                className="btn-primary flex-1 py-2.5 text-xs font-bold flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
                   <>

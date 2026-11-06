@@ -45,8 +45,9 @@ describe('Toast click-through body (Phase 3, Task 3.2)', () => {
     // Card root carries pointer-events-none (clicks pass to the UI below).
     expect(html).toContain('pointer-events-none flex items-start');
     expect(html).not.toContain('pointer-events-auto flex items-start');
-    // The close button opts back in.
-    expect(html).toContain('pointer-events-auto text-white/60');
+    // The close button opts back in. (Phase 4, Task 4.1: the close
+    // button is token-coloured now — text-text-muted, not white/60.)
+    expect(html).toContain('pointer-events-auto text-text-muted');
   });
 
   it('the action button stays tappable on action toasts', () => {
