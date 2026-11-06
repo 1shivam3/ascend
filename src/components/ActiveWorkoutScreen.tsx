@@ -4176,7 +4176,7 @@ export default function ActiveWorkoutScreen({
             <div className="p-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-accent" />
-                {/* Honest title: a 2-of-17 bail is "SESSION SAVED.", not a trophy ceremony. */}
+                {/* Honest title: a 2-of-17 bail is "SESSION SAVED", not a trophy ceremony. */}
                 <h3 className="display-title font-display uppercase tracking-tight text-xl text-text-primary">{isPartial ? t('workout.sessionSaved') : t('workout.workoutComplete')}</h3>
               </div>
               <button
@@ -4193,7 +4193,9 @@ export default function ActiveWorkoutScreen({
               <div className="grid grid-cols-3 gap-2">
                 <div className="p-3 rounded-xl bg-bg-secondary text-center border border-border">
                   <span className="text-2xs uppercase font-mono text-text-muted block">{t('workout.volume')}</span>
-                  <span className="text-lg font-black font-mono text-accent block mt-0.5">
+                  {/* P1-10: volume is a neutral stat — neutral token,
+                      not the accent (which read as emphasis/alert). */}
+                  <span className="text-lg font-black font-mono text-text-primary block mt-0.5">
                     {userUnit === 'lbs' ? Math.round(kgToLbs(sessionStats.totalVolumeKg)) : sessionStats.totalVolumeKg} {userUnit}
                   </span>
                 </div>
