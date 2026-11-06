@@ -1711,7 +1711,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             </button>
           )}
           <div>
-            <div className="text-[0.625rem] font-mono font-bold tracking-widest text-accent-text uppercase">{t('meals.eyebrow')}</div>
+            {/* P2-2 (UI/UX audit phase 3): one name per feature — the
+                screen title is "Fuel", matching the tab. The old
+                "MEALS" title under a "NUTRITION & FUEL" kicker named
+                the same screen three ways; the kicker is gone. */}
             <h1 className="display-title font-display uppercase tracking-tight text-2xl sm:text-3xl text-text-primary">{t('meals.title')}</h1>
           </div>
         </div>
