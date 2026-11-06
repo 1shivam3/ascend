@@ -48,7 +48,7 @@ import CustomizeSheet from '@/components/CustomizeSheet';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import Switch from '@/components/ui/Switch';
 import FeedbackModal from '@/components/FeedbackModal';
-import { ACCENT_PRESETS, deriveCustomAccent, normalizeHex, isCustomAccentUsable } from '@/lib/accent-themes';
+import { ACCENT_PRESETS, deriveCustomAccent, normalizeHex, isCustomAccentUsable, resolveAccentVariant } from '@/lib/accent-themes';
 import { resolveTodayLayout, sanitizeTodayLayout, DEFAULT_TODAY_LAYOUT } from '@/lib/today-layout';
 import LanguagePicker from '@/components/ui/LanguagePicker';
 import PermissionHelp from '@/components/ui/PermissionHelp';
@@ -200,6 +200,16 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     ),
     swatch: isDarkMode ? p.dark.accent : p.light.accent,
   }));
+  // Audit phase 4 (2026-11-06), Task 4.3 (P1-8): the custom-hex
+  // field's placeholder shows the accent CURRENTLY in effect for this
+  // mode (preset variant, or the corrected custom variant) — it used
+  // to hard-code Vermilion's #E44427 beside every other preset.
+  // Recomputed on every selection, so picking a preset updates it.
+  const activeAccentHex = resolveAccentVariant(
+    uiPreferences.accentTheme,
+    uiPreferences.customAccentHex ?? null,
+    isDarkMode ? 'dark' : 'light',
+  ).accent;
   const [draftHex, setDraftHex] = useState(() =>
     uiPreferences.accentTheme === 'custom' ? (uiPreferences.customAccentHex ?? '') : '',
   );
@@ -811,6 +821,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             <ThemePicker
               swatches={accentSwatches}
               selectedId={uiPreferences.accentTheme}
+              activeHex={activeAccentHex}
               customHex={draftHex}
               customError={customError}
               preview={customPreview}
