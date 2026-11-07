@@ -51,6 +51,7 @@ import { mainCompoundKey } from './percent-1rm';
 import { calculateWorkoutVolumeKg } from './volume';
 import { earliestDataDate } from './scheduled-days';
 import type { FormSessionSummary } from '../features/form-coach/models/form-session.types';
+import { getRepStatus } from '../features/form-coach/models/form-session.types';
 import { kgToLbs, lbsToKg } from './units';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -421,10 +422,10 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
       // never land in the "below parallel" denominator (or vice versa).
       const squatReps = weekFormSessions
         .filter((s) => s.exerciseId === 'squat')
-        .flatMap((s) => s.reps);
+        .flatMap((s) => s.reps.filter((r) => getRepStatus(r) !== 'unverified'));
       const deadliftReps = weekFormSessions
         .filter((s) => s.exerciseId === 'deadlift')
-        .flatMap((s) => s.reps);
+        .flatMap((s) => s.reps.filter((r) => getRepStatus(r) !== 'unverified'));
       const below = squatReps.filter((r) => r.estimatedDepth === 'below_parallel').length;
       const lockouts = deadliftReps.filter((r) => r.lockoutAchieved).length;
       const tempoWeight = weekFormSessions.reduce((acc, s) => acc + s.totalValidReps, 0);
@@ -467,9 +468,13 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
           byExerciseId.set(s.exerciseId, group);
         }
         for (const [exerciseId, group] of byExerciseId) {
-          const groupReps = group.flatMap((s) => s.reps);
+          const groupReps = group.flatMap((s) =>
+            s.reps.filter((r) => getRepStatus(r) !== 'unverified')
+          );
           const groupValid = group.reduce((acc, s) => acc + s.totalValidReps, 0);
-          segments.push(`${exerciseId}: ${groupValid} valid of ${groupReps.length} reps`);
+          if (groupReps.length > 0) {
+            segments.push(`${exerciseId}: ${groupValid} valid of ${groupReps.length} reps`);
+          }
         }
         if (plankSessions.length > 0) {
           const maxHold = Math.max(...plankSessions.map((s) => s.holdDurationSeconds ?? 0));

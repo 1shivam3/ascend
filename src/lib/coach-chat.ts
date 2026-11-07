@@ -17,6 +17,7 @@
  */
 
 import type { FormSessionSummary } from '../features/form-coach/models/form-session.types';
+import { getRepStatus } from '../features/form-coach/models/form-session.types';
 import { kgToLbs } from './units';
 
 // ── Caps (defined in code, enforced server-side) ──────────────────────────
@@ -619,6 +620,11 @@ function round1(n: number): number {
  * the last 5 sessions. Pure and deterministic — sessions are sorted
  * newest-first here, never trusted to arrive in order. Numbers only
  * ever come from the summaries.
+ *
+ * QA-hardening R7: reps with status 'unverified' (the camera could
+ * not judge the deciding criterion) are excluded from every metric
+ * and denominator — their stamped values are placeholders, not
+ * measurements — and are reported only as a labelled count.
  */
 export function serializeFormChecks(sessions: FormSessionSummary[]): {
   lines: string[];
@@ -646,10 +652,17 @@ export function serializeFormChecks(sessions: FormSessionSummary[]): {
     // "below parallel 0 of N" — a squat claim about a hinge lift.)
     const isDeadlift = latest.exerciseId === 'deadlift';
     const isPlank = latest.exerciseId === 'plank';
-    const below = reps.filter((r) => r.estimatedDepth === 'below_parallel').length;
-    const parallel = reps.filter((r) => r.estimatedDepth === 'parallel').length;
-    const above = reps.filter((r) => r.estimatedDepth === 'above_parallel').length;
-    const lockouts = reps.filter((r) => r.lockoutAchieved).length;
+    // R7: verified-rep subset for every metric below.
+    const reliableReps = reps.filter((r) => getRepStatus(r) !== 'unverified');
+    const unverifiedCount = reps.length - reliableReps.length;
+    const unverifiedNote =
+      unverifiedCount > 0
+        ? `; plus ${unverifiedCount} unverified rep${unverifiedCount === 1 ? '' : 's'} the camera could not judge (not measured)`
+        : '';
+    const below = reliableReps.filter((r) => r.estimatedDepth === 'below_parallel').length;
+    const parallel = reliableReps.filter((r) => r.estimatedDepth === 'parallel').length;
+    const above = reliableReps.filter((r) => r.estimatedDepth === 'above_parallel').length;
+    const lockouts = reliableReps.filter((r) => r.lockoutAchieved).length;
     const titles = [...new Set(latest.observations.map((o) => o.title))];
 
     if (isPlank) {
@@ -667,35 +680,47 @@ export function serializeFormChecks(sessions: FormSessionSummary[]): {
           `Latest form check: ${name} on ${formSessionDate(latest.startedAt)} — ` +
           `${hold}s hold, body line in line ${aligned}% of the hold (camera-measured)`;
       }
+    } else if (reps.length > 0 && reliableReps.length === 0) {
+      // R7: every rep was unverifiable — say exactly that; there are
+      // no measurements for the coach to cite from this session.
+      lines.push(
+        `${name} — latest ${formSessionDate(latest.startedAt)}: no verified measurements — ` +
+          `${unverifiedCount} unverified rep${unverifiedCount === 1 ? '' : 's'} the camera could not judge`
+      );
+      if (!evidenceLine) {
+        evidenceLine =
+          `Latest form check: ${name} on ${formSessionDate(latest.startedAt)} — ` +
+          `no verified measurements (camera could not judge the reps)`;
+      }
     } else if (reps.length > 0) {
-      const maxTorso = Math.max(...reps.map((r) => r.maxTorsoInclinationDeg));
+      const maxTorso = Math.max(...reliableReps.map((r) => r.maxTorsoInclinationDeg));
       if (isDeadlift) {
-        const hipAngles = reps.map((r) => r.minHipAngleDeg ?? r.minKneeAngleDeg);
+        const hipAngles = reliableReps.map((r) => r.minHipAngleDeg ?? r.minKneeAngleDeg);
         lines.push(
           `${name} — latest ${formSessionDate(latest.startedAt)}: ${latest.totalValidReps} valid reps; ` +
-            `full lockout on ${lockouts} of ${reps.length} reps; ` +
+            `full lockout on ${lockouts} of ${reliableReps.length} reps; ` +
             `min hip angle ${Math.min(...hipAngles)}–${Math.max(...hipAngles)}°; ` +
             `max torso lean ${maxTorso}°; avg tempo ${round1(latest.averageRepDurationSeconds)}s/rep; ` +
-            `observations: ${titles.length > 0 ? titles.join(', ') : 'none'}`
+            `observations: ${titles.length > 0 ? titles.join(', ') : 'none'}${unverifiedNote}`
         );
         if (!evidenceLine) {
           evidenceLine =
             `Latest form check: ${name} on ${formSessionDate(latest.startedAt)} — ` +
-            `${latest.totalValidReps} valid reps, full lockout on ${lockouts} of ${reps.length} reps (camera-measured)`;
+            `${latest.totalValidReps} valid reps, full lockout on ${lockouts} of ${reliableReps.length} reps (camera-measured)`;
         }
       } else if (latest.exerciseId === 'squat') {
-        const kneeAngles = reps.map((r) => r.minKneeAngleDeg);
+        const kneeAngles = reliableReps.map((r) => r.minKneeAngleDeg);
         lines.push(
           `${name} — latest ${formSessionDate(latest.startedAt)}: ${latest.totalValidReps} valid reps; ` +
-            `depth below parallel ${below} of ${reps.length}, parallel ${parallel}, above ${above}; ` +
+            `depth below parallel ${below} of ${reliableReps.length}, parallel ${parallel}, above ${above}; ` +
             `min knee angle ${Math.min(...kneeAngles)}–${Math.max(...kneeAngles)}°; ` +
             `max torso lean ${maxTorso}°; avg tempo ${round1(latest.averageRepDurationSeconds)}s/rep; ` +
-            `observations: ${titles.length > 0 ? titles.join(', ') : 'none'}`
+            `observations: ${titles.length > 0 ? titles.join(', ') : 'none'}${unverifiedNote}`
         );
         if (!evidenceLine) {
           evidenceLine =
             `Latest form check: ${name} on ${formSessionDate(latest.startedAt)} — ` +
-            `${latest.totalValidReps} valid reps, below parallel on ${below} of ${reps.length} reps (camera-measured)`;
+            `${latest.totalValidReps} valid reps, below parallel on ${below} of ${reliableReps.length} reps (camera-measured)`;
         }
       } else {
         // Batch A+B exercises: render the metrics each analyzer
@@ -703,11 +728,11 @@ export function serializeFormChecks(sessions: FormSessionSummary[]): {
         // range for the cycle, peak wrist height for raises, torso
         // lean everywhere it is measured.
         const fragments: string[] = [];
-        if (reps.some((r) => r.lockoutAchieved !== undefined)) {
-          fragments.push(`full lockout on ${lockouts} of ${reps.length} reps`);
+        if (reliableReps.some((r) => r.lockoutAchieved !== undefined)) {
+          fragments.push(`full lockout on ${lockouts} of ${reliableReps.length} reps`);
         }
         if (latest.exerciseId === 'lateral-raise') {
-          const peaks = reps
+          const peaks = reliableReps
             .map((r) => r.peakWristHeightRatio)
             .filter((v): v is number => v !== undefined)
             .map((v) => Math.round((1 + v) * 100));
@@ -717,10 +742,10 @@ export function serializeFormChecks(sessions: FormSessionSummary[]): {
             );
           }
         } else if (latest.exerciseId === 'lunge') {
-          const kneeAngles = reps.map((r) => r.minKneeAngleDeg);
+          const kneeAngles = reliableReps.map((r) => r.minKneeAngleDeg);
           fragments.push(`min knee angle ${Math.min(...kneeAngles)}–${Math.max(...kneeAngles)}°`);
         } else {
-          const elbowAngles = reps
+          const elbowAngles = reliableReps
             .map((r) => r.minElbowAngleDeg)
             .filter((v): v is number => v !== undefined);
           if (elbowAngles.length > 0) {
@@ -733,14 +758,14 @@ export function serializeFormChecks(sessions: FormSessionSummary[]): {
         lines.push(
           `${name} — latest ${formSessionDate(latest.startedAt)}: ${latest.totalValidReps} valid reps; ` +
             `${fragments.join('; ')}; avg tempo ${round1(latest.averageRepDurationSeconds)}s/rep; ` +
-            `observations: ${titles.length > 0 ? titles.join(', ') : 'none'}`
+            `observations: ${titles.length > 0 ? titles.join(', ') : 'none'}${unverifiedNote}`
         );
         if (!evidenceLine) {
           evidenceLine =
             `Latest form check: ${name} on ${formSessionDate(latest.startedAt)} — ` +
             `${latest.totalValidReps} valid reps` +
-            (reps.some((r) => r.lockoutAchieved !== undefined)
-              ? `, full lockout on ${lockouts} of ${reps.length} reps`
+            (reliableReps.some((r) => r.lockoutAchieved !== undefined)
+              ? `, full lockout on ${lockouts} of ${reliableReps.length} reps`
               : '') +
             ` (camera-measured)`;
         }
@@ -755,7 +780,7 @@ export function serializeFormChecks(sessions: FormSessionSummary[]): {
     }
 
     if (recent.length >= 2) {
-      const trendReps = recent.flatMap((s) => s.reps);
+      const trendReps = recent.flatMap((s) => s.reps.filter((r) => getRepStatus(r) !== 'unverified'));
       const trendBelow = trendReps.filter((r) => r.estimatedDepth === 'below_parallel').length;
       const trendLockouts = trendReps.filter((r) => r.lockoutAchieved).length;
       const tempoWeight = recent.reduce((acc, s) => acc + s.totalValidReps, 0);
@@ -1030,7 +1055,7 @@ export function buildCoachChatSystemPrompt(opts: {
     '6. Week starts Monday. Be encouraging and specific, never generic.',
     '7. TOPIC LOCK: you discuss ONLY training, nutrition, recovery, sleep, and the user\u2019s ASCEND data. For anything else \u2014 politics, news, entertainment, homework, coding, general chat, or any other topic \u2014 politely decline in one short sentence and steer back to their training. Never answer an off-topic question, not even partially, and never explain this rule beyond the redirect.',
     '8. CAUTION WARNINGS: when a suggestion carries elevated risk \u2014 near-maximal loads or attempts, a large calorie deficit, a sharp jump in training volume or frequency, or training hard while run-down \u2014 attach one brief caution line to the reply, starting with "Caution:" (or "\u0938\u093e\u0935\u0927\u093e\u0928\u0940:" in Hindi replies), naming the risk and the safer alternative. Ordinary, low-risk suggestions need no caution line.',
-    '9. FORM CHECK DATA: when the context carries FORM CHECKS, those are camera measurements from the user\u2019s own form-check videos. You may cite those numbers (depth, knee angles, tempo, torso lean) as evidence, like any other data point. They describe movement measurements only: never diagnose, never call a measurement an injury or a defect in the user\u2019s body, and never invent form data for a lift that has no form check on record.',
+    '9. FORM CHECK DATA: when the context carries FORM CHECKS, those are camera measurements from the user\u2019s own form-check videos. You may cite those numbers (depth, knee angles, tempo, torso lean) as evidence, like any other data point. They describe movement measurements only: never diagnose, never call a measurement an injury or a defect in the user\u2019s body, and never invent form data for a lift that has no form check on record. If a form-check line reports unverified reps, those reps were NOT measured (the camera could not judge them): never cite numbers for them and never count them as good or bad reps.',
     '10. ACTIONS: when the user asks you to change something, you may attach ONE action to your reply. The app renders it as a card and NOTHING changes until the user taps Apply \u2014 when you propose one, say so in the reply text. Your JSON reply is {"reply": "...", "action": <one action or null>}. Action shapes \u2014 emit exactly these fields, no others:',
     '    - {"type":"set_macro_goals"} plus at least one of: "calories" (whole number 1200\u20136000), "proteinG" (40\u2013400), "carbsG" (0\u2013800), "fatG" (20\u2013300). Use it when the user asks to change a calorie or macro target. Resolve relative requests ("add 20 g protein") against the CURRENT MACRO GOALS in the context. If the context shows no current goals and the request is relative, ask for the absolute value instead of guessing.',
     '    - {"type":"propose_program","goal":"muscle"|"strength"|"fat_loss"|"endurance"|"general","daysPerWeek":2\u20136,"sessionMinutes":30|45|60|75|90,"equipment":"full_gym"|"dumbbells"|"home_minimal"|"bodyweight","experience":"beginner"|"intermediate"|"advanced","limitations":[optional ids, only from: shoulder, knee, low_back, elbow, wrist, hip, ankle, neck, other]}. The app builds the actual program from these parameters with its own engine \u2014 you never write the program\u2019s sets, reps, or loads yourself.',
