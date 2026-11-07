@@ -5,6 +5,7 @@
  */
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { execFileSync } from 'node:child_process';
+import * as vm from 'node:vm';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
@@ -171,5 +172,128 @@ describe('F4-1: lazy tab chunks are precached and servable on localhost', () => 
     for (const f of onDisk) {
       expect(sw).toContain(`'${f}'`);
     }
+  });
+});
+
+// ─── F4-2: offline relaunch was not served from the precache ────────
+
+describe('F4-2: navigations fall back to the precached shell on every origin', () => {
+  const template = () =>
+    fs.readFileSync(path.join(process.cwd(), 'public', 'sw.template.js'), 'utf8');
+
+  it('the localhost bypass excludes navigations', () => {
+    expect(template()).toContain("request.mode !== 'navigate'");
+  });
+
+  it('the precache is fail-soft per asset, never one atomic addAll', () => {
+    expect(template()).toContain('allSettled');
+    expect(template()).not.toContain('addAll(STATIC_PRECACHE');
+  });
+
+  /** Run the real template in a VM with stubbed caches/fetch. */
+  function loadWorker(opts: {
+    fetchImpl: (req: unknown) => Promise<unknown>;
+    addImpl?: (url: string) => Promise<void>;
+    origin?: string;
+  }) {
+    const handlers: Record<string, (event: never) => void> = {};
+    const shellResponse = { status: 200, body: 'APP SHELL', clone() { return shellResponse; } };
+    const store = new Map<string, unknown>([['/', shellResponse]]);
+    const cache = {
+      match: async (req: unknown) =>
+        store.get(typeof req === 'string' ? req : (req as { url: string }).url),
+      add: opts.addImpl ?? (async () => undefined),
+      put: async () => undefined,
+    };
+    let skipWaitingCalled = false;
+    const selfObj = {
+      addEventListener: (type: string, fn: (event: never) => void) => {
+        handlers[type] = fn;
+      },
+      location: { origin: opts.origin ?? 'http://127.0.0.1:3100' },
+      skipWaiting: async () => {
+        skipWaitingCalled = true;
+      },
+      clients: { claim: async () => undefined },
+      registration: { showNotification: async () => undefined },
+    };
+    const sandbox: Record<string, unknown> = {
+      self: selfObj,
+      caches: { open: async () => cache, match: cache.match, keys: async () => [], delete: async () => true },
+      fetch: opts.fetchImpl,
+      URL,
+      Response: class {
+        constructor(public body: unknown, public init?: unknown) {}
+      },
+      AbortController,
+      setTimeout,
+      clearTimeout,
+      console,
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(template(), sandbox);
+    return { handlers, shellResponse, wasSkipWaitingCalled: () => skipWaitingCalled };
+  }
+
+  async function fireNavigation(
+    handlers: Record<string, (event: never) => void>,
+    url: string
+  ): Promise<Promise<unknown> | undefined> {
+    let responded: Promise<unknown> | undefined;
+    const event = {
+      request: { method: 'GET', url, mode: 'navigate' },
+      respondWith: (p: Promise<unknown>) => {
+        responded = p;
+      },
+    };
+    handlers['fetch'](event as never);
+    return responded;
+  }
+
+  it('an offline localhost navigation is answered from the precached shell', async () => {
+    const { handlers, shellResponse } = loadWorker({
+      fetchImpl: async () => {
+        throw new Error('offline');
+      },
+    });
+    const responded = await fireNavigation(handlers, 'http://127.0.0.1:3100/');
+    expect(responded).toBeDefined();
+    // NB: the VM realm's Promise is not an instanceof the test realm's,
+    // so await it directly instead of expect().resolves.
+    expect(await responded!).toBe(shellResponse);
+  });
+
+  it('an offline production-origin navigation is answered from the shell (regression guard)', async () => {
+    const { handlers, shellResponse } = loadWorker({
+      fetchImpl: async () => {
+        throw new Error('offline');
+      },
+      origin: 'https://ascendtonext.vercel.app',
+    });
+    const responded = await fireNavigation(handlers, 'https://ascendtonext.vercel.app/');
+    expect(responded).toBeDefined();
+    expect(await responded!).toBe(shellResponse);
+  });
+
+  it('install still completes (skipWaiting) when one precache asset fails', async () => {
+    let addCalls = 0;
+    const { handlers, wasSkipWaitingCalled } = loadWorker({
+      fetchImpl: async () => {
+        throw new Error('unused');
+      },
+      addImpl: async (url: string) => {
+        addCalls += 1;
+        if (url.includes('icon')) throw new Error('404');
+      },
+    });
+    let installed: Promise<unknown> | undefined;
+    handlers['install']({
+      waitUntil: (p: Promise<unknown>) => {
+        installed = p;
+      },
+    } as never);
+    await installed!; // a rejection here fails the test — that is the point
+    expect(addCalls).toBeGreaterThan(5);
+    expect(wasSkipWaitingCalled()).toBe(true);
   });
 });
