@@ -163,7 +163,7 @@ import {
   type HealthFetchResult,
 } from './health-connect';
 import { kgToLbs } from './units';
-import { enforceMinorMacroGoals, isMinorAge } from './minor-targets';
+import { enforceMinorMacroGoals, enforceUnknownAgeMacroGoals, hasKnownAge, isMinorAge } from './minor-targets';
 import { calculateRecommendedMacroGoals } from './macros';
 import { hasRealBodyStats } from './body-stats';
 
@@ -1684,7 +1684,14 @@ export const useAppStore = create<AppState>()(
           const activityLevel = state.trainingProfile?.activityLevel;
           if (isMinorAge(profile.age)) {
             nextMacroGoals = enforceMinorMacroGoals(nextMacroGoals, profile, activityLevel);
-          } else if (isMinorAge(state.profile?.age)) {
+          } else if (!hasKnownAge(profile.age)) {
+            // QA-hardening R5: age unknown (no DOB) — stored targets
+            // may not sit off maintenance in either direction.
+            nextMacroGoals = enforceUnknownAgeMacroGoals(nextMacroGoals, profile, activityLevel);
+          } else if (isMinorAge(state.profile?.age) || !hasKnownAge(state.profile?.age)) {
+            // Left the minor band, or age just became known (DOB
+            // added): recompute under adult rules so the unlock
+            // actually happens instead of leaving a clamp behind.
             nextMacroGoals = calculateRecommendedMacroGoals(
               profile.bodyweightKg,
               resolvePrimaryGoal(nextGoals),
@@ -2416,9 +2423,16 @@ export const useAppStore = create<AppState>()(
       // enforced here: for a 13–17 profile with real body stats,
       // stored targets are clamped to maintenance (see
       // lib/minor-targets.ts). Adults and null pass through verbatim.
+      // QA-hardening R5: the unknown-age guard composes on top — no
+      // DOB on file means no off-maintenance target may be written
+      // either (see enforceUnknownAgeMacroGoals).
       setMacroGoals: (goals) => set((state) => ({
-        macroGoals: enforceMinorMacroGoals(
-          goals,
+        macroGoals: enforceUnknownAgeMacroGoals(
+          enforceMinorMacroGoals(
+            goals,
+            state.profile,
+            state.trainingProfile?.activityLevel
+          ),
           state.profile,
           state.trainingProfile?.activityLevel
         ),

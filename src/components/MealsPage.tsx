@@ -24,7 +24,8 @@ import {
   getSafeMinCalories,
   normalizeCalorieDelta,
 } from '@/lib/macros';
-import { effectiveMacroGoals, dayScaledGoals, macroSplitPercentages, fallbackMacroGoals, fallbackProteinTargetG } from '@/lib/effective-goals';
+import { effectiveMacroGoals, dayScaledGoals, macroSplitPercentages, fallbackMacroGoals, fallbackProteinTargetG, missingTargetInputs } from '@/lib/effective-goals';
+import TargetEstimateNote from '@/components/TargetEstimateNote';
 import { hasRealBodyStats } from '@/lib/body-stats';
 import {
   Plus,
@@ -148,7 +149,7 @@ const EMPTY_FOOD = (): FoodItem => ({
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface MealsPageProps {
-  onNavigate?: (tab: 'home' | 'prs' | 'workout' | 'meals') => void;
+  onNavigate?: (tab: 'home' | 'prs' | 'workout' | 'meals' | 'profile') => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -1374,6 +1375,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   // target anywhere on this tab (ring, macro cards, Macros sub-tab,
   // suggestions) — the "set your weight" prompt renders instead.
   const targetsNeedBodyStats = !macroGoals && !hasRealBodyStats(profile);
+  // QA-hardening R5: derived targets with missing/defaulted engine
+  // inputs are labelled estimates (see TargetEstimateNote).
+  const estimateMissing = !macroGoals ? missingTargetInputs(profile) : [];
   // Gauntlet DI-11: shared fallback (was bw x 1.8 here vs bw x 2.0 on
   // Home — same numbers now, from effective-goals.ts).
   const proteinTargetG = effectiveGoals?.proteinG || (targetsNeedBodyStats ? 0 : fallbackProteinTargetG(profile?.bodyweightKg));
@@ -1814,6 +1818,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <span className="text-xs font-semibold text-text-muted tabular-nums">
                 {t('meals.ofDailyTarget', { target: displayGoals?.calories || splitFallback.calories })}
               </span>
+            )}
+            {!targetsNeedBodyStats && estimateMissing.length > 0 && (
+              <TargetEstimateNote missing={estimateMissing} onFix={() => onNavigate?.('profile')} />
             )}
 
             {/* Fast / festival day pattern — per-date, targets are guidance */}

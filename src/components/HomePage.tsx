@@ -87,7 +87,8 @@ const FormCoachModal = dynamic(() => import('@/features/form-coach/components/Fo
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import BackupNudge from '@/components/BackupNudge';
 import { calculateMealMacros, scaleMacroGoalsToCalories } from '@/lib/macros';
-import { effectiveMacroGoals, dayScaledGoals, fallbackMacroGoals, fallbackProteinTargetG } from '@/lib/effective-goals';
+import { effectiveMacroGoals, dayScaledGoals, fallbackMacroGoals, fallbackProteinTargetG, missingTargetInputs } from '@/lib/effective-goals';
+import TargetEstimateNote from '@/components/TargetEstimateNote';
 import { hasRealBodyStats } from '@/lib/body-stats';
 import { toLocalDateString, calculateHydrationTarget } from '@/lib/habits';
 import { getTimeGreeting, getWeekRange, formatNumber } from '@/lib/formatters';
@@ -509,6 +510,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   // is no honest target — the strip shows the "set your weight"
   // prompt instead of a fallback number derived from defaults.
   const targetsNeedBodyStats = !macroGoals && !hasRealBodyStats(profile);
+  // QA-hardening R5: on the derived-target path, name the engine
+  // inputs that are missing/defaulted — the target is an estimate.
+  const estimateMissing = !macroGoals ? missingTargetInputs(profile) : [];
   // Today's Fuel summary: real calories and protein vs target
   const fuelStats = useMemo(() => {
     const todayMeals = meals.filter((m) => m.date === todayStr);
@@ -703,6 +707,14 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </div>
         </div>
       </div>
+
+      {/* QA-hardening R5: derived targets with missing inputs are
+          labelled estimates, with a one-tap route to fix the inputs. */}
+      {!targetsNeedBodyStats && estimateMissing.length > 0 && (
+        <div className="mt-3">
+          <TargetEstimateNote missing={estimateMissing} onFix={() => onNavigate('profile')} />
+        </div>
+      )}
 
       {homeProteinHint && (
         <button

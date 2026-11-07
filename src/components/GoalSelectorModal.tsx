@@ -5,6 +5,7 @@ import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
 import { calculateRecommendedMacroGoals } from '@/lib/macros';
+import { hasKnownAge } from '@/lib/minor-targets';
 import { hasRealBodyStats } from '@/lib/body-stats';
 import {
   X,
@@ -112,6 +113,13 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
         }),
         t('goals.updatedTitle')
       );
+    }
+    // QA-hardening R5: choosing Lose Fat with no DOB on file prompts
+    // for it — without an age no deficit target is written (the
+    // engine and the store guard both hold the target at
+    // maintenance), and the user should know why and what to do.
+    if (primaryGoal === 'lose_fat' && !hasKnownAge(profile?.age)) {
+      toast.info(t('goals.loseFatDobMsg'), t('goals.loseFatDobTitle'));
     }
     onClose();
   };

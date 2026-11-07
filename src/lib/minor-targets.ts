@@ -50,6 +50,17 @@ export function isMinorAge(age: number | null | undefined): boolean {
   return typeof age === 'number' && Number.isFinite(age) && age >= 13 && age < 18;
 }
 
+/**
+ * QA-hardening R5: a KNOWN age is a plausible recorded one (13–120).
+ * Anything else — no DOB on file, an unparseable/legacy value — is
+ * unknown-age, a separate axis from the minor band: the user cannot
+ * be shown to be an adult, so no deficit target may be written for
+ * them (see enforceUnknownAgeMacroGoals).
+ */
+export function hasKnownAge(age: number | null | undefined): boolean {
+  return typeof age === 'number' && Number.isFinite(age) && age >= 13 && age <= 120;
+}
+
 /** How far a minor's target may sit from maintenance and still BE
  * maintenance — the app's Atwater rounding band (±10 kcal). */
 export const MINOR_MAINTENANCE_TOLERANCE_KCAL = CALORIE_DELTA_ROUNDING_BAND_KCAL;
@@ -125,6 +136,44 @@ export function enforceMinorMacroGoals(
 ): MacroGoals | null {
   if (!goals) return goals;
   const maintenance = minorMaintenanceFor(profile, activityLevel);
+  if (maintenance === null) return goals;
+  return clampGoalsToMinorMaintenance(goals, maintenance);
+}
+
+/**
+ * QA-hardening R5 — the unknown-age guard, sibling to the minor
+ * guard above. When the profile has real body stats but NO known
+ * age (no DOB), a stored/written target may not sit off maintenance
+ * in either direction: without an age the app cannot show the user
+ * is an adult, and the engine's silent "cost them as 25" default is
+ * not consent to a deficit. The maintenance figure itself is
+ * computed with the engine's existing age default (the target is an
+ * estimate — the display layer labels it as such); the guarantee
+ * this guard makes is narrower and absolute: delta = 0.
+ */
+export function unknownAgeMaintenanceFor(
+  profile: MinorTargetProfile | null | undefined,
+  activityLevel?: ActivityLevel,
+): number | null {
+  if (!profile || hasKnownAge(profile.age)) return null;
+  if (!hasRealBodyStats(profile)) return null;
+  if (!profile.bodyweightKg || profile.bodyweightKg <= 0) return null;
+  return calculateMaintenanceCalories(
+    profile.bodyweightKg,
+    profile.gender ?? 'male',
+    profile.heightCm ?? undefined,
+    undefined,
+    activityLevel,
+  );
+}
+
+export function enforceUnknownAgeMacroGoals(
+  goals: MacroGoals | null,
+  profile: MinorTargetProfile | null | undefined,
+  activityLevel?: ActivityLevel,
+): MacroGoals | null {
+  if (!goals) return goals;
+  const maintenance = unknownAgeMaintenanceFor(profile, activityLevel);
   if (maintenance === null) return goals;
   return clampGoalsToMinorMaintenance(goals, maintenance);
 }
