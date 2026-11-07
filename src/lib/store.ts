@@ -95,6 +95,8 @@ import {
   canonicalizeExerciseName,
 } from './workout-outcome-evidence';
 import { isSetPrescribed } from './workout-adherence';
+import { planDerivedPRsAfterHistoryChange } from './pr-reevaluation';
+import { DEFAULT_BODYWEIGHT_KG } from './defaults';
 import { isBodyweightExercise } from './strength-standards';
 import {
   registerCustomExerciseMuscle,
@@ -455,11 +457,18 @@ export interface AppState {
   
   addWorkout: (workout: WorkoutEntry) => void;
   deleteWorkout: (id: string) => void;
+  /** QA-hardening R1: re-base the DERIVED PR records (auto-minted from
+   *  history — see lib/pr-reevaluation) for the named exercises on the
+   *  history that remains. User-owned records are never touched.
+   *  Called by deleteWorkout and insertWorkoutAt (delete + its Undo),
+   *  the two store paths that remove or restore whole sessions. */
+  reconcileDerivedPRs: (exerciseNames: string[]) => void;
   /** Persona-sim round 5 (SIM-P1-09) Undo: re-insert a deleted workout
    *  at its original index (no-op if present) and clear its tombstone,
-   *  mirroring the QA4-014 meal/plan undo. PRs minted by the workout
-   *  are NOT restored here — they survive deletion today (delete does
-   *  not remove PRs), so undo only restores the session itself. */
+   *  mirroring the QA4-014 meal/plan undo. QA-hardening R1: the restore
+   *  also re-derives the workout's PR records — deletion recomputed
+   *  them away (see reconcileDerivedPRs), so undo must bring back what
+   *  the restored history earns. */
   insertWorkoutAt: (workout: WorkoutEntry, index: number) => void;
   /** Edit a saved workout in place (same update mechanism as
    *  updateMeal / updatePR: sanitize at the store boundary + stamp the
@@ -2194,32 +2203,82 @@ export const useAppStore = create<AppState>()(
         // recompute, counts only) and idempotent.
         get().refreshAthleteModel();
       },
-      deleteWorkout: (id) => set((state) => {
-        const nextWorkouts = state.workouts.filter(w => w.id !== id);
-        const nextProfile = generateLifterTwinProfile(nextWorkouts, state.profile?.unit || 'kg');
-        return {
-          workouts: nextWorkouts,
-          lifterProfile: nextProfile,
-          // Tombstone so a stale server copy can't resurrect it (QA4-001).
-          deletedWorkoutIds: (state.deletedWorkoutIds || []).includes(id)
-            ? state.deletedWorkoutIds
-            : [...(state.deletedWorkoutIds || []), id],
-          // S1/S2: stamp the deletion for delete-vs-edit ordering.
-          tombstoneStamps: stampTombstoneDeletes(state.tombstoneStamps, 'workouts', [id]),
-        };
-      }),
-      insertWorkoutAt: (workout, index) => set((state) => {
-        if (state.workouts.some((w) => w.id === workout.id)) return state;
-        const nextWorkouts = [...state.workouts];
-        nextWorkouts.splice(Math.max(0, Math.min(index, nextWorkouts.length)), 0, workout);
-        return {
-          workouts: nextWorkouts,
-          lifterProfile: generateLifterTwinProfile(nextWorkouts, state.profile?.unit || 'kg'),
-          // Undoing a deletion must also clear its tombstone (QA4-001),
-          // or the next sync would delete the restored workout again.
-          deletedWorkoutIds: (state.deletedWorkoutIds || []).filter((d) => d !== workout.id),
-        };
-      }),
+      deleteWorkout: (id) => {
+        const target = get().workouts.find((w) => w.id === id);
+        set((state) => {
+          const nextWorkouts = state.workouts.filter(w => w.id !== id);
+          const nextProfile = generateLifterTwinProfile(nextWorkouts, state.profile?.unit || 'kg');
+          return {
+            workouts: nextWorkouts,
+            lifterProfile: nextProfile,
+            // Tombstone so a stale server copy can't resurrect it (QA4-001).
+            deletedWorkoutIds: (state.deletedWorkoutIds || []).includes(id)
+              ? state.deletedWorkoutIds
+              : [...(state.deletedWorkoutIds || []), id],
+            // S1/S2: stamp the deletion for delete-vs-edit ordering.
+            tombstoneStamps: stampTombstoneDeletes(state.tombstoneStamps, 'workouts', [id]),
+          };
+        });
+        // QA-hardening R1: the deleted session may have minted PRs —
+        // re-base the derived records on the history that remains, or
+        // the Library keeps showing a PR with no history behind it.
+        if (target) {
+          get().reconcileDerivedPRs((target.exercises || []).map((e) => e.name));
+        }
+      },
+      reconcileDerivedPRs: (exerciseNames) => {
+        const state = get();
+        const plan = planDerivedPRsAfterHistoryChange({
+          exerciseNames,
+          prs: state.prs || [],
+          allWorkouts: state.workouts || [],
+          bodyweightKg: state.profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG,
+          userUnit: state.profile?.unit || 'kg',
+        });
+        if (plan.create.length === 0 && plan.deleteIds.length === 0) return;
+        set((s) => {
+          let deletedPrIds = s.deletedPrIds || [];
+          let tombstoneStamps = s.tombstoneStamps;
+          let prs = s.prs || [];
+          if (plan.deleteIds.length > 0) {
+            const deleteSet = new Set(plan.deleteIds);
+            prs = prs.filter((pr) => !deleteSet.has(pr.id));
+            // Same bookkeeping as deletePR: tombstone + stamp, so a
+            // stale server copy cannot resurrect the removed record.
+            for (const delId of plan.deleteIds) {
+              if (!deletedPrIds.includes(delId)) deletedPrIds = [...deletedPrIds, delId];
+            }
+            tombstoneStamps = stampTombstoneDeletes(tombstoneStamps, 'personal_records', plan.deleteIds);
+          }
+          if (plan.create.length > 0) {
+            const created = plan.create.map((pr) => stampNewRow(pr));
+            prs = [...prs, ...created];
+            // Re-creating a record clears its deletion tombstone (as
+            // addPR does). No XP is awarded here: the performance was
+            // already credited when it was first logged, and the
+            // deterministic ids keep a delete/undo cycle idempotent.
+            const createdIds = new Set(created.map((p) => p.id));
+            deletedPrIds = deletedPrIds.filter((d) => !createdIds.has(d));
+          }
+          return { prs, deletedPrIds, tombstoneStamps };
+        });
+      },
+      insertWorkoutAt: (workout, index) => {
+        if (get().workouts.some((w) => w.id === workout.id)) return;
+        set((state) => {
+          const nextWorkouts = [...state.workouts];
+          nextWorkouts.splice(Math.max(0, Math.min(index, nextWorkouts.length)), 0, workout);
+          return {
+            workouts: nextWorkouts,
+            lifterProfile: generateLifterTwinProfile(nextWorkouts, state.profile?.unit || 'kg'),
+            // Undoing a deletion must also clear its tombstone (QA4-001),
+            // or the next sync would delete the restored workout again.
+            deletedWorkoutIds: (state.deletedWorkoutIds || []).filter((d) => d !== workout.id),
+          };
+        });
+        // QA-hardening R1: restore the PRs the deletion recomputed away.
+        get().reconcileDerivedPRs((workout.exercises || []).map((e) => e.name));
+      },
       updateWorkout: (id, updated) => set((state) => ({
         // Gauntlet DI-15: clamp/validate at the store boundary, exactly
         // like updateMeal / updatePR.

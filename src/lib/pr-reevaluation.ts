@@ -308,3 +308,167 @@ export function planPRChangesAfterSetEdit(args: {
   }
   return {};
 }
+
+// ─── Whole-history recompute (QA-hardening R1) ──────────────────────────────
+//
+// The set-edit planner above fixes the records of ONE edited session.
+// Workout deletion and its Undo change history itself: the session that
+// minted a PR can vanish (or return), and every derived record for the
+// affected exercises must be re-based on the history that remains.
+// Before this, deleteWorkout never touched state.prs, so the Library
+// could show "No history logged" beside a standing "PR: 140 kg" — the
+// record outlived the performance that earned it.
+//
+// Classification: a record is DERIVED (history-owned) iff its note is
+// one of the auto-generated forms the finish paths write — the two
+// 1RM notes, the Log Past path's auto-detected note, or a "Rep PR: …"
+// note. Everything else (Record Personal Best modal entries, CSV
+// imports, user-edited notes) is user-owned and is NEVER created,
+// updated, or deleted here.
+//
+// Method: replay finish detection over the remaining sessions of the
+// exercise in date order, gating each session against user-owned
+// records dated on or before it plus the outcomes the replay itself
+// has already produced — the same position finish detection was in.
+// Diff the replay against the existing derived records by content
+// (date + kind + values): matches keep their ids, missing outcomes are
+// created with deterministic ids (so a delete → undo → delete cycle
+// converges instead of stacking duplicates or re-awarding XP under a
+// fresh id), and derived records the replay no longer produces are
+// deleted.
+
+const AUTO_DETECTED_NOTE = 'Auto-detected from workout session';
+
+export function isDerivedPR(pr: PersonalRecord): boolean {
+  const notes = pr.notes || '';
+  return (
+    notes === BASELINE_NOTE ||
+    notes === ALL_TIME_NOTE ||
+    notes === AUTO_DETECTED_NOTE ||
+    notes.startsWith('Rep PR:')
+  );
+}
+
+function derivedRecordMatchesOutcome(
+  pr: PersonalRecord,
+  date: string,
+  outcome: SessionPROutcome,
+): boolean {
+  if (pr.date !== date) return false;
+  if (Math.abs((pr.weightKg || 0) - outcome.weightKg) > 0.051) return false;
+  if (pr.reps !== outcome.reps) return false;
+  if (Math.abs((pr.oneRepMax || 0) - outcome.oneRepMax) > 0.051) return false;
+  const notes = pr.notes || '';
+  if (outcome.kind === 'reps') return notes.startsWith('Rep PR:');
+  return notes === BASELINE_NOTE || notes === ALL_TIME_NOTE || notes === AUTO_DETECTED_NOTE;
+}
+
+export function derivedPRId(exerciseName: string, date: string, outcome: SessionPROutcome): string {
+  const slug =
+    exerciseName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') ||
+    'exercise';
+  return `pr-auto-${slug}-${date}-${outcome.kind}-${outcome.weightKg}-${outcome.reps}`;
+}
+
+export interface DerivedPRSyncPlan {
+  create: PersonalRecord[];
+  deleteIds: string[];
+}
+
+/**
+ * Plans the derived-record sync for the given exercises against the
+ * history as it stands NOW (`allWorkouts` is the post-change history).
+ * Pure: reads nothing, mutates nothing. The caller applies the plan
+ * through the store's own bookkeeping (tombstones included).
+ */
+export function planDerivedPRsAfterHistoryChange(args: {
+  exerciseNames: string[];
+  prs: PersonalRecord[];
+  allWorkouts: WorkoutEntry[];
+  bodyweightKg: number;
+  userUnit: Unit;
+}): DerivedPRSyncPlan {
+  const { prs, allWorkouts, bodyweightKg, userUnit } = args;
+  const create: PersonalRecord[] = [];
+  const deleteIds: string[] = [];
+
+  const exerciseKeys = new Map<string, string>();
+  for (const name of args.exerciseNames || []) {
+    const key = (name || '').trim().toLowerCase();
+    if (key && !exerciseKeys.has(key)) exerciseKeys.set(key, name);
+  }
+
+  for (const [key, displayName] of exerciseKeys) {
+    const records = (prs || []).filter(
+      (pr) => pr.exercise.trim().toLowerCase() === key,
+    );
+    const derived = records.filter(isDerivedPR);
+    const owned = records.filter((pr) => !isDerivedPR(pr));
+
+    // Sessions containing the exercise, in the order finish detection
+    // met them: by date, ties broken by history order.
+    const sessions = (allWorkouts || [])
+      .map((w, index) => ({ w, index }))
+      .filter(({ w }) =>
+        (w.exercises || []).some((e) => e.name.trim().toLowerCase() === key),
+      )
+      .sort((a, b) =>
+        a.w.date === b.w.date ? a.index - b.index : a.w.date < b.w.date ? -1 : 1,
+      );
+
+    interface Expected {
+      date: string;
+      outcome: SessionPROutcome;
+      isFirstExposure: boolean;
+    }
+    const expected: Expected[] = [];
+    let runningBestKg = 0;
+    for (const { w } of sessions) {
+      const ownedBestByThen = owned
+        .filter((pr) => pr.date <= w.date)
+        .reduce((m, pr) => Math.max(m, pr.oneRepMax || 0), 0);
+      const gateBestKg = Math.max(runningBestKg, ownedBestByThen);
+      const sets = (w.exercises || [])
+        .filter((e) => e.name.trim().toLowerCase() === key)
+        .flatMap((e) => e.sets || []);
+      const history = (allWorkouts || []).filter((other) => other.id !== w.id);
+      const best = computeSessionBest(displayName, sets, history, bodyweightKg);
+      const outcome = gateSessionOutcome(best, gateBestKg);
+      if (outcome) {
+        expected.push({
+          date: w.date,
+          outcome,
+          isFirstExposure:
+            expected.length === 0 &&
+            !owned.some((pr) => pr.date <= w.date),
+        });
+        runningBestKg = Math.max(runningBestKg, outcome.oneRepMax);
+      }
+    }
+
+    const unmatched = [...derived];
+    for (const exp of expected) {
+      const matchIdx = unmatched.findIndex((pr) =>
+        derivedRecordMatchesOutcome(pr, exp.date, exp.outcome),
+      );
+      if (matchIdx >= 0) {
+        unmatched.splice(matchIdx, 1);
+      } else {
+        create.push({
+          id: derivedPRId(displayName, exp.date, exp.outcome),
+          exercise: displayName,
+          weightKg: exp.outcome.weightKg,
+          weightLbs: exp.outcome.weightLbs,
+          reps: exp.outcome.reps,
+          oneRepMax: exp.outcome.oneRepMax,
+          date: exp.date,
+          notes: outcomeNote(exp.outcome, exp.isFirstExposure, userUnit),
+          prType: exp.outcome.kind,
+        });
+      }
+    }
+    for (const stale of unmatched) deleteIds.push(stale.id);
+  }
+
+  return { create, deleteIds };
+}
