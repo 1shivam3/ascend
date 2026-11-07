@@ -1520,6 +1520,20 @@ export function calculateRecommendedMacroGoals(
     targetCalories = maintenance;
   }
 
+  // QA-hardening R5: unknown age is a SEPARATE axis from the minor
+  // clamp above. When no usable age is on file (no DOB — the engine
+  // would otherwise cost the user as a 25-year-old), the user cannot
+  // be shown to be an adult, so no deficit — and no surplus — is
+  // prescribed either: the calorie target IS maintenance until a DOB
+  // is added. Protein per kg stays goal-driven, as in the minor
+  // clamp. "Known" mirrors a plausible recorded age (13–120); the
+  // BMR defaulting in calculateMaintenanceCalories is unchanged.
+  const hasKnownAge =
+    typeof ageYears === 'number' && Number.isFinite(ageYears) && ageYears >= 13 && ageYears <= 120;
+  if (!hasKnownAge) {
+    targetCalories = maintenance;
+  }
+
   // Protein calculation
   const proteinG = Math.round(bw * proteinPerKg);
   const proteinCalories = proteinG * 4;

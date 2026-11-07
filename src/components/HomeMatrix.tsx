@@ -14,6 +14,8 @@ import {
   type MatrixHabitId,
   type MatrixInputs,
 } from '@/lib/home-matrix';
+import { resolvePlannedDay } from '@/lib/scheduled-days';
+import type { PlannedWorkout, WeeklySchedule } from '@/lib/types';
 import { HABIT_FILL, HABIT_ON_FILL } from '@/lib/habit-tokens';
 
 export type MatrixView = 'weekly' | 'monthly';
@@ -21,6 +23,12 @@ export type MatrixView = 'weekly' | 'monthly';
 interface HomeMatrixProps extends MatrixInputs {
   /** Persisted default from Settings — what the widget opens as. */
   defaultView: MatrixView;
+  /** QA-hardening R3: schedule + plans so the day detail can name the
+   *  day's plan (or rest) through the one resolver instead of only
+   *  ever saying "no workout". Optional: without them the detail
+   *  keeps its history-only behaviour. */
+  weeklySchedule?: WeeklySchedule | null;
+  plannedWorkouts?: PlannedWorkout[];
 }
 
 // Phase 4, Task 4.4 (P2-3): fills come from the shared habit tokens
@@ -42,6 +50,8 @@ export default function HomeMatrix({
   proteinTargetG,
   showCreatine,
   defaultView,
+  weeklySchedule,
+  plannedWorkouts,
 }: HomeMatrixProps) {
   const { t, language } = useTranslation();
   const todayStr = useToday();
@@ -76,6 +86,24 @@ export default function HomeMatrix({
     () => (selected ? getDaySummary(selected, inputs) : null),
     [selected, inputs],
   );
+
+  // QA-hardening R3: what the selected day IS (planned/rest) comes
+  // from the one resolver — the same answer Today and Train give.
+  const dayResolution = useMemo(
+    () =>
+      selected
+        ? resolvePlannedDay(selected, { weeklySchedule, plannedWorkouts, workouts })
+        : null,
+    [selected, weeklySchedule, plannedWorkouts, workouts],
+  );
+  const plannedLine =
+    dayResolution?.kind === 'planned'
+      ? t('homeMatrix.plannedWorkout', {
+          name: dayResolution.plan?.name || dayResolution.customTitle || '',
+        })
+      : dayResolution?.kind === 'rest'
+        ? t('homeMatrix.restDay')
+        : null;
 
   const week = useMemo(() => weekDays(weekStart), [weekStart]);
   const weeks = useMemo(() => monthGrid(monthAnchor.year, monthAnchor.month), [monthAnchor]);
@@ -312,7 +340,7 @@ export default function HomeMatrix({
             </button>
           </div>
           {summary.empty ? (
-            <p className="text-2xs text-text-muted">{t('homeMatrix.emptyDay')}</p>
+            <p className="text-2xs text-text-muted">{plannedLine || t('homeMatrix.emptyDay')}</p>
           ) : (
             <>
               <div>
@@ -320,7 +348,7 @@ export default function HomeMatrix({
                   {t('homeMatrix.workouts')}
                 </p>
                 {summary.workouts.length === 0 ? (
-                  <p className="text-2xs text-text-muted">{t('homeMatrix.noWorkout')}</p>
+                  <p className="text-2xs text-text-muted">{plannedLine || t('homeMatrix.noWorkout')}</p>
                 ) : (
                   <ul className="space-y-1.5">
                     {summary.workouts.map((w) => (

@@ -6,6 +6,7 @@ import { useStore } from '@/lib/store';
 import { AIPostWorkoutTake, isSetCompleted, type WorkoutEntry } from '@/lib/types';
 import { calculateWorkoutVolumeKg } from '@/lib/volume';
 import { fetchPostWorkoutTake, generateDeterministicPostWorkoutTake } from '@/lib/ai-coach';
+import { detectSessionPRs } from '@/lib/session-pr-detection';
 import { buildSessionDebrief } from '@/lib/weekly-review';
 import { getNextSessionTarget, exerciseHadPain } from '@/lib/workout-engine';
 import { formatDuration, getLocalTodayStr } from '@/lib/formatters';
@@ -184,12 +185,18 @@ export default function PostWorkoutTakeModal({
     return `${displayVal.toLocaleString()} ${userUnit}`;
   }, [completedWorkout, store.profile?.bodyweightKg, userUnit]);
 
-  // QA4-024: PR dates are local-day keys — a UTC key hides PRs set
-  // earlier the same local day (and can show yesterday's as today's).
+  // QA-hardening R2: the banner reads the ONE session-PR detection
+  // (lib/session-pr-detection) — records attributable to the session
+  // just finished, not every record dated today. A PR from an earlier
+  // session today is not this session's news; the old date-only
+  // filter let the banner and the headline celebrate different PRs.
   const todayStr = useMemo(() => getLocalTodayStr(), []);
   const todayPRs = useMemo(() => {
-    return (store.prs || []).filter((p) => p.date && p.date.startsWith(todayStr));
-  }, [store.prs, todayStr]);
+    return detectSessionPRs(store.prs || [], {
+      date: todayStr,
+      exercises: completedWorkout.exercises || [],
+    });
+  }, [store.prs, todayStr, completedWorkout]);
 
   if (!isOpen) return null;
 

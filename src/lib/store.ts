@@ -84,7 +84,8 @@ import {
 } from './weekly-review';
 import { readFormSessions } from '../features/form-coach/repositories/form-session-storage';
 import { buildDefaultWeeklySchedule, getTodayDayOfWeek, getWorkoutBodyParts, DAYS_OF_WEEK } from './workout-schedule';
-import { safeRandomId, sanitizeAthleteName, isValidEntryDate, normalizeDateToLocalDay, normalizeRowDates, normalizeAndDedupeBodyMetricDates } from './formatters';
+import { safeRandomId, sanitizeAthleteName, isValidEntryDate, normalizeDateToLocalDay, normalizeRowDates, normalizeAndDedupeBodyMetricDates, getMondayOfWeek } from './formatters';
+import { resolvePlannedDay } from './scheduled-days';
 import {
   evaluateTrainingDecisionPolicyV0,
   canPersistDecisionToLedger,
@@ -95,6 +96,8 @@ import {
   canonicalizeExerciseName,
 } from './workout-outcome-evidence';
 import { isSetPrescribed } from './workout-adherence';
+import { planDerivedPRsAfterHistoryChange } from './pr-reevaluation';
+import { DEFAULT_BODYWEIGHT_KG } from './defaults';
 import { isBodyweightExercise } from './strength-standards';
 import {
   registerCustomExerciseMuscle,
@@ -160,7 +163,7 @@ import {
   type HealthFetchResult,
 } from './health-connect';
 import { kgToLbs } from './units';
-import { enforceMinorMacroGoals, isMinorAge } from './minor-targets';
+import { enforceMinorMacroGoals, enforceUnknownAgeMacroGoals, hasKnownAge, isMinorAge } from './minor-targets';
 import { calculateRecommendedMacroGoals } from './macros';
 import { hasRealBodyStats } from './body-stats';
 
@@ -455,11 +458,18 @@ export interface AppState {
   
   addWorkout: (workout: WorkoutEntry) => void;
   deleteWorkout: (id: string) => void;
+  /** QA-hardening R1: re-base the DERIVED PR records (auto-minted from
+   *  history — see lib/pr-reevaluation) for the named exercises on the
+   *  history that remains. User-owned records are never touched.
+   *  Called by deleteWorkout and insertWorkoutAt (delete + its Undo),
+   *  the two store paths that remove or restore whole sessions. */
+  reconcileDerivedPRs: (exerciseNames: string[]) => void;
   /** Persona-sim round 5 (SIM-P1-09) Undo: re-insert a deleted workout
    *  at its original index (no-op if present) and clear its tombstone,
-   *  mirroring the QA4-014 meal/plan undo. PRs minted by the workout
-   *  are NOT restored here — they survive deletion today (delete does
-   *  not remove PRs), so undo only restores the session itself. */
+   *  mirroring the QA4-014 meal/plan undo. QA-hardening R1: the restore
+   *  also re-derives the workout's PR records — deletion recomputed
+   *  them away (see reconcileDerivedPRs), so undo must bring back what
+   *  the restored history earns. */
   insertWorkoutAt: (workout: WorkoutEntry, index: number) => void;
   /** Edit a saved workout in place (same update mechanism as
    *  updateMeal / updatePR: sanitize at the store boundary + stamp the
@@ -740,15 +750,6 @@ function loadProgressPhotosFromDisk(): ProgressPhoto[] {
  * Progress photos are deliberately EXCLUDED (see PROGRESS_PHOTOS_KEY):
  * their base64 dataURLs would make every startup JSON.parse megabytes.
  */
-const DAY_OF_WEEK_TO_JS: Record<DayOfWeek, number> = {
-  monday: 1,
-  tuesday: 2,
-  wednesday: 3,
-  thursday: 4,
-  friday: 5,
-  saturday: 6,
-  sunday: 0,
-};
 
 /**
  * Workout-reminder days follow the training schedule until the user
@@ -759,17 +760,29 @@ const DAY_OF_WEEK_TO_JS: Record<DayOfWeek, number> = {
  */
 export function syncWorkoutReminderDays(
   schedule: WeeklySchedule,
-  prefs: NotificationPreferences
+  prefs: NotificationPreferences,
+  plannedWorkouts?: PlannedWorkout[] | null
 ): NotificationPreferences {
   if (!prefs || !prefs.workoutReminders || prefs.workoutReminders.daysCustomized) {
     return prefs;
   }
-  const days = DAYS_OF_WEEK.filter((d) => {
-    const id = schedule?.[d]?.workoutPlanId;
-    return !!id && id !== 'rest';
-  })
-    .map((d) => DAY_OF_WEEK_TO_JS[d])
-    .sort((a, b) => a - b);
+  // QA-hardening R3: training days come from the one planned-day
+  // resolver over this week's dates — a day counts only when
+  // resolvePlannedDay calls it 'planned' (its plan still exists).
+  // Before, a schedule pointing at a deleted plan kept the reminder.
+  const monday = getMondayOfWeek(new Date());
+  const days: number[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const res = resolvePlannedDay(getLocalTodayStr(d), {
+      weeklySchedule: schedule,
+      plannedWorkouts: plannedWorkouts ?? null,
+      workouts: [],
+    });
+    if (res.kind === 'planned') days.push(d.getDay());
+  }
+  days.sort((a, b) => a - b);
   if (days.length === 0) return prefs;
   const current = [...(prefs.workoutReminders.daysOfWeek || [])].sort((a, b) => a - b);
   if (JSON.stringify(days) === JSON.stringify(current)) return prefs;
@@ -1326,7 +1339,7 @@ export const useAppStore = create<AppState>()(
       },
       setWeeklySchedule: (weeklySchedule) => set((state) => ({
         weeklySchedule,
-        notificationPreferences: syncWorkoutReminderDays(weeklySchedule, state.notificationPreferences),
+        notificationPreferences: syncWorkoutReminderDays(weeklySchedule, state.notificationPreferences, state.plannedWorkouts),
       })),
       setDaySchedule: (day, config) => set((state) => {
         const weeklySchedule = {
@@ -1335,7 +1348,7 @@ export const useAppStore = create<AppState>()(
         };
         return {
           weeklySchedule,
-          notificationPreferences: syncWorkoutReminderDays(weeklySchedule, state.notificationPreferences),
+          notificationPreferences: syncWorkoutReminderDays(weeklySchedule, state.notificationPreferences, state.plannedWorkouts),
         };
       }),
 
@@ -1671,7 +1684,14 @@ export const useAppStore = create<AppState>()(
           const activityLevel = state.trainingProfile?.activityLevel;
           if (isMinorAge(profile.age)) {
             nextMacroGoals = enforceMinorMacroGoals(nextMacroGoals, profile, activityLevel);
-          } else if (isMinorAge(state.profile?.age)) {
+          } else if (!hasKnownAge(profile.age)) {
+            // QA-hardening R5: age unknown (no DOB) — stored targets
+            // may not sit off maintenance in either direction.
+            nextMacroGoals = enforceUnknownAgeMacroGoals(nextMacroGoals, profile, activityLevel);
+          } else if (isMinorAge(state.profile?.age) || !hasKnownAge(state.profile?.age)) {
+            // Left the minor band, or age just became known (DOB
+            // added): recompute under adult rules so the unlock
+            // actually happens instead of leaving a clamp behind.
             nextMacroGoals = calculateRecommendedMacroGoals(
               profile.bodyweightKg,
               resolvePrimaryGoal(nextGoals),
@@ -2194,32 +2214,82 @@ export const useAppStore = create<AppState>()(
         // recompute, counts only) and idempotent.
         get().refreshAthleteModel();
       },
-      deleteWorkout: (id) => set((state) => {
-        const nextWorkouts = state.workouts.filter(w => w.id !== id);
-        const nextProfile = generateLifterTwinProfile(nextWorkouts, state.profile?.unit || 'kg');
-        return {
-          workouts: nextWorkouts,
-          lifterProfile: nextProfile,
-          // Tombstone so a stale server copy can't resurrect it (QA4-001).
-          deletedWorkoutIds: (state.deletedWorkoutIds || []).includes(id)
-            ? state.deletedWorkoutIds
-            : [...(state.deletedWorkoutIds || []), id],
-          // S1/S2: stamp the deletion for delete-vs-edit ordering.
-          tombstoneStamps: stampTombstoneDeletes(state.tombstoneStamps, 'workouts', [id]),
-        };
-      }),
-      insertWorkoutAt: (workout, index) => set((state) => {
-        if (state.workouts.some((w) => w.id === workout.id)) return state;
-        const nextWorkouts = [...state.workouts];
-        nextWorkouts.splice(Math.max(0, Math.min(index, nextWorkouts.length)), 0, workout);
-        return {
-          workouts: nextWorkouts,
-          lifterProfile: generateLifterTwinProfile(nextWorkouts, state.profile?.unit || 'kg'),
-          // Undoing a deletion must also clear its tombstone (QA4-001),
-          // or the next sync would delete the restored workout again.
-          deletedWorkoutIds: (state.deletedWorkoutIds || []).filter((d) => d !== workout.id),
-        };
-      }),
+      deleteWorkout: (id) => {
+        const target = get().workouts.find((w) => w.id === id);
+        set((state) => {
+          const nextWorkouts = state.workouts.filter(w => w.id !== id);
+          const nextProfile = generateLifterTwinProfile(nextWorkouts, state.profile?.unit || 'kg');
+          return {
+            workouts: nextWorkouts,
+            lifterProfile: nextProfile,
+            // Tombstone so a stale server copy can't resurrect it (QA4-001).
+            deletedWorkoutIds: (state.deletedWorkoutIds || []).includes(id)
+              ? state.deletedWorkoutIds
+              : [...(state.deletedWorkoutIds || []), id],
+            // S1/S2: stamp the deletion for delete-vs-edit ordering.
+            tombstoneStamps: stampTombstoneDeletes(state.tombstoneStamps, 'workouts', [id]),
+          };
+        });
+        // QA-hardening R1: the deleted session may have minted PRs —
+        // re-base the derived records on the history that remains, or
+        // the Library keeps showing a PR with no history behind it.
+        if (target) {
+          get().reconcileDerivedPRs((target.exercises || []).map((e) => e.name));
+        }
+      },
+      reconcileDerivedPRs: (exerciseNames) => {
+        const state = get();
+        const plan = planDerivedPRsAfterHistoryChange({
+          exerciseNames,
+          prs: state.prs || [],
+          allWorkouts: state.workouts || [],
+          bodyweightKg: state.profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG,
+          userUnit: state.profile?.unit || 'kg',
+        });
+        if (plan.create.length === 0 && plan.deleteIds.length === 0) return;
+        set((s) => {
+          let deletedPrIds = s.deletedPrIds || [];
+          let tombstoneStamps = s.tombstoneStamps;
+          let prs = s.prs || [];
+          if (plan.deleteIds.length > 0) {
+            const deleteSet = new Set(plan.deleteIds);
+            prs = prs.filter((pr) => !deleteSet.has(pr.id));
+            // Same bookkeeping as deletePR: tombstone + stamp, so a
+            // stale server copy cannot resurrect the removed record.
+            for (const delId of plan.deleteIds) {
+              if (!deletedPrIds.includes(delId)) deletedPrIds = [...deletedPrIds, delId];
+            }
+            tombstoneStamps = stampTombstoneDeletes(tombstoneStamps, 'personal_records', plan.deleteIds);
+          }
+          if (plan.create.length > 0) {
+            const created = plan.create.map((pr) => stampNewRow(pr));
+            prs = [...prs, ...created];
+            // Re-creating a record clears its deletion tombstone (as
+            // addPR does). No XP is awarded here: the performance was
+            // already credited when it was first logged, and the
+            // deterministic ids keep a delete/undo cycle idempotent.
+            const createdIds = new Set(created.map((p) => p.id));
+            deletedPrIds = deletedPrIds.filter((d) => !createdIds.has(d));
+          }
+          return { prs, deletedPrIds, tombstoneStamps };
+        });
+      },
+      insertWorkoutAt: (workout, index) => {
+        if (get().workouts.some((w) => w.id === workout.id)) return;
+        set((state) => {
+          const nextWorkouts = [...state.workouts];
+          nextWorkouts.splice(Math.max(0, Math.min(index, nextWorkouts.length)), 0, workout);
+          return {
+            workouts: nextWorkouts,
+            lifterProfile: generateLifterTwinProfile(nextWorkouts, state.profile?.unit || 'kg'),
+            // Undoing a deletion must also clear its tombstone (QA4-001),
+            // or the next sync would delete the restored workout again.
+            deletedWorkoutIds: (state.deletedWorkoutIds || []).filter((d) => d !== workout.id),
+          };
+        });
+        // QA-hardening R1: restore the PRs the deletion recomputed away.
+        get().reconcileDerivedPRs((workout.exercises || []).map((e) => e.name));
+      },
       updateWorkout: (id, updated) => set((state) => ({
         // Gauntlet DI-15: clamp/validate at the store boundary, exactly
         // like updateMeal / updatePR.
@@ -2353,9 +2423,16 @@ export const useAppStore = create<AppState>()(
       // enforced here: for a 13–17 profile with real body stats,
       // stored targets are clamped to maintenance (see
       // lib/minor-targets.ts). Adults and null pass through verbatim.
+      // QA-hardening R5: the unknown-age guard composes on top — no
+      // DOB on file means no off-maintenance target may be written
+      // either (see enforceUnknownAgeMacroGoals).
       setMacroGoals: (goals) => set((state) => ({
-        macroGoals: enforceMinorMacroGoals(
-          goals,
+        macroGoals: enforceUnknownAgeMacroGoals(
+          enforceMinorMacroGoals(
+            goals,
+            state.profile,
+            state.trainingProfile?.activityLevel
+          ),
           state.profile,
           state.trainingProfile?.activityLevel
         ),

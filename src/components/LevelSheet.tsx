@@ -114,6 +114,11 @@ export default function LevelSheet({
           <p className="text-xs text-text-muted tabular-nums mt-2">
             {t('level.summary', { total: total.toLocaleString(), remaining: remaining.toLocaleString(), next: level + 1 })}
           </p>
+          {/* QA-hardening R4: one line saying what this level is (and
+              is not), so it is never confused with the strength tier. */}
+          <p className="text-2xs text-text-muted leading-relaxed mt-1">
+            {t('level.helper')}
+          </p>
           <div className="w-full h-2 rounded-full bg-border/60 overflow-hidden mt-3">
             <div
               className="h-full rounded-full bg-accent transition-all duration-700"

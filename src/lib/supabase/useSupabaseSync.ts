@@ -11,6 +11,8 @@ export function useSupabaseSync() {
     user: AuthUser | null;
     // S4: a merge choice is waiting on the user (MergeChoiceModal).
     pendingMergeChoice: boolean;
+    // QA-hardening R6: classified sync failure (offline/auth/server).
+    errorKind: 'offline' | 'auth' | 'server' | null;
   }>(syncEngine.getStatus());
 
   useEffect(() => {
@@ -24,6 +26,7 @@ export function useSupabaseSync() {
         error,
         user,
         pendingMergeChoice: syncEngine.getStatus().pendingMergeChoice,
+        errorKind: syncEngine.getStatus().errorKind,
       });
     });
     return () => unsubscribe();

@@ -217,9 +217,11 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
     // ── 3. Athlete name + tier pill ──
     const athleteName = (profile?.name || t('recap.athlete')).toUpperCase();
     drawText(ctx, athleteName, width / 2, 348, '800 44px system-ui, sans-serif', INK, 'center', 900);
+    // QA-hardening R4: the pill names the system — this is the
+    // strength tier (DOTS-based), not the XP level.
     const tierText = weeklyStats.dotsScore > 0
-      ? `${weeklyStats.tier} · ${weeklyStats.dotsScore} DOTS`
-      : weeklyStats.tier;
+      ? `${t('recap.strengthTier')}: ${weeklyStats.tier} · ${weeklyStats.dotsScore} DOTS`
+      : `${t('recap.strengthTier')}: ${weeklyStats.tier}`;
     ctx.font = '700 22px ui-monospace, monospace';
     const tierW = ctx.measureText(tierText).width + 56;
     ctx.fillStyle = 'rgba(249, 115, 22, 0.14)';

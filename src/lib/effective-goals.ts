@@ -22,6 +22,7 @@
 import { calculateRecommendedMacroGoals, type ActivityLevel } from './macros';
 import { getDayKindTargets } from './nutrition-coach';
 import { hasRealBodyStats } from './body-stats';
+import { hasKnownAge } from './minor-targets';
 import {
   resolvePrimaryGoal,
   type AthleteGoal,
@@ -81,6 +82,35 @@ export function effectiveMacroGoals(
  * is known at all.
  */
 export const FALLBACK_BODYWEIGHT_KG = 72;
+
+/**
+ * QA-hardening R5 — which engine inputs are missing or defaulted for
+ * this profile. The calorie/macro engine reads five inputs and
+ * silently substitutes a default for each missing one: a gendered
+ * default height, age 25, male BMR offset, and the default activity
+ * multiplier (weight itself is guarded separately by the
+ * placeholder-stats rule). A target derived while any input is
+ * missing is an ESTIMATE; the UI labels it as one and names what is
+ * missing instead of presenting a precise-looking number.
+ */
+export type TargetInput = 'weight' | 'height' | 'age' | 'gender' | 'activity';
+
+export function missingTargetInputs(
+  profile: EffectiveGoalsProfile | null | undefined,
+): TargetInput[] {
+  if (!profile) return ['weight', 'height', 'age', 'gender', 'activity'];
+  const missing: TargetInput[] = [];
+  if (!profile.bodyweightKg || profile.bodyweightKg <= 0 || profile.bodyweightSource === 'default') {
+    missing.push('weight');
+  }
+  if (!profile.heightCm || profile.heightCm <= 0 || profile.heightSource === 'default') {
+    missing.push('height');
+  }
+  if (!hasKnownAge(profile.age)) missing.push('age');
+  if (!profile.gender) missing.push('gender');
+  if (!profile.activityLevel) missing.push('activity');
+  return missing;
+}
 
 export function fallbackProteinTargetG(bodyweightKg?: number | null): number {
   return bodyweightKg && bodyweightKg > 0 ? Math.round(bodyweightKg * 1.8) : 140;

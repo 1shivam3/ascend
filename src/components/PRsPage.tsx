@@ -344,7 +344,7 @@ function LevelProgressionModal({
           <div className="rounded-xl border border-accent/30 bg-accent/5 p-3 space-y-2">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-accent" />
-              <span className="text-xs font-semibold text-text-primary">{t('prs.toReachLevel', { level: nextInfo.nextLevel })}</span>
+              <span className="text-xs font-semibold text-text-primary">{t('prs.toReachTier', { tier: nextInfo.nextRank })}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-2xs text-text-muted font-mono">{t('prs.required1rm')}</span>
@@ -374,8 +374,8 @@ function LevelProgressionModal({
               />
             </div>
             <div className="flex justify-between text-2xs text-text-muted font-mono">
-              <span>LV {tier.min}</span>
-              <span>LV {tier.max === 999 ? '96+' : tier.max}</span>
+              <span>{tier.min}</span>
+              <span>{tier.max === 999 ? '96+' : tier.max}</span>
             </div>
           </div>
 
@@ -414,7 +414,7 @@ function LevelProgressionModal({
                       <RankBadge rank={t.rank} size="sm" />
                     </div>
                     <span className={`text-2xs font-mono font-semibold ${isCurrent ? 'text-accent-text' : 'text-text-muted'}`}>
-                      LV {t.range}
+                      {t.range}
                     </span>
                   </div>
                 );
@@ -586,9 +586,7 @@ function LiftCard({
                 className="text-xs font-semibold text-accent-text hover:underline flex items-center gap-1"
                 title={t('prs.viewTier')}
               >
-                <span>{t('prs.level', { level: item.levelInfo.level })}</span>
-                <span>•</span>
-                <span>{item.levelInfo.rank}</span>
+                <span>{t('prs.strengthTier', { tier: item.levelInfo.rank })}</span>
               </button>
               <span className="text-text-muted text-2xs">•</span>
               <span className="text-2xs text-text-muted font-mono">{item.levelInfo.ratio}× BW</span>

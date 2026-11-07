@@ -87,7 +87,8 @@ const FormCoachModal = dynamic(() => import('@/features/form-coach/components/Fo
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import BackupNudge from '@/components/BackupNudge';
 import { calculateMealMacros, scaleMacroGoalsToCalories } from '@/lib/macros';
-import { effectiveMacroGoals, dayScaledGoals, fallbackMacroGoals, fallbackProteinTargetG } from '@/lib/effective-goals';
+import { effectiveMacroGoals, dayScaledGoals, fallbackMacroGoals, fallbackProteinTargetG, missingTargetInputs } from '@/lib/effective-goals';
+import TargetEstimateNote from '@/components/TargetEstimateNote';
 import { hasRealBodyStats } from '@/lib/body-stats';
 import { toLocalDateString, calculateHydrationTarget } from '@/lib/habits';
 import { getTimeGreeting, getWeekRange, formatNumber } from '@/lib/formatters';
@@ -509,6 +510,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   // is no honest target — the strip shows the "set your weight"
   // prompt instead of a fallback number derived from defaults.
   const targetsNeedBodyStats = !macroGoals && !hasRealBodyStats(profile);
+  // QA-hardening R5: on the derived-target path, name the engine
+  // inputs that are missing/defaulted — the target is an estimate.
+  const estimateMissing = !macroGoals ? missingTargetInputs(profile) : [];
   // Today's Fuel summary: real calories and protein vs target
   const fuelStats = useMemo(() => {
     const todayMeals = meals.filter((m) => m.date === todayStr);
@@ -621,11 +625,13 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
   // Sync caption: honest status for cloud-synced data only. The new
   // personalization keys are local-only and are never described as synced.
-  const { status: syncStatus } = useSupabaseSync();
+  const { status: syncStatus, errorKind: syncErrorKind } = useSupabaseSync();
   const syncText =
     syncStatus === 'syncing' ? t('home.syncSyncing')
     : syncStatus === 'synced' ? t('home.syncSynced')
-    : syncStatus === 'error' ? t('home.syncFailed')
+    // QA-hardening R6: the caption reads the same classified state as
+    // the banner — offline failures say so instead of 'Sync failed'.
+    : syncStatus === 'error' ? (syncErrorKind === 'offline' ? t('home.syncOffline') : t('home.syncFailed'))
     : t('home.syncLocalOnly');
 
   // UI-1b-06 (final certification): Today section blocks, keyed by
@@ -703,6 +709,15 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </div>
         </div>
       </div>
+
+      {/* QA-hardening R5: derived targets with missing inputs are
+          labelled estimates, with a one-tap route to fix the inputs. */}
+      {!targetsNeedBodyStats && estimateMissing.length > 0 && (
+        <div className="mt-3">
+          {/* Label-only on Today: Today never routes to Profile (owner's rule, ux-discoverability pin); the fix-it jump lives on Meals. */}
+          <TargetEstimateNote missing={estimateMissing} />
+        </div>
+      )}
 
       {homeProteinHint && (
         <button
@@ -928,6 +943,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           })}
           proteinTargetG={targetsNeedBodyStats ? null : (effectiveMacroGoals(macroGoals, profile)?.proteinG || (profile?.bodyweightKg ? Math.round(profile.bodyweightKg * 1.8) : 140))}
           defaultView={uiPreferences.defaultMatrixView ?? 'weekly'}
+          weeklySchedule={weeklySchedule}
+          plannedWorkouts={plannedWorkouts}
         />
       </div>
       )}

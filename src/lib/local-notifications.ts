@@ -16,10 +16,12 @@
 import { Capacitor } from '@capacitor/core';
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
-  type DayOfWeek,
   type NotificationPreferences,
+  type PlannedWorkout,
   type WeeklySchedule,
 } from './types';
+import { getLocalTodayStr, getMondayOfWeek } from './formatters';
+import { resolvePlannedDay } from './scheduled-days';
 
 export type LocalReminderType = 'water' | 'meal' | 'workout' | 'weekly_report';
 export type LocalMealType = 'breakfast' | 'lunch' | 'dinner';
@@ -126,17 +128,6 @@ function addDays(day: Date, count: number): Date {
   return d;
 }
 
-// Index = JS day-of-week (0 = Sunday … 6 = Saturday).
-const JS_DAY_TO_NAME: DayOfWeek[] = [
-  'sunday',
-  'monday',
-  'tuesday',
-  'wednesday',
-  'thursday',
-  'friday',
-  'saturday',
-];
-
 const REPORT_DAY_TO_JS: Record<string, number> = {
   sunday: 0,
   monday: 1,
@@ -151,24 +142,37 @@ const REPORT_DAY_TO_JS: Record<string, number> = {
  * Effective workout-reminder days (JS day numbers). Mirrors the store's
  * syncWorkoutReminderDays contract: hand-picked days (daysCustomized) win;
  * otherwise days derive from the weekly schedule (a day counts when it has
- * a workout plan assigned); if the schedule yields nothing, the stored
- * preference days are kept.
+ * a workout plan assigned AND still existing — QA-hardening R3 routes
+ * the derivation through resolvePlannedDay); if the schedule yields
+ * nothing, the stored preference days are kept.
  */
 export function resolveTrainingDays(
   prefs: NotificationPreferences,
-  weeklySchedule?: WeeklySchedule | null
+  weeklySchedule?: WeeklySchedule | null,
+  plannedWorkouts?: PlannedWorkout[] | null
 ): number[] {
   const stored = prefs?.workoutReminders?.daysOfWeek;
   if (prefs?.workoutReminders?.daysCustomized) {
     return Array.isArray(stored) ? [...stored] : [];
   }
   if (weeklySchedule) {
+    // QA-hardening R3: derived from the one planned-day resolver —
+    // a day counts only when resolvePlannedDay calls it 'planned'
+    // (its plan still exists). Before, a schedule pointing at a
+    // deleted plan still produced reminders for that day.
     const derived: number[] = [];
-    for (let jsDay = 0; jsDay < 7; jsDay++) {
-      const id = weeklySchedule[JS_DAY_TO_NAME[jsDay]]?.workoutPlanId;
-      if (id && id !== 'rest') derived.push(jsDay);
+    const monday = getMondayOfWeek(new Date());
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const res = resolvePlannedDay(getLocalTodayStr(d), {
+        weeklySchedule,
+        plannedWorkouts: plannedWorkouts ?? null,
+        workouts: [],
+      });
+      if (res.kind === 'planned') derived.push(d.getDay());
     }
-    if (derived.length > 0) return derived;
+    if (derived.length > 0) return derived.sort((a, b) => a - b);
   }
   return Array.isArray(stored) ? [...stored] : [];
 }
@@ -195,7 +199,8 @@ export function planLocalNotifications(
   prefs: NotificationPreferences | null | undefined,
   weeklySchedule: WeeklySchedule | null | undefined,
   now: Date,
-  horizonDays = 14
+  horizonDays = 14,
+  plannedWorkouts?: PlannedWorkout[] | null
 ): PlannedLocalNotification[] {
   if (!prefs || !prefs.enabled) return [];
 
@@ -246,7 +251,7 @@ export function planLocalNotifications(
     }
   }
 
-  const trainingDays = resolveTrainingDays(prefs, weeklySchedule);
+  const trainingDays = resolveTrainingDays(prefs, weeklySchedule, plannedWorkouts);
   const workoutMinutes = prefs.workoutReminders?.enabled
     ? parseTimeToMinutes(prefs.workoutReminders.preferredTime)
     : null;

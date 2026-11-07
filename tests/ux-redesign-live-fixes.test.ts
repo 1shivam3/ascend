@@ -222,7 +222,10 @@ describe('L7 accent tokens (static)', () => {
     const mv = src('src/components/MuscleVolumeSection.tsx');
     expect(mv).not.toContain('Orange = this week');
     expect(mv).toContain('bg-accent');
-    expect(mv).toContain('this week');
+    // Re-pinned (QA-hardening Phase 1 pre-step): audit Phase 5, item (i),
+    // moved the legend copy to the progress.thisWeek / progress.lastWeek
+    // i18n keys, so the pin follows the key, not the literal copy.
+    expect(mv).toContain("t('progress.thisWeek')");
   });
 });
 

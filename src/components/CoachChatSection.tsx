@@ -392,7 +392,18 @@ export default function CoachChatSection() {
   };
 
   return (
-    <section className="space-y-2.5" aria-label={t('coachChat.sectionAria')}>
+    <section
+      // QA-hardening R10: with a conversation going, the section is a
+      // bounded chat column — the thread takes the available height
+      // (flex-1, the ONE scroll region), and the input row pins to
+      // the section's bottom instead of floating mid-page under a
+      // max-h-80 thread nested in the page scroll. Empty state keeps
+      // its natural height.
+      className={
+        messages.length > 0 ? 'flex flex-col gap-2.5 h-[min(78dvh,46rem)]' : 'space-y-2.5'
+      }
+      aria-label={t('coachChat.sectionAria')}
+    >
       <div className="flex items-center gap-2">
         <h2 className="section-title text-[0.6875rem] mb-0">{t('coachChat.title')}</h2>
       </div>
@@ -436,7 +447,7 @@ export default function CoachChatSection() {
             const el = e.currentTarget;
             stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
           }}
-          className="card p-3 space-y-3 max-h-80 overflow-y-auto"
+          className="card p-3 space-y-3 flex-1 min-h-0 overflow-y-auto"
         >
           {messages.map((m, i) => (
             <div key={i} className="space-y-1">

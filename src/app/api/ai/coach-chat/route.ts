@@ -17,6 +17,7 @@ import {
   isCoachChatInScope,
   sanitizeHistory,
   stripModelCitations,
+  replaceIsoDatesInReply,
   truncateReply,
 } from '@/lib/coach-chat';
 import { AiActorAuthError, aiQuotaExceededResponse, checkAiDailyQuota } from '@/lib/ai-quota';
@@ -295,6 +296,9 @@ export async function POST(req: Request) {
     // the user to train through pain, skip a doctor, or eat unsafely is
     // replaced with the safety fallback, never served raw.
     let reply = truncateReply(rawReply.trim());
+    // QA-hardening R11: no raw ISO dates reach the user — rewrite
+    // any YYYY-MM-DD in the model text to the display format.
+    reply = replaceIsoDatesInReply(reply);
     let safetyFiltered = false;
     if (violatesCoachGuardrails(reply)) {
       reply = COACH_SAFETY_FALLBACK;

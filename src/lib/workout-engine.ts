@@ -29,6 +29,7 @@ import {
 
 export type { MovementFamily } from './exercise-library';
 import { getTodayDayOfWeek, getWorkoutBodyParts } from './workout-schedule';
+import { resolvePlannedDay } from './scheduled-days';
 import { calculateSetEffortDrift } from './lifter-twin';
 import { canonicalizeExerciseName } from './workout-outcome-evidence';
 import { kgToLbs, lbsToKg } from './units';
@@ -2180,13 +2181,24 @@ export function getTodaySessionState(
     };
   }
 
-  // 3. User has a weekly schedule or planned routine
+  // 3. User has a weekly schedule or planned routine.
+  // QA-hardening R3: rest/planned classification comes from the one
+  // resolver (lib/scheduled-days) — the same definition the habit
+  // matrix, Train's week strip and the reminders now read. Today's
+  // presentation policies stay layered on top: a brand-new athlete is
+  // never put on a rest day, a builtin template yields to a custom
+  // plan, and an unresolvable day falls through to the first-plan
+  // fallback below rather than claiming "rest".
   if (weeklySchedule) {
     const todayDay = getTodayDayOfWeek(todayStr);
     const dayConfig = weeklySchedule[todayDay];
+    const resolution = resolvePlannedDay(todayStr, {
+      weeklySchedule,
+      plannedWorkouts,
+      workouts: [],
+    });
 
-    if (dayConfig) {
-      if (dayConfig.workoutPlanId === 'rest') {
+    if (resolution.kind === 'rest') {
         const userCustomPlans = plannedWorkouts.filter((p) => !p.id.startsWith('builtin_'));
         const nextPlan = userCustomPlans[0] || plannedWorkouts[0] || null;
 
@@ -2221,7 +2233,7 @@ export function getTodaySessionState(
 
         return {
           status: 'planned',
-          title: dayConfig.customTitle || 'Rest & Recovery',
+          title: dayConfig?.customTitle || 'Rest & Recovery',
           subtitle: nextPlan ? `Scheduled Rest Day • Next up: ${nextPlan.name}` : 'Scheduled Rest Day • Hydrate, sleep, and hit your protein target',
           exercises: nextPlan ? nextPlan.exercises.map((e) => e.name) : [],
           firstExerciseLoadHint: nextPlan ? `Next: ${nextPlan.name}` : undefined,
@@ -2233,19 +2245,16 @@ export function getTodaySessionState(
           bodyParts: [],
           plannedWorkoutId: nextPlan?.id,
         };
-      }
-
-      let matchedPlan = plannedWorkouts.find(
-        (p) => p.id === dayConfig.workoutPlanId || p.name.toLowerCase() === dayConfig.workoutPlanId?.toLowerCase()
-      );
+    } else if (resolution.kind === 'planned' && resolution.plan) {
+      let matchedPlan = resolution.plan;
 
       // If schedule references a builtin template but the user has created custom plans, prioritize user's plan
       const userCustomPlans = plannedWorkouts.filter((p) => !p.id.startsWith('builtin_'));
-      if ((!matchedPlan || dayConfig.workoutPlanId?.startsWith('builtin_')) && userCustomPlans.length > 0) {
+      if (dayConfig?.workoutPlanId?.startsWith('builtin_') && userCustomPlans.length > 0) {
         matchedPlan = userCustomPlans[0];
       }
 
-      if (matchedPlan) {
+      {
         const exNames = matchedPlan.exercises.map((e) => e.name);
         const firstEx = matchedPlan.exercises[0];
         let loadHint: string | undefined = undefined;
@@ -2257,7 +2266,7 @@ export function getTodaySessionState(
         }
 
         const bodyParts =
-          dayConfig.bodyParts && dayConfig.bodyParts.length > 0
+          dayConfig?.bodyParts && dayConfig.bodyParts.length > 0
             ? dayConfig.bodyParts
             : getWorkoutBodyParts(matchedPlan.exercises);
 
