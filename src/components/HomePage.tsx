@@ -714,7 +714,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           labelled estimates, with a one-tap route to fix the inputs. */}
       {!targetsNeedBodyStats && estimateMissing.length > 0 && (
         <div className="mt-3">
-          <TargetEstimateNote missing={estimateMissing} onFix={() => onNavigate('profile')} />
+          {/* Label-only on Today: Today never routes to Profile (owner's rule, ux-discoverability pin); the fix-it jump lives on Meals. */}
+          <TargetEstimateNote missing={estimateMissing} />
         </div>
       )}
 

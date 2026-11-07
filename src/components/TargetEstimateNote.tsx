@@ -14,8 +14,11 @@ const INPUT_KEYS: Record<TargetInput, StringKey> = {
  * QA-hardening R5 — the labelled estimate. When a displayed calorie /
  * macro target was derived while engine inputs were missing (the
  * engine substitutes defaults silently), the number is an estimate:
- * this note says so, names what is missing, and offers the fix
- * (jump to Profile, where those inputs live). Rendered only on the
+ * this note says so and names what is missing. Where the surface
+ * may route to Profile (Meals), it also offers the fix-it jump;
+ * on Today it renders label-only — Today never navigates to the
+ * Profile tab (owner's rule, pinned by tests/ux-discoverability:
+ * Profile/Settings live in the You tab). Rendered only on the
  * derived-target path — stored targets are the user's own numbers.
  */
 export default function TargetEstimateNote({
@@ -23,7 +26,7 @@ export default function TargetEstimateNote({
   onFix,
 }: {
   missing: TargetInput[];
-  onFix: () => void;
+  onFix?: () => void;
 }) {
   const { t } = useTranslation();
   if (missing.length === 0) return null;
@@ -33,13 +36,15 @@ export default function TargetEstimateNote({
       <p className="text-2xs text-text-muted leading-relaxed">
         {t('targets.estimateNote', { missing: list })}
       </p>
-      <button
-        type="button"
-        onClick={onFix}
-        className="shrink-0 min-h-[44px] px-2 text-2xs font-bold text-accent-text hover:underline cursor-pointer"
-      >
-        {t('targets.addDetails')}
-      </button>
+      {onFix && (
+        <button
+          type="button"
+          onClick={onFix}
+          className="shrink-0 min-h-[44px] px-2 text-2xs font-bold text-accent-text hover:underline cursor-pointer"
+        >
+          {t('targets.addDetails')}
+        </button>
+      )}
     </div>
   );
 }

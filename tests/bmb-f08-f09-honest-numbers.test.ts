@@ -22,6 +22,7 @@ import { useStore } from '@/lib/store';
 import { getInitialCoachBlocksState } from '@/lib/block-engine';
 import type { BlockIntake } from '@/lib/block-intake';
 import { translate } from '@/lib/i18n';
+import { formatDate } from '@/lib/formatters';
 import type { WeeklySchedule } from '@/lib/types';
 
 const NULL_SCHEDULE: WeeklySchedule = {
@@ -97,9 +98,12 @@ describe('F-08: empty days carry no phantom duration and the summary counts live
 
 describe('F-09: copy agrees with the immediate-apply behavior', () => {
   it('startsOn says approval applies straight away, first full week Monday', () => {
-    const en = translate('en', 'coachBlock.startsOn', { date: '2026-11-09' });
+    // Re-pinned for QA-hardening R11: the copy no longer hard-codes
+    // the weekday (it duplicated formatDate's). The fixture passes
+    // the date exactly as the real call site does — display format.
+    const en = translate('en', 'coachBlock.startsOn', { date: formatDate('2026-11-09') });
     expect(en).toContain('straight away');
-    expect(en).toContain('first full week starts Monday 2026-11-09');
+    expect(en).toContain('first full week starts Mon, Nov 9, 2026');
     expect(en).not.toContain('The block starts Monday');
   });
 
