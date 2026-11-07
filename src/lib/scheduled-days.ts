@@ -1,5 +1,6 @@
-import type { DayOfWeek, PlannedWorkout, WeeklySchedule } from './types';
+import type { DayOfWeek, PlannedWorkout, WeeklySchedule, WorkoutEntry } from './types';
 import { getLocalTodayStr, normalizeDateToLocalDay } from './formatters';
+import { getTodayDayOfWeek } from './workout-schedule';
 
 /**
  * FND-02 — the ONE definition of "a scheduled training day", pinned here
@@ -109,4 +110,62 @@ export function earliestDataDate(input: {
   }
   for (const key of Object.keys(input.dailyCheckins ?? {})) consider(key);
   return best;
+}
+
+// ─── The one planned-day resolver (QA-hardening R3) ─────────────────────────
+//
+// "What is this day?" had four different answers: Today used
+// getTodaySessionState's own schedule walk, Train's week strip used
+// getScheduledWorkoutForDay (which calls an UNSCHEDULED day "rest"
+// and silently substitutes another plan when the scheduled one was
+// deleted), the habit matrix's day detail knew nothing about plans
+// at all, and the reminder derivations counted a day whose plan no
+// longer exists. resolvePlannedDay is now the single definition:
+//
+//   completed  a workout is logged on the date (wins over everything)
+//   rest       the day's config is the rest override ('rest')
+//   planned    the config names a plan that still exists (matched by
+//              id, or by name as Today's matcher has always done)
+//   none       no schedule, day unassigned, or the plan is gone
+//
+// plannedWorkouts may be null when a caller genuinely cannot know
+// the plan list (legacy reminder call sites): a non-rest planId then
+// resolves 'planned' with plan: null — existence unverifiable, the
+// schedule taken on trust. Callers that know the list always pass it.
+export type PlannedDayResolution<P extends { id: string; name: string }> =
+  | { kind: 'completed'; day: DayOfWeek; workout: WorkoutEntry }
+  | { kind: 'rest'; day: DayOfWeek; customTitle?: string }
+  | { kind: 'planned'; day: DayOfWeek; plan: P | null; customTitle?: string }
+  | { kind: 'none'; day: DayOfWeek };
+
+export function resolvePlannedDay<P extends { id: string; name: string }>(
+  dateStr: string,
+  input: {
+    weeklySchedule?: WeeklySchedule | null;
+    plannedWorkouts?: readonly P[] | null;
+    workouts?: WorkoutEntry[] | null;
+  },
+): PlannedDayResolution<P> {
+  const day = getTodayDayOfWeek(dateStr);
+  const done = (input.workouts || []).find(
+    (w) => w.date && normalizeDateToLocalDay(w.date) === dateStr,
+  );
+  if (done) return { kind: 'completed', day, workout: done };
+
+  const cfg = input.weeklySchedule?.[day];
+  if (cfg?.workoutPlanId === 'rest') {
+    return { kind: 'rest', day, customTitle: cfg.customTitle };
+  }
+  if (cfg?.workoutPlanId) {
+    if (!input.plannedWorkouts) {
+      return { kind: 'planned', day, plan: null, customTitle: cfg.customTitle };
+    }
+    const plan = input.plannedWorkouts.find(
+      (p) =>
+        p.id === cfg.workoutPlanId ||
+        p.name.toLowerCase() === cfg.workoutPlanId!.toLowerCase(),
+    );
+    if (plan) return { kind: 'planned', day, plan, customTitle: cfg.customTitle };
+  }
+  return { kind: 'none', day };
 }

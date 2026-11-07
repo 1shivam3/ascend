@@ -84,7 +84,8 @@ import {
 } from './weekly-review';
 import { readFormSessions } from '../features/form-coach/repositories/form-session-storage';
 import { buildDefaultWeeklySchedule, getTodayDayOfWeek, getWorkoutBodyParts, DAYS_OF_WEEK } from './workout-schedule';
-import { safeRandomId, sanitizeAthleteName, isValidEntryDate, normalizeDateToLocalDay, normalizeRowDates, normalizeAndDedupeBodyMetricDates } from './formatters';
+import { safeRandomId, sanitizeAthleteName, isValidEntryDate, normalizeDateToLocalDay, normalizeRowDates, normalizeAndDedupeBodyMetricDates, getMondayOfWeek } from './formatters';
+import { resolvePlannedDay } from './scheduled-days';
 import {
   evaluateTrainingDecisionPolicyV0,
   canPersistDecisionToLedger,
@@ -749,15 +750,6 @@ function loadProgressPhotosFromDisk(): ProgressPhoto[] {
  * Progress photos are deliberately EXCLUDED (see PROGRESS_PHOTOS_KEY):
  * their base64 dataURLs would make every startup JSON.parse megabytes.
  */
-const DAY_OF_WEEK_TO_JS: Record<DayOfWeek, number> = {
-  monday: 1,
-  tuesday: 2,
-  wednesday: 3,
-  thursday: 4,
-  friday: 5,
-  saturday: 6,
-  sunday: 0,
-};
 
 /**
  * Workout-reminder days follow the training schedule until the user
@@ -768,17 +760,29 @@ const DAY_OF_WEEK_TO_JS: Record<DayOfWeek, number> = {
  */
 export function syncWorkoutReminderDays(
   schedule: WeeklySchedule,
-  prefs: NotificationPreferences
+  prefs: NotificationPreferences,
+  plannedWorkouts?: PlannedWorkout[] | null
 ): NotificationPreferences {
   if (!prefs || !prefs.workoutReminders || prefs.workoutReminders.daysCustomized) {
     return prefs;
   }
-  const days = DAYS_OF_WEEK.filter((d) => {
-    const id = schedule?.[d]?.workoutPlanId;
-    return !!id && id !== 'rest';
-  })
-    .map((d) => DAY_OF_WEEK_TO_JS[d])
-    .sort((a, b) => a - b);
+  // QA-hardening R3: training days come from the one planned-day
+  // resolver over this week's dates — a day counts only when
+  // resolvePlannedDay calls it 'planned' (its plan still exists).
+  // Before, a schedule pointing at a deleted plan kept the reminder.
+  const monday = getMondayOfWeek(new Date());
+  const days: number[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const res = resolvePlannedDay(getLocalTodayStr(d), {
+      weeklySchedule: schedule,
+      plannedWorkouts: plannedWorkouts ?? null,
+      workouts: [],
+    });
+    if (res.kind === 'planned') days.push(d.getDay());
+  }
+  days.sort((a, b) => a - b);
   if (days.length === 0) return prefs;
   const current = [...(prefs.workoutReminders.daysOfWeek || [])].sort((a, b) => a - b);
   if (JSON.stringify(days) === JSON.stringify(current)) return prefs;
@@ -1335,7 +1339,7 @@ export const useAppStore = create<AppState>()(
       },
       setWeeklySchedule: (weeklySchedule) => set((state) => ({
         weeklySchedule,
-        notificationPreferences: syncWorkoutReminderDays(weeklySchedule, state.notificationPreferences),
+        notificationPreferences: syncWorkoutReminderDays(weeklySchedule, state.notificationPreferences, state.plannedWorkouts),
       })),
       setDaySchedule: (day, config) => set((state) => {
         const weeklySchedule = {
@@ -1344,7 +1348,7 @@ export const useAppStore = create<AppState>()(
         };
         return {
           weeklySchedule,
-          notificationPreferences: syncWorkoutReminderDays(weeklySchedule, state.notificationPreferences),
+          notificationPreferences: syncWorkoutReminderDays(weeklySchedule, state.notificationPreferences, state.plannedWorkouts),
         };
       }),
 

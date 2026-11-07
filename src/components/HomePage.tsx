@@ -928,6 +928,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           })}
           proteinTargetG={targetsNeedBodyStats ? null : (effectiveMacroGoals(macroGoals, profile)?.proteinG || (profile?.bodyweightKg ? Math.round(profile.bodyweightKg * 1.8) : 140))}
           defaultView={uiPreferences.defaultMatrixView ?? 'weekly'}
+          weeklySchedule={weeklySchedule}
+          plannedWorkouts={plannedWorkouts}
         />
       </div>
       )}

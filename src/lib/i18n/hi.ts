@@ -164,6 +164,9 @@ export const hi: Partial<Record<StringKey, string>> = {
   'homeMatrix.meals': 'भोजन',
   'homeMatrix.habits': 'आदतें',
   'homeMatrix.noWorkout': 'कोई वर्कआउट दर्ज नहीं',
+  // QA-hardening R3 (machine-translated, unreviewed): day-detail plan/rest lines.
+  'homeMatrix.plannedWorkout': 'योजनाबद्ध: {name}',
+  'homeMatrix.restDay': 'आराम का दिन',
   'homeMatrix.noMeals': 'कोई भोजन दर्ज नहीं',
   'homeMatrix.emptyDay': 'इस दिन कुछ दर्ज नहीं है।',
   'homeMatrix.done': 'पूरा',

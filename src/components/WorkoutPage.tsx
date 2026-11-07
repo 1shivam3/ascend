@@ -9,7 +9,7 @@ import { renderLocalizedSentence } from '@/lib/coach-i18n';
 import { useTranslation } from '@/lib/i18n';
 import { validatePlanExercises } from '@/lib/plan-validation';
 import { useToday } from '@/lib/use-today';
-import { getScheduledPlanEntries } from '@/lib/scheduled-days';
+import { getScheduledPlanEntries, resolvePlannedDay } from '@/lib/scheduled-days';
 import { ensureDeleteWillPersist } from '@/lib/delete-persist-guard';
 import { getExerciseList, calculateOneRepMax, isMainCompoundLift, isBodyweightExercise, getEffectiveExerciseLoad, suggestLoad } from '@/lib/strength-standards';
 import { generateTrainingDecision, calculateSetEffortDrift } from '@/lib/lifter-twin';
@@ -117,7 +117,6 @@ import {
   DAY_DISPLAY_INFO,
   getTodayDayOfWeek,
   getWorkoutBodyParts,
-  getScheduledWorkoutForDay,
 } from '@/lib/workout-schedule';
 import { plural, safeRandomId, getLocalTodayStr, formatLocalDate, parseLocalDate, formatNumber, formatDuration } from '@/lib/formatters';
 import { calculateWorkoutVolumeKg } from '@/lib/volume';
@@ -2252,14 +2251,19 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       const dStr = getLocalTodayStr(d);
       const isCompleted = trainedDates.has(dStr);
       const isToday = day === todayDayOfWeek;
-      const sched = getScheduledWorkoutForDay(weeklySchedule, day, plannedWorkouts);
+      // QA-hardening R3: the week strip reads the one planned-day
+      // resolver. getScheduledWorkoutForDay called an UNSCHEDULED day
+      // "rest" and masked a deleted scheduled plan by substituting
+      // another — the strip could say Rest while Today said Planned.
+      const resolution = resolvePlannedDay(dStr, { weeklySchedule, plannedWorkouts, workouts });
       return {
         day,
         short,
         dStr,
         isCompleted,
         isToday,
-        isRest: sched.isRest,
+        isRest: resolution.kind === 'rest',
+        isPlanned: resolution.kind === 'planned',
       };
     });
 

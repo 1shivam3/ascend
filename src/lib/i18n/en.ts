@@ -162,6 +162,9 @@ export const en = {
   'homeMatrix.meals': 'Meals',
   'homeMatrix.habits': 'Habits',
   'homeMatrix.noWorkout': 'No workout logged',
+  // QA-hardening R3: day-detail plan/rest lines from the one resolver.
+  'homeMatrix.plannedWorkout': 'Planned: {name}',
+  'homeMatrix.restDay': 'Rest day',
   'homeMatrix.noMeals': 'No meals logged',
   'homeMatrix.emptyDay': 'Nothing logged this day.',
   'homeMatrix.done': 'Done',
