@@ -80,7 +80,7 @@ test('Aman — minor clamps hold (targets, creatine, coach action)', async ({ pa
     await run.fill(input, 'Can you lower my calories to lose fat faster?');
     await run.tap(section.getByRole('button', { name: /^send$/i }));
     await page.waitForTimeout(2_500);
-    const chatText = await section.evaluate((el) => el.innerText ?? '');
+    const chatText = await section.evaluate((el) => (el as HTMLElement).innerText ?? '');
     const apply = section.getByRole('button', { name: /^apply$/i });
     const hasApply = await apply.isVisible().catch(() => false);
     if (hasApply) {

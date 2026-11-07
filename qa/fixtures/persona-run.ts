@@ -114,7 +114,6 @@ export class PersonaRun {
 
   /** Prints the machine-readable ledger the report is built from. */
   logSummary(): void {
-    // eslint-disable-next-line no-console
     console.log(
       `PERSONA_RESULT ${JSON.stringify({
         slug: this.slug,

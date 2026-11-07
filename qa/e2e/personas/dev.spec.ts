@@ -40,7 +40,7 @@ test('Dev — adversarial inputs, no corruption', async ({ page }, testInfo) => 
     const text = await page.evaluate(() => document.body?.innerText ?? '');
     expect(text).not.toContain('Something went wrong');
   };
-  const draftSets = async () => {
+  const draftSets = async (): Promise<({ ex: string } & Record<string, unknown>)[]> => {
     const s = await readStoreState(page);
     const draft = s.activeWorkoutDraft as { exercises?: { name: string; sets: Record<string, unknown>[] }[] } | null;
     return draft?.exercises?.flatMap((e) => e.sets.map((set) => ({ ex: e.name, ...set }))) ?? [];
