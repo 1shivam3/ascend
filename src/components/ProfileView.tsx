@@ -206,7 +206,10 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               <div className="pt-1">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-2xs font-mono font-semibold uppercase tracking-wider bg-bg-secondary text-text-secondary border border-border">
                   <span className="w-1.5 h-1.5 rounded-full bg-sage" />
-                  {athleteTier.title} · {t('profile.level', { level: athleteTier.level })}
+                  {/* QA-hardening R4: the strength standing is named as
+                      what it is — a tier — never a bare "Lv", which
+                      read as the XP level beside it. */}
+                  {t('profile.strengthTier', { tier: athleteTier.title })}
                 </span>
                 {athleteTier.estimatedCount > 0 && (
                   <p className="text-2xs text-amber-500 mt-1 leading-relaxed">

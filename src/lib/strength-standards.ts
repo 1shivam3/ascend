@@ -601,9 +601,9 @@ export function getLiftLevel(
     standardNote: isOther
       ? 'Official competitive strength standards are calibrated exclusively for male and female divisions. Progression is tracked against an unadjusted baseline.'
       : resolved.muscleMismatch
-        ? 'No published strength standard exists for this exercise — no same-muscle standard could be matched, so this level is a rough estimate and excluded from your overall level.'
+        ? 'No published strength standard exists for this exercise — no same-muscle standard could be matched, so this tier is a rough estimate and excluded from your overall tier.'
         : standardUnavailable
-          ? 'No published strength standard exists for this exercise — this level is estimated from a similar lift and excluded from your overall level.'
+          ? 'No published strength standard exists for this exercise — this tier is estimated from a similar lift and excluded from your overall tier.'
           : undefined,
   };
 }
