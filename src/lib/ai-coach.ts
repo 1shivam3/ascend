@@ -53,7 +53,7 @@ export function getVolumeComparison(
   workouts: WorkoutEntry[],
   bodyweightKg = DEFAULT_BODYWEIGHT_KG,
   targetDate: Date = new Date()
-): { thisWeekKg: number; lastWeekKg: number; diffPercent: number } {
+): { thisWeekKg: number; lastWeekKg: number; diffPercent: number | null } {
   // Calendar weeks: this Mon–Sun vs last Mon–Sun.
   const thisWeekStrs = new Set(getWeekDateStrings(targetDate));
   const lastWeekAnchor = new Date(targetDate);
@@ -77,12 +77,26 @@ export function getVolumeComparison(
   const thisWeekKg = Math.round(thisWeekTonnage);
   const lastWeekKg = Math.round(lastWeekTonnage);
 
-  let diffPercent = 0;
+  // QA-hardening R2: with no last-week volume there is NO comparison —
+  // null, not 0. Returning 0 made the coach context claim "Shift=+0%"
+  // (and the take announce "0% total tonnage vs last week") for users
+  // with no prior week at all. The week windows above are disjoint
+  // Mon–Sun sets, so this week's sessions never count as last week.
+  let diffPercent: number | null = null;
   if (lastWeekKg > 0) {
     diffPercent = Math.round(((thisWeekKg - lastWeekKg) / lastWeekKg) * 100);
   }
 
   return { thisWeekKg, lastWeekKg, diffPercent };
+}
+
+/**
+ * The one rendering of a volume comparison: a signed percent when a
+ * comparison exists, "No comparison yet" when it does not.
+ */
+export function formatVolumeShift(diffPercent: number | null): string {
+  if (diffPercent === null) return 'No comparison yet';
+  return `${diffPercent >= 0 ? '+' : ''}${diffPercent}%`;
 }
 
 /**

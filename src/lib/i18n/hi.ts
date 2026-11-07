@@ -2501,6 +2501,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'take.closeAria': 'सारांश बंद करें',
   'take.duration': 'अवधि',
   'take.volume': 'वॉल्यूम',
+  // QA-hardening R2 (machine-translated, unreviewed): no-comparison wording.
+  'take.noComparisonYet': 'अभी कोई तुलना नहीं',
   'take.lifts': 'लिफ़्ट',
   'take.sets': 'सेट',
   'take.newPrs': '{count} नए पर्सनल रिकॉर्ड मिले!',

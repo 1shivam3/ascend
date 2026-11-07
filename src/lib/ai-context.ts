@@ -1,7 +1,8 @@
 import { AppState } from './store';
 import { AITrainingProfile, isSetCompleted } from './types';
 import { toLocalDateString, calculateHydrationTarget, getCreatineStats } from './habits';
-import { getVolumeComparison, getConsecutiveWorkoutDays, getDaysSinceLastWorkout } from './ai-coach';
+import { getVolumeComparison, formatVolumeShift, getConsecutiveWorkoutDays, getDaysSinceLastWorkout } from './ai-coach';
+import { getBestPRForExercise } from './session-pr-detection';
 import { isBodyweightExercise } from './strength-standards';
 import { DEFAULT_BODYWEIGHT_KG } from './defaults';
 
@@ -130,7 +131,7 @@ export function buildCompactUserContext(state: AppState): string {
         const loadPrefix = r.isBW ? '+' : '';
         return `${loadPrefix}${r.weight}${unit}×${r.reps}`;
       }).join(' -> ');
-      const pr = state.prs.find((p) => p.exercise.toLowerCase().includes(exName.toLowerCase()));
+      const pr = getBestPRForExercise(state.prs, exName);
       const prText = pr ? ` (PR: ${pr.weightKg}${unit}×${pr.reps})` : '';
       trendLines.push(`- ${exName}: ${recentHistory}${prText}`);
     }
@@ -142,7 +143,7 @@ export function buildCompactUserContext(state: AppState): string {
   const daysSinceLast = getDaysSinceLastWorkout(state.workouts);
 
   const recoveryLines = [
-    `VOLUME & FATIGUE: ThisWeek=${volume.thisWeekKg}kg LastWeek=${volume.lastWeekKg}kg Shift=${volume.diffPercent >= 0 ? '+' : ''}${volume.diffPercent}% ConsecutiveDays=${consecutiveDays} DaysSinceLast=${daysSinceLast}`,
+    `VOLUME & FATIGUE: ThisWeek=${volume.thisWeekKg}kg LastWeek=${volume.lastWeekKg}kg Shift=${formatVolumeShift(volume.diffPercent)} ConsecutiveDays=${consecutiveDays} DaysSinceLast=${daysSinceLast}`,
   ];
 
   // 5. Daily Essentials & Habit Context

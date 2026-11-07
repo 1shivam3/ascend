@@ -2497,6 +2497,9 @@ export const en = {
   'take.closeAria': 'Close summary',
   'take.duration': 'Duration',
   'take.volume': 'Volume',
+  // QA-hardening R2: the volume comparison's no-data wording — a week
+  // with no prior-week volume has no comparison, never "0%".
+  'take.noComparisonYet': 'No comparison yet',
   'take.lifts': 'Lifts',
   'take.sets': 'Sets',
   'take.newPrs': '{count} NEW PERSONAL RECORDS DETECTED!',
