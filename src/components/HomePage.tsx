@@ -1023,7 +1023,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     'hydration': (
       <div className={shown('hydration') ? undefined : 'hidden'}>
       <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
             <span className="w-9 h-9 rounded-xl bg-sky-500/15 text-sky-500 flex items-center justify-center">
               <Droplets className="w-4 h-4" />
@@ -1035,7 +1035,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 ml-auto">
             <button
               type="button"
               onClick={() => {
