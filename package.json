@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "prebuild": "node scripts/generate-sw.js",
-    "postbuild": "node scripts/generate-sw.js && node scripts/assert-sw.js"
+    "postbuild": "node scripts/generate-sw.js && node scripts/assert-sw.js",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@capacitor-community/speech-recognition": "^7.0.1",
@@ -35,6 +36,7 @@
   "devDependencies": {
     "@capacitor/android": "^8.5.3",
     "@capacitor/cli": "^8.5.3",
+    "@playwright/test": "^1.65.0",
     "@types/node": "^22.7.5",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",

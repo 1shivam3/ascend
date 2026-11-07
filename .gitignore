@@ -34,3 +34,7 @@ android/.gradle/
 # Generated service worker (scripts/generate-sw.js) — never commit;
 # a stale committed copy shipped once (pre-play D-PWA-1).
 /public/sw.js
+
+# QA harness (Playwright)
+qa/test-results/
+playwright-report/
