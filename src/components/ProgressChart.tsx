@@ -7,6 +7,7 @@ import { calculateOneRepMax } from '@/lib/strength-standards';
 import { getExerciseHistorySessions } from '@/lib/lifter-twin';
 import { summarizeSeries } from '@/lib/chart-a11y';
 import { useTranslation } from '@/lib/i18n';
+import { formatNumber, formatDateShort } from '@/lib/formatters';
 
 const PRIMARY_EXERCISES = ['Squat', 'Bench Press', 'Deadlift', 'Overhead Press'];
 
@@ -188,7 +189,7 @@ export default function ProgressChart() {
     if (valDelta > 0 && latest.avgRpe !== undefined && latest.avgRpe <= 8.5) {
       return {
         headline: t('chart.headOverload'),
-        explanation: t('chart.expOverload', { delta: valDelta.toLocaleString(), unit: userUnit, rpe: latest.avgRpe ?? '' }),
+        explanation: t('chart.expOverload', { delta: formatNumber(valDelta), unit: userUnit, rpe: latest.avgRpe ?? '' }),
       };
     }
 
@@ -201,7 +202,7 @@ export default function ProgressChart() {
 
     return {
       headline: t('chart.headMaintenance'),
-      explanation: t('chart.expMaintenance', { value: latest.value.toLocaleString(), unit: userUnit, rpe: latest.avgRpe ?? 8 }),
+      explanation: t('chart.expMaintenance', { value: formatNumber(latest.value), unit: userUnit, rpe: latest.avgRpe ?? 8 }),
     };
   }, [currentChartData, userUnit, t]);
 
@@ -363,7 +364,7 @@ export default function ProgressChart() {
             <div>
               <div className="flex items-baseline gap-1.5">
                 <span className="text-2xl font-black text-text-primary font-sans tabular-nums">
-                  {activePoint ? activePoint.value.toLocaleString() : latestVal.toLocaleString()}
+                  {activePoint ? formatNumber(activePoint.value) : formatNumber(latestVal)}
                 </span>
                 <span className="text-xs text-text-muted">
                   {userUnit} {metricMode === 'volume' ? t('chart.volume') : '1RM'}
@@ -373,7 +374,7 @@ export default function ProgressChart() {
                 {activePoint
                   ? metricMode === 'volume'
                     ? t('chart.pointVolume', {
-                        date: new Date(activePoint.date).toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { month: 'short', day: 'numeric' }),
+                        date: formatDateShort(activePoint.date, language === 'hi' ? 'hi-IN' : 'en-US'),
                         sets: activePoint.setsCount || 1,
                         weight: activePoint.weight,
                         unit: userUnit,
@@ -382,7 +383,7 @@ export default function ProgressChart() {
                         drift: (activePoint.rpeDrift ?? 0) >= 0 ? `+${activePoint.rpeDrift ?? 0}` : (activePoint.rpeDrift ?? 0),
                       })
                     : t('chart.point1rm', {
-                        date: new Date(activePoint.date).toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { month: 'short', day: 'numeric' }),
+                        date: formatDateShort(activePoint.date, language === 'hi' ? 'hi-IN' : 'en-US'),
                         weight: activePoint.weight,
                         unit: userUnit,
                         reps: activePoint.reps,
@@ -401,13 +402,13 @@ export default function ProgressChart() {
                   }`}
                 >
                   {delta > 0 ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
-                  {delta > 0 ? `+${delta.toLocaleString()}` : delta.toLocaleString()} {userUnit}
+                  {delta > 0 ? `+${formatNumber(delta)}` : formatNumber(delta)} {userUnit}
                 </span>
               ) : (
                 <span className="text-xs text-text-muted font-medium">{t('chart.consistent')}</span>
               )}
               <p className="text-2xs text-text-muted mt-0.5">
-                {t('chart.peak', { value: maxVal.toLocaleString(), unit: userUnit })}
+                {t('chart.peak', { value: formatNumber(maxVal), unit: userUnit })}
               </p>
             </div>
           </div>

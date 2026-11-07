@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
 import { getLiftLevel, getOverallLevel } from '@/lib/strength-standards';
-import { formatHeightImperial, plural } from '@/lib/formatters';
+import { formatHeightImperial, plural, formatVolume } from '@/lib/formatters';
 import { ATHLETE_GOAL_CONFIGS } from '@/lib/types';
 import { useAppNavigation } from '@/lib/navigation';
 import { useTranslation } from '@/lib/i18n';
@@ -136,11 +136,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
   // Format weight display
   const displayWeight = () => {
     if (!profile?.bodyweightKg) return '—';
-    if (userUnit === 'lbs') {
-      const lbs = profile.bodyweightLbs || Math.round(kgToLbs(profile.bodyweightKg));
-      return `${lbs} lbs`;
-    }
-    return `${profile.bodyweightKg} kg`;
+    return formatVolume(profile.bodyweightKg, userUnit, undefined, { precision: 'tenth' });
   };
 
   // Format age display

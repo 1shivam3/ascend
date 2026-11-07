@@ -3103,7 +3103,7 @@ export const en = {
   'home.freezesOne': '{count} freeze ready',
   'home.freezesMany': '{count} freezes ready',
   'home.freezeCovered': 'A streak freeze covered a missed day this run — no harm done.',
-  'home.hydrationToday': '{drank} / {target} L today',
+  'home.hydrationToday': '{drank} / {target} today',
   'home.toLevel': 'to XP level {level}',
   'home.joinChallenge': 'Join challenge',
   'home.todaysTraining': 'Today\'s Training',

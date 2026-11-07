@@ -118,7 +118,7 @@ import {
   getTodayDayOfWeek,
   getWorkoutBodyParts,
 } from '@/lib/workout-schedule';
-import { plural, safeRandomId, getLocalTodayStr, formatLocalDate, parseLocalDate, formatNumber, formatDuration } from '@/lib/formatters';
+import { plural, safeRandomId, getLocalTodayStr, formatLocalDate, parseLocalDate, formatNumber, formatDuration, formatDate, formatDateShort, formatMonthName } from '@/lib/formatters';
 import { calculateWorkoutVolumeKg } from '@/lib/volume';
 import { planPRChangesAfterSetEdit } from '@/lib/pr-reevaluation';
 import { getSessionDuration } from '@/lib/workout-elapsed';
@@ -2213,11 +2213,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     startOfWeek.setDate(now.getDate() - dayOfWeek);
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 6);
-    const startMonth = startOfWeek.toLocaleDateString(dateLocale, { month: 'short' });
-    const endMonth = endOfWeek.toLocaleDateString(dateLocale, { month: 'short' });
+    const startMonth = formatMonthName(startOfWeek, dateLocale, 'short');
+    const endMonth = formatMonthName(endOfWeek, dateLocale, 'short');
+    // QA-hardening R12: day-first range, like every other date.
     return startMonth === endMonth
-      ? `${startMonth} ${startOfWeek.getDate()}–${endOfWeek.getDate()}`
-      : `${startMonth} ${startOfWeek.getDate()} – ${endMonth} ${endOfWeek.getDate()}`;
+      ? `${startOfWeek.getDate()}–${endOfWeek.getDate()} ${startMonth}`
+      : `${startOfWeek.getDate()} ${startMonth} – ${endOfWeek.getDate()} ${endMonth}`;
   }, [dateLocale]);
 
   const weeklyScheduleStats = useMemo(() => {
@@ -2316,7 +2317,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       if (diffDays === 0) return t('workout.todayRel');
       if (diffDays === 1) return t('workout.yesterdayRel');
       if (diffDays > 1 && diffDays < 7) return t('workout.daysAgoRel', { days: diffDays });
-      return past.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' });
+      return formatDateShort(getLocalTodayStr(past), dateLocale);
     } catch {
       return dateStr;
     }
@@ -2942,12 +2943,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               // duration — previously it showed only the date and an
               // exercise/set count, so sessions were indistinguishable.
               const rowTitle = workout.name?.trim() || null;
-              const rowDate = parseLocalDate(workout.date).toLocaleDateString(dateLocale, {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              });
+              const rowDate = formatDate(workout.date, dateLocale);
               const volumeKg = calculateWorkoutVolumeKg(workout);
               const volumeDisplay = volumeKg > 0
                 ? `${formatNumber(Math.round(userUnit === 'lbs' ? kgToLbs(volumeKg) : volumeKg))} ${userUnit}`

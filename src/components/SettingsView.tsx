@@ -32,7 +32,7 @@ import {
 import { exportFullBackupJSON, restoreBackupSideData } from '@/lib/storage';
 import { recordBackupExported } from '@/lib/backup-nudge';
 import { buildCombinedCsvExport } from '@/lib/csv-export';
-import { getLocalTodayStr } from '@/lib/formatters';
+import { getLocalTodayStr, formatDateTime } from '@/lib/formatters';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
 import { useAppNavigation } from '@/lib/navigation';
 import { getTelemetryConsent, setTelemetryConsent, TelemetryConsent, TELEMETRY_CONSENT_EVENT } from '@/lib/telemetry';
@@ -1141,7 +1141,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 <p className="text-2xs text-text-muted">
                   {healthConnectLastSyncedAt
                     ? t('health.lastSynced', {
-                        time: new Date(healthConnectLastSyncedAt).toLocaleString(),
+                        time: formatDateTime(new Date(healthConnectLastSyncedAt).getTime()),
                       })
                     : t('health.neverSynced')}
                 </p>

@@ -20,7 +20,7 @@ import {
   Flag,
 } from 'lucide-react';
 import { FoodItem } from '@/lib/types';
-import { round1 } from '@/lib/formatters';
+import { round1, formatCalories } from '@/lib/formatters';
 import { localizedUserMessage } from '@/lib/user-error';
 import { fetchProductByBarcode, ScannedProduct, scannedProductToFoodItem } from '@/lib/openfoodfacts';
 import { getFoodSuggestions, estimateMacros } from '@/lib/macros';
@@ -518,7 +518,7 @@ export default function BarcodeScannerModal({
         if (item.proteinG !== undefined) setManualProtein(String(item.proteinG));
         if (item.carbsG !== undefined) setManualCarbs(String(item.carbsG));
         if (item.fatG !== undefined) setManualFat(String(item.fatG));
-        setAiLabelSnippet(`${item.name || 'Product'} — ${Math.round(item.calories)} kcal, ${item.proteinG}g protein, ${item.carbsG}g carbs, ${item.fatG}g fat`);
+        setAiLabelSnippet(`${item.name || 'Product'} — ${formatCalories(item.calories)}, ${item.proteinG}g protein, ${item.carbsG}g carbs, ${item.fatG}g fat`);
         toast.success(t('scan2.extractedMsg', { name: item.name || t('scan2.product'), cal: Math.round(item.calories), protein: item.proteinG }), t('scan2.labelScanned'));
       } else if (result && result.totalCalories !== undefined) {
         if (result.mealName) setManualName(result.mealName);
@@ -526,7 +526,7 @@ export default function BarcodeScannerModal({
         setManualProtein(String(result.totalProtein));
         setManualCarbs(String(result.totalCarbs));
         setManualFat(String(result.totalFat));
-        setAiLabelSnippet(`${result.mealName || 'Product label'} — ${Math.round(result.totalCalories)} kcal, ${result.totalProtein}g protein, ${result.totalCarbs}g carbs, ${result.totalFat}g fat`);
+        setAiLabelSnippet(`${result.mealName || 'Product label'} — ${formatCalories(result.totalCalories)}, ${result.totalProtein}g protein, ${result.totalCarbs}g carbs, ${result.totalFat}g fat`);
         toast.success(t('scan2.extractedFacts'), t('scan2.labelScanned'));
       } else {
         toast.info(t('scan2.unclearMsg'), t('scan2.labelScan'));

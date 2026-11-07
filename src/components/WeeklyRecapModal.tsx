@@ -7,7 +7,7 @@ import { isSetCompleted } from '@/lib/types';
 import { calculateDOTS, getDOTSClassification } from '@/lib/dots';
 import { X, Share2, Download, MessageCircle, Trophy, Flame, Dumbbell, Sparkles } from 'lucide-react';
 import { useToast } from './ui/Toast';
-import { getWeekRange, parseLocalDate, formatNumber } from '@/lib/formatters';
+import { getWeekRange, parseLocalDate, formatNumber, formatDateShort, getLocalTodayStr } from '@/lib/formatters';
 import { selectWeeklyRecapPRs } from '@/lib/weekly-recap';
 import { calculateWorkoutVolumeKg } from '@/lib/volume';
 import { useTranslation } from '@/lib/i18n';
@@ -99,7 +99,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
       totalBig3: Math.round(totalBig3),
       dotsScore: Math.round(dotsScore),
       tier: classification.tier,
-      dateRange: `${monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${sunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+      dateRange: `${formatDateShort(getLocalTodayStr(monday), 'en-US')} – ${formatDateShort(getLocalTodayStr(sunday), 'en-US')}`,
     };
   }, [workouts, prs, profile]);
 

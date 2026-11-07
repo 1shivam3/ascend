@@ -33,7 +33,7 @@ import {
   type MovementFamily,
 } from './workout-engine';
 import { resolveExerciseMuscle, type MuscleGroup } from './exercise-library';
-import { parseLocalDate } from './formatters';
+import { parseLocalDate, formatDateShort } from './formatters';
 import { getScheduledPlanEntries, earliestDataDate } from './scheduled-days';
 import type { LocalizedSentence } from './coach-i18n';
 import { lbsToKg } from './units';
@@ -207,10 +207,8 @@ function roundTo(x: number, step: number): number {
 }
 
 function fmtDate(dateStr: string): string {
-  return parseLocalDate(dateStr).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-  });
+  // QA-hardening R12: the shared day-first short date ("6 Nov").
+  return formatDateShort(dateStr, 'en-GB');
 }
 
 function tierFor(n: number, emergingAt: number, establishedAt: number): AthleteModelTier {

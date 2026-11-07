@@ -3,6 +3,7 @@
 import React, { useMemo } from 'react';
 import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toLocalDateString } from '@/lib/habits';
+import { formatDateShort, getLocalTodayStr } from '@/lib/formatters';
 import { useToday } from '@/lib/use-today';
 import type { WorkoutEntry, MealEntry, CreatineLog } from '@/lib/types';
 import { useTranslation, weekdayNames } from '@/lib/i18n';
@@ -106,7 +107,7 @@ export default function WeeklyHabitMatrix({
     { id: 'protein', label: t('habit.protein'), done: (d) => proteinTargetG !== null && (proteinMap.get(d) || 0) >= proteinTargetG * 0.85 },
   ];
 
-  const rangeLabel = `${days[0].date.toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { month: 'short', day: 'numeric' })} – ${days[days.length - 1].date.toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { month: 'short', day: 'numeric' })}`;
+  const rangeLabel = `${formatDateShort(getLocalTodayStr(days[0].date), language === 'hi' ? 'hi-IN' : 'en-US')} – ${formatDateShort(getLocalTodayStr(days[days.length - 1].date), language === 'hi' ? 'hi-IN' : 'en-US')}`;
 
   return (
     <div className="space-y-1.5 text-xs font-mono">

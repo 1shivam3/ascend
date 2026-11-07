@@ -12,7 +12,7 @@ import {
   round1,
   round2,
   plural,
-  formatWaterMl,
+  formatWater,
   getTimeGreeting,
   formatHeightImperial,
   sanitizeAthleteName,
@@ -168,13 +168,13 @@ describe('P2 — grammar helpers', () => {
 
 describe('P2 — water display', () => {
   it('shows ml under 1 L', () => {
-    expect(formatWaterMl(250)).toBe('250 ml');
-    expect(formatWaterMl(999)).toBe('999 ml');
+    expect(formatWater(250)).toBe('250 ml');
+    expect(formatWater(999)).toBe('999 ml');
   });
 
   it('shows L at/above 1 L', () => {
-    expect(formatWaterMl(1500)).toBe('1.5 L');
-    expect(formatWaterMl(3000)).toBe('3 L');
+    expect(formatWater(1500)).toBe('1.5 L');
+    expect(formatWater(3000)).toBe('3 L');
   });
 });
 

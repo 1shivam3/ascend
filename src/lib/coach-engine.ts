@@ -36,7 +36,7 @@ import {
 import { calculateWorkoutTonnage } from './ai-coach';
 import { SAFE_MIN_CALORIES } from './macros';
 import { isMinorAge } from './minor-targets';
-import { getWeekDateStrings, plural, formatKg, getLocalTodayStr, parseLocalDate } from './formatters';
+import { getWeekDateStrings, plural, formatKg, getLocalTodayStr, parseLocalDate, formatNumber, formatVolume, formatCalories } from './formatters';
 import { EXERCISE_LIBRARY, findLibraryExercise } from './exercise-library';
 import type { MuscleGroup } from './exercise-library';
 import { isPlaceholderSubstitute } from './workout-engine';
@@ -808,7 +808,7 @@ export function calculateReadiness(
     if (typeof steps === 'number' && steps > 0 && steps < 2000) {
       score -= 5;
       factors.push(
-        `Yesterday was a very low-movement day (${steps.toLocaleString()} steps). ` +
+        `Yesterday was a very low-movement day (${formatNumber(steps)} steps). ` +
         `Blood flow is recovery — an easy warm-up and some walking between sets will help more than usual today.`
       );
     }
@@ -1088,7 +1088,7 @@ export function generateCoachTake(workout: WorkoutEntry, history: WorkoutEntry[]
     );
   } else if (volumeLandmark) {
     sentences.push(
-      `Quietly a monster session: ${Math.round(tonnage).toLocaleString()} kg of total volume, ` +
+      `Quietly a monster session: ${formatVolume(tonnage, 'kg')} of total volume, ` +
       `about ${Math.round((tonnage / avgPriorTonnage - 1) * 100)}% more than your recent average — ` +
       `that's the kind of workload that moves the needle, just don't try to repeat it twice this week.`
     );
@@ -1631,8 +1631,8 @@ export function suggestCalorieAdjustment(
         newCalories: current,
         atSafeMinimum: true,
         reason:
-          `I'd normally trim about ${Math.abs(delta)} kcal, but you're already at ${current.toLocaleString()} kcal — ` +
-          `below the safe floor of ${safeMin.toLocaleString()}. Cutting further risks muscle, hormones and sanity. ` +
+          `I'd normally trim about ${formatCalories(Math.abs(delta))}, but you're already at ${formatCalories(current)} — ` +
+          `below the safe floor of ${formatNumber(safeMin)}. Cutting further risks muscle, hormones and sanity. ` +
           `Instead: tighten tracking accuracy for two weeks, or add a couple of brisk walks. If the scale still won't budge, that's a conversation, not a bigger deficit.`,
         // LIVE-P1-03: the floor branch builds its own struct — callers
         // can't know in advance that the floor will trigger.
@@ -1640,8 +1640,8 @@ export function suggestCalorieAdjustment(
           key: 'coachDigest.calFloorHold',
           params: {
             delta: String(Math.abs(delta)),
-            current: current.toLocaleString(),
-            floor: safeMin.toLocaleString(),
+            current: formatNumber(current),
+            floor: formatNumber(safeMin),
           },
         },
       };

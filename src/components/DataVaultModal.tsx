@@ -7,7 +7,7 @@ import { useToast } from '@/components/ui/Toast';
 import { ensureDeleteWillPersist } from '@/lib/delete-persist-guard';
 import { parseWorkoutCSV } from '@/lib/workout-import';
 import { localizedUserMessage } from '@/lib/user-error';
-import { getLocalTodayStr } from '@/lib/formatters';
+import { getLocalTodayStr, formatDate } from '@/lib/formatters';
 import { buildFullBackup, getCustomBarcodes } from '@/lib/storage';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
 import { dataLocationMessageKey, getDataLocationStatus, isPermanentAccount } from '@/lib/data-location';
@@ -471,9 +471,9 @@ export default function DataVaultModal({ isOpen, onClose, startAtDeleteConfirm }
               <p className="text-2xs text-text-muted text-center font-mono">
                 {lastBackupAt !== null
                   ? t('vault.lastBackup', {
-                      date: new Date(lastBackupAt).toLocaleDateString(
-                        language === 'hi' ? 'hi-IN' : 'en-US',
-                        { day: 'numeric', month: 'short', year: 'numeric' }
+                      date: formatDate(
+                        getLocalTodayStr(new Date(lastBackupAt)),
+                        language === 'hi' ? 'hi-IN' : 'en-US'
                       ),
                     })
                   : t('vault.noBackupYet')}

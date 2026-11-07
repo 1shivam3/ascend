@@ -1,7 +1,7 @@
 import { AppState } from './store';
 import { WorkoutEntry, AIPostWorkoutTake, isSetCompleted } from './types';
 import { toLocalDateString } from './habits';
-import { getWeekDateStrings } from './formatters';
+import { getWeekDateStrings, formatVolume } from './formatters';
 import { calculateWorkoutVolumeKg } from './volume';
 import { getExerciseMuscle } from './exercise-library';
 import { buildCompactUserContext } from './ai-context';
@@ -231,7 +231,7 @@ export function generateDeterministicPostWorkoutTake(
     // because no last-week figure reaches this generator.
     volumeVsLastWeek:
       roundedVolumeKg > 0
-        ? `Total volume this session: ${roundedVolumeKg.toLocaleString()} kg across ${completedSetCount} completed sets.`
+        ? `Total volume this session: ${formatVolume(roundedVolumeKg, 'kg')} across ${completedSetCount} completed sets.`
         : 'No weighted sets were recorded, so there is no volume total for this session.',
     keyAchievements,
     nextSessionTarget,

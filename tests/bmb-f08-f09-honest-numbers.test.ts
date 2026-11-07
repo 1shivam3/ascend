@@ -103,7 +103,8 @@ describe('F-09: copy agrees with the immediate-apply behavior', () => {
     // the date exactly as the real call site does — display format.
     const en = translate('en', 'coachBlock.startsOn', { date: formatDate('2026-11-09') });
     expect(en).toContain('straight away');
-    expect(en).toContain('first full week starts Mon, Nov 9, 2026');
+    // Re-pinned for QA-hardening R12: formatDate is day-first now.
+    expect(en).toContain('first full week starts Mon, 9 Nov 2026');
     expect(en).not.toContain('The block starts Monday');
   });
 

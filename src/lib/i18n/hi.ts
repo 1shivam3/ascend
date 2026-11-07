@@ -3105,7 +3105,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'home.freezesOne': '{count} फ़्रीज़ तैयार',
   'home.freezesMany': '{count} फ़्रीज़ तैयार',
   'home.freezeCovered': 'इस बार एक स्ट्रीक फ़्रीज़ ने छूटे दिन को कवर कर दिया — कोई नुकसान नहीं हुआ।',
-  'home.hydrationToday': 'आज {drank} / {target} लीटर',
+  'home.hydrationToday': 'आज {drank} / {target}',
   'home.toLevel': 'XP लेवल {level} तक',
   'home.joinChallenge': 'चैलेंज में शामिल हों',
   'home.todaysTraining': 'आज की ट्रेनिंग',

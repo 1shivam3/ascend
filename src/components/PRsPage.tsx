@@ -49,7 +49,7 @@ import { useToast } from '@/components/ui/Toast';
 import { ExerciseRank, EquipmentType, Gender } from '@/lib/types';
 import { useAppNavigation } from '@/lib/navigation';
 import { useTranslation } from '@/lib/i18n';
-import { safeRandomId, getLocalTodayStr, formatLocalDate } from '@/lib/formatters';
+import { safeRandomId, getLocalTodayStr, formatDate, formatVolume } from '@/lib/formatters';
 import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
 import { kgToLbs, lbsToKg } from '@/lib/units';
 
@@ -650,7 +650,7 @@ function LiftCard({
                         e1RM: {Math.round(single1RM * 10) / 10} {userUnit}
                       </span>
                       <span>•</span>
-                      <span>{formatLocalDate(p.date)}</span>
+                      <span>{formatDate(p.date)}</span>
                     </div>
                     {p.notes && (
                       <p className="text-2xs text-text-secondary italic mt-0.5">
@@ -710,12 +710,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
     return calculateDOTS(profile.bodyweightKg, bigThreeStats.totalKg, profile.gender);
   }, [profile, bigThreeStats]);
 
-  const displayWeight = (kg: number) => {
-    if (userUnit === 'lbs') {
-      return `${Math.round(kgToLbs(kg))} lbs`;
-    }
-    return `${Math.round(kg * 10) / 10} kg`;
-  };
+  const displayWeight = (kg: number) => formatVolume(kg, userUnit);
 
   // ── Existing state ──
   const [showAddModal, setShowAddModal] = useState(false);

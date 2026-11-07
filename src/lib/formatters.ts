@@ -1,11 +1,10 @@
 /**
  * String and number formatting helpers
  */
+import { kgToLbs } from './units';
 
 export const plural = (n: number, one: string, many = one + 's'): string =>
   `${n} ${n === 1 ? one : many}`;
-
-export const formatKg = (kg: number): string => `${Math.round(kg * 10) / 10} kg`;
 
 /**
  * Formats a real elapsed duration honestly — including sub-minute sessions.
@@ -303,22 +302,121 @@ export const formatLocalDate = (
  * Audit phase 4 (2026-11-06), Task 4.8 (P3-1): the shared
  * user-facing number/date formatters. formatNumber groups thousands
  * the same way on every surface (Today rendered the fuel target as
- * "2,592" while Fuel rendered it "2592"); formatDate renders the
- * History style ("Fri, Nov 6, 2026") so coach surfaces stop leaking
- * raw ISO dates ("2026-11-09") into sentences. Pass the app locale
+ * "2,592" while Fuel rendered it "2592"); formatDate renders ONE
+ * date style so coach surfaces stop leaking raw ISO dates
+ * ("2026-11-09") into sentences. Pass the app locale
  * ('en-US' / 'hi-IN') where the component has it; the runtime locale
- * is the fallback, matching formatLocalDate.
+ * is the fallback, matching formatLocalDate. QA-hardening R12
+ * (2026-11-07) completed the family (formatVolume, formatWater,
+ * formatCalories, formatDateShort) and made formatDate day-first.
  */
 export const formatNumber = (n: number, locale?: string): string =>
   new Intl.NumberFormat(locale).format(n);
 
-export const formatDate = (dateStr: string, locale?: string): string =>
-  parseLocalDate(dateStr).toLocaleDateString(locale, {
+/**
+ * QA-hardening R12: ONE date style everywhere — day-first, suiting
+ * the India-based audience: "Mon, 2 Nov 2026". Weekday/month names
+ * still come from the active locale (Hindi renders Hindi names);
+ * only the ORDER is fixed. Assembled from parts because
+ * toLocaleDateString orders fields by locale (en-US gives the
+ * month-first "Nov 2, 2026" the brief rejected).
+ */
+export const formatDate = (dateStr: string, locale?: string): string => {
+  const parts = new Intl.DateTimeFormat(locale, {
     weekday: 'short',
-    month: 'short',
     day: 'numeric',
+    month: 'short',
     year: 'numeric',
-  });
+  }).formatToParts(parseLocalDate(dateStr));
+  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+  return `${part('weekday')}, ${part('day')} ${part('month')} ${part('year')}`;
+};
+
+/**
+ * QA-hardening R12: the short sibling of formatDate — same day-first
+ * order, no year: "2 Nov", or "Mon, 2 Nov" with { weekday: true }.
+ * For range labels, day chips, and chart tooltips where the year is
+ * obvious from context.
+ */
+export const formatDateShort = (
+  dateStr: string,
+  locale?: string,
+  options?: { weekday?: boolean },
+): string => {
+  const parts = new Intl.DateTimeFormat(locale, {
+    ...(options?.weekday ? { weekday: 'short' as const } : {}),
+    day: 'numeric',
+    month: 'short',
+  }).formatToParts(parseLocalDate(dateStr));
+  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+  const dayMonth = `${part('day')} ${part('month')}`;
+  return options?.weekday ? `${part('weekday')}, ${dayMonth}` : dayMonth;
+};
+
+/**
+ * QA-hardening R12: month names and month+year labels go through
+ * the family too (they were toLocaleDateString one-offs):
+ * formatMonthName gives "November" / "Nov"; formatMonthYear gives
+ * "November 2026" — month-first is correct for a month+year label
+ * in every locale.
+ */
+export const formatMonthName = (
+  d: Date,
+  locale?: string,
+  style: 'long' | 'short' = 'long',
+): string => new Intl.DateTimeFormat(locale, { month: style }).format(d);
+
+export const formatMonthYear = (d: Date, locale?: string): string =>
+  new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(d);
+
+/**
+ * QA-hardening R12: a timestamp in the same day-first style —
+ * formatDateTime(ms) is "Mon, 2 Nov 2026, 7:30 pm". Built on
+ * formatDate so the date half can never drift from the app style.
+ */
+export const formatDateTime = (ms: number, locale?: string): string => {
+  const d = new Date(ms);
+  const time = new Intl.DateTimeFormat(locale, {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(d);
+  return `${formatDate(getLocalDateOfTimestamp(ms), locale)}, ${time}`;
+};
+
+/**
+ * QA-hardening R12: a weight/volume in the user's display unit,
+ * grouped like every other number: formatVolume(1800, 'kg') is
+ * "1,800 kg", formatVolume(100, 'lbs') is "220 lbs". Input is always
+ * kilograms (the engine's canonical unit). Rounding preserves the
+ * app's historical display precision: 0.1 kg, whole lbs.
+ */
+export const formatVolume = (
+  kg: number,
+  unit: 'kg' | 'lbs' = 'kg',
+  locale?: string,
+  options?: { precision?: 'tenth' | 'whole' },
+): string => {
+  const value = unit === 'lbs' ? kgToLbs(kg) : kg;
+  // Default precision preserves the app's historical displays:
+  // 0.1 kg, whole lbs. Bodyweight surfaces (Profile, Body Metrics)
+  // historically showed 0.1 lbs too — they pass precision 'tenth'.
+  const tenth = options?.precision
+    ? options.precision === 'tenth'
+    : unit === 'kg';
+  const rounded = tenth ? Math.round(value * 10) / 10 : Math.round(value);
+  return `${formatNumber(rounded, locale)} ${unit}`;
+};
+
+/** Weight in kg with the shared grouping (formatVolume, kg fixed). */
+export const formatKg = (kg: number, locale?: string): string =>
+  formatVolume(kg, 'kg', locale);
+
+/**
+ * QA-hardening R12: calories, grouped, one suffix:
+ * formatCalories(2592) is "2,592 kcal".
+ */
+export const formatCalories = (kcal: number, locale?: string): string =>
+  `${formatNumber(Math.round(kcal), locale)} kcal`;
 
 /**
  * Single source of truth for cm → imperial height display.
@@ -382,9 +480,16 @@ export const getTimeGreeting = (date: Date = new Date()): string => {
 };
 
 /**
- * Format a water volume: "250 ml" under 1 L, "1.5 L" at/above.
+ * QA-hardening R12: THE water format — one rule on Today, Fuel, the
+ * Hydration modal, and the habit matrix: under 1000 ml shows ml,
+ * otherwise litres with one decimal. "250 ml", "2.5 L", "3 L".
+ * (Replaces the identical-rule duplicates formatWaterMl here and
+ * formatWaterLiters in habits.ts — the screens disagreed only where
+ * a call site formatted by hand, e.g. Today's "(ml/1000).toFixed(1)"
+ * rendering "0.0 / 2.5 L" against Fuel's "0 ml / 2.5 L".)
  */
-export function formatWaterMl(ml: number): string {
-  if (ml < 1000) return `${Math.round(ml)} ml`;
-  return `${round1(ml / 1000)} L`;
+export function formatWater(ml: number): string {
+  const v = ml || 0;
+  if (v < 1000) return `${Math.round(v)} ml`;
+  return `${round1(v / 1000)} L`;
 }

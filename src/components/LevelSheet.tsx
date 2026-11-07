@@ -15,6 +15,7 @@ import {
   type XpActivitySummary,
 } from '@/lib/xp-system';
 import { useTranslation } from '@/lib/i18n';
+import { formatNumber } from '@/lib/formatters';
 
 interface LevelSheetProps {
   isOpen: boolean;
@@ -112,7 +113,7 @@ export default function LevelSheet({
             <span className="text-base font-semibold text-text-muted ml-2">{name}</span>
           </span>
           <p className="text-xs text-text-muted tabular-nums mt-2">
-            {t('level.summary', { total: total.toLocaleString(), remaining: remaining.toLocaleString(), next: level + 1 })}
+            {t('level.summary', { total: formatNumber(total), remaining: formatNumber(remaining), next: level + 1 })}
           </p>
           {/* QA-hardening R4: one line saying what this level is (and
               is not), so it is never confused with the strength tier. */}
@@ -126,7 +127,7 @@ export default function LevelSheet({
             />
           </div>
           <p className="text-2xs text-text-muted tabular-nums mt-1.5">
-            {t('level.inLevel', { current: progress.current.toLocaleString(), needed: progress.needed.toLocaleString() })}
+            {t('level.inLevel', { current: formatNumber(progress.current), needed: formatNumber(progress.needed) })}
           </p>
         </div>
 
@@ -167,12 +168,12 @@ export default function LevelSheet({
               {weekRows.map((r) => (
                 <div key={r.label} className="flex items-center justify-between text-xs">
                   <span className="text-text-secondary">{r.label}</span>
-                  <span className="font-bold text-text-primary tabular-nums">+{r.xp.toLocaleString()} XP</span>
+                  <span className="font-bold text-text-primary tabular-nums">+{formatNumber(r.xp)} XP</span>
                 </div>
               ))}
               <div className="flex items-center justify-between text-xs pt-1 border-t border-border/60">
                 <span className="font-bold text-text-primary">{t('level.totalWeek')}</span>
-                <span className="font-bold text-accent tabular-nums">+{weekXp.total.toLocaleString()} XP</span>
+                <span className="font-bold text-accent tabular-nums">+{formatNumber(weekXp.total)} XP</span>
               </div>
             </div>
           ) : (
@@ -216,7 +217,7 @@ export default function LevelSheet({
                     </p>
                   </div>
                   <span className="text-2xs text-text-muted tabular-nums shrink-0">
-                    {xpForLevel(lvl).toLocaleString()} XP
+                    {formatNumber(xpForLevel(lvl))} XP
                   </span>
                 </div>
               );
