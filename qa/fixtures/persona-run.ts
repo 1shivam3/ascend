@@ -345,21 +345,35 @@ export async function finishWorkout(page: Page, run: PersonaRun): Promise<void> 
   if (!clickedFinish) {
     await run.tap(page.getByRole('button', { name: /finish workout|वर्कआउट समाप्त/i }).first());
   }
-  await page.waitForTimeout(1_200);
+  // Dismissal phase, polled: the summary sheet can open late (the
+  // offline Local Coach computes on-device), so a single pass races
+  // it. Keep confirming/dismissing until a full pass finds nothing.
   // Advanced view: header Finish opens a session-summary sheet whose
-  // confirm is "Save & Finish" (Resume would return to the session).
-  const saveFinish = page.getByRole('button', { name: /save & finish/i });
-  if (await saveFinish.isVisible().catch(() => false)) await run.tap(saveFinish);
-  await page.waitForTimeout(800);
-  const anyway = page.getByRole('button', { name: /finish anyway|end workout|फिर भी समाप्त/i });
-  if (await anyway.isVisible().catch(() => false)) await run.tap(anyway);
-  await page.waitForTimeout(1_000);
-  for (const name of [/^done$/i, /^close$/i, /^हो गया$/, /^बंद करें$/]) {
-    const btn = page.getByRole('button', { name }).first();
-    if (await btn.isVisible().catch(() => false)) {
-      await run.tap(btn);
-      break;
+  // confirm is "Save & Finish" (Resume would return to the session);
+  // the completed-session sheet's exit is "Done & Return to Workouts"
+  // (offline) or a plain "Done"/"Close".
+  const dismissNames = [
+    /save & finish/i,
+    /finish anyway|end workout|फिर भी समाप्त/i,
+    /^done$/i,
+    /^done & return/i,
+    /done and return/i,
+    /^close$/i,
+    /^हो गया$/,
+    /^बंद करें$/,
+  ];
+  for (let pass = 0; pass < 10; pass++) {
+    await page.waitForTimeout(pass === 0 ? 1_200 : 800);
+    let acted = false;
+    for (const name of dismissNames) {
+      const btn = page.getByRole('button', { name }).first();
+      if (await btn.isVisible().catch(() => false)) {
+        await run.tap(btn);
+        acted = true;
+        break;
+      }
     }
+    if (!acted) break;
   }
   await page.waitForTimeout(600);
 }
