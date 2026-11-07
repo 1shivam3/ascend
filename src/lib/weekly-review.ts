@@ -755,7 +755,7 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
     focus = {
       kind: 'consistency',
       headline: 'A quiet week — no judgement, just a restart',
-      detail: 'No sessions were logged this week, so there is nothing to analyse and nothing to fix. The plan is still there; the next session is the only target.',
+      detail: 'No sessions were logged this week, so there is nothing to analyze and nothing to fix. The plan is still there; the next session is the only target.',
       headlineI18n: { key: 'weeklyReview.focusQuietHeadline' },
       detailI18n: { key: 'weeklyReview.focusQuietDetail' },
     };

@@ -118,7 +118,8 @@ describe('Google Play Store Launch Readiness Verification', () => {
       expect(mealsContent).toContain("t('meals.inputMethods')");
       expect(
         fs.readFileSync(path.join(rootDir, 'src', 'lib', 'i18n', 'en.ts'), 'utf8')
-      ).toContain("'meals.inputMethods': 'Macro Lens • Voice / Text • Indian IFCT'");
+      // Re-pinned for QA-hardening R13 (2026-11-07): plain-language badge.
+      ).toContain("'meals.inputMethods': 'Photo scan • Voice • Text • Indian food database'");
 
       const scanMealModalPath = path.join(rootDir, 'src', 'components', 'ScanMealModal.tsx');
       const scanContent = fs.readFileSync(scanMealModalPath, 'utf8');
