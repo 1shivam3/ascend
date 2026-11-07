@@ -106,6 +106,15 @@ test('Sana — offline: cold failures, then warm offline logging', async ({ page
   await goOffline(page);
   await page.waitForTimeout(800);
   await run.step('Open Train offline cold — dark theme', async () => {
+    // Choreography repair (F4 fix phase): this step originally
+    // relied on the light step CRASHING — the boundary's 'Return to
+    // dashboard' recovery put the app back on Today, where the
+    // 'Start Workout' button lives. Post-F4-1 the light step ends on
+    // Train (no crash, recovery is a no-op), so return to Today
+    // explicitly; the dark cold open then starts from the same
+    // place the light one did.
+    await tapVisibleButton(page, run, /^today$/);
+    await page.waitForTimeout(800);
     await tapVisibleButton(page, run, /^start workout$/);
     await page.waitForTimeout(2_000);
     await run.shotAt('cold-train-error-dark');

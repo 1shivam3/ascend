@@ -21,11 +21,19 @@ const STATIC_PRECACHE = [
 // Install Event: Precaches the core app shell
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_PRECACHE).catch((err) => {
-        // Non-blocking in dev / test environments
-        console.warn('[SW] Core precache partial fail:', err);
-      });
+    caches.open(CACHE_NAME).then(async (cache) => {
+      // F4-2: fail-soft PER ASSET. cache.addAll is atomic — one stale
+      // or missing URL rejected the whole batch and left the cache
+      // empty, which silently defeats the navigation fallback below
+      // (it would find neither the page nor '/'). Settle each asset
+      // independently so the shell is cached even if a chunk 404s.
+      const results = await Promise.allSettled(
+        STATIC_PRECACHE.map((assetUrl) => cache.add(assetUrl))
+      );
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      if (failed > 0) {
+        console.warn(`[SW] Core precache: ${failed}/${STATIC_PRECACHE.length} assets failed`);
+      }
     }).then(() => self.skipWaiting())
   );
 });
@@ -59,9 +67,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Development on localhost / 127.0.0.1: bypass service worker cache completely
-  // so hot reloads, worker changes, and CSP headers are never masked by stale caches.
-  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+  const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+  const isStaticAsset =
+    url.pathname.startsWith('/_next/static/') ||
+    url.pathname.endsWith('.svg') ||
+    url.pathname.endsWith('.png') ||
+    url.pathname.endsWith('.ico') ||
+    url.pathname.endsWith('.css') ||
+    url.pathname.endsWith('.js');
+
+  // Development on localhost / 127.0.0.1: bypass service worker cache
+  // so hot reloads, worker changes, and CSP headers are never masked
+  // by stale caches — EXCEPT for static assets (F4-1) and navigations
+  // (F4-2). A local PRODUCTION build (next start — the QA harness, or
+  // a developer verifying offline behavior) must be able to serve
+  // precached chunks and the app shell offline; without these
+  // exceptions the worker was a no-op on localhost and an offline
+  // relaunch died on the browser's network error. The static branch
+  // is network-first on localhost, so a dev server still serves fresh
+  // chunks whenever it is reachable.
+  if (isLocalhost && !isStaticAsset && request.mode !== 'navigate') {
     return;
   }
 
@@ -83,10 +108,6 @@ self.addEventListener('fetch', (event) => {
   // (not failing) connection previously left users on a blank screen
   // forever even though a cached shell was available.
   if (request.mode === 'navigate') {
-    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
-      event.respondWith(fetch(request));
-      return;
-    }
     event.respondWith(
       (async () => {
         const cache = await caches.open(CACHE_NAME);
@@ -120,14 +141,28 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Static Assets (_next/static, images, styles, fonts) - Stale While Revalidate
-  if (
-    url.pathname.startsWith('/_next/static/') ||
-    url.pathname.endsWith('.svg') ||
-    url.pathname.endsWith('.png') ||
-    url.pathname.endsWith('.ico') ||
-    url.pathname.endsWith('.css') ||
-    url.pathname.endsWith('.js')
-  ) {
+  if (isStaticAsset) {
+    // Localhost (F4-1): network-first, so dev servers serve fresh
+    // chunks and a local production build falls back to the precache
+    // when offline instead of failing the dynamic import.
+    if (isLocalhost) {
+      event.respondWith(
+        fetch(request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              const responseClone = networkResponse.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
+            }
+            return networkResponse;
+          })
+          .catch(async () => {
+            const cachedResponse = await caches.match(request);
+            if (cachedResponse) return cachedResponse;
+            return new Response('', { status: 504, statusText: 'Offline and not cached' });
+          })
+      );
+      return;
+    }
     event.respondWith(
       caches.match(request).then((cachedResponse) => {
         const fetchPromise = fetch(request)

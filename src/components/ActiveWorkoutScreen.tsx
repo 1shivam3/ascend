@@ -47,6 +47,7 @@ import {
   getLastExercisePerformance,
   getProgressionRecommendation,
   getFilteredSubstitutes,
+  getPainSwapFallbacks,
   getExercisePrescription,
   isActiveSetCompleted,
   finalizeWorkoutExercises,
@@ -3984,28 +3985,87 @@ export default function ActiveWorkoutScreen({
             </div>
 
             <div className="space-y-2">
-              {getFilteredSubstitutes(currentExercise.name, {
-                equipment: trainingProfile?.equipment || 'full_gym',
-                exclusions: trainingProfile?.dislikedExercises || [],
-                // "Hurts" swaps must leave the painful movement family
-                // entirely — the raw table offered hinge-for-hinge swaps.
-                avoidSameFamilyAs: swapReason === 'hurts' ? currentExercise.name : undefined,
-                // ...and must not load the same joints either (SIM-P2-08):
-                // 'other'-family isolation work shares no family, but a
-                // lateral raise for shoulder pain must not offer another
-                // raise. Empty list degrades to the "need another" note.
-                avoidJointsOf: swapReason === 'hurts' ? currentExercise.name : undefined,
-              }).map((sub) => (
-                  <button
-                    key={sub.name}
-                    type="button"
-                    onClick={() => handleApplySwap(sub.name)}
-                    className="w-full text-left p-3 rounded-xl bg-bg-secondary border border-border/70 hover:border-accent/60 transition-all cursor-pointer"
-                  >
-                    <span className="block text-sm font-bold text-text-primary">{sub.name}</span>
-                    <span className="block text-2xs text-text-muted mt-0.5">{sub.reason}</span>
-                  </button>
-                ))}
+              {(() => {
+                const subs = getFilteredSubstitutes(currentExercise.name, {
+                  equipment: trainingProfile?.equipment || 'full_gym',
+                  exclusions: trainingProfile?.dislikedExercises || [],
+                  // "Hurts" swaps must leave the painful movement family
+                  // entirely — the raw table offered hinge-for-hinge swaps.
+                  avoidSameFamilyAs: swapReason === 'hurts' ? currentExercise.name : undefined,
+                  // ...and must not load the same joints either (SIM-P2-08):
+                  // 'other'-family isolation work shares no family, but a
+                  // lateral raise for shoulder pain must not offer another
+                  // raise.
+                  avoidJointsOf: swapReason === 'hurts' ? currentExercise.name : undefined,
+                });
+                if (subs.length > 0) {
+                  return subs.map((sub) => (
+                    <button
+                      key={sub.name}
+                      type="button"
+                      onClick={() => handleApplySwap(sub.name)}
+                      className="w-full text-left p-3 rounded-xl bg-bg-secondary border border-border/70 hover:border-accent/60 transition-all cursor-pointer"
+                    >
+                      <span className="block text-sm font-bold text-text-primary">{sub.name}</span>
+                      <span className="block text-2xs text-text-muted mt-0.5">{sub.reason}</span>
+                    </button>
+                  ));
+                }
+                if (swapReason !== 'hurts') return null;
+                // F4-4: the strict pain filter can empty the list (Squat:
+                // every table substitute is a knee-loaded squat). Fall
+                // back to the closest alternatives — same muscle,
+                // different movement family — with any shared joint
+                // labelled, or say plainly that removal is the option.
+                const fallbacks = getPainSwapFallbacks(currentExercise.name, {
+                  equipment: trainingProfile?.equipment || 'full_gym',
+                  exclusions: trainingProfile?.dislikedExercises || [],
+                });
+                if (fallbacks.length === 0) {
+                  return (
+                    <div className="space-y-2">
+                      <p className="text-2xs text-text-secondary leading-relaxed">
+                        {t('workout.swapNoneNote', { name: currentExercise.name })}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsSwapModalOpen(false);
+                          handleRemoveExercise(activeExerciseIdx);
+                        }}
+                        className="w-full p-3 rounded-xl bg-danger/15 border border-danger/40 text-danger text-sm font-bold hover:bg-danger/25 transition-all cursor-pointer"
+                      >
+                        {t('workout.removeExercise')}
+                      </button>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold text-text-primary">{t('workout.swapFallbackTitle')}</p>
+                    <p className="text-2xs text-text-muted leading-relaxed">{t('workout.swapFallbackNote')}</p>
+                    {fallbacks.map((f) => (
+                      <button
+                        key={f.name}
+                        type="button"
+                        onClick={() => handleApplySwap(f.name)}
+                        className="w-full text-left p-3 rounded-xl bg-bg-secondary border border-border/70 hover:border-accent/60 transition-all cursor-pointer"
+                      >
+                        <span className="block text-sm font-bold text-text-primary">{f.name}</span>
+                        <span className="block text-2xs text-text-muted mt-0.5">{f.reason}</span>
+                        {f.sharedJoints.length > 0 && (
+                          <span className="flex items-center gap-1 text-2xs font-semibold text-amber-400 mt-1">
+                            <AlertTriangle className="w-3 h-3 shrink-0" />
+                            {t('workout.swapFallbackCaution', {
+                              joints: f.sharedJoints.map((j) => j.replace(/_/g, ' ')).join(', '),
+                            })}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
               <p className="text-2xs text-text-muted text-center pt-1">
                 {t('workout.swapNeedOther')}
               </p>

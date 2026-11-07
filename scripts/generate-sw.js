@@ -41,11 +41,48 @@ const PLACEHOLDER = '__ASCEND_CACHE_NAME__';
 const ASSETS_PLACEHOLDER = "'__APP_SHELL_ASSETS__'";
 
 /**
+ * Every JS/CSS chunk the build emitted under .next/static (URLs of the
+ * form /_next/static/...). F4-1: the shell-HTML set alone misses the
+ * lazily loaded tab chunks (Train, Fuel, Progress, You, Settings are
+ * next/dynamic imports — nothing in index.html references them), so a
+ * first-ever offline open of a tab had no chunk to load and crashed
+ * into the error boundary. Precaching the whole static output costs
+ * ~4.5 MB on current builds (measured .next/static JS+CSS total) —
+ * acceptable for an offline-first app whose core promise is training
+ * with no connection. Returns [] when no build output exists yet.
+ */
+function buildChunkAssets() {
+  const files = new Set();
+  const staticRoot = path.join(root, '.next', 'static');
+  const walk = (dir) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return; /* no build output yet */
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (/\.(?:js|css)$/.test(entry.name)) {
+        const rel = path.relative(staticRoot, full).split(path.sep).join('/');
+        files.add('/_next/static/' + rel);
+      }
+    }
+  };
+  walk(staticRoot);
+  return [...files];
+}
+
+/**
  * Critical app-shell JS/CSS for the current build. Ground truth is the
  * prerendered shell HTML (.next/server/app/index.html): every
  * /_next/static/*.js|css URL it references is required to render `/`
- * offline. Fallback: build-manifest rootMainFiles (+ /_app). Returns
- * [] when no build output exists yet (first-ever build).
+ * offline. Fallback: build-manifest rootMainFiles (+ /_app). The set
+ * is then UNIONED with every chunk the build emitted (buildChunkAssets,
+ * F4-1) so lazy tab chunks are precached too. Returns [] when no build
+ * output exists yet (first-ever build).
  */
 function appShellAssets() {
   const files = new Set();
@@ -78,7 +115,10 @@ function appShellAssets() {
       /* manifest absent — precache stays shell-only */
     }
   }
-  return [...files];
+  // F4-1: union in every emitted chunk (lazy tabs included), sorted
+  // for a deterministic precache list.
+  for (const f of buildChunkAssets()) files.add(f);
+  return [...files].sort();
 }
 
 function main() {

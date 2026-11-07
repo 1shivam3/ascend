@@ -1168,6 +1168,10 @@ export const hi: Partial<Record<StringKey, string>> = {
   'workout.swapReasonPrefer': 'बस दूसरी पसंद है',
   'workout.swapHurtsNote': 'दर्द की वजह से बदलने पर {name} की प्रगति भी रुक जाती है और यह आपके आगे के प्लान से हट जाती है। एक हफ़्ते से ज़्यादा रहने वाले दर्द को विशेषज्ञ को दिखाएं।',
   'workout.swapNeedOther': 'कुछ और चाहिए? "एक्सरसाइज़ जोड़ें" से लाइब्रेरी से कोई भी मूवमेंट चुनें।',
+  'workout.swapFallbackTitle': 'सबसे नज़दीकी विकल्प',
+  'workout.swapFallbackNote': 'कोई भी विकल्प इस मूवमेंट और जोड़ों दोनों से पूरी तरह नहीं बचता, इसलिए ये उसी मांसपेशी को अलग तरीके से ट्रेन करते हैं।',
+  'workout.swapFallbackCaution': 'यह आपके {joints} पर भी ज़ोर डालता है — दर्द हो तो रुक जाएं।',
+  'workout.swapNoneNote': 'कोई भी विकल्प इस मांसपेशी को उसी मूवमेंट या जोड़ों के बिना ट्रेन नहीं करता। {name} हटाना ही सुरक्षित विकल्प है।',
   'workout.changeExerciseTitle': 'एक्सरसाइज़ बदलें',
   'workout.removeExerciseTitle': 'यह एक्सरसाइज़ हटाएं?',
   'workout.removeExerciseMsgOne': '"{name}" का {count} पूरा सेट है। हटाने से वह दर्ज काम मिट जाएगा।',
@@ -3088,6 +3092,9 @@ export const hi: Partial<Record<StringKey, string>> = {
   'sg.toastNamed': 'कृपया कम से कम एक नामित एक्सरसाइज़ शामिल करें।',
   'sg.toastGenerated': '{days}-दिन का {split} साप्ताहिक वर्कआउट प्लान बना!',
   'sg.toastGeneratedT': 'शेड्यूल बना',
+  // F4-3: limitation transparency in the generator (en + hi).
+  'sg.limitationsApplied': 'आपकी सीमाओं ({limitations}) के हिसाब से बदला गया: सीमित हिस्से पर ज़ोर डालने वाले मूवमेंट बदल या हटा दिए गए हैं।',
+  'sg.clashWarning': 'ध्यान दें — सीमा से टकराव: {names} — यह आपकी बताई सीमाओं ({limitations}) वाले हिस्से पर ज़ोर डालता है। यहाँ बनी एक्सरसाइज़ अपने-आप बदल या हट जाती हैं, इसलिए हाथ से जोड़ी गई एक्सरसाइज़ पर सिर्फ़ यह चेतावनी मिलती है। दर्द हो तो इसे बदल लें।',
   // LIVE-P1-03: Today chrome + coach sentences converted to i18n.
   'home.quickLogPast': 'पहले ही ट्रेनिंग कर ली? पिछला सेशन जल्दी लॉग करें',
   'home.restDayLine': 'आराम का दिन — कोई वर्कआउट तय नहीं। हमेशा की तरह खाएं और सोएं।',

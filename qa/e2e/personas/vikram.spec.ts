@@ -26,6 +26,13 @@ import { PersonaRun, expectBooted, mainNav, readStoreState } from '../../fixture
  * the consequence note renders, but a swap cannot be completed
  * in-panel — removal is the only working escape.
  *
+ * F4 FIX PHASE (2026-11-07): F4-3 fixed — the generator now routes
+ * through the adaptation pipeline, so this spec's session no longer
+ * contains Squat; the swap step adds Barbell Back Squat BY HAND
+ * (the warn-don't-block case) to exercise the pain swap on the same
+ * movement. F4-4 fixed — the panel falls back to labelled
+ * closest alternatives and the swap completes in-panel.
+ *
  * The coach-context leg is not observable end-to-end (the prompt
  * is server-side and replies are mocked); src/lib/ai-context.ts
  * adds "LIMITATIONS/INJURIES: …" to the coach context — verified
@@ -100,38 +107,57 @@ test('Vikram — injury limitations respected?', async ({ page }, testInfo) => {
   });
 
   await run.step('Swap the exercise with "Hurts / joint discomfort"', async () => {
+    // Post-F4-3 the generated session is knee-safe (no Squat), so add
+    // Barbell Back Squat by hand — the warn-don't-block case — to run
+    // the F4-4 pain swap on the movement Phase 4 failed on.
+    await run.tap(page.locator('button[aria-label="Add Exercise"]').first());
+    await page.getByPlaceholder(/search exercise/i).fill('Back Squat');
+    await page.waitForTimeout(600);
+    await run.tap(page.getByRole('button', { name: /barbell back squat/i }).first());
+    await page.waitForTimeout(1_000);
+    const sessionText = await page.evaluate(() => document.body?.innerText ?? '');
+    expect(sessionText).toMatch(/barbell back squat/i);
+
     await run.tap(page.getByRole('button', { name: /workout tools/i }));
     await run.tap(page.getByRole('button', { name: /^swap this exercise$/i }));
-    await expect(page.getByText(/swap squat/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/swap barbell back squat/i)).toBeVisible({ timeout: 10_000 });
     await run.tap(page.getByRole('button', { name: /hurts \/ joint discomfort/i }));
     await page.waitForTimeout(800);
     const panelText = await page.evaluate(() => document.body?.innerText ?? '');
     // The hurts path states its future-plans consequence…
     expect(panelText).toMatch(/removes it from your future plans/i);
+    // …the strict filter still (correctly) offers no same-family,
+    // joint-loaded substitute — but post-F4-4 the panel no longer
+    // dead-ends: a labelled closest-alternatives section appears,
+    // and every fallback that loads a flagged joint says so.
+    expect(panelText).toMatch(/closest alternatives/i);
+    expect(panelText).toMatch(/also loads your/i);
     await run.shotAt('swap-panel-light');
-    // …but for Squat + knee pain it offers NO replacement at all:
-    // the same-family/joint filter empties the list (Leg Press,
-    // Hack Squat, Goblet Squat were offered pre-chip) and the panel
-    // falls back to "use Add exercise" (F4-4). A completed in-panel
-    // swap is therefore impossible for exactly the case that needs
-    // it most.
-    const replacements = await page
-      .locator('button')
-      .filter({ hasText: /leg press|hack squat|goblet/i })
-      .count();
-    expect(replacements).toBeGreaterThan(0);
+    // A swap can finally be completed in-panel.
+    await run.tap(page.getByRole('button', { name: /lying leg curl/i }).first());
+    await page.waitForTimeout(4_000); // let the pain-noted toast clear
+    const text = await page.evaluate(() => document.body?.innerText ?? '');
+    expect(text).toMatch(/lying leg curl/i);
+    expect(text).not.toMatch(/barbell back squat/i);
   });
 
-  await run.step('Remove the banned exercise from the session instead', async () => {
+  await run.step('Remove an exercise from the session', async () => {
     await page.keyboard.press('Escape').catch(() => {});
     await page.waitForTimeout(600);
     await run.tap(page.getByRole('button', { name: /remove this exercise/i }).first());
     await page.waitForTimeout(1_000);
     const confirm = page.getByRole('button', { name: /^remove$|^confirm$|^yes$/i }).first();
     if (await confirm.isVisible().catch(() => false)) await run.tap(confirm);
-    await page.waitForTimeout(1_000);
+    await page.waitForTimeout(4_000); // let the removed-exercise toast clear
     const text = await page.evaluate(() => document.body?.innerText ?? '');
-    expect(text).toContain('EXERCISE 1 OF');
+    // The appended-then-swapped exercise is gone and the session is
+    // still open. (Phase 4 asserted 'EXERCISE 1 OF' because its
+    // session was the Legs-only list with Squat first; the fixed
+    // generator's session is the multi-part list, so the active
+    // index after a removal is not 1 — the outcome that matters is
+    // the removal itself.)
+    expect(text).toMatch(/EXERCISE \d+ OF \d+/);
+    expect(text).not.toMatch(/lying leg curl/i);
     expect(text).not.toMatch(/BARBELL \| SQUAT/);
   });
 

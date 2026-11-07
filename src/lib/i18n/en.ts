@@ -1159,6 +1159,10 @@ export const en = {
   'workout.swapReasonPrefer': 'Just prefer another',
   'workout.swapHurtsNote': 'Swapping because it hurts also pauses progression on {name} and removes it from your future plans. Pain that lingers past a week deserves a professional look.',
   'workout.swapNeedOther': 'Need something else? Use "Add exercise" to pick any movement from the library.',
+  'workout.swapFallbackTitle': 'Closest alternatives',
+  'workout.swapFallbackNote': 'No swap avoids both the movement and the joints completely, so these train the same muscle a different way.',
+  'workout.swapFallbackCaution': 'Also loads your {joints} — stop if it hurts.',
+  'workout.swapNoneNote': 'No replacement trains this muscle without the same movement or joints. Removing {name} is the safe option.',
   'workout.changeExerciseTitle': 'Change Exercise',
   'workout.removeExerciseTitle': 'Remove this exercise?',
   'workout.removeExerciseMsgOne': '"{name}" has {count} completed set. Removing it will discard that logged work.',
@@ -3081,6 +3085,9 @@ export const en = {
   'sg.toastNamed': 'Please include at least one named exercise.',
   'sg.toastGenerated': 'Generated {days}-day {split} weekly workout plan!',
   'sg.toastGeneratedT': 'Schedule Generated',
+  // F4-3: limitation transparency in the generator (en + hi).
+  'sg.limitationsApplied': 'Adjusted for your limitations ({limitations}): movements that load a limited area were swapped or removed.',
+  'sg.clashWarning': 'Heads up — limitation clash: {names} — this loads an area in your declared limitations ({limitations}). Exercises generated here are swapped or dropped automatically, so this one was added by hand and only warns. Swap it out if it still hurts.',
   // LIVE-P1-03: Today chrome + coach sentences converted to i18n.
   'home.quickLogPast': 'Already trained? Quick log a past session',
   'home.restDayLine': 'Rest day — no workout scheduled. Eat and sleep as usual.',
