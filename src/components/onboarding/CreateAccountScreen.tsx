@@ -83,7 +83,8 @@ export default function CreateAccountScreen({
       }
     } catch (err: any) {
       setLoading(false);
-      setError(err?.message || t('auth.createFailed'));
+      // F-10: generic copy even here — never a raw thrown message.
+      setError(t('auth.createFailed'));
     }
   };
 
