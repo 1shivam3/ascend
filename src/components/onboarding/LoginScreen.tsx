@@ -76,7 +76,9 @@ export default function LoginScreen({
       }
     } catch (err: any) {
       setLoading(false);
-      setError(err?.message || t('auth.signInFailed'));
+      // F-10: generic copy even here — a thrown error's message is
+      // still a raw string the user must never see on this surface.
+      setError(t('auth.signInFailed'));
     }
   };
 
