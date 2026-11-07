@@ -59,9 +59,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Development on localhost / 127.0.0.1: bypass service worker cache completely
-  // so hot reloads, worker changes, and CSP headers are never masked by stale caches.
-  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+  const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+  const isStaticAsset =
+    url.pathname.startsWith('/_next/static/') ||
+    url.pathname.endsWith('.svg') ||
+    url.pathname.endsWith('.png') ||
+    url.pathname.endsWith('.ico') ||
+    url.pathname.endsWith('.css') ||
+    url.pathname.endsWith('.js');
+
+  // Development on localhost / 127.0.0.1: bypass service worker cache
+  // so hot reloads, worker changes, and CSP headers are never masked
+  // by stale caches — EXCEPT for static assets (F4-1). A local
+  // PRODUCTION build (next start — the QA harness, or a developer
+  // verifying offline behavior) must be able to serve precached
+  // chunks offline; without this exception the worker was a no-op on
+  // localhost and a first-ever offline tab open crashed on its lazy
+  // chunk. The static branch is network-first on localhost, so a dev
+  // server still serves fresh chunks whenever it is reachable.
+  if (isLocalhost && !isStaticAsset) {
     return;
   }
 
@@ -120,14 +136,28 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Static Assets (_next/static, images, styles, fonts) - Stale While Revalidate
-  if (
-    url.pathname.startsWith('/_next/static/') ||
-    url.pathname.endsWith('.svg') ||
-    url.pathname.endsWith('.png') ||
-    url.pathname.endsWith('.ico') ||
-    url.pathname.endsWith('.css') ||
-    url.pathname.endsWith('.js')
-  ) {
+  if (isStaticAsset) {
+    // Localhost (F4-1): network-first, so dev servers serve fresh
+    // chunks and a local production build falls back to the precache
+    // when offline instead of failing the dynamic import.
+    if (isLocalhost) {
+      event.respondWith(
+        fetch(request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              const responseClone = networkResponse.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
+            }
+            return networkResponse;
+          })
+          .catch(async () => {
+            const cachedResponse = await caches.match(request);
+            if (cachedResponse) return cachedResponse;
+            return new Response('', { status: 504, statusText: 'Offline and not cached' });
+          })
+      );
+      return;
+    }
     event.respondWith(
       caches.match(request).then((cachedResponse) => {
         const fetchPromise = fetch(request)
