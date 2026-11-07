@@ -658,6 +658,20 @@ export default function ActiveWorkoutScreen({
 
   // Current active exercise
   const currentExercise = exercises[activeExerciseIdx] || exercises[0];
+  // QA-hardening R8: exactly ONE Finish entry is ever on screen —
+  // the header Finish. It is visually secondary while sets remain
+  // and is promoted (emerald primary) only when every set is done.
+  // The in-flow Next/Finish slots never render a Finish button:
+  // at 320x568 an in-flow Finish can sit below the fold, which is
+  // how the old layout could show two entries (or, with the header
+  // hidden, a promoted Finish the user could not see).
+  const allSetsDone =
+    exercises.length > 0 &&
+    exercises.every(
+      (ex) =>
+        ex.sets.length > 0 &&
+        ex.sets.every((set) => isActiveSetCompleted(set) || set.status === 'skipped')
+    );
 
   const completedSetsThisEx = useMemo(() => {
     return currentExercise?.sets.filter(isActiveSetCompleted).length || 0;
@@ -2264,7 +2278,11 @@ export default function ActiveWorkoutScreen({
           <button
             type="button"
             onClick={() => setIsFinishModalOpen(true)}
-            className="px-2.5 py-1.5 min-h-[44px] rounded-lg bg-bg-secondary hover:bg-emerald-500/15 border border-border/80 hover:border-emerald-500/40 text-text-secondary hover:text-emerald-400 font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer"
+            className={
+              allSetsDone
+                ? 'px-2.5 py-1.5 min-h-[44px] rounded-lg bg-emerald-500 hover:bg-emerald-600 border border-transparent text-white font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-md shadow-emerald-500/20'
+                : 'px-2.5 py-1.5 min-h-[44px] rounded-lg bg-bg-secondary hover:bg-emerald-500/15 border border-border/80 hover:border-emerald-500/40 text-text-secondary hover:text-emerald-400 font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer'
+            }
             title={t('workout.finishWorkout')}
             aria-label={t('workout.finishWorkout')}
           >
@@ -2930,14 +2948,10 @@ export default function ActiveWorkoutScreen({
                   ) : (
                     <button
                       type="button"
-                      onClick={() => {
-                        setShowEffortPrompt(false);
-                        setIsFinishModalOpen(true);
-                      }}
-                      className="btn-primary w-full py-3 text-sm font-bold flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 border-none cursor-pointer"
+                      onClick={() => setShowEffortPrompt(false)}
+                      className="btn-secondary w-full py-3 text-sm font-bold flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      <Check className="w-4 h-4 stroke-[3]" />
-                      <span>{t('workout.finishWorkout')}</span>
+                      <span>{t('common.continue')}</span>
                     </button>
                   )}
                 </div>
@@ -3132,16 +3146,7 @@ export default function ActiveWorkoutScreen({
                     <span>{t('workout.nextExerciseWithName', { name: exercises[activeExerciseIdx + 1]?.name })}</span>
                     <ChevronRight className="w-4 h-4 text-accent" />
                   </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setIsFinishModalOpen(true)}
-                    className="btn-primary w-full py-3.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 border-none text-white shadow-md shadow-emerald-500/20 cursor-pointer"
-                  >
-                    <Check className="w-4 h-4 stroke-[3]" />
-                    <span>{t('workout.finishWorkout')}</span>
-                  </button>
-                )}
+                ) : null}
 
                 {activeExerciseIdx > 0 && (
                   <button
@@ -3349,16 +3354,7 @@ export default function ActiveWorkoutScreen({
                     <span>{t('workout.nextWithName', { name: exercises[activeExerciseIdx + 1]?.name })}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setIsFinishModalOpen(true)}
-                    className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all shrink-0"
-                  >
-                    <Check className="w-3.5 h-3.5 stroke-[3]" />
-                    <span>{t('workout.finishWorkout')}</span>
-                  </button>
-                )}
+                ) : null}
               </div>
             )}
 
@@ -3373,16 +3369,7 @@ export default function ActiveWorkoutScreen({
                   <span>{t('workout.nextExerciseCaps', { name: exercises[activeExerciseIdx + 1]?.name })}</span>
                   <ChevronRight className="w-4 h-4 text-accent" />
                 </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsFinishModalOpen(true)}
-                  className="btn-primary w-full py-3.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 border-none text-white shadow-md shadow-emerald-500/20"
-                >
-                  <Check className="w-4 h-4 stroke-[3]" />
-                  <span>{t('workout.finishWorkoutCaps')}</span>
-                </button>
-              )}
+              ) : null}
 
               {activeExerciseIdx > 0 && (
                 <button
