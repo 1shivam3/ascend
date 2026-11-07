@@ -1070,6 +1070,7 @@ export const en = {
   'workout.decreaseReps': 'Decrease reps',
   'workout.increaseReps': 'Increase reps',
   'workout.adjustWeightBy': 'Adjust weight by {delta} {unit}',
+  'workout.adjustPlan': 'Adjust plan',
   'workout.effortRpe': 'Effort (RPE)',
   'workout.rpeTitle': 'Tap to select target effort / RPE',
   'workout.skip': 'Skip',

@@ -2787,7 +2787,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             onClick={() => setIsScheduleModalOpen(true)}
             className="btn-secondary py-2 px-3 text-xs font-semibold rounded-lg shrink-0 cursor-pointer"
           >
-            Adjust plan
+            {t('workout.adjustPlan')}
           </button>
         </div>
 
@@ -2799,7 +2799,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5 text-accent" />
-            <span>Suggested Workout</span>
+            <span>{t('sg.fallbackWorkout')}</span>
           </button>
           <button
             type="button"
@@ -2807,7 +2807,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <Calendar className="w-3.5 h-3.5 text-accent" />
-            <span>Log Past Session</span>
+            <span>{t('tools.pastTitle')}</span>
           </button>
         </div>
       </section>

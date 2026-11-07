@@ -1078,6 +1078,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'workout.decreaseReps': 'रेप्स घटाएं',
   'workout.increaseReps': 'रेप्स बढ़ाएं',
   'workout.adjustWeightBy': 'वज़न {delta} {unit} बदलें',
+  // QA Phase 3 Check 5 (machine-translated, unreviewed): schedule-card button.
+  'workout.adjustPlan': 'प्लान समायोजित करें',
   'workout.effortRpe': 'प्रयास (RPE)',
   'workout.rpeTitle': 'लक्ष्य प्रयास / RPE चुनने के लिए दबाएं',
   'workout.skip': 'छोड़ें',
