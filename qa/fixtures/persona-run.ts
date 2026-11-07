@@ -213,18 +213,28 @@ export async function logAllSets(page: Page, run: PersonaRun): Promise<void> {
         return !!top && (top === b || b.contains(top));
       };
       const buttons = Array.from(document.querySelectorAll('button')).filter(visible);
+      // Label matchers are bilingual (en + hi) so the Hindi persona
+      // (Priya) drives the same loop: Complete Set = सेट पूरा करें,
+      // Log anyway = फिर भी लॉग करें, Dismiss aria = बंद करें,
+      // Next = अगला, Finish = समाप्त.
+      const isDismiss = (b: Element) =>
+        /dismiss set complete/i.test(label(b)) || label(b) === 'बंद करें';
+      const isComplete = (b: Element) => /^complete set$/i.test(label(b)) || label(b) === 'सेट पूरा करें';
       // 1) Rest overlay ("Set Complete!"): Dismiss is unique to it.
-      const dismiss = buttons.find((b) => /dismiss set complete/i.test(label(b)));
+      const dismiss = buttons.find((b) => isDismiss(b));
       if (dismiss) {
         const adv = buttons.find(
-          (b) => b !== dismiss && /^(next|finish|done)/i.test(label(b)) && hitOk(b),
+          (b) =>
+            b !== dismiss &&
+            (/^(next|finish|done)/i.test(label(b)) || /^अगला/.test(label(b)) || /समाप्त/.test(label(b))) &&
+            hitOk(b),
         );
         const target = adv ?? dismiss;
         target.click();
         return `overlay:${label(target)}`;
       }
       // 2) R8 "Log without weight?" prompt — confirm is "Log anyway".
-      const noWeight = buttons.find((b) => /^log anyway$/i.test(label(b)));
+      const noWeight = buttons.find((b) => /^log anyway$/i.test(label(b)) || label(b) === 'फिर भी लॉग करें');
       if (noWeight && hitOk(noWeight)) {
         noWeight.click();
         return 'prompt:log-anyway';
@@ -235,14 +245,14 @@ export async function logAllSets(page: Page, run: PersonaRun): Promise<void> {
         const cx = r.left + r.width / 2;
         return cx >= 0 && cx <= window.innerWidth;
       };
-      const complete = buttons.find((b) => /^complete set$/i.test(label(b)) && inFrameX(b));
+      const complete = buttons.find((b) => isComplete(b) && inFrameX(b));
       if (complete && hitOk(complete)) {
         complete.click();
         return 'complete-set';
       }
       // 3b) Below the fold — scroll into view, click next round.
       const anyComplete = Array.from(document.querySelectorAll('button')).find(
-        (b) => /^complete set$/i.test(label(b)) && inFrameX(b as HTMLElement),
+        (b) => isComplete(b) && inFrameX(b as HTMLElement),
       );
       if (anyComplete) {
         anyComplete.scrollIntoView({ block: 'center' });
@@ -273,8 +283,10 @@ export async function logAllSets(page: Page, run: PersonaRun): Promise<void> {
  */
 export async function finishWorkout(page: Page, run: PersonaRun): Promise<void> {
   await page.evaluate(() => {
-    const b = Array.from(document.querySelectorAll('button')).find((x) =>
-      /dismiss set complete/i.test(x.getAttribute('aria-label') ?? ''),
+    const b = Array.from(document.querySelectorAll('button')).find(
+      (x) =>
+        /dismiss set complete/i.test(x.getAttribute('aria-label') ?? '') ||
+        (x.getAttribute('aria-label') ?? '') === 'बंद करें',
     );
     b?.click();
   });
@@ -283,7 +295,7 @@ export async function finishWorkout(page: Page, run: PersonaRun): Promise<void> 
     const label = (b: Element) => (b.getAttribute('aria-label') ?? b.textContent ?? '').trim();
     const cands = Array.from(document.querySelectorAll('button')).filter((b) => {
       const r = b.getBoundingClientRect();
-      return r.width > 0 && r.height > 0 && /finish/i.test(label(b));
+      return r.width > 0 && r.height > 0 && (/finish/i.test(label(b)) || /समाप्त/.test(label(b)));
     });
     for (const b of cands) {
       const r = b.getBoundingClientRect();
@@ -297,13 +309,13 @@ export async function finishWorkout(page: Page, run: PersonaRun): Promise<void> 
   });
   run.taps += 1;
   if (!clickedFinish) {
-    await run.tap(page.getByRole('button', { name: /finish workout/i }).first());
+    await run.tap(page.getByRole('button', { name: /finish workout|वर्कआउट समाप्त/i }).first());
   }
   await page.waitForTimeout(1_200);
-  const anyway = page.getByRole('button', { name: /finish anyway|end workout/i });
+  const anyway = page.getByRole('button', { name: /finish anyway|end workout|फिर भी समाप्त/i });
   if (await anyway.isVisible().catch(() => false)) await run.tap(anyway);
   await page.waitForTimeout(1_000);
-  for (const name of [/^done$/i, /^close$/i]) {
+  for (const name of [/^done$/i, /^close$/i, /^हो गया$/, /^बंद करें$/]) {
     const btn = page.getByRole('button', { name }).first();
     if (await btn.isVisible().catch(() => false)) {
       await run.tap(btn);
