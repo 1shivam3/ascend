@@ -599,6 +599,40 @@ export function resolveCloudDataProbe(
 
 export type SyncStatus = 'unconfigured' | 'offline' | 'idle' | 'syncing' | 'synced' | 'error';
 
+/**
+ * QA-hardening R6: sync failures are classified so the UI can speak
+ * plainly instead of showing one generic "Sync failed" (or worse, a
+ * raw PostgREST message). Classes: 'offline' (no connectivity /
+ * network-level failure), 'auth' (session expired / rejected —
+ * retrying cannot heal it; the user must sign in again), 'server'
+ * (5xx, timeouts, and everything else — safe to retry with backoff).
+ */
+export type SyncErrorKind = 'offline' | 'auth' | 'server';
+
+export function classifySyncError(err: unknown): SyncErrorKind {
+  const e: any = err as any;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'offline';
+  // pushLocalData wraps the first transport error (see its throw);
+  // classify by the original error when one is attached.
+  const inner: any = e?.cause ?? e;
+  const msg = String(inner?.message ?? inner ?? '');
+  if (inner instanceof TypeError || /failed to fetch|networkerror|network request failed|load failed|err_internet|err_network|connection.*(refused|reset)/i.test(msg)) {
+    return 'offline';
+  }
+  const status = typeof inner?.status === 'number' ? inner.status : undefined;
+  if (status === 401 || inner?.code === 'PGRST301' || inner?.code === 'PGRST302') return 'auth';
+  if (/jwt|invalid.*token|token.*(expired|invalid)|unauthori[sz]ed|not authenticated|session.*expired|refresh[_ ]token/i.test(msg)) {
+    return 'auth';
+  }
+  return 'server';
+}
+
+/** QA-hardening R6: exponential backoff for automatic sync retries. */
+export function syncRetryDelayMs(attempt: number): number {
+  return Math.min(15_000 * 2 ** Math.max(0, attempt), 300_000);
+}
+
+
 export interface AuthUser {
   id: string;
   email?: string;
@@ -816,6 +850,10 @@ class SupabaseSyncEngine {
   private status: SyncStatus = 'unconfigured';
   private lastSyncedAt: string | null = null;
   private errorMessage: string | null = null;
+  /** QA-hardening R6: classified failure + backoff retry state. */
+  private errorKind: SyncErrorKind | null = null;
+  private retryAttempt = 0;
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private currentUser: AuthUser | null = null;
   private listeners: Set<SyncListener> = new Set();
   private debounceTimer: any = null;
@@ -857,6 +895,8 @@ class SupabaseSyncEngine {
       user: this.currentUser,
       // S4: a merge choice is waiting on the user (MergeChoiceModal).
       pendingMergeChoice: this.pendingMergeChoiceFor !== null,
+      // QA-hardening R6: classified sync failure (null when healthy).
+      errorKind: this.errorKind,
     };
   }
 
@@ -1544,6 +1584,51 @@ class SupabaseSyncEngine {
      };
    }
 
+  /**
+   * QA-hardening R6: single funnel for sync failures — classify the
+   * error, publish it with the status (one state source for the
+   * banner, the Today caption and Settings, all via useSupabaseSync),
+   * and schedule an exponential-backoff retry. Auth failures are NOT
+   * auto-retried: an expired session cannot heal by retrying; the
+   * banner's auth message asks the user to sign in again.
+   */
+  private recordSyncFailure(err: unknown) {
+    const e: any = err as any;
+    this.status = 'error';
+    this.errorMessage = e?.message || 'Sync failed';
+    this.errorKind = classifySyncError(err);
+    this.notify();
+    if (this.errorKind !== 'auth') {
+      this.scheduleSyncRetry();
+    }
+  }
+
+  private scheduleSyncRetry() {
+    this.clearSyncRetryTimer();
+    const delay = syncRetryDelayMs(this.retryAttempt);
+    this.retryAttempt += 1;
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      // Backoff retries must not reset the attempt counter (only a
+      // manual/event-driven sync or a success does).
+      void this.startSyncNow(false);
+    }, delay);
+  }
+
+  private clearSyncRetryTimer() {
+    if (this.retryTimer !== null) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
+  }
+
+  /** A healthy sync (or a fresh manual attempt) ends the failure state. */
+  private markSyncHealthy() {
+    this.errorKind = null;
+    this.retryAttempt = 0;
+    this.clearSyncRetryTimer();
+  }
+
   private scheduleDebouncedPush() {
     clearTimeout(this.debounceTimer);
     this.debounceTimer = setTimeout(() => {
@@ -1552,9 +1637,20 @@ class SupabaseSyncEngine {
   }
 
   public async triggerSyncNow() {
+    return this.startSyncNow(true);
+  }
+
+  private async startSyncNow(resetBackoff: boolean) {
     // Deduplicate concurrent sync calls by returning the in-flight promise
     if (this.pendingSyncPromise) {
       return this.pendingSyncPromise;
+    }
+    // QA-hardening R6: a manual/event-driven sync cancels any pending
+    // backoff retry and restarts the backoff ladder; scheduled
+    // retries call startSyncNow(false) so the ladder keeps growing.
+    if (resetBackoff) {
+      this.retryAttempt = 0;
+      this.clearSyncRetryTimer();
     }
 
     if (typeof window !== 'undefined' && localStorage.getItem('ascend_logged_out') === 'true') {
@@ -2233,12 +2329,11 @@ class SupabaseSyncEngine {
 
       this.status = 'synced';
       this.lastSyncedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      this.markSyncHealthy();
       this.notify();
      } catch (err: any) {
       console.error('Supabase sync error:', err);
-      this.status = 'error';
-      this.errorMessage = err?.message || 'Sync failed';
-      this.notify();
+      this.recordSyncFailure(err);
     } finally {
       this.isSyncing = false;
       this.pendingSyncPromise = null;
@@ -2726,7 +2821,13 @@ class SupabaseSyncEngine {
 
     // F29: surface the first upsert failure instead of reporting 'synced'.
     if (firstError.current) {
-      throw new Error(`Supabase push failed: ${firstError.current.message || 'unknown error'}`);
+      // QA-hardening R6: attach the original transport error so the
+      // sync-failure classifier can read its status/code.
+      const pushError: Error & { cause?: unknown } = new Error(
+        `Supabase push failed: ${firstError.current.message || 'unknown error'}`,
+      );
+      pushError.cause = firstError.current;
+      throw pushError;
     }
 
     // F28: the push succeeded, so record the signature of the state
@@ -2913,15 +3014,14 @@ class SupabaseSyncEngine {
         await this.pushLocalData(user.id);
         this.status = 'synced';
         this.lastSyncedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        this.markSyncHealthy();
         this.notify();
       } catch (err: any) {
         // F29: a failed push used to leave the previous (usually
         // 'synced') status in place. Report the failure honestly; the
         // UI renders 'error' from this status.
         console.warn('Background sync push warning:', err?.message);
-        this.status = 'error';
-        this.errorMessage = err?.message || 'Sync failed';
-        this.notify();
+        this.recordSyncFailure(err);
       }
     };
 

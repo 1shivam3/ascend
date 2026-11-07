@@ -126,6 +126,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     user,
     signOut,
     deleteAccount,
+    errorKind: syncErrorKind,
   } = useSupabaseSync();
   const logout = useStore((state) => state.logout);
   const clearAllData = useStore((state) => state.clearAllData);
@@ -663,6 +664,10 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                       ? t('settings.cloudSynced')
                       : syncStatus === 'syncing'
                       ? t('settings.syncing')
+                      // QA-hardening R6: same classified state as the
+                      // banner/Today caption — an error is not 'idle'.
+                      : syncStatus === 'error'
+                      ? (syncErrorKind === 'offline' ? t('home.syncOffline') : t('home.syncFailed'))
                       : t('settings.syncIdle')
                     : t('settings.localOnly')}
                 </span>

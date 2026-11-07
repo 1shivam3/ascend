@@ -625,11 +625,13 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
   // Sync caption: honest status for cloud-synced data only. The new
   // personalization keys are local-only and are never described as synced.
-  const { status: syncStatus } = useSupabaseSync();
+  const { status: syncStatus, errorKind: syncErrorKind } = useSupabaseSync();
   const syncText =
     syncStatus === 'syncing' ? t('home.syncSyncing')
     : syncStatus === 'synced' ? t('home.syncSynced')
-    : syncStatus === 'error' ? t('home.syncFailed')
+    // QA-hardening R6: the caption reads the same classified state as
+    // the banner — offline failures say so instead of 'Sync failed'.
+    : syncStatus === 'error' ? (syncErrorKind === 'offline' ? t('home.syncOffline') : t('home.syncFailed'))
     : t('home.syncLocalOnly');
 
   // UI-1b-06 (final certification): Today section blocks, keyed by

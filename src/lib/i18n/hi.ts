@@ -80,6 +80,12 @@ export const hi: Partial<Record<StringKey, string>> = {
   'home.syncErrorBanner': 'सिंक विफल — आपके बदलाव इस डिवाइस पर सहेजे गए हैं, लेकिन अभी बैकअप नहीं हुआ है।',
   'home.syncRetry': 'फिर से सिंक करें',
   'home.syncLocalOnly': 'केवल इसी डिवाइस पर',
+  // QA-hardening R6 (machine-translated, unreviewed): per-class sync-failure copy.
+  'home.syncErrorOffline': 'आप ऑफ़लाइन हैं। बदलाव इस डिवाइस पर सेव हैं और ऑनलाइन होते ही बैकअप हो जाएंगे।',
+  'home.syncErrorAuth': 'आपका साइन-इन समाप्त हो गया है। बैकअप फिर शुरू करने के लिए दोबारा साइन इन करें — आपके बदलाव इस डिवाइस पर सेव रहेंगे।',
+  'home.syncErrorServer': 'बैकअप में सर्वर समस्या आई। बदलाव इस डिवाइस पर सेव हैं और सिंक फिर कोशिश करता रहेगा।',
+  'home.syncOffline': 'ऑफ़लाइन — डिवाइस पर सेव',
+  'home.syncBannerDismiss': 'बंद करें',
   'home.carbsFat': 'कार्ब्स {carbs}g · फ़ैट {fat}g',
   'customize.today': 'Today कस्टमाइज़ करें',
   'customize.restoreLayout': 'लेआउट रीसेट करें',

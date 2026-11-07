@@ -82,6 +82,12 @@ export const en = {
   'home.syncErrorBanner': 'Sync failed — your changes are saved on this device but not backed up yet.',
   'home.syncRetry': 'Retry sync',
   'home.syncLocalOnly': 'Local only',
+  // QA-hardening R6: per-class sync-failure copy (offline/auth/server).
+  'home.syncErrorOffline': "You're offline. Changes are saved on this device and will back up when you're back online.",
+  'home.syncErrorAuth': 'Your sign-in has expired. Sign in again to resume backup — your changes stay saved on this device.',
+  'home.syncErrorServer': 'Backup hit a server problem. Changes are saved on this device and sync will keep retrying.',
+  'home.syncOffline': 'Offline — saved on this device',
+  'home.syncBannerDismiss': 'Dismiss',
   'home.carbsFat': 'Carbs {carbs}g · Fat {fat}g',
   'customize.today': 'Customize Today',
   'customize.restoreLayout': 'Restore layout',
