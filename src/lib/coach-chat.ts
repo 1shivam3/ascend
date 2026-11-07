@@ -19,6 +19,7 @@
 import type { FormSessionSummary } from '../features/form-coach/models/form-session.types';
 import { getRepStatus } from '../features/form-coach/models/form-session.types';
 import { kgToLbs } from './units';
+import { formatDate, parseLocalDate } from './formatters';
 
 // ── Caps (defined in code, enforced server-side) ──────────────────────────
 /** Max reply length the server will ever return (chars). */
@@ -482,6 +483,28 @@ const CITATION_LEAD_IN_EN = new RegExp(`^\\s*${CITATION_PHRASE_EN}\\s*[:\\-–�
  * attribution prefix at the very start of the reply. Ordinary sentences
  * that merely mention the user's data mid-text are untouched.
  */
+/**
+ * QA-hardening R11: model output must not leak raw ISO dates to the
+ * user. Any YYYY-MM-DD in the reply is rewritten to the shared
+ * display format (formatters.formatDate — the same single format
+ * source the context is built with). Strings that merely look like
+ * dates but are not real calendar dates are left untouched.
+ */
+export function replaceIsoDatesInReply(reply: string): string {
+  return reply.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (match, y, m, d) => {
+    const parsed = parseLocalDate(match);
+    // parseLocalDate rolls overflow values over (2026-13-40 becomes a
+    // real 2027 date) — only rewrite when the components round-trip,
+    // i.e. the string names a date that actually exists.
+    const roundTrips =
+      !isNaN(parsed.getTime()) &&
+      parsed.getFullYear() === Number(y) &&
+      parsed.getMonth() === Number(m) - 1 &&
+      parsed.getDate() === Number(d);
+    return roundTrips ? formatDate(match) : match;
+  });
+}
+
 export function stripModelCitations(reply: string): string {
   const kept = reply
     .split('\n')
@@ -602,7 +625,11 @@ function fmtKg(v: number, unit: 'kg' | 'lbs'): string {
 
 // ── Form-check bridge (B2) ────────────────────────────────────────────────
 function formSessionDate(startedAt: number): string {
-  return new Date(startedAt).toISOString().slice(0, 10);
+  // QA-hardening R11: dates reach the model in display format
+  // (formatters.formatDate — the one shared format source), never
+  // raw ISO. The ISO date of the instant is formatted as a date
+  // label, so the calendar day shown matches the stored day.
+  return formatDate(new Date(startedAt).toISOString().slice(0, 10));
 }
 
 function round1(n: number): number {
@@ -842,17 +869,17 @@ export function buildCoachChatContext(
     const ts = data.todaySession;
     const ex = ts.exercises.length > 0 ? ` — exercises: ${ts.exercises.join(', ')}` : '';
     if (ts.state === 'rest') {
-      sections.push(`TODAY (${ts.date}): rest day — no workout is scheduled for today.`);
+      sections.push(`TODAY (${formatDate(ts.date)}): rest day — no workout is scheduled for today.`);
       evidence.push('Today is a scheduled rest day');
     } else if (ts.state === 'completed') {
-      sections.push(`TODAY'S SESSION (${ts.date}): "${ts.title}" — already logged today${ex}.`);
+      sections.push(`TODAY'S SESSION (${formatDate(ts.date)}): "${ts.title}" — already logged today${ex}.`);
       evidence.push(`Today's session "${ts.title}" already logged`);
     } else if (ts.state === 'in_progress') {
-      sections.push(`TODAY'S SESSION (${ts.date}): "${ts.title}" — in progress right now${ex}.`);
+      sections.push(`TODAY'S SESSION (${formatDate(ts.date)}): "${ts.title}" — in progress right now${ex}.`);
       evidence.push(`Today's session "${ts.title}" in progress`);
     } else {
       sections.push(
-        `TODAY'S SESSION (${ts.date}): "${ts.title}" — the workout planned for today from the user's schedule${ex}. When the user asks what they are training today, THIS is the answer.`
+        `TODAY'S SESSION (${formatDate(ts.date)}): "${ts.title}" — the workout planned for today from the user's schedule${ex}. When the user asks what they are training today, THIS is the answer.`
       );
       evidence.push(`Today's planned workout: ${ts.title}`);
     }
@@ -879,7 +906,7 @@ export function buildCoachChatContext(
   if (data.activeBlock) {
     const b = data.activeBlock;
     sections.push(
-      `CURRENT COACH BLOCK: "${b.name}" (focus: ${b.focus}, started ${b.startMonday}, week ${b.weekIndex} of ${b.weekCount}, status: ${b.status})`
+      `CURRENT COACH BLOCK: "${b.name}" (focus: ${b.focus}, started ${formatDate(b.startMonday)}, week ${b.weekIndex} of ${b.weekCount}, status: ${b.status})`
     );
     evidence.push(`Current block "${b.name}", week ${b.weekIndex} of ${b.weekCount}`);
   }
@@ -891,18 +918,18 @@ export function buildCoachChatContext(
   if (data.recentWorkouts.length > 0) {
     const lines = data.recentWorkouts.slice(0, 5).map((w) => {
       const lifts = w.lifts.length > 0 ? ` — ${w.lifts.join(', ')}` : '';
-      return `${w.date}: ${w.name}${lifts}`;
+      return `${formatDate(w.date)}: ${w.name}${lifts}`;
     });
     sections.push(`RECENT WORKOUTS (most recent first):\n- ${lines.join('\n- ')}`);
     const last = data.recentWorkouts[0];
-    if (last) evidence.push(`Last workout: ${last.name} on ${last.date}`);
+    if (last) evidence.push(`Last workout: ${last.name} on ${formatDate(last.date)}`);
   }
 
   if (data.prs.length > 0) {
-    const lines = data.prs.slice(0, 5).map((p) => `${p.exercise}: ${fmtKg(p.oneRepMax, data.unit)} on ${p.date}`);
+    const lines = data.prs.slice(0, 5).map((p) => `${p.exercise}: ${fmtKg(p.oneRepMax, data.unit)} on ${formatDate(p.date)}`);
     sections.push(`PERSONAL RECORDS:\n- ${lines.join('\n- ')}`);
     const top = data.prs[0];
-    if (top) evidence.push(`Recent PR: ${top.exercise} ${fmtKg(top.oneRepMax, data.unit)} on ${top.date}`);
+    if (top) evidence.push(`Recent PR: ${top.exercise} ${fmtKg(top.oneRepMax, data.unit)} on ${formatDate(top.date)}`);
   }
 
   if (data.readiness) {
@@ -917,11 +944,11 @@ export function buildCoachChatContext(
 
   if (data.weeklyReviews.length > 0) {
     const lines = data.weeklyReviews.slice(0, 2).map(
-      (r) => `Week of ${r.weekMonday}: focus "${r.focusHeadline}" — ${r.sessionsCompleted} of ${r.sessionsPlanned} sessions`
+      (r) => `Week of ${formatDate(r.weekMonday)}: focus "${r.focusHeadline}" — ${r.sessionsCompleted} of ${r.sessionsPlanned} sessions`
     );
     sections.push(`WEEKLY REVIEWS:\n- ${lines.join('\n- ')}`);
     const latest = data.weeklyReviews[0];
-    if (latest) evidence.push(`Latest review (week of ${latest.weekMonday}): ${latest.focusHeadline}`);
+    if (latest) evidence.push(`Latest review (week of ${formatDate(latest.weekMonday)}): ${latest.focusHeadline}`);
   }
 
   // Form-check bridge (B2): measured form data joins the grounding
@@ -968,11 +995,11 @@ export function buildCoachChatContext(
 
   if (data.bodyMetricsLatest) {
     const m = data.bodyMetricsLatest;
-    const parts = [`${m.date}`];
+    const parts = [`${formatDate(m.date)}`];
     if (m.weightKg != null) parts.push(`weight ${fmtKg(m.weightKg, data.unit)}`);
     if (m.waistIn != null) parts.push(`waist ${m.waistIn} in`);
     sections.push(`LATEST BODY MEASUREMENT: ${parts.join(', ')}`);
-    if (m.weightKg != null) evidence.push(`Latest weigh-in: ${fmtKg(m.weightKg, data.unit)} on ${m.date}`);
+    if (m.weightKg != null) evidence.push(`Latest weigh-in: ${fmtKg(m.weightKg, data.unit)} on ${formatDate(m.date)}`);
   }
 
   if (data.checkinToday && (data.checkinToday.sleep != null || data.checkinToday.soreness != null || data.checkinToday.energy != null)) {
@@ -991,7 +1018,7 @@ export function buildCoachChatContext(
   }
 
   if (data.painEpisodes.length > 0) {
-    const lines = data.painEpisodes.slice(0, 3).map((p) => `${p.exerciseName || 'whole session'} on ${p.date}`);
+    const lines = data.painEpisodes.slice(0, 3).map((p) => `${p.exerciseName || 'whole session'} on ${formatDate(p.date)}`);
     sections.push(`PAIN EPISODES ON RECORD (respect these — do not program the flagged lifts):\n- ${lines.join('\n- ')}`);
     if (data.flaggedFamilies.length > 0) {
       sections.push(`FLAGGED MOVEMENT FAMILIES (excluded from new plans): ${data.flaggedFamilies.join(', ')}`);

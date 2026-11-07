@@ -3,6 +3,7 @@ import { AITrainingProfile, isSetCompleted } from './types';
 import { toLocalDateString, calculateHydrationTarget, getCreatineStats } from './habits';
 import { getVolumeComparison, formatVolumeShift, getConsecutiveWorkoutDays, getDaysSinceLastWorkout } from './ai-coach';
 import { getBestPRForExercise } from './session-pr-detection';
+import { formatDate } from './formatters';
 import { isBodyweightExercise } from './strength-standards';
 import { DEFAULT_BODYWEIGHT_KG } from './defaults';
 
@@ -81,7 +82,7 @@ export function buildCompactUserContext(state: AppState): string {
         }
         return `${e.name}: ${completedSets.length} sets (${topRepSet.reps} reps, unmeasured load)`;
       });
-      workoutLines.push(`- [${w.date}] ${exSummaries.slice(0, 4).join('; ')}`);
+      workoutLines.push(`- [${formatDate(w.date)}] ${exSummaries.slice(0, 4).join('; ')}`);
     }
   }
 

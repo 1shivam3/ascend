@@ -195,7 +195,8 @@ describe('personalization — the context carries the user\'s own data', () => {
     expect(ctx.contextText).toContain('100 kg');
     expect(ctx.contextText).toContain('Test Block');
     expect(ctx.contextText).toContain('Upper A');
-    expect(ctx.contextText).toContain('2026-10-22');
+    // Re-pinned for QA-hardening R11: context dates render in display format.
+    expect(ctx.contextText).toContain('Thu, Oct 22, 2026');
     expect(ctx.contextText).toContain('Consistency is improving');
     expect(ctx.contextText).toContain('1800 kcal');
   });
@@ -248,7 +249,8 @@ describe('personalization — the context carries the user\'s own data', () => {
 
   it('context carries today\'s resolved session (live-test catch 2026-10-29)', () => {
     const ctx = buildCoachChatContext(seededUser());
-    expect(ctx.contextText).toContain("TODAY'S SESSION (2026-10-23)");
+    // Re-pinned for QA-hardening R11: display-format date.
+    expect(ctx.contextText).toContain("TODAY'S SESSION (Fri, Oct 23, 2026)");
     expect(ctx.contextText).toContain('"Upper A"');
     expect(ctx.contextText).toContain('Bench Press');
     expect(ctx.evidence.join(' ')).toContain("Today's planned workout: Upper A");

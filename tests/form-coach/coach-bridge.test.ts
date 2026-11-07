@@ -205,7 +205,7 @@ describe('B2 — deadlift form checks in the coach-chat context', () => {
   it('serializes lockout and hip-angle metrics — never squat depth classes', () => {
     const { lines, evidenceLine } = serializeFormChecks([deadliftA, deadliftB]);
     expect(lines[0]).toBe(
-      'Conventional Deadlift — latest 2026-10-16: 3 valid reps; ' +
+      'Conventional Deadlift — latest Fri, Oct 16, 2026: 3 valid reps; ' +
         'full lockout on 3 of 3 reps; ' +
         'min hip angle 60–66°; max torso lean 52°; avg tempo 2.9s/rep; ' +
         'observations: Lockout Reached'
@@ -214,7 +214,7 @@ describe('B2 — deadlift form checks in the coach-chat context', () => {
       'Conventional Deadlift — last 2 checks: full lockout on 6 of 7 reps; avg tempo 3s/rep'
     );
     expect(evidenceLine).toBe(
-      'Latest form check: Conventional Deadlift on 2026-10-16 — 3 valid reps, full lockout on 3 of 3 reps (camera-measured)'
+      'Latest form check: Conventional Deadlift on Fri, Oct 16, 2026 — 3 valid reps, full lockout on 3 of 3 reps (camera-measured)'
     );
     expect(lines.join(' ')).not.toContain('below parallel');
     expect(lines.join(' ')).not.toContain('min knee angle');
@@ -284,7 +284,7 @@ describe('B2 — form checks in the coach-chat context', () => {
     // Passed oldest-first on purpose: the serializer sorts.
     const { lines, evidenceLine } = serializeFormChecks([sessionA, sessionB]);
     expect(lines[0]).toBe(
-      'Barbell Back Squat — latest 2026-10-15: 3 valid reps; ' +
+      'Barbell Back Squat — latest Thu, Oct 15, 2026: 3 valid reps; ' +
         'depth below parallel 2 of 3, parallel 1, above 0; ' +
         'min knee angle 55–88°; max torso lean 40°; avg tempo 2.5s/rep; ' +
         'observations: Target Depth Reached, Torso Inclination'
@@ -293,7 +293,7 @@ describe('B2 — form checks in the coach-chat context', () => {
       'Barbell Back Squat — last 2 checks: below parallel on 5 of 6 reps; avg tempo 2.4s/rep'
     );
     expect(evidenceLine).toBe(
-      'Latest form check: Barbell Back Squat on 2026-10-15 — 3 valid reps, below parallel on 2 of 3 reps (camera-measured)'
+      'Latest form check: Barbell Back Squat on Thu, Oct 15, 2026 — 3 valid reps, below parallel on 2 of 3 reps (camera-measured)'
     );
   });
 
@@ -302,7 +302,7 @@ describe('B2 — form checks in the coach-chat context', () => {
     expect(ctx.contextText).toContain('FORM CHECKS (on-device camera measurements');
     expect(ctx.contextText).toContain('below parallel 2 of 3');
     expect(ctx.contextText).toContain('min knee angle 55–88°');
-    expect(ctx.evidence.join(' ')).toContain('Latest form check: Barbell Back Squat on 2026-10-15');
+    expect(ctx.evidence.join(' ')).toContain('Latest form check: Barbell Back Squat on Thu, Oct 15, 2026');
     // Form data alone is real personal data: not a cold start.
     expect(ctx.hasData).toBe(true);
     expect(ctx.contextText).not.toContain('NO USER HISTORY YET');
