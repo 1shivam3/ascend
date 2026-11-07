@@ -346,6 +346,22 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
     onClose();
   };
 
+  // QA-hardening R9 (shared disabled rule): the Save/Log control is
+  // disabled while the form is empty or invalid — the same live
+  // validator the submit handler runs decides, so the button state
+  // and the save behavior can never disagree.
+  const canSaveMetrics =
+    validateBodyMetricsForm({
+      weight: weightInput,
+      height: heightInput,
+      bodyFat: bodyFatInput,
+      chest: chestInput,
+      waist: waistInput,
+      hips: hipsInput,
+      unit,
+      date: dateInput,
+    }).values !== undefined;
+
   // Sort history newest first
   const sortedMetrics = [...bodyMetrics].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
@@ -587,6 +603,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
 
           <button
             type="submit"
+            disabled={!canSaveMetrics}
             className="btn-primary w-full py-2.5 text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer"
           >
             <Plus className="w-4 h-4" />

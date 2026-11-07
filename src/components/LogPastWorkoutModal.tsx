@@ -379,6 +379,19 @@ export default function LogPastWorkoutModal({
     );
   };
 
+  // QA-hardening R9 (shared disabled rule): Save stays disabled
+  // until at least one set is loggable — the same validity test the
+  // save handler applies (reps > 0 and weight > 0, bodyweight, or a
+  // warmup set).
+  const hasLoggableSet = exercises.some((ex) => {
+    const isBW = isBodyweightExercise(ex.name);
+    return ex.sets.some((s) => {
+      const r = parseInt(String(s.reps), 10) || 0;
+      const w = parseFloat(String(s.weight)) || 0;
+      return r > 0 && (w > 0 || isBW || s.isWarmup);
+    });
+  });
+
   const handleSavePastWorkout = () => {
     const validExercises = exercises
       .map((ex) => {
@@ -881,6 +894,7 @@ export default function LogPastWorkoutModal({
             <button
               type="button"
               onClick={handleSavePastWorkout}
+              disabled={!hasLoggableSet}
               className="btn-primary py-2.5 px-6 text-xs font-bold flex items-center justify-center gap-2 rounded-xl shadow-lg shadow-accent/20 flex-1 sm:flex-initial cursor-pointer"
             >
               <Check className="w-4 h-4 stroke-[3]" />
