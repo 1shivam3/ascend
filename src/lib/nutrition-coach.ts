@@ -1,4 +1,5 @@
 import { FOOD_DB } from './macros';
+import { formatCalories, formatNumber } from './formatters';
 import type { DietPreference, MacroGoals, MealDayKind } from './types';
 import type { LocalizedSentence } from './coach-i18n';
 
@@ -210,15 +211,15 @@ export function getWholeDayAdaptation(input: {
     consumedPct,
     remainingKcal,
     suggestedDinnerKcal: remainingKcal,
-    reason: `You've logged about ${consumedPct}% of today's ${calorieTarget.toLocaleString()} kcal target by this afternoon. A dinner near ${remainingKcal.toLocaleString()} kcal lands the day right on target — this is just for today; your saved goals don't change.`,
+    reason: `You've logged about ${consumedPct}% of today's ${formatCalories(calorieTarget)} target by this afternoon. A dinner near ${formatCalories(remainingKcal)} lands the day right on target — this is just for today; your saved goals don't change.`,
     // Numbers are pre-formatted (locale grouping) so the key-based
     // render shows exactly what the English string shows.
     reasonI18n: {
       key: 'nutritionCoach.wholeDayReason',
       params: {
         pct: consumedPct,
-        target: calorieTarget.toLocaleString(),
-        remaining: remainingKcal.toLocaleString(),
+        target: formatNumber(calorieTarget),
+        remaining: formatNumber(remainingKcal),
       },
     },
   };

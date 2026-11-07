@@ -100,7 +100,8 @@ describe('pre-play unit spacing (D-UX-5)', () => {
 
   it('home XP total is a single spaced string', () => {
     const home = read('src/components/HomePage.tsx');
-    expect(home).toContain('{`${levelInfo.total.toLocaleString()} XP`}');
+    // Re-pinned for QA-hardening R12: XP total goes through formatNumber.
+    expect(home).toContain('{formatNumber(levelInfo.total)} XP');
   });
 });
 
@@ -113,7 +114,8 @@ describe('pre-play SVG accessibility (D-A11Y-4)', () => {
 
   it('Meals calorie donut exposes its value', () => {
     const meals = read('src/components/MealsPage.tsx');
-    expect(meals).toContain('role="img" aria-label={`${Math.round(todayMacros.calories).toLocaleString()} cal,');
+    // Re-pinned for QA-hardening R12: the ring label uses formatCalories.
+    expect(meals).toContain('role="img" aria-label={`${formatCalories(todayMacros.calories)},');
   });
 
   it('Google "G" logos are hidden from AT (button text names them)', () => {

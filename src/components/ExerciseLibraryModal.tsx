@@ -289,11 +289,16 @@ export default function ExerciseLibraryModal({
                   className="hover:bg-bg-secondary/40 rounded-xl transition-colors group"
                 >
                   <div className="py-3 px-2 flex items-center justify-between">
-                  <div className="space-y-1 min-w-0 pr-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-text-primary break-words min-w-0 font-sans">
-                        {ex.name}
-                      </span>
+                  <div className="space-y-1 min-w-0 flex-1 pr-2">
+                    {/* QA-hardening R14: the name gets the full row width
+                        on its own line — it used to share the line with the
+                        equipment/muscle chips and could break awkwardly
+                        against them; the chips (and the Hindi name) wrap
+                        on the line below instead. */}
+                    <span className="block text-xs font-bold text-text-primary break-words font-sans">
+                      {ex.name}
+                    </span>
+                    <div className="flex items-center gap-2 flex-wrap">
                       {/* SIM-P1-05 Round 3: Devanagari name under the
                           English one in Hindi mode — display-only, the
                           English name stays the key everywhere. */}

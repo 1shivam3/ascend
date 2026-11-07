@@ -13,7 +13,7 @@
  * Deliberately left (see the Phase 4 report for the full list):
  * per-food row values and other sub-1,000 figures where grouping
  * cannot differ, the challenges sheets' local short-date helper
- * ("Nov 6" — a different, shorter format by design), canvas-internal
+ * ("6 Nov" — a different, shorter format by design), canvas-internal
  * and log/debug formatting, and the remaining toLocaleDateString
  * calls that already go through formatLocalDate or locale-aware
  * inline options.
@@ -34,9 +34,11 @@ describe('Phase 4.8 — the shared formatters', () => {
     expect(formatNumber(123456, 'hi-IN')).toBe('1,23,456');
   });
 
-  it('formatDate renders the History style', () => {
-    expect(formatDate('2026-11-06', 'en-US')).toBe('Fri, Nov 6, 2026');
-    expect(formatDate('2026-11-09', 'en-US')).toBe('Mon, Nov 9, 2026');
+  it('formatDate renders the one date style', () => {
+    // Re-pinned for QA-hardening R12 (2026-11-07): the one style is
+    // now day-first ("Fri, 6 Nov 2026"), per the Phase 2 brief.
+    expect(formatDate('2026-11-06', 'en-US')).toBe('Fri, 6 Nov 2026');
+    expect(formatDate('2026-11-09', 'en-US')).toBe('Mon, 9 Nov 2026');
   });
 
   it('formatDuration (pre-existing) still anchors the set', () => {

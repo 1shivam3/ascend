@@ -187,6 +187,7 @@ function post(body: unknown) {
   });
 }
 
+// Re-pinned for QA-hardening R12 (2026-11-07): formatDate is day-first ("Fri, 16 Oct 2026").
 describe('personalization — the context carries the user\'s own data', () => {
   it('includes lifts, block, history, and PRs in the context text', () => {
     const ctx = buildCoachChatContext(seededUser());
@@ -196,7 +197,7 @@ describe('personalization — the context carries the user\'s own data', () => {
     expect(ctx.contextText).toContain('Test Block');
     expect(ctx.contextText).toContain('Upper A');
     // Re-pinned for QA-hardening R11: context dates render in display format.
-    expect(ctx.contextText).toContain('Thu, Oct 22, 2026');
+    expect(ctx.contextText).toContain('Thu, 22 Oct 2026');
     expect(ctx.contextText).toContain('Consistency is improving');
     expect(ctx.contextText).toContain('1800 kcal');
   });
@@ -250,7 +251,7 @@ describe('personalization — the context carries the user\'s own data', () => {
   it('context carries today\'s resolved session (live-test catch 2026-10-29)', () => {
     const ctx = buildCoachChatContext(seededUser());
     // Re-pinned for QA-hardening R11: display-format date.
-    expect(ctx.contextText).toContain("TODAY'S SESSION (Fri, Oct 23, 2026)");
+    expect(ctx.contextText).toContain("TODAY'S SESSION (Fri, 23 Oct 2026)");
     expect(ctx.contextText).toContain('"Upper A"');
     expect(ctx.contextText).toContain('Bench Press');
     expect(ctx.evidence.join(' ')).toContain("Today's planned workout: Upper A");

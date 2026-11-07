@@ -5,7 +5,7 @@ import { useModalA11y } from '@/lib/use-modal-a11y';
 import { ensureDeleteWillPersist } from '@/lib/delete-persist-guard';
 import { useStore } from '@/lib/store';
 import { X, Scale, History, Trash2, Plus } from 'lucide-react';
-import { getLocalTodayStr, round1 } from '@/lib/formatters';
+import { getLocalTodayStr, round1, formatVolume } from '@/lib/formatters';
 import { useTranslation } from '@/lib/i18n';
 import { useToast } from '@/components/ui/Toast';
 import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
@@ -632,10 +632,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
               {sortedMetrics.map((entry, idx) => {
                 const prev = sortedMetrics[idx + 1];
                 const diffKg = prev ? entry.weightKg - prev.weightKg : null;
-                const displayWeight =
-                  preferredUnit === 'lbs'
-                    ? `${Math.round(kgToLbs(entry.weightKg) * 10) / 10} lbs`
-                    : `${entry.weightKg} kg`;
+                const displayWeight = formatVolume(entry.weightKg, preferredUnit, undefined, { precision: 'tenth' });
 
                 const diffFormatted =
                   diffKg !== null

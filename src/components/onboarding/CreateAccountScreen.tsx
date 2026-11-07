@@ -6,6 +6,7 @@ import { syncEngine } from '@/lib/supabase/sync';
 import { useToast } from '@/components/ui/Toast';
 import SocialAuthButtons from './SocialAuthButtons';
 import { useTranslation } from '@/lib/i18n';
+import { validateAuthField, type AuthFormField } from '@/lib/auth-flow';
 
 interface CreateAccountScreenProps {
   onBack: () => void;
@@ -26,6 +27,23 @@ export default function CreateAccountScreen({
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // QA-hardening R16: inline per-field validation (blur + submit)
+  // replaces the native browser bubbles — the form is noValidate and
+  // errors render under each field with role="alert". The top banner
+  // remains for generic server failures only (F-10).
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<AuthFormField, string>>
+  >({});
+
+  const checkField = (field: AuthFormField): boolean => {
+    const key = validateAuthField('signup', field, {
+      name: fullName,
+      email,
+      password,
+    });
+    setFieldErrors((prev) => ({ ...prev, [field]: key ? t(key) : undefined }));
+    return !key;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,16 +52,11 @@ export default function CreateAccountScreen({
     const trimmedName = fullName.trim();
     const trimmedEmail = email.trim();
 
-    if (!trimmedName) {
-      setError(t('auth.nameRequired'));
-      return;
-    }
-    if (!trimmedEmail || !trimmedEmail.includes('@')) {
-      setError(t('auth.validEmail'));
-      return;
-    }
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long. Use a mix of letters and numbers to make it harder to guess.');
+    // Validate every field at once so all inline errors show together.
+    const nameOk = checkField('name');
+    const emailOk = checkField('email');
+    const passwordOk = checkField('password');
+    if (!nameOk || !emailOk || !passwordOk) {
       return;
     }
 
@@ -94,6 +107,16 @@ export default function CreateAccountScreen({
 
       {/* Main Elevated Form Card */}
       <div className="w-full max-w-md mx-auto my-auto py-4">
+        {/* QA-hardening R16: the same ASCEND logo mark the Login
+            screen carries (audit phase 5, task 5.1(l)) — a brand
+            asset with fixed colors, added above the card so both
+            auth screens open identically. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/ascend-logo.png"
+          alt="ASCEND"
+          className="w-16 h-16 mx-auto mb-5 rounded-2xl shadow-sm"
+        />
         <div className="bg-bg-card rounded-2xl p-6 sm:p-8 border border-border shadow-xs space-y-6">
           {/* Header */}
           <div className="text-left space-y-1">
@@ -113,8 +136,8 @@ export default function CreateAccountScreen({
             </div>
           )}
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Form — noValidate (R16): inline errors, never native bubbles. */}
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             {/* Full Name */}
             <div>
               <label htmlFor="create-full-name" className="block text-xs font-semibold text-text-primary mb-1.5">
@@ -126,10 +149,17 @@ export default function CreateAccountScreen({
                 autoComplete="name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
+                onBlur={() => checkField('name')}
                 placeholder={t('auth.namePlaceholder')}
-                required
+                aria-invalid={fieldErrors.name ? true : undefined}
+                aria-describedby={fieldErrors.name ? 'create-name-error' : undefined}
                 className="w-full px-4 py-3 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary placeholder:text-text-muted/60 outline-none transition"
               />
+              {fieldErrors.name && (
+                <p id="create-name-error" role="alert" className="mt-1.5 text-xs text-red-600">
+                  {fieldErrors.name}
+                </p>
+              )}
             </div>
 
             {/* Email */}
@@ -143,10 +173,17 @@ export default function CreateAccountScreen({
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => checkField('email')}
                 placeholder="you@email.com"
-                required
+                aria-invalid={fieldErrors.email ? true : undefined}
+                aria-describedby={fieldErrors.email ? 'create-email-error' : undefined}
                 className="w-full px-4 py-3 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary placeholder:text-text-muted/60 outline-none transition"
               />
+              {fieldErrors.email && (
+                <p id="create-email-error" role="alert" className="mt-1.5 text-xs text-red-600">
+                  {fieldErrors.email}
+                </p>
+              )}
             </div>
 
             {/* Password */}
@@ -161,8 +198,10 @@ export default function CreateAccountScreen({
                   autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  onBlur={() => checkField('password')}
                   placeholder="At least 8 characters"
-                  required
+                  aria-invalid={fieldErrors.password ? true : undefined}
+                  aria-describedby={fieldErrors.password ? 'create-password-error' : undefined}
                   className="w-full pl-4 pr-11 py-3 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary placeholder:text-text-muted/60 outline-none transition"
                 />
                 <button
@@ -174,8 +213,15 @@ export default function CreateAccountScreen({
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              {/* Password rule shown before submit, not only after failure. */}
-              <p className="mt-1.5 text-2xs text-text-muted">{t('auth.passwordLength')}</p>
+              {/* Password rule shown before submit, not only after
+                  failure; on error the alert replaces the hint (R16). */}
+              {fieldErrors.password ? (
+                <p id="create-password-error" role="alert" className="mt-1.5 text-xs text-red-600">
+                  {fieldErrors.password}
+                </p>
+              ) : (
+                <p className="mt-1.5 text-2xs text-text-muted">{t('auth.passwordLength')}</p>
+              )}
             </div>
 
             {/* Primary Action Button */}

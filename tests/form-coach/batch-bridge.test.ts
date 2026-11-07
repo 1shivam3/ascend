@@ -100,11 +100,12 @@ const plankSession = session({
   ],
 });
 
+// Re-pinned for QA-hardening R12 (2026-11-07): formatDate is day-first ("Fri, 16 Oct 2026").
 describe('batch bridge — coach-chat serialization', () => {
   it('overhead press renders lockout + elbow range, never squat vocabulary', () => {
     const { lines, evidenceLine } = serializeFormChecks([pressB, pressA]);
     expect(lines[0]).toBe(
-      'Overhead Press — latest Fri, Oct 16, 2026: 3 valid reps; ' +
+      'Overhead Press — latest Fri, 16 Oct 2026: 3 valid reps; ' +
         'full lockout on 3 of 3 reps; min elbow angle 95–95°; ' +
         'max torso lean 12°; avg tempo 2s/rep; observations: Lockout Reached'
     );
@@ -112,7 +113,7 @@ describe('batch bridge — coach-chat serialization', () => {
       'Overhead Press — last 2 checks: 6 valid reps of 6; avg tempo 2s/rep'
     );
     expect(evidenceLine).toBe(
-      'Latest form check: Overhead Press on Fri, Oct 16, 2026 — 3 valid reps, full lockout on 3 of 3 reps (camera-measured)'
+      'Latest form check: Overhead Press on Fri, 16 Oct 2026 — 3 valid reps, full lockout on 3 of 3 reps (camera-measured)'
     );
     expect(lines.join(' ')).not.toContain('below parallel');
   });
@@ -120,10 +121,10 @@ describe('batch bridge — coach-chat serialization', () => {
   it('plank renders the hold itself — duration and alignment, no reps', () => {
     const { lines, evidenceLine } = serializeFormChecks([plankSession]);
     expect(lines[0]).toBe(
-      'Plank — latest Fri, Oct 16, 2026: hold 42s; body line in line 86% of the hold; observations: Hold Measured'
+      'Plank — latest Fri, 16 Oct 2026: hold 42s; body line in line 86% of the hold; observations: Hold Measured'
     );
     expect(evidenceLine).toBe(
-      'Latest form check: Plank on Fri, Oct 16, 2026 — 42s hold, body line in line 86% of the hold (camera-measured)'
+      'Latest form check: Plank on Fri, 16 Oct 2026 — 42s hold, body line in line 86% of the hold (camera-measured)'
     );
     expect(lines.join(' ')).not.toContain('valid reps');
   });
@@ -155,7 +156,7 @@ describe('batch bridge — coach-chat serialization', () => {
     });
     const { lines } = serializeFormChecks([raise]);
     expect(lines[0]).toBe(
-      'Lateral Raise — latest Fri, Oct 16, 2026: 3 valid reps; ' +
+      'Lateral Raise — latest Fri, 16 Oct 2026: 3 valid reps; ' +
         'peak wrist height 88–102% of the way to shoulder height; ' +
         'max torso lean 8°; avg tempo 1.8s/rep; observations: none'
     );
@@ -175,8 +176,8 @@ describe('batch bridge — coach-chat serialization', () => {
       observations: [],
     });
     const { lines, evidenceLine } = serializeFormChecks([goblet]);
-    expect(lines[0]).toContain('Goblet Squat — latest Fri, Oct 16, 2026: 3 valid reps; depth below parallel 2 of 3');
-    expect(evidenceLine).toContain('Goblet Squat on Fri, Oct 16, 2026');
+    expect(lines[0]).toContain('Goblet Squat — latest Fri, 16 Oct 2026: 3 valid reps; depth below parallel 2 of 3');
+    expect(evidenceLine).toContain('Goblet Squat on Fri, 16 Oct 2026');
   });
 });
 

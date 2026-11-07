@@ -81,9 +81,11 @@ describe('LIVE-P1-RESIDUAL-01 Hindi readiness no-history factor', () => {
 
 describe('LIVE-P1-RESIDUAL-02 Hindi Fuel input-methods badge', () => {
   it('both dictionaries define meals.inputMethods with real copy', () => {
-    expect(en['meals.inputMethods']).toBe('Macro Lens • Voice / Text • Indian IFCT');
-    expect(hi['meals.inputMethods']).toBe('मैक्रो लेंस • आवाज़ / टेक्स्ट • भारतीय IFCT');
-    expect(translate('hi', 'meals.inputMethods')).toBe('मैक्रो लेंस • आवाज़ / टेक्स्ट • भारतीय IFCT');
+    // Re-pinned for QA-hardening R13 (2026-11-07): the badge now uses
+    // plain language — the internal codenames (Macro Lens, IFCT) are gone.
+    expect(en['meals.inputMethods']).toBe('Photo scan • Voice • Text • Indian food database');
+    expect(hi['meals.inputMethods']).toBe('फ़ोटो स्कैन • आवाज़ • टेक्स्ट • भारतीय भोजन डेटाबेस');
+    expect(translate('hi', 'meals.inputMethods')).toBe('फ़ोटो स्कैन • आवाज़ • टेक्स्ट • भारतीय भोजन डेटाबेस');
   });
 
   it('MealsPage renders the badge through i18n, not a hardcoded string', () => {

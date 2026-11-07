@@ -32,7 +32,7 @@ import type {
   WeeklySchedule,
   WorkoutEntry,
 } from './types';
-import { getMondayOfWeek, parseLocalDate } from './formatters';
+import { getMondayOfWeek, parseLocalDate, formatVolume } from './formatters';
 import { getExerciseMuscle, getExerciseSecondaryMuscles } from './exercise-library';
 import { calculateOneRepMax } from './strength-standards';
 import { canonicalizeExerciseName } from './workout-outcome-evidence';
@@ -310,8 +310,8 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
         exercise: pr.exercise,
         detail:
           pr.oneRepMax > 0
-            ? `estimated 1RM ${Math.round(pr.oneRepMax)} kg`
-            : `${Math.round(pr.weightKg)} kg × ${pr.reps}`,
+            ? `estimated 1RM ${formatVolume(Math.round(pr.oneRepMax), 'kg')}`
+            : `${formatVolume(Math.round(pr.weightKg), 'kg')} × ${pr.reps}`,
         detailI18n,
       };
     });
@@ -755,7 +755,7 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
     focus = {
       kind: 'consistency',
       headline: 'A quiet week — no judgement, just a restart',
-      detail: 'No sessions were logged this week, so there is nothing to analyse and nothing to fix. The plan is still there; the next session is the only target.',
+      detail: 'No sessions were logged this week, so there is nothing to analyze and nothing to fix. The plan is still there; the next session is the only target.',
       headlineI18n: { key: 'weeklyReview.focusQuietHeadline' },
       detailI18n: { key: 'weeklyReview.focusQuietDetail' },
     };
@@ -840,9 +840,7 @@ export function buildSessionDebrief(input: {
     if (scheme.kind !== 'bodyweight' && topReps >= scheme.repMax && working.length >= (planEx.targetSets || 1)) {
       const inc =
         scheme.incrementKg != null
-          ? input.unit === 'lbs'
-            ? `${Math.round(kgToLbs(scheme.incrementKg) * 2) / 2} lbs`
-            : `${scheme.incrementKg} kg`
+          ? formatVolume(scheme.incrementKg, input.unit)
           : '';
       lines.push(
         `${ex.name} hit the top of its ${scheme.repMin}–${scheme.repMax} range on every set — next session adds ${inc}. That is the scheme working exactly as written.`
@@ -936,9 +934,9 @@ export function buildBlockDebrief(input: {
     const line =
       fromKg !== null && toKg !== null
         ? toKg > fromKg
-          ? `${scheme.displayName}: estimated 1RM ${fromKg} → ${toKg} kg (+${round1(toKg - fromKg)} kg across the block).`
-          : `${scheme.displayName}: estimated 1RM held at about ${toKg} kg — no gain this block, which the next block's focus takes into account.`
-        : `${scheme.displayName}: estimated 1RM now about ${toKg ?? fromKg} kg.`;
+          ? `${scheme.displayName}: estimated 1RM ${formatVolume(fromKg, 'kg')} → ${formatVolume(toKg, 'kg')} (+${formatVolume(round1(toKg - fromKg), 'kg')} across the block).`
+          : `${scheme.displayName}: estimated 1RM held at about ${formatVolume(toKg, 'kg')} — no gain this block, which the next block's focus takes into account.`
+        : `${scheme.displayName}: estimated 1RM now about ${formatVolume(toKg ?? fromKg ?? 0, 'kg')}`;
     liftChanges.push({ name: scheme.displayName, fromKg, toKg, line });
   }
 

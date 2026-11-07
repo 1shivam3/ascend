@@ -125,7 +125,7 @@ export function toUserMessageLocalized(
 
   // Cancelled by the user / superseded request — not an error at all.
   if (name === 'AbortError' || lower.includes('abort')) {
-    return fixed('Cancelled.', 'userError.cancelled');
+    return fixed('Canceled.', 'userError.cancelled');
   }
 
   // AI daily quota / fleet cap (server codes AI_QUOTA_EXCEEDED /

@@ -2,6 +2,7 @@ import { FoodItem, MacroTotals, MacroGoals, AthleteGoal, Gender } from './types'
 import { INDIAN_FOOD_VALUES, getHouseholdUnitGrams } from './indian-foods';
 import { containsDevanagari, expandFoodQuery, transliterateDevanagari } from './devanagari';
 import { resolveFoodAlias } from './food-aliases';
+import { formatNumber } from './formatters';
 
 // Macros per 100g or 100ml (unless noted)
 const FOOD_DB_BASE: Record<string, Omit<FoodItem, 'name'>> = {
@@ -1347,10 +1348,10 @@ export function getAbsurdQuantityWarning(food: { name?: string; calories?: numbe
   const unit = (food.unit || 'g').toLowerCase().trim();
   const label = (food.name || 'This item').trim() || 'This item';
   if (cal > 6000) {
-    return { key: 'toast.absurdCalories', params: { label, kcal: Math.round(cal).toLocaleString() } };
+    return { key: 'toast.absurdCalories', params: { label, kcal: formatNumber(Math.round(cal)) } };
   }
   if ((unit === 'g' || unit === 'ml') && qty > 2500) {
-    return { key: 'toast.absurdGrams', params: { label, qty: qty.toLocaleString(), unit } };
+    return { key: 'toast.absurdGrams', params: { label, qty: formatNumber(qty), unit } };
   }
   if ((unit === 'kg' || unit === 'l') && qty > 2.5) {
     return { key: 'toast.absurdBulk', params: { label, qty, unit } };

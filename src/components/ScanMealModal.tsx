@@ -11,7 +11,7 @@ import { OIL_LEVELS, defaultOilForFood, applyOilDelta, tspForOilLevel, servingsF
 import { validateImageFile, resizeAndCompressImage, captureVideoFrame, MAX_IMAGE_DIMENSION } from '@/lib/image-processing';
 import { estimateMacros } from '@/lib/macros';
 import { tildeForFoods } from '@/lib/meal-display';
-import { getLocalTodayStr, round1 } from '@/lib/formatters';
+import { getLocalTodayStr, round1, formatCalories } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
 import ReportAIModal from '@/components/ReportAIModal';
 import AiNoticeBanner from '@/components/AiNoticeBanner';
@@ -1714,7 +1714,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
             analysis.mealName,
             analysis.items.map((i) => i.name).join(', '),
             analysis.coachingNote || '',
-            `~${analysis.totalCalories} kcal, ${analysis.totalProtein}g protein`,
+            `~${formatCalories(analysis.totalCalories)}, ${analysis.totalProtein}g protein`,
           ]
             .filter(Boolean)
             .join(' — ')}

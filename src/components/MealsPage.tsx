@@ -91,7 +91,7 @@ import { useToast } from '@/components/ui/Toast';
 
 import { useAppNavigation } from '@/lib/navigation';
 import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
-import { safeRandomId, getLocalTodayStr, formatLocalDate, round1, formatWaterMl, formatNumber } from '@/lib/formatters';
+import { safeRandomId, getLocalTodayStr, formatLocalDate, round1, formatWater, formatNumber, formatCalories, formatDateShort } from '@/lib/formatters';
 import { useToday } from '@/lib/use-today';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -1141,7 +1141,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     // days were then praised as "Deficit Preserved".
     const safeFloor = getSafeMinCalories(profile?.gender || 'male');
     if (cal < safeFloor || cal > 10000) {
-      toast.error(t('toast.caloriesRange', { floor: safeFloor.toLocaleString(), entered: goalCalories }), t('toast.titleUnsafeTarget'));
+      toast.error(t('toast.caloriesRange', { floor: formatNumber(safeFloor), entered: goalCalories }), t('toast.titleUnsafeTarget'));
       return;
     }
     if (prot < 10 || prot > 400) {
@@ -1292,7 +1292,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             snippet: [
               q,
               data.foods.map((f: FoodItem) => f.name).join(', '),
-              `${tildeForFoods(data.foods)}${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g protein`,
+              `${tildeForFoods(data.foods)}${formatCalories(data.totalCalories || 0)}, ${data.totalProteinG || 0}g protein`,
             ]
               .filter(Boolean)
               .join(' — '),
@@ -1452,7 +1452,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           return {
             isPositive: false,
             badgeText: t('meals.pacingBelowSafeBadge'),
-            subtext: t('meals.pacingBelowSafeSub', { floor: getSafeMinCalories(profile?.gender || 'male').toLocaleString() }),
+            subtext: t('meals.pacingBelowSafeSub', { floor: formatNumber(getSafeMinCalories(profile?.gender || 'male')) }),
             protStatus: protDelta >= 0 ? t('meals.pacingProtMetAntiCatabolic') : t('meals.pacingProtSpareMass', { n: Math.abs(protDelta) }),
           };
         }
@@ -1779,7 +1779,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
             {/* Circular Donut Ring */}
             <div className="relative inline-flex items-center justify-center">
-              <svg width={130} height={130} className="transform -rotate-90" role="img" aria-label={`${Math.round(todayMacros.calories).toLocaleString()} cal, ${targetsNeedBodyStats ? t('targets.setWeightPrompt') : t('meals.ofDailyTarget', { target: displayGoals?.calories || splitFallback.calories })}`}>
+              <svg width={130} height={130} className="transform -rotate-90" role="img" aria-label={`${formatCalories(todayMacros.calories)}, ${targetsNeedBodyStats ? t('targets.setWeightPrompt') : t('meals.ofDailyTarget', { target: displayGoals?.calories || splitFallback.calories })}`}>
                 <circle
                   cx={65}
                   cy={65}
@@ -1803,7 +1803,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                 <span className="text-3xl font-black tabular-nums text-text-primary leading-none">
-                  {Math.round(todayMacros.calories).toLocaleString()}
+                  {formatNumber(Math.round(todayMacros.calories))}
                 </span>
                 <span className="text-2xs text-text-muted font-medium mt-1">
                   cal
@@ -1864,15 +1864,15 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <CollapsibleDetails label={t('meals.why')} className="w-full">
                 {!dayKind && displayGoals?.maintenanceCalories !== undefined && displayGoals?.calorieDelta !== undefined && displayGoals.calorieDelta !== 0 && (
                   <span className="text-xs text-text-muted tabular-nums text-center leading-relaxed px-2 block">
-                    {displayGoals.calories.toLocaleString()} = {displayGoals.maintenanceCalories.toLocaleString()} {t('meals.maintenanceWord')}{' '}
-                    {displayGoals.calorieDelta < 0 ? '−' : '+'}{Math.abs(displayGoals.calorieDelta).toLocaleString()}{' '}
+                    {formatNumber(displayGoals.calories)} = {formatNumber(displayGoals.maintenanceCalories)} {t('meals.maintenanceWord')}{' '}
+                    {displayGoals.calorieDelta < 0 ? '−' : '+'}{formatNumber(Math.abs(displayGoals.calorieDelta))}{' '}
                     {displayGoals.calorieDelta < 0 ? t('meals.deficitWord') : t('meals.surplusWord')}
                     {displayGoals.calorieDelta < 0 && (
                       <> · ≈{(Math.abs(displayGoals.calorieDelta * 7) / 7000).toFixed(2)} {t('meals.perWeek')}</>
                     )}
                     <span className="block text-2xs opacity-80">
                       {displayGoals.calorieDelta < 0
-                        ? t('meals.deficitNote', { floor: getSafeMinCalories(profile?.gender || 'male').toLocaleString() })
+                        ? t('meals.deficitNote', { floor: formatNumber(getSafeMinCalories(profile?.gender || 'male')) })
                         : t('meals.surplusNote')}
                     </span>
                   </span>
@@ -2014,7 +2014,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     {t('meals.lighterDinner')}
                   </span>
                   <p className="text-xs text-text-secondary leading-relaxed mt-0.5">
-                    {t('meals.dinnerHint', { kcal: dayAdaptation.suggestedDinnerKcal.toLocaleString() })}
+                    {t('meals.dinnerHint', { kcal: formatNumber(dayAdaptation.suggestedDinnerKcal) })}
                   </p>
                   <CollapsibleDetails label={t('meals.why')} className="mt-0.5">
                     {renderLocalizedSentence(t, language, dayAdaptation.reasonI18n, dayAdaptation.reason)}
@@ -2209,7 +2209,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <div className="truncate">
                 <span className="text-[0.625rem] uppercase font-bold text-text-muted tracking-wider block font-mono">{t('meals.water')}</span>
                 <span className="text-xs font-bold text-text-primary font-mono block">
-                  {formatWaterMl(waterToday)} <span className="text-text-muted font-normal text-2xs">/ {formatWaterMl(waterTargetMl)}</span>
+                  {formatWater(waterToday)} <span className="text-text-muted font-normal text-2xs">/ {formatWater(waterTargetMl)}</span>
                 </span>
               </div>
             </button>
@@ -2528,7 +2528,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="text-xs font-bold text-text-primary">
-                        {isToday ? t('common.today') : isYesterday ? t('meals.yesterday') : new Date(date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                        {isToday ? t('common.today') : isYesterday ? t('meals.yesterday') : formatDateShort(date, undefined, { weekday: true })}
                       </h3>
                       <span className="text-2xs font-mono px-1.5 py-0.5 rounded bg-bg-secondary text-text-muted">
                         {t(dayMeals.length === 1 ? 'meals.mealCountOne' : 'meals.mealCountMany', { count: dayMeals.length })}
@@ -3910,7 +3910,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   <div>
                     <h4 className="text-xs font-bold text-text-primary group-hover:text-accent-text transition-colors">{t('meals.toolsMacroTargets')}</h4>
                     <p className="text-2xs text-text-muted">
-                      {macroGoals ? `${macroGoals.calories} kcal • ${macroGoals.proteinG}g P` : t('meals.toolsAutoCalc')}
+                      {macroGoals ? `${formatCalories(macroGoals.calories)} • ${macroGoals.proteinG}g P` : t('meals.toolsAutoCalc')}
                     </p>
                   </div>
                 </div>
@@ -3932,7 +3932,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   <div>
                     <h4 className="text-xs font-bold text-text-primary group-hover:text-accent-text transition-colors">{t('meals.toolsHydration')}</h4>
                     <p className="text-2xs text-text-muted">
-                      {t('meals.toolsHydrationHint', { target: formatWaterMl(waterTargetMl) })}
+                      {t('meals.toolsHydrationHint', { target: formatWater(waterTargetMl) })}
                     </p>
                   </div>
                 </div>

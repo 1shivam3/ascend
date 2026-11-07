@@ -16,6 +16,7 @@ import { XP_CHALLENGE_COMPLETE } from '@/lib/xp-system';
 import { buildActiveDays, calculateStreak } from '@/lib/streak-freeze';
 import { useToast } from '@/components/ui/Toast';
 import FriendChallengesSection from '@/components/FriendChallengesSection';
+import { formatDateShort, formatMonthYear } from '@/lib/formatters';
 import { useTranslation } from '@/lib/i18n';
 import type { StringKey } from '@/lib/i18n/en';
 
@@ -33,10 +34,9 @@ const GOAL_KEY: Record<ChallengeMetric, StringKey> = {
   water_days: 'chal.goalWater',
 };
 
-function formatDate(dateStr: string): string {
-  const d = new Date(`${dateStr}T12:00:00`);
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
+// QA-hardening R12: short dates come from the shared formatters
+// (day-first "2 Nov"), not a per-sheet helper.
+const formatDate = formatDateShort;
 
 /**
  * ChallengesSheet — browse this month's opt-in challenges. Quiet by design:
@@ -63,10 +63,7 @@ export default function ChallengesSheet({ isOpen, onClose }: ChallengesSheetProp
   const month = getChallengeMonth(todayStr);
   const monthLabel = useMemo(
     () =>
-      new Date(`${month}-01T12:00:00`).toLocaleDateString(undefined, {
-        month: 'long',
-        year: 'numeric',
-      }),
+      formatMonthYear(new Date(`${month}-01T12:00:00`)),
     [month],
   );
 

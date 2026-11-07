@@ -56,7 +56,7 @@ import {
 import { estimateE1rmKg, mainCompoundKey, roundToLoadable } from './percent-1rm';
 import { canonicalizeExerciseName } from './workout-outcome-evidence';
 import { getExerciseHistorySessions } from './lifter-twin';
-import { getMondayOfWeek, parseLocalDate } from './formatters';
+import { getMondayOfWeek, parseLocalDate, formatVolume } from './formatters';
 import { getWorkoutBodyParts } from './workout-schedule';
 import type { AthleteModel } from './athlete-model';
 import type { StallFlag } from './coach-engine';
@@ -1183,7 +1183,7 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
         whyByExercise[key] = `${swapNote} — it trains the same pattern within your limits.`;
       } else if (role === 'main') {
         whyByExercise[key] = e1rm
-          ? `Main lift for your ${getExerciseMuscle(ex.name).toLowerCase()}. The load is set from your estimated 1RM of about ${Math.round(e1rm)} kg.`
+          ? `Main lift for your ${getExerciseMuscle(ex.name).toLowerCase()}. The load is set from your estimated 1RM of about ${formatVolume(e1rm, 'kg')}.`
           : `Main lift for your ${getExerciseMuscle(ex.name).toLowerCase()}. The starting load is a conservative default — week 1 calibrates it.`;
       } else {
         whyByExercise[key] = `${getExerciseMuscle(ex.name)} work to balance the day — ${targetSets} sets in the ${range.min}–${range.max} rep range.`;
@@ -1547,7 +1547,7 @@ export function buildPlateauProposals(input: {
       displayName: flag.exercise,
       planId,
       suggestion: flag.suggestion,
-      evidence: `${flag.exercise} has not moved in ${flag.sessionsStalled} of the last ${flag.sessionsAnalyzed} sessions — best e1RM is holding at about ${Math.round(flag.peakE1rmKg)} kg (latest about ${Math.round(flag.lastE1rmKg)} kg). ${flag.explanation}`,
+      evidence: `${flag.exercise} has not moved in ${flag.sessionsStalled} of the last ${flag.sessionsAnalyzed} sessions — best e1RM is holding at about ${formatVolume(flag.peakE1rmKg, 'kg')} (latest about ${formatVolume(flag.lastE1rmKg, 'kg')}). ${flag.explanation}`,
       change,
       changeText,
       expected: {},

@@ -78,6 +78,7 @@ describe('toUserMessage (QA4-016)', () => {
   it('abort reads as a cancellation, not an error', () => {
     const e = new Error('The operation was aborted');
     e.name = 'AbortError';
-    expect(msg(e)).toBe('Cancelled.');
+    // Re-pinned for QA-hardening R13: US spelling ('Canceled.').
+    expect(msg(e)).toBe('Canceled.');
   });
 });

@@ -9,7 +9,7 @@ import { fetchPostWorkoutTake, generateDeterministicPostWorkoutTake } from '@/li
 import { detectSessionPRs } from '@/lib/session-pr-detection';
 import { buildSessionDebrief } from '@/lib/weekly-review';
 import { getNextSessionTarget, exerciseHadPain } from '@/lib/workout-engine';
-import { formatDuration, getLocalTodayStr } from '@/lib/formatters';
+import { formatDuration, getLocalTodayStr, formatVolume } from '@/lib/formatters';
 import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
 import ReportAIModal from '@/components/ReportAIModal';
 import { useTranslation } from '@/lib/i18n';
@@ -181,8 +181,7 @@ export default function PostWorkoutTakeModal({
       completedWorkout as unknown as WorkoutEntry,
       store.profile?.bodyweightKg,
     );
-    const displayVal = userUnit === 'lbs' ? Math.round(kgToLbs(volKg)) : Math.round(volKg);
-    return `${displayVal.toLocaleString()} ${userUnit}`;
+    return formatVolume(volKg, userUnit);
   }, [completedWorkout, store.profile?.bodyweightKg, userUnit]);
 
   // QA-hardening R2: the banner reads the ONE session-PR detection

@@ -5,7 +5,7 @@ import { Users, Copy, Check, Share2, UserPlus, Plus, Trophy } from 'lucide-react
 import { useStore } from '@/lib/store';
 import { useToday } from '@/lib/use-today';
 import { useTranslation } from '@/lib/i18n';
-import { safeRandomId } from '@/lib/formatters';
+import { safeRandomId, formatDateShort } from '@/lib/formatters';
 import { buildActiveDays, calculateStreak } from '@/lib/streak-freeze';
 import { XP_CHALLENGE_COMPLETE } from '@/lib/xp-system';
 import {
@@ -30,10 +30,8 @@ import {
 } from '@/lib/friend-challenges';
 import { useToast } from '@/components/ui/Toast';
 
-function formatDate(dateStr: string): string {
-  const d = new Date(`${dateStr}T12:00:00`);
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
+// QA-hardening R12: shared day-first short date ("2 Nov").
+const formatDate = formatDateShort;
 
 function whatsappUrl(text: string): string {
   return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;

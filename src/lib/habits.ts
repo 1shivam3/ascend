@@ -16,7 +16,7 @@ import {
 } from './types';
 import { calculateWorkoutVolumeKg } from './volume';
 import { DEFAULT_BODYWEIGHT_KG } from './defaults';
-import { kgToLbs } from './units';
+import { formatWater, formatVolume, formatMonthName } from './formatters';
 
 export type { DayType };
 
@@ -51,11 +51,9 @@ export function calculateHydrationTarget(params: {
   return Math.max(1500, target);
 }
 
-export function formatWaterLiters(ml: number): string {
-  if ((ml || 0) < 1000) return `${Math.round(ml || 0)} ml`;
-  const val = (ml || 0) / 1000;
-  return `${Math.round(val * 10) / 10} L`;
-}
+// QA-hardening R12: the water format lives in lib/formatters now
+// (formatWater) — this duplicate (identical rule) is removed so the
+// rule exists exactly once.
 
 // ── 2. Creatine Consistency & Saturation ─────────────────────────────────────
 export interface CreatineStats {
@@ -235,7 +233,7 @@ export function getDailyObjectives(params: {
   objectives.push({
     id: 'water',
     title: 'Hydration Target',
-    metricLabel: `${formatWaterLiters(waterMl)} / ${formatWaterLiters(waterTargetMl)}`,
+    metricLabel: `${formatWater(waterMl)} / ${formatWater(waterTargetMl)}`,
     done: waterDone,
   });
 
@@ -264,9 +262,7 @@ export function getDailyObjectives(params: {
   // 5. Bodyweight
   const weightDone = !!weightEntry;
   const displayBw = weightEntry
-    ? profileUnit === 'lbs'
-      ? `${Math.round(kgToLbs(weightEntry.weightKg))} lbs`
-      : `${Math.round(weightEntry.weightKg)} kg`
+    ? formatVolume(weightEntry.weightKg, profileUnit)
     : 'Log Today';
   objectives.push({
     id: 'weight',
@@ -391,8 +387,8 @@ export function getNextBestAction(params: {
     const quickDrink = remainingMl >= 500 ? 500 : 250;
     return {
       type: 'DRINK_WATER',
-      title: `Drink ${quickDrink} ml water`,
-      description: `${formatWaterLiters(waterMl)} / ${formatWaterLiters(waterTargetMl)} (${formatWaterLiters(remainingMl)} remaining)`,
+      title: `Drink ${formatWater(quickDrink)} water`,
+      description: `${formatWater(waterMl)} / ${formatWater(waterTargetMl)} (${formatWater(remainingMl)} remaining)`,
       buttonLabel: `+${quickDrink} ML`,
       amountMl: quickDrink,
     };
@@ -529,7 +525,7 @@ export function getMonthlyAscensionReport(params: {
   const { year, month, workouts, prs, waterLogs, waterTargetMl, creatineLogs } = params;
 
   const dateObj = new Date(year, month, 1);
-  const monthName = dateObj.toLocaleDateString('en-US', { month: 'long' });
+  const monthName = formatMonthName(dateObj, 'en-US');
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
@@ -594,7 +590,7 @@ export function getMonthlyAscensionReport(params: {
 📊 Volume: ${totalVolumeTonnes} Tonnes
 💧 Hydration Goal: ${waterGoalPct}%
 🥤 Creatine: ${creatineAdherenceStr} days
-${strongerLifts.map((l) => `📈 ${l.exercise}: +${l.deltaKg} kg 1RM`).join('\n')}
+${strongerLifts.map((l) => `📈 ${l.exercise}: +${formatVolume(l.deltaKg, 'kg')} 1RM`).join('\n')}
 ━━━━━━━━━━━━━━━━━━
 Built with discipline on ASCEND.`;
 
@@ -636,10 +632,7 @@ export function buildDailyTimeline(params: {
 
   // Morning bodyweight
   if (weightEntry) {
-    const disp =
-      profileUnit === 'lbs'
-        ? `${Math.round(kgToLbs(weightEntry.weightKg))} lbs`
-        : `${Math.round(weightEntry.weightKg)} kg`;
+    const disp = formatVolume(weightEntry.weightKg, profileUnit);
     events.push({
       id: `weight_${weightEntry.id}`,
       time: '07:30',
@@ -682,8 +675,8 @@ export function buildDailyTimeline(params: {
       id: b.id,
       time: tStr,
       type: 'water',
-      title: `Hydration +${b.amountMl} ml`,
-      detail: `${b.amountMl} ml water consumed`,
+      title: `Hydration +${formatWater(b.amountMl)}`,
+      detail: `${formatWater(b.amountMl)} water consumed`,
       completed: true,
     });
   }

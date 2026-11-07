@@ -118,7 +118,7 @@ import {
   getTodayDayOfWeek,
   getWorkoutBodyParts,
 } from '@/lib/workout-schedule';
-import { plural, safeRandomId, getLocalTodayStr, formatLocalDate, parseLocalDate, formatNumber, formatDuration } from '@/lib/formatters';
+import { plural, safeRandomId, getLocalTodayStr, formatLocalDate, parseLocalDate, formatNumber, formatDuration, formatDate, formatDateShort, formatMonthName } from '@/lib/formatters';
 import { calculateWorkoutVolumeKg } from '@/lib/volume';
 import { planPRChangesAfterSetEdit } from '@/lib/pr-reevaluation';
 import { getSessionDuration } from '@/lib/workout-elapsed';
@@ -970,23 +970,24 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
 
   return (
     <div className="card flex flex-col gap-3">
-      {/* Card top row. Layout contract (QA4 P3): the name block is
-          flex-1 + min-w-0 and the title truncates, so it can only ever
-          occupy the space left over by the shrink-0 action rail — the
-          icons can never paint over the name's last glyphs (a long or
-          unlucky-width name used to render clipped under the first
-          icon, e.g. "Upper A" → "Uppei A"). Full name stays available
-          via the title tooltip and the plan detail view. */}
-      <div className="flex items-start justify-between gap-3">
+      {/* Layout contract (QA-hardening R14, supersedes QA4 P3): the name
+          owns the first row BY ITSELF and wraps at word boundaries — the
+          QA4 shared row could only offer the name whatever space the
+          shrink-0 action rail left, so long names were cut at the
+          buttons ("Muscle Blo..."). The meta line sits directly under
+          the name inside the title block, and the action rail (percent /
+          edit / duplicate / delete) moved to its OWN row below, aligned
+          right. Full name is also carried in the `title` tooltip. */}
+      <div>
         <div
-          className="flex-1 min-w-0 cursor-pointer"
+          className="min-w-0 cursor-pointer"
           onClick={onOpen}
           role="button"
           tabIndex={0}
           aria-label={`View details for ${plan.name}`}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
         >
-          <h3 className="font-bold text-text-primary truncate leading-tight" title={plan.name}>{plan.name}</h3>
+          <h3 className="font-bold text-text-primary break-words leading-tight" title={plan.name}>{plan.name}</h3>
           <p className="text-xs text-text-muted font-mono mt-0.5">
             {/* Pre-play D-UX-5: single-string count via plural() — the
                 split {count} exercise{'s'} nodes glued together as
@@ -996,8 +997,8 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
             {' · '}{(() => { const d = estimatePlanDurationMin(plan); return t('plan.estDuration', { min: d.min, max: d.max }); })()}
           </p>
         </div>
-        {/* Action buttons */}
-        <div className="flex items-center gap-1 shrink-0">
+        {/* Action buttons — own row below the name (R14). */}
+        <div className="flex items-center justify-end gap-1 shrink-0 mt-2">
           {/* SIM-P3-04: %1RM mode used to be silently inert on generated
               plans — it lived only inside the plan editor. A card-level
               toggle makes it discoverable and switchable anywhere. */}
@@ -2213,11 +2214,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     startOfWeek.setDate(now.getDate() - dayOfWeek);
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 6);
-    const startMonth = startOfWeek.toLocaleDateString(dateLocale, { month: 'short' });
-    const endMonth = endOfWeek.toLocaleDateString(dateLocale, { month: 'short' });
+    const startMonth = formatMonthName(startOfWeek, dateLocale, 'short');
+    const endMonth = formatMonthName(endOfWeek, dateLocale, 'short');
+    // QA-hardening R12: day-first range, like every other date.
     return startMonth === endMonth
-      ? `${startMonth} ${startOfWeek.getDate()}–${endOfWeek.getDate()}`
-      : `${startMonth} ${startOfWeek.getDate()} – ${endMonth} ${endOfWeek.getDate()}`;
+      ? `${startOfWeek.getDate()}–${endOfWeek.getDate()} ${startMonth}`
+      : `${startOfWeek.getDate()} ${startMonth} – ${endOfWeek.getDate()} ${endMonth}`;
   }, [dateLocale]);
 
   const weeklyScheduleStats = useMemo(() => {
@@ -2316,7 +2318,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       if (diffDays === 0) return t('workout.todayRel');
       if (diffDays === 1) return t('workout.yesterdayRel');
       if (diffDays > 1 && diffDays < 7) return t('workout.daysAgoRel', { days: diffDays });
-      return past.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' });
+      return formatDateShort(getLocalTodayStr(past), dateLocale);
     } catch {
       return dateStr;
     }
@@ -2942,12 +2944,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               // duration — previously it showed only the date and an
               // exercise/set count, so sessions were indistinguishable.
               const rowTitle = workout.name?.trim() || null;
-              const rowDate = parseLocalDate(workout.date).toLocaleDateString(dateLocale, {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              });
+              const rowDate = formatDate(workout.date, dateLocale);
               const volumeKg = calculateWorkoutVolumeKg(workout);
               const volumeDisplay = volumeKg > 0
                 ? `${formatNumber(Math.round(userUnit === 'lbs' ? kgToLbs(volumeKg) : volumeKg))} ${userUnit}`

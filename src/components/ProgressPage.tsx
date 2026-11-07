@@ -40,7 +40,7 @@ import PRsPage from '@/components/PRsPage';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import MeetAttemptPlannerModal from '@/components/MeetAttemptPlannerModal';
 import WeeklyRecapModal from '@/components/WeeklyRecapModal';
-import { plural, safeRandomId, getLocalTodayStr, getWeekDateStrings, formatNumber } from '@/lib/formatters';
+import { plural, safeRandomId, getLocalTodayStr, getWeekDateStrings, formatNumber, formatVolume } from '@/lib/formatters';
 import { buildActiveDays, calculateStreak } from '@/lib/streak-freeze';
 import { useToday } from '@/lib/use-today';
 import { useAppNavigation } from '@/lib/navigation';
@@ -335,10 +335,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     if (kg === null || kg === undefined || isNaN(kg) || kg <= 0) {
       return '—';
     }
-    if (userUnit === 'lbs') {
-      return `${Math.round(kgToLbs(kg))} lbs`;
-    }
-    return `${Math.round(kg * 10) / 10} kg`;
+    return formatVolume(kg, userUnit);
   };
 
   const { registerBackHandler } = useAppNavigation();
@@ -1450,7 +1447,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       <div key={idx} className="py-2.5 flex items-center justify-between text-xs">
                         <div>
                           <span className="font-bold text-text-primary font-mono block">
-                            {userUnit === 'lbs' ? `${s.bestWeight} lbs` : `${s.bestWeight} kg`} × {s.bestReps} reps
+                            {formatNumber(s.bestWeight)} {userUnit} × {s.bestReps} reps
                           </span>
                           {/* Open-items J4.2: the best set is not the whole
                               session — every set, compactly, underneath. */}
@@ -1460,7 +1457,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                             </span>
                           )}
                           <span className="text-2xs text-text-muted font-mono">
-                            Est. 1RM: {userUnit === 'lbs' ? `${s.bestE1RM} lbs` : `${s.bestE1RM} kg`}
+                            Est. 1RM: {formatNumber(s.bestE1RM)} {userUnit}
                           </span>
                         </div>
                         <div className="text-right">

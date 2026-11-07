@@ -22,9 +22,9 @@ import { useTranslation } from '@/lib/i18n';
 import {
   toLocalDateString,
   calculateHydrationTarget,
-  formatWaterLiters,
   getDayType,
 } from '@/lib/habits';
+import { formatWater } from '@/lib/formatters';
 import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
 
 interface HydrationModalProps {
@@ -199,14 +199,14 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
           <div className="flex items-baseline justify-between">
             <div className="flex items-baseline gap-1.5">
               <span className="text-3xl font-black text-text-primary font-sans">
-                {formatWaterLiters(currentWaterMl)}
+                {formatWater(currentWaterMl)}
               </span>
               <span className="text-sm font-bold text-text-muted">
-                / {formatWaterLiters(currentTargetMl)}
+                / {formatWater(currentTargetMl)}
               </span>
             </div>
             <span className="text-xs font-bold text-sky-600 bg-sky-500/10 px-2 py-0.5 rounded-full">
-              {remainingMl === 0 ? t('hydration.targetHit') : t('hydration.remaining', { amount: formatWaterLiters(remainingMl) })}
+              {remainingMl === 0 ? t('hydration.targetHit') : t('hydration.remaining', { amount: formatWater(remainingMl) })}
             </span>
           </div>
 
@@ -221,7 +221,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
             <div className="flex justify-between items-center text-[0.625rem] text-text-muted font-mono font-medium">
               <span>0 ml</span>
               <span>{t('hydration.saturated', { pct })}</span>
-              <span>{formatWaterLiters(currentTargetMl)}</span>
+              <span>{formatWater(currentTargetMl)}</span>
             </div>
           </div>
         </div>

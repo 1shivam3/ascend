@@ -5,7 +5,7 @@ import { useStore } from '@/lib/store';
 import type { AuthUser } from '@/lib/supabase/sync';
 import { AthleteGoal, Gender, Unit, UserMode, DietPreference, AITrainingProfile, ATHLETE_GOAL_CONFIGS, resolvePrimaryGoal, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
 import { useAppNavigation } from '@/lib/navigation';
-import { safeRandomId, getLocalTodayStr, sanitizeAthleteName } from '@/lib/formatters';
+import { safeRandomId, getLocalTodayStr, sanitizeAthleteName, formatNumber } from '@/lib/formatters';
 import { getOrCreateGuestId } from '@/lib/storage';
 import { estimateSessionMinutes } from '@/lib/workout-engine';
 import { canContinueFromGoalStep } from '@/lib/onboarding';
@@ -859,9 +859,9 @@ export default function Onboarding() {
               number to show — an honest prompt takes its place. */}
           {currentMacroGoals && currentMacroGoals.maintenanceCalories ? (
             <div className="bg-bg-card border border-border rounded-2xl px-4 py-3 shadow-2xs space-y-1">
-              <p className="text-sm font-bold">{t('onboarding.foodTargetTitle', { calories: currentMacroGoals.calories.toLocaleString() })}</p>
+              <p className="text-sm font-bold">{t('onboarding.foodTargetTitle', { calories: formatNumber(currentMacroGoals.calories) })}</p>
               <p className="text-xs text-text-primary/70 leading-relaxed">
-                {t('onboarding.foodTargetBurn', { maintenance: currentMacroGoals.maintenanceCalories.toLocaleString() })}
+                {t('onboarding.foodTargetBurn', { maintenance: formatNumber(currentMacroGoals.maintenanceCalories) })}
                 {typeof currentMacroGoals.calorieDelta === 'number' && currentMacroGoals.calorieDelta < 0
                   ? ` ${t('onboarding.foodTargetDeficit', { delta: Math.abs(currentMacroGoals.calorieDelta) })}`
                   : typeof currentMacroGoals.calorieDelta === 'number' && currentMacroGoals.calorieDelta > 0

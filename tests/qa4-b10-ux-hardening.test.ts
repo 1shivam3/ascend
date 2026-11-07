@@ -180,9 +180,20 @@ describe('QA4-031 jargon glosses in plain language', () => {
 describe('QA4-035(a) password floor', () => {
   it('CreateAccountScreen requires 8 characters with matching copy', () => {
     const src = read('src/components/onboarding/CreateAccountScreen.tsx');
-    expect(src).toContain('password.length < 8');
-    expect(src).not.toContain('password.length < 6');
-    expect(src).toContain('Password must be at least 8 characters long.');
+    // QA-hardening R16 (2026-11-07): the floor + message moved out of
+    // the screen into the shared validator and the i18n dictionary —
+    // the screen delegates to validateAuthField, auth-flow.ts holds
+    // the < 8 rule, and en auth.passwordLength carries the exact
+    // sentence this test originally pinned as a hardcoded string.
+    // The floor and the copy are unchanged.
+    expect(src).toContain('validateAuthField');
+    const flow = read('src/lib/auth-flow.ts');
+    expect(flow).toContain('password.length < 8');
+    expect(flow).not.toContain('password.length < 6');
+    const en = read('src/lib/i18n/en.ts');
+    expect(en).toContain(
+      "'auth.passwordLength': 'Password must be at least 8 characters long.'",
+    );
     expect(src).toContain('placeholder="At least 8 characters"');
     expect(src).not.toContain('At least 6 characters');
   });

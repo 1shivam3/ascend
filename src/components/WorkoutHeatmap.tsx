@@ -24,8 +24,8 @@ import { weekdayNames } from '@/lib/i18n';
 import {
   toLocalDateString,
   calculateHydrationTarget,
-  formatWaterLiters,
 } from '@/lib/habits';
+import { formatWater, formatDateShort, formatMonthName } from '@/lib/formatters';
 import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
 import { hasRealBodyStats } from '@/lib/body-stats';
 
@@ -137,7 +137,7 @@ export default function WorkoutHeatmap({
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
 
-    const name = currentDate.toLocaleDateString('en-US', { month: 'long' });
+    const name = formatMonthName(currentDate, 'en-US');
     const totalDays = new Date(year, month + 1, 0).getDate();
 
     const firstDayIndex = new Date(year, month, 1).getDay();
@@ -438,11 +438,7 @@ export default function WorkoutHeatmap({
           <div className="flex justify-between items-center font-mono">
             <div className="flex items-center gap-1.5">
               <span className="font-bold text-text-primary text-sm">
-                {new Date(selectedDate + 'T00:00:00').toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', {
-                  weekday: 'short',
-                  month: 'short',
-                  day: 'numeric',
-                })}
+                {formatDateShort(selectedDate, language === 'hi' ? 'hi-IN' : 'en-US', { weekday: true })}
               </span>
               {selectedDate === todayStr && (
                 <span className="px-1.5 py-0.5 rounded text-[0.625rem] bg-accent/15 text-accent-text font-bold">
@@ -492,7 +488,7 @@ export default function WorkoutHeatmap({
                 <span className="font-semibold text-text-primary">{t('heat.hydration')}</span>
               </div>
               <span className="font-bold text-[0.625rem] text-sky-600">
-                {formatWaterLiters(selectedWater)}
+                {formatWater(selectedWater)}
               </span>
             </div>
 

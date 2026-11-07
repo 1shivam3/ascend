@@ -17,6 +17,7 @@ import {
 import { resolvePlannedDay } from '@/lib/scheduled-days';
 import type { PlannedWorkout, WeeklySchedule } from '@/lib/types';
 import { HABIT_FILL, HABIT_ON_FILL } from '@/lib/habit-tokens';
+import { formatDateShort, formatMonthYear, formatWater, getLocalTodayStr } from '@/lib/formatters';
 
 export type MatrixView = 'weekly' | 'monthly';
 
@@ -116,18 +117,11 @@ export default function HomeMatrix({
     setMonthAnchor({ year: now.getFullYear(), month: now.getMonth() });
   };
 
-  const weekLabel = `${week[0].toLocaleDateString(locale, { month: 'short', day: 'numeric' })} – ${week[6].toLocaleDateString(locale, { month: 'short', day: 'numeric' })}`;
-  const monthLabel = new Date(monthAnchor.year, monthAnchor.month, 1).toLocaleDateString(locale, {
-    month: 'long',
-    year: 'numeric',
-  });
+  const weekLabel = `${formatDateShort(getLocalTodayStr(week[0]), locale)} – ${formatDateShort(getLocalTodayStr(week[6]), locale)}`;
+  const monthLabel = formatMonthYear(new Date(monthAnchor.year, monthAnchor.month, 1), locale);
 
   const detailTitle = selected
-    ? new Date(`${selected}T00:00:00`).toLocaleDateString(locale, {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-      })
+    ? formatDateShort(selected, locale, { weekday: true })
     : '';
 
   return (
@@ -405,7 +399,7 @@ export default function HomeMatrix({
                       </span>
                       <span className="text-text-muted ml-auto tabular-nums">
                         {h.id === 'water' && h.target !== null
-                          ? `${h.value} / ${h.target} ml`
+                          ? `${formatWater(h.value)} / ${formatWater(h.target)}`
                           : h.id === 'protein' && h.target !== null
                             ? `${Math.round(h.value)} / ${h.target} g`
                             : h.id === 'workout'

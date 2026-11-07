@@ -91,7 +91,7 @@ import { effectiveMacroGoals, dayScaledGoals, fallbackMacroGoals, fallbackProtei
 import TargetEstimateNote from '@/components/TargetEstimateNote';
 import { hasRealBodyStats } from '@/lib/body-stats';
 import { toLocalDateString, calculateHydrationTarget } from '@/lib/habits';
-import { getTimeGreeting, getWeekRange, formatNumber } from '@/lib/formatters';
+import { getTimeGreeting, getWeekRange, formatNumber, formatWater } from '@/lib/formatters';
 import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
 import { useToast } from '@/components/ui/Toast';
 import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
@@ -815,7 +815,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 <p className="text-xs font-semibold text-text-primary leading-relaxed">
                   {t('home.coachSuggestsKcal', {
                     delta: `${nutritionSuggestion.deltaKcal > 0 ? '+' : ''}${nutritionSuggestion.deltaKcal}`,
-                    new: nutritionSuggestion.newCalories.toLocaleString(),
+                    new: formatNumber(nutritionSuggestion.newCalories),
                   })}
                 </p>
                 <CollapsibleDetails label={t('home.why')}>
@@ -839,11 +839,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                       setMacroGoals(scaleMacroGoalsToCalories(current, nutritionSuggestion.newCalories));
                     }
                     recordCalorieAdjustment(record);
-                    toast.success(t('toast.targetUpdated', { kcal: nutritionSuggestion.newCalories.toLocaleString() }), t('toast.titleCaloriesAdjusted'));
+                    toast.success(t('toast.targetUpdated', { kcal: formatNumber(nutritionSuggestion.newCalories) }), t('toast.titleCaloriesAdjusted'));
                   }}
                   className="mt-2 py-2 px-4 rounded-xl bg-accent text-accent-on text-xs font-bold active:scale-95 transition-all cursor-pointer"
                 >
-                  {t('home.applyKcal', { kcal: nutritionSuggestion.newCalories.toLocaleString() })}
+                  {t('home.applyKcal', { kcal: formatNumber(nutritionSuggestion.newCalories) })}
                 </button>
               </div>
             </div>
@@ -1031,7 +1031,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             <div>
               <p className="text-xs font-bold text-text-primary">{t('home.hydration')}</p>
               <p className="text-xs text-text-muted tabular-nums">
-                {t('home.hydrationToday', { drank: (todayWaterMl / 1000).toFixed(1), target: (hydrationTargetMl / 1000).toFixed(1) })}
+                {t('home.hydrationToday', { drank: formatWater(todayWaterMl), target: formatWater(hydrationTargetMl) })}
               </p>
             </div>
           </div>
@@ -1104,7 +1104,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <span className="text-xs font-medium text-text-muted">{t('home.level')} {levelInfo.level}</span>
           <span className="mt-1.5 block">
             <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums leading-tight">
-              {`${levelInfo.total.toLocaleString()} XP`}
+              {formatNumber(levelInfo.total)} XP
             </span>
             <span className="w-full h-1.5 rounded-full bg-border/60 overflow-hidden mt-2 block">
               <span
@@ -1113,7 +1113,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               />
             </span>
             <span className="text-xs text-text-muted tabular-nums block mt-1">
-              {(levelInfo.progress.needed - levelInfo.progress.current).toLocaleString()} {t('home.toLevel', { level: levelInfo.level + 1 })}
+              {formatNumber(levelInfo.progress.needed - levelInfo.progress.current)} {t('home.toLevel', { level: levelInfo.level + 1 })}
             </span>
           </span>
         </button>
@@ -1139,7 +1139,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             <span className="text-2xs text-text-muted block">{t('health.sourceLabel')}</span>
           </div>
           <span className="ml-auto text-sm font-black font-mono text-text-primary tabular-nums">
-            {healthSummary.stepsToday.toLocaleString()}
+            {formatNumber(healthSummary.stepsToday)}
           </span>
         </div>
       )}

@@ -30,26 +30,45 @@ export interface AuthFormValues {
   password: string;
 }
 
+export type AuthFormField = 'name' | 'email' | 'password';
+
+/**
+ * Per-field validation — the SAME rules as validateAuthForm, scoped
+ * to one field (QA-hardening R16: the onboarding screens validate
+ * inline on blur/submit with these, instead of native browser
+ * bubbles). Returns the field's i18n error key, or null.
+ */
+export function validateAuthField(
+  mode: AuthFormMode,
+  field: AuthFormField,
+  values: AuthFormValues,
+): StringKey | null {
+  if (field === 'name') {
+    return mode === 'signup' && !values.name.trim()
+      ? 'auth.nameRequired'
+      : null;
+  }
+  if (field === 'email') {
+    const email = values.email.trim();
+    return !email || !email.includes('@') ? 'auth.validEmail' : null;
+  }
+  // field === 'password'
+  if (mode === 'signup') {
+    return values.password.length < 8 ? 'auth.passwordLength' : null;
+  }
+  return !values.password ? 'auth.passwordRequired' : null;
+}
+
 /** Returns the i18n key of the first validation error, or null. */
 export function validateAuthForm(
   mode: AuthFormMode,
   values: AuthFormValues,
 ): StringKey | null {
-  if (mode === 'signup' && !values.name.trim()) {
-    return 'auth.nameRequired';
-  }
-  const email = values.email.trim();
-  if (!email || !email.includes('@')) {
-    return 'auth.validEmail';
-  }
-  if (mode === 'signup') {
-    if (values.password.length < 8) {
-      return 'auth.passwordLength';
-    }
-  } else if (!values.password) {
-    return 'auth.passwordRequired';
-  }
-  return null;
+  return (
+    validateAuthField(mode, 'name', values) ??
+    validateAuthField(mode, 'email', values) ??
+    validateAuthField(mode, 'password', values)
+  );
 }
 
 /**
