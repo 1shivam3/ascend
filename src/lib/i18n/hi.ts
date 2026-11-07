@@ -203,8 +203,9 @@ export const hi: Partial<Record<StringKey, string>> = {
   'fuelPrefs.skip': 'छोड़ दें',
   // Token-reuse composition only — flagged for native-speaker review.
   'coachBlock.approveEmpty': 'वर्कआउट नहीं है',
-  // Token-reuse compositions only — flagged for native-speaker review.
-  'tools.title': 'ट्रेनिंग देखें',
+  // QA-hardening R15: corrected — the previous value read "view
+  // training", not "Training Tools" (machine-translated, unreviewed).
+  'tools.title': 'ट्रेनिंग टूल्स',
   'tools.formCoachTitle': 'फ़ॉर्म कोच',
   'tools.formCoachHint': '10 व्यायाम — पोज़ विश्लेषण और रेप काउंट के लिए आपके वीडियो से अपने आप पहचाने जाते हैं',
   'workout.formCoach': 'फ़ॉर्म कोच',
@@ -1040,6 +1041,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'workout.previousSessions': 'पिछले सत्र',
   'workout.viewMode': 'वर्कआउट व्यू',
   'workout.viewAuto': 'ऑटो',
+  // QA-hardening R13 (machine-translated, unreviewed).
   'workout.viewIndependentHint': 'सिर्फ़ वर्कआउट स्क्रीन के लिए। शुरुआती में बड़े स्टेपर दिखते हैं; उन्नत में पूरी सेट टेबल दिखती है।',
   'workout.viewSimple': 'सिंपल',
   'workout.viewAdvanced': 'एडवांस्ड',
@@ -1174,6 +1176,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'workout.discardMsg': 'इस वर्कआउट को समाप्त करके रद्द करें? इस सेशन के अनसेव सेट मिट जाएंगे — पहले से सेव पूरे सेट आपके इतिहास में रहेंगे।',
   'workout.keepTraining': 'ट्रेनिंग जारी रखें',
   'workout.sessionSaved': 'सेशन सेव हुआ।',
+  // QA-hardening R13 (machine-translated, unreviewed).
   'workout.workoutComplete': 'सेशन पूरा!',
   'workout.closeSummary': 'सारांश बंद करें',
   'workout.volume': 'वॉल्यूम',
@@ -1586,6 +1589,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'common.undo': 'वापस लाएँ',
   'meals.deleteMealButton': 'खाना हटाएं',
   'meals.mealTotal': 'खाने का कुल',
+  // QA-hardening R13 (machine-translated, unreviewed).
   'meals.inputMethods': 'फ़ोटो स्कैन • आवाज़ • टेक्स्ट • भारतीय भोजन डेटाबेस',
   'meals.saveMeal': 'खाना सेव करें',
   'meals.noFoodsInMeal': 'इस खाने में अभी कोई खाद्य नहीं जोड़ा गया।',
