@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { STORE_KEY } from './personas';
@@ -79,8 +79,53 @@ export async function setAccent(page: Page, accent: AccentId, customHex?: string
   });
 }
 
+/**
+ * Sets the app theme the way the app itself does (Phase 3 fix).
+ *
+ * The Phase 0 version of this helper only patched `theme` inside the
+ * persisted store blob. That never worked: public/theme-init.js
+ * honors a stored theme only when it is a CUSTOM choice, and the
+ * custom flag lives in the standalone localStorage keys
+ * `ascend_theme` + `ascend_has_custom_theme` (exactly the writes
+ * store.setTheme makes in src/lib/store.ts). Without them the app
+ * follows the OS preference — light in this harness — so every
+ * "dark" screenshot taken through the old helper was actually a
+ * light render (root-caused in Phase 2; the Phase 2 specs carried a
+ * local workaround).
+ *
+ * This version mirrors store.setTheme's writes through an init
+ * script — the channel that survives the app's persist-on-unload
+ * during reload — keeps the blob consistent for rehydration, then
+ * reloads and ASSERTS the html `data-theme` attribute matches, so a
+ * screenshot taken after setTheme(page, 'dark') is provably dark.
+ */
 export async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await patchStore(page, { theme });
+  await page.addInitScript((t) => {
+    try {
+      window.localStorage.setItem('ascend_theme', t);
+      window.localStorage.setItem('ascend_has_custom_theme', 'true');
+      const raw = window.localStorage.getItem('ascend_store');
+      if (raw) {
+        const blob = JSON.parse(raw);
+        if (blob && blob.state) {
+          blob.state.theme = t;
+          blob.state.hasCustomTheme = true;
+          window.localStorage.setItem('ascend_store', JSON.stringify(blob));
+        }
+      }
+    } catch {}
+  }, theme);
+  await page.reload({ waitUntil: 'load' });
+  await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+  // Settle: `load` fires before React finishes mounting (lazy tab
+  // chunks + the mount fade), and a screenshot taken inside that
+  // window captures the skeleton or a mid-fade frame — the Phase 3
+  // re-shoots caught exactly that (a uniformly dim "dark" frame that
+  // resolved to a crisp render ~1 s later). Wait for the network to
+  // go idle, then a beat for the fade, mirroring the settle waits
+  // the specs already use after opening a workout.
+  await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {});
+  await page.waitForTimeout(800);
 }
 
 export async function setTextSize(page: Page, textScale: 'normal' | 'large' | 'xlarge'): Promise<void> {
