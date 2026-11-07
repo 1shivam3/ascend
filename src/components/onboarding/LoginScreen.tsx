@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/Toast';
 import SocialAuthButtons from './SocialAuthButtons';
 import ForgotPasswordModal from './ForgotPasswordModal';
 import { useTranslation } from '@/lib/i18n';
+import { validateAuthField, type AuthFormField } from '@/lib/auth-flow';
 
 interface LoginScreenProps {
   onBack: () => void;
@@ -27,18 +28,33 @@ export default function LoginScreen({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isForgotOpen, setIsForgotOpen] = useState(false);
+  // QA-hardening R16: inline per-field validation (blur + submit)
+  // replaces the native browser bubbles — the form is noValidate and
+  // errors render under each field with role="alert". The top banner
+  // remains for generic server failures only (F-10).
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<AuthFormField, string>>
+  >({});
+
+  const checkField = (field: AuthFormField): boolean => {
+    const key = validateAuthField('login', field, {
+      name: '',
+      email,
+      password,
+    });
+    setFieldErrors((prev) => ({ ...prev, [field]: key ? t(key) : undefined }));
+    return !key;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     const trimmedEmail = email.trim();
-    if (!trimmedEmail || !trimmedEmail.includes('@')) {
-      setError(t('auth.validEmail'));
-      return;
-    }
-    if (!password) {
-      setError(t('auth.passwordRequired'));
+    // Validate every field at once so all inline errors show together.
+    const emailOk = checkField('email');
+    const passwordOk = checkField('password');
+    if (!emailOk || !passwordOk) {
       return;
     }
 
@@ -112,8 +128,8 @@ export default function LoginScreen({
             </div>
           )}
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Form — noValidate (R16): inline errors, never native bubbles. */}
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             {/* Email */}
             <div>
               <label htmlFor="login-email" className="block text-xs font-semibold text-text-primary mb-1.5">
@@ -125,10 +141,17 @@ export default function LoginScreen({
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => checkField('email')}
                 placeholder="you@email.com"
-                required
+                aria-invalid={fieldErrors.email ? true : undefined}
+                aria-describedby={fieldErrors.email ? 'login-email-error' : undefined}
                 className="w-full px-4 py-3 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary placeholder:text-text-muted/60 outline-none transition"
               />
+              {fieldErrors.email && (
+                <p id="login-email-error" role="alert" className="mt-1.5 text-xs text-red-600">
+                  {fieldErrors.email}
+                </p>
+              )}
             </div>
 
             {/* Password */}
@@ -152,8 +175,10 @@ export default function LoginScreen({
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  onBlur={() => checkField('password')}
                   placeholder={t('auth.passwordPlaceholder')}
-                  required
+                  aria-invalid={fieldErrors.password ? true : undefined}
+                  aria-describedby={fieldErrors.password ? 'login-password-error' : undefined}
                   className="w-full pl-4 pr-11 py-3 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary placeholder:text-text-muted/60 outline-none transition"
                 />
                 <button
@@ -165,6 +190,11 @@ export default function LoginScreen({
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              {fieldErrors.password && (
+                <p id="login-password-error" role="alert" className="mt-1.5 text-xs text-red-600">
+                  {fieldErrors.password}
+                </p>
+              )}
             </div>
 
             {/* Primary Action Button */}

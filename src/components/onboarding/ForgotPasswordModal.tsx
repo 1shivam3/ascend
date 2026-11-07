@@ -80,7 +80,8 @@ export default function ForgotPasswordModal({
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
+            {/* noValidate (R16): JS validation only, no native bubbles. */}
             <p className="text-xs text-text-muted leading-relaxed">
               {t('auth.resetIntro')}
             </p>

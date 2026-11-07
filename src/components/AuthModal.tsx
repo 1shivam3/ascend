@@ -338,7 +338,8 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               ))}
             </div>
 
-            <form onSubmit={handleEmailSubmit} className="space-y-2.5">
+            {/* noValidate (R16): JS validation only, no native bubbles. */}
+            <form onSubmit={handleEmailSubmit} noValidate className="space-y-2.5">
               {mode === 'signup' && (
                 <div className="space-y-1">
                   <label htmlFor="auth-name" className="text-2xs font-bold text-text-secondary">{t('auth.fullName')}</label>
