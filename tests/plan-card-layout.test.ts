@@ -2,17 +2,18 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import path from 'path';
 
-// QA4 P3 (browser-verified on production 2026-10-21): on the Train tab
-// at ~420px the plan card's action icons painted over the plan name —
-// "Upper A" rendered as "Uppei A", "Lower B" as "Lowei B". PlanCard is
-// not exported, so per the codebase's existing source-assertion pattern
-// (data-recovery-and-barcode-qa.ts) this test pins the layout contract
-// that makes overlap structurally impossible:
-//   - header row is flex with a real gap,
-//   - name block is flex-1 + min-w-0 (confined to leftover space),
-//   - the title truncates inside its own box,
-//   - the action rail is shrink-0 (never compressed into the name).
-// Layout (not visual) verification: no browser is available in CI here.
+// PlanCard header layout contract.
+// History: QA4 P3 (browser-verified on production 2026-10-21) fixed the
+// action icons PAINTING OVER the plan name ("Upper A" → "Uppei A") by
+// confining the name to the leftover space beside a shrink-0 rail and
+// truncating it. QA-hardening R14 (2026-11-07) supersedes that
+// trade-off: truncation itself was the remaining complaint ("Muscle
+// Blo..."), so the name now owns its row and WRAPS, and the action
+// rail moved to its own row below. Overlap stays structurally
+// impossible — name and rail no longer share a row at all.
+// PlanCard is not exported, so per the codebase's existing
+// source-assertion pattern this test pins the layout contract.
+// Browser evidence for the new contract: qa/e2e/r14-truncation.spec.ts.
 
 const src = readFileSync(
   path.join(__dirname, '..', 'src', 'components', 'WorkoutPage.tsx'),
@@ -25,27 +26,31 @@ const planCardStart = src.indexOf('function PlanCard(');
 const planCardEnd = src.indexOf('// ─── Main Component', planCardStart);
 const planCard = src.slice(planCardStart, planCardEnd);
 
-describe('PlanCard header layout contract (QA4 P3 icon/name overlap)', () => {
+describe('PlanCard header layout contract (R14, supersedes QA4 P3)', () => {
   it('finds the PlanCard component', () => {
     expect(planCardStart).toBeGreaterThan(-1);
     expect(planCardEnd).toBeGreaterThan(planCardStart);
     expect(planCard).toContain('{plan.name}');
   });
 
-  it('header row is a flex row with a gap between name and actions', () => {
-    expect(planCard).toMatch(/flex items-start justify-between gap-3/);
+  it('name and actions no longer share a flex row', () => {
+    expect(planCard).not.toMatch(/flex items-start justify-between gap-3/);
   });
 
-  it('name block claims leftover space and can shrink below content size', () => {
-    expect(planCard).toMatch(/className="flex-1 min-w-0 cursor-pointer"/);
-  });
-
-  it('title truncates inside its own box instead of line-clamping under the icons', () => {
-    expect(planCard).toMatch(/<h3 className="[^"]*truncate[^"]*" title=\{plan\.name\}>/);
+  it('the name wraps at word boundaries instead of truncating', () => {
+    expect(planCard).toMatch(
+      /<h3 className="font-bold text-text-primary break-words leading-tight" title=\{plan\.name\}>/,
+    );
+    expect(planCard).not.toContain('truncate');
     expect(planCard).not.toContain('line-clamp-2');
   });
 
-  it('action rail never shrinks', () => {
-    expect(planCard).toMatch(/<div className="flex items-center gap-1 shrink-0">/);
+  it('the action rail is its own row below the name, aligned right, never shrunk', () => {
+    expect(planCard).toMatch(
+      /<div className="flex items-center justify-end gap-1 shrink-0 mt-2">/,
+    );
+    expect(planCard.indexOf('{plan.name}')).toBeLessThan(
+      planCard.indexOf("aria-label={t('plan.usePercent')}"),
+    );
   });
 });
