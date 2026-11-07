@@ -258,6 +258,32 @@ export async function logAllSets(page: Page, run: PersonaRun): Promise<void> {
         anyComplete.scrollIntoView({ block: 'center' });
         return 'scrolled-to-complete';
       }
+      // 4) Advanced view: per-row "Mark set complete" toggles. The
+      // returned label carries the remaining-toggle count so the
+      // repeat guard sees progress (the count drops per completion)
+      // and only trips when a click truly changes nothing.
+      const toggles = buttons.filter((b) => /^mark set complete/i.test(label(b)));
+      const toggle = toggles.find((b) => inFrameX(b));
+      if (toggle && hitOk(toggle)) {
+        toggle.click();
+        return `advanced-toggle:left-${toggles.length}`;
+      }
+      const anyToggle = Array.from(document.querySelectorAll('button')).find(
+        (b) => /^mark set complete/i.test(label(b as HTMLElement)) && inFrameX(b as HTMLElement),
+      );
+      if (anyToggle) {
+        anyToggle.scrollIntoView({ block: 'center' });
+        return 'scrolled-to-toggle';
+      }
+      // 5) Advanced view: an exercise-complete card ("Bench Press
+      // Complete!") gates progression behind a Next Exercise action.
+      const nextEx = buttons.find(
+        (b) => (/^next exercise/i.test(label(b)) || /^next:/i.test(label(b))) && hitOk(b),
+      );
+      if (nextEx) {
+        nextEx.click();
+        return `next-exercise:${label(nextEx).slice(0, 24)}`;
+      }
       return null;
     });
     if (!clicked) {
@@ -270,8 +296,16 @@ export async function logAllSets(page: Page, run: PersonaRun): Promise<void> {
     run.taps += 1;
     repeats = clicked === lastClicked ? repeats + 1 : 0;
     lastClicked = clicked;
-    if (repeats >= 3) throw new Error(`set loop stuck repeating "${clicked}"`);
-    await page.waitForTimeout(clicked === 'complete-set' ? 900 : 350);
+    if (repeats >= 3) {
+      // Advanced end-state: after the final exercise the Next
+      // Exercise button stays visible but inert — that is loop-end,
+      // not a stuck state; the caller's assertions verify the save.
+      if (clicked.startsWith('next-exercise:')) break;
+      throw new Error(`set loop stuck repeating "${clicked}"`);
+    }
+    await page.waitForTimeout(
+      clicked === 'complete-set' || clicked.startsWith('advanced-toggle') || clicked === 'next-exercise' ? 900 : 350,
+    );
   }
 }
 
@@ -312,6 +346,11 @@ export async function finishWorkout(page: Page, run: PersonaRun): Promise<void> 
     await run.tap(page.getByRole('button', { name: /finish workout|वर्कआउट समाप्त/i }).first());
   }
   await page.waitForTimeout(1_200);
+  // Advanced view: header Finish opens a session-summary sheet whose
+  // confirm is "Save & Finish" (Resume would return to the session).
+  const saveFinish = page.getByRole('button', { name: /save & finish/i });
+  if (await saveFinish.isVisible().catch(() => false)) await run.tap(saveFinish);
+  await page.waitForTimeout(800);
   const anyway = page.getByRole('button', { name: /finish anyway|end workout|फिर भी समाप्त/i });
   if (await anyway.isVisible().catch(() => false)) await run.tap(anyway);
   await page.waitForTimeout(1_000);
