@@ -14,12 +14,16 @@ import {
   generateExercisesFromSelection,
 } from '@/components/SuggestedWorkoutModal';
 import {
+  getExerciseJointCautions,
+  getFilteredSubstitutes,
   getInjuryBannedFamilies,
   getMovementFamily,
+  getPainSwapFallbacks,
   getPlanBannedJoints,
   isExerciseJointBanned,
   prepareGeneratedPlans,
 } from '@/lib/workout-engine';
+import { EXERCISE_LIBRARY, getExerciseMuscle } from '@/lib/exercise-library';
 import type { PlannedWorkout } from '@/lib/store';
 
 // ─── F4-3: modal generator ignored DECLARED limitations ─────────────
@@ -295,5 +299,67 @@ describe('F4-2: navigations fall back to the precached shell on every origin', (
     await installed!; // a rejection here fails the test — that is the point
     expect(addCalls).toBeGreaterThan(5);
     expect(wasSkipWaitingCalled()).toBe(true);
+  });
+});
+
+// ─── F4-4: Swap → Hurts for Squat offered zero replacements ─────────
+
+describe('F4-4: pain swaps fall back instead of dead-ending', () => {
+  it('root cause pinned: the strict hurts filter for Squat is empty (gym and home)', () => {
+    const hurts = { avoidSameFamilyAs: 'Squat', avoidJointsOf: 'Squat' } as const;
+    expect(getFilteredSubstitutes('Squat', { equipment: 'full_gym', ...hurts })).toEqual([]);
+    expect(getFilteredSubstitutes('Squat', { equipment: 'home_dumbbells', ...hurts })).toEqual([]);
+    // …while a normal (non-hurts) swap for Squat still has its list —
+    // the strict machinery itself is not broken, only the pain corner.
+    expect(getFilteredSubstitutes('Squat', { equipment: 'full_gym' }).length).toBeGreaterThan(0);
+  });
+
+  it('fallbacks: same primary muscle, different family, safest first, joints reported', () => {
+    const fallbacks = getPainSwapFallbacks('Squat', { equipment: 'full_gym' });
+    expect(fallbacks.length).toBeGreaterThan(0);
+    expect(fallbacks.length).toBeLessThanOrEqual(3);
+    const squatCautions = new Set(getExerciseJointCautions('Squat'));
+    for (const f of fallbacks) {
+      expect(getExerciseMuscle(f.name)).toBe('Legs');
+      expect(getMovementFamily(f.name)).not.toBe('squat');
+      // sharedJoints is exactly the candidate's cautions ∩ Squat's —
+      // the panel's caution label is driven by this, never hidden.
+      const expected = getExerciseJointCautions(f.name).filter((j) => squatCautions.has(j));
+      expect(f.sharedJoints).toEqual(expected);
+    }
+    const counts = fallbacks.map((f) => f.sharedJoints.length);
+    expect(counts).toEqual([...counts].sort((a, b) => a - b));
+  });
+
+  it('no Legs movement avoids every Squat joint — so every Squat fallback carries a caution', () => {
+    // Data fact behind the design: the fallback list for Squat can
+    // never be caution-free; the UI must label each one (and does, via
+    // sharedJoints). If library data changes so a joint-free option
+    // exists, this test flips and the sort puts it first instead.
+    const fallbacks = getPainSwapFallbacks('Squat', { equipment: 'full_gym' });
+    expect(fallbacks.every((f) => f.sharedJoints.length > 0)).toBe(true);
+  });
+
+  it('equipment is honored: home Squat pain honestly has no fallback (the remove branch)', () => {
+    expect(getPainSwapFallbacks('Squat', { equipment: 'home_dumbbells' })).toEqual([]);
+    const bw = getPainSwapFallbacks('Bench Press', { equipment: 'bodyweight_only' });
+    expect(bw.length).toBeGreaterThan(0);
+    for (const f of bw) {
+      expect(['Bodyweight', 'Cardio']).toContain(f.equipment);
+    }
+  });
+
+  it('exclusions are honored, and excluding everything yields the honest empty list', () => {
+    const withExclusion = getPainSwapFallbacks('Squat', {
+      equipment: 'full_gym',
+      exclusions: ['Lying Leg Curl'],
+    });
+    expect(withExclusion.map((f) => f.name)).not.toContain('Lying Leg Curl');
+    const allLegs = EXERCISE_LIBRARY.filter(
+      (i) => getExerciseMuscle(i.name) === 'Legs' && i.name !== 'Squat'
+    ).map((i) => i.name);
+    expect(
+      getPainSwapFallbacks('Squat', { equipment: 'full_gym', exclusions: allLegs })
+    ).toEqual([]);
   });
 });

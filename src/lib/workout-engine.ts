@@ -18,8 +18,9 @@ import {
   isActiveSetCompleted,
   UserMode,
 } from './types';
-import { getEquipmentType, isMainCompoundLift, calculateOneRepMax, suggestLoad, isBodyweightExercise } from './strength-standards';
+import { getEquipmentType, isMainCompoundLift, calculateOneRepMax, suggestLoad, isBodyweightExercise, normalizeExerciseName } from './strength-standards';
 import {
+  EXERCISE_LIBRARY,
   findLibraryExercise,
   getExerciseMuscle,
   getLibrarySubstitutes,
@@ -1794,7 +1795,73 @@ export function getFilteredSubstitutes(
   return list.filter((s) => normalizeExerciseKey(s.name) !== selfKey);
 }
 
-/** Beginner pull-up regression: 3×8 pull-ups is impossible for most day-one users. */
+export interface PainSwapFallback extends ExerciseSubstitute {
+  /**
+   * Joints this candidate shares with the painful exercise's caution
+   * list. The swap UI must show a visible caution for any candidate
+   * where this is non-empty — it is never presented as joint-free.
+   */
+  sharedJoints: JointArea[];
+}
+
+/**
+ * F4-4: last-resort 'hurts' fallbacks. getFilteredSubstitutes is
+ * deliberately strict (different movement family AND none of the
+ * painful exercise's joints), and for some exercises it returns
+ * NOTHING — Squat's only table substitutes are all knee-loaded squat
+ * family, so the pain swap dead-ended at "remove the exercise".
+ * When the strict list is empty the swap panel calls this instead:
+ * same primary muscle, DIFFERENT movement family, equipment-allowed,
+ * not excluded — safest first (candidates avoiding the painful
+ * exercise's joints entirely lead), each carrying its sharedJoints so
+ * the panel labels the caution honestly.
+ * Trade-off: a candidate that still loads a flagged joint may be
+ * offered — but only ever with that caution visible, and the strict
+ * list remains the default whenever it has anything.
+ */
+export function getPainSwapFallbacks(
+  exerciseName: string,
+  opts: SubstituteFilterOptions = {}
+): PainSwapFallback[] {
+  if (!exerciseName) return [];
+  const normalized = normalizeExerciseName(exerciseName);
+  const selfKey = normalizeExerciseKey(normalized);
+  const muscle = getExerciseMuscle(normalized);
+  const family = getMovementFamily(normalized);
+  const origJoints = new Set(getExerciseJointCautions(normalized));
+  const allowed = opts.equipment ? ALLOWED_EQUIPMENT[opts.equipment] : null;
+  const out: PainSwapFallback[] = [];
+  for (const item of EXERCISE_LIBRARY) {
+    const name = item.name;
+    if (normalizeExerciseKey(name) === selfKey) continue;
+    // Same primary muscle — a replacement must train the same thing.
+    if (getExerciseMuscle(name) !== muscle) continue;
+    // Different movement family — the point is different joint loading.
+    // (An 'other'-family original has no family to avoid.)
+    if (family !== 'other' && getMovementFamily(name) === family) continue;
+    if (isPlaceholderSubstitute(name)) continue;
+    if (exerciseMatchesExclusion(name, opts.exclusions)) continue;
+    // Home profiles cannot use a pull-up bar they may not have — the
+    // same rule getFilteredSubstitutes applies to both home profiles.
+    if (
+      (opts.equipment === 'home_dumbbells' || opts.equipment === 'bodyweight_only') &&
+      /pull[- ]?up|chin[- ]?up/i.test(name)
+    ) {
+      continue;
+    }
+    if (allowed && !allowed.has(String(item.equipment).toLowerCase())) continue;
+    const sharedJoints = getExerciseJointCautions(name).filter((j) => origJoints.has(j));
+    out.push({
+      name,
+      equipment: item.equipment,
+      reason: 'Same muscle, different movement',
+      sharedJoints,
+    });
+  }
+  // Safest first: no shared joints, then fewest shared joints.
+  out.sort((a, b) => a.sharedJoints.length - b.sharedJoints.length);
+  return out.slice(0, 3);
+}
 export function regressPullUpsForBeginner(ex: PlannedExercise, access: EquipmentAccess): PlannedExercise {
   if (!/^pull-?ups?$/i.test(ex.name.trim())) return ex;
   const regression =
