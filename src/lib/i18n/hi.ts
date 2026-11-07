@@ -3088,6 +3088,9 @@ export const hi: Partial<Record<StringKey, string>> = {
   'sg.toastNamed': 'कृपया कम से कम एक नामित एक्सरसाइज़ शामिल करें।',
   'sg.toastGenerated': '{days}-दिन का {split} साप्ताहिक वर्कआउट प्लान बना!',
   'sg.toastGeneratedT': 'शेड्यूल बना',
+  // F4-3: limitation transparency in the generator (en + hi).
+  'sg.limitationsApplied': 'आपकी सीमाओं ({limitations}) के हिसाब से बदला गया: सीमित हिस्से पर ज़ोर डालने वाले मूवमेंट बदल या हटा दिए गए हैं।',
+  'sg.clashWarning': 'ध्यान दें — सीमा से टकराव: {names} — यह आपकी बताई सीमाओं ({limitations}) वाले हिस्से पर ज़ोर डालता है। यहाँ बनी एक्सरसाइज़ अपने-आप बदल या हट जाती हैं, इसलिए हाथ से जोड़ी गई एक्सरसाइज़ पर सिर्फ़ यह चेतावनी मिलती है। दर्द हो तो इसे बदल लें।',
   // LIVE-P1-03: Today chrome + coach sentences converted to i18n.
   'home.quickLogPast': 'पहले ही ट्रेनिंग कर ली? पिछला सेशन जल्दी लॉग करें',
   'home.restDayLine': 'आराम का दिन — कोई वर्कआउट तय नहीं। हमेशा की तरह खाएं और सोएं।',

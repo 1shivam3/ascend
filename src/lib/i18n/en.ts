@@ -3081,6 +3081,9 @@ export const en = {
   'sg.toastNamed': 'Please include at least one named exercise.',
   'sg.toastGenerated': 'Generated {days}-day {split} weekly workout plan!',
   'sg.toastGeneratedT': 'Schedule Generated',
+  // F4-3: limitation transparency in the generator (en + hi).
+  'sg.limitationsApplied': 'Adjusted for your limitations ({limitations}): movements that load a limited area were swapped or removed.',
+  'sg.clashWarning': 'Heads up — limitation clash: {names} — this loads an area in your declared limitations ({limitations}). Exercises generated here are swapped or dropped automatically, so this one was added by hand and only warns. Swap it out if it still hurts.',
   // LIVE-P1-03: Today chrome + coach sentences converted to i18n.
   'home.quickLogPast': 'Already trained? Quick log a past session',
   'home.restDayLine': 'Rest day — no workout scheduled. Eat and sleep as usual.',

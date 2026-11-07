@@ -29,7 +29,14 @@ import {
 import { getExerciseList, getExerciseEquipment, isBodyweightExercise } from '@/lib/strength-standards';
 import { PlannedExercise, PlannedWorkout, useStore } from '@/lib/store';
 import { generateSplitWeeklySchedule } from '@/lib/workout-schedule';
-import { prepareGeneratedPlans } from '@/lib/workout-engine';
+import {
+  prepareGeneratedPlans,
+  getInjuryBannedFamilies,
+  getInjuryBannedJoints,
+  getMovementFamily,
+  isExerciseJointBanned,
+  type GeneratedPlanContext,
+} from '@/lib/workout-engine';
 import { EquipmentType } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
 import { useTranslation } from '@/lib/i18n';
@@ -338,6 +345,61 @@ export function generateExercisesFromSelection(
   });
 }
 
+/**
+ * F4-3: names in a list that clash with the user's DECLARED limitations
+ * — the same detection the hand-built plan editor warns with
+ * (SIM-P1-02): a banned movement family, or an exercise flagging a
+ * limited joint (full joint set — warning is informational, so unlike
+ * plan adaptation it does not exempt lower_back).
+ */
+export function findLimitationClashes(
+  exercises: PlannedExercise[],
+  limitations: string[] = []
+): string[] {
+  if (!limitations || limitations.length === 0) return [];
+  const bannedFamilies = getInjuryBannedFamilies(limitations);
+  const bannedJoints = getInjuryBannedJoints(limitations);
+  if (bannedFamilies.size === 0 && bannedJoints.size === 0) return [];
+  return exercises
+    .map((e) => e.name.trim())
+    .filter(
+      (n) =>
+        n &&
+        (bannedFamilies.has(getMovementFamily(n)) || isExerciseJointBanned(n, bannedJoints))
+    );
+}
+
+/**
+ * F4-3 (Phase 4, safety): the modal's body-part generator used to hand
+ * back its raw pool picks — it never passed through the adaptation
+ * pipeline the split-schedule path uses, so declared limitations were
+ * ignored and a Knee + Low-back user was prescribed barbell Squat with
+ * no warning. Generated exercises now pass through
+ * prepareGeneratedPlans with the same context as
+ * handleApplySplitSchedule ("one helper, every door"): clashing
+ * movements are swapped or dropped by the machinery itself.
+ * `limitationAdjusted` reports whether the RAW picks clashed with the
+ * declared limitations, so the modal can say what it did instead of
+ * silently presenting a shortened list.
+ */
+export function generateAdaptedExercisesFromSelection(
+  bodyParts: BodyPartOption[],
+  intensity: IntensityOption,
+  userUnit: 'kg' | 'lbs',
+  ctx: Omit<GeneratedPlanContext, 'unit'>
+): { exercises: PlannedExercise[]; limitationAdjusted: boolean } {
+  const raw = generateExercisesFromSelection(bodyParts, intensity, userUnit);
+  const limitationAdjusted = findLimitationClashes(raw, ctx.limitations || []).length > 0;
+  const plan: PlannedWorkout = {
+    id: 'sg-modal-generated',
+    name: 'Suggested workout',
+    createdAt: new Date().toISOString(),
+    exercises: raw,
+  };
+  const [adapted] = prepareGeneratedPlans([plan], { ...ctx, unit: userUnit });
+  return { exercises: adapted?.exercises || raw, limitationAdjusted };
+}
+
 export default function SuggestedWorkoutModal({
   isOpen,
   onClose,
@@ -421,6 +483,9 @@ export default function SuggestedWorkoutModal({
   // Plan editor state
   const [planTitle, setPlanTitle] = useState('');
   const [exercises, setExercises] = useState<PlannedExercise[]>([]);
+  // F4-3: true when the last generation's raw picks clashed with the
+  // declared limitations and the pipeline swapped/dropped them.
+  const [limitationAdjusted, setLimitationAdjusted] = useState(false);
 
   // Search & quick add exercise
   const [searchQuery, setSearchQuery] = useState('');
@@ -450,9 +515,21 @@ export default function SuggestedWorkoutModal({
     });
   };
 
-  // Generate exercises based on chosen body parts and intensity
-  const generateExercises = (bodyParts: BodyPartOption[], intensity: IntensityOption): PlannedExercise[] => {
-    return generateExercisesFromSelection(bodyParts, intensity, userUnit);
+  // F4-3: declared limitations / exclusions / equipment the generator
+  // must respect, as primitives so the regeneration effect re-runs when
+  // they change (same context handleApplySplitSchedule passes to the
+  // pipeline — one helper, every door).
+  const declaredLimitations = trainingProfile?.injuriesOrLimitations || [];
+  const declaredExclusions = trainingProfile?.dislikedExercises || [];
+  const limitationsKey = declaredLimitations.join('|');
+  const exclusionsKey = declaredExclusions.join('|');
+  const generationCtx: Omit<GeneratedPlanContext, 'unit'> = {
+    bodyweightKg: profile?.bodyweightKg,
+    experience: profile?.userMode,
+    ageYears: profile?.age,
+    equipment: trainingProfile?.equipment || 'full_gym',
+    exclusions: declaredExclusions,
+    limitations: declaredLimitations,
   };
 
   // Re-generate routine on changes
@@ -462,17 +539,24 @@ export default function SuggestedWorkoutModal({
     if (activeTab === 'bodyparts') {
       const names = selectedBodyParts.map((bp) => { const f = BODY_PARTS.find((b) => b.id === bp); return f ? t(f.labelKey) : bp; }).join(' + ');
       setPlanTitle(`${names} (${t(INTENSITIES.find((i) => i.id === selectedIntensity)?.labelKey ?? 'sg.int.medium')})`);
-      setExercises(generateExercisesFromSelection(selectedBodyParts, selectedIntensity, userUnit));
+      const generated = generateAdaptedExercisesFromSelection(selectedBodyParts, selectedIntensity, userUnit, generationCtx);
+      setExercises(generated.exercises);
+      setLimitationAdjusted(generated.limitationAdjusted);
     } else {
       // Split mode
       const split = SPLIT_PRESETS.find((s) => s.id === selectedSplitId);
       const day = split?.days[selectedSplitDayIdx] || split?.days[0];
       if (day) {
         setPlanTitle(day.name);
-        setExercises(generateExercisesFromSelection(day.bodyParts, selectedIntensity, userUnit));
+        const generated = generateAdaptedExercisesFromSelection(day.bodyParts, selectedIntensity, userUnit, generationCtx);
+        setExercises(generated.exercises);
+        setLimitationAdjusted(generated.limitationAdjusted);
       }
     }
-  }, [isOpen, activeTab, selectedBodyParts, selectedIntensity, selectedSplitId, selectedSplitDayIdx, userUnit, t]);
+    // generationCtx is rebuilt per render; its primitive inputs are
+    // the deps that matter (userUnit covers ctx.unit).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, activeTab, selectedBodyParts, selectedIntensity, selectedSplitId, selectedSplitDayIdx, userUnit, t, limitationsKey, exclusionsKey, trainingProfile?.equipment, profile?.bodyweightKg, profile?.userMode, profile?.age]);
 
   if (!isOpen) return null;
 
@@ -914,6 +998,35 @@ export default function SuggestedWorkoutModal({
                 </div>
               </div>
             )}
+
+            {/* F4-3: say what the pipeline did. When the raw picks
+                clashed with the declared limitations, the list the
+                user sees was swapped/shortened by the adaptation
+                machinery — never present that silently. */}
+            {limitationAdjusted && declaredLimitations.length > 0 && (
+              <div className="rounded-xl border border-border bg-bg-secondary/60 p-3 text-xs leading-relaxed text-text-secondary">
+                {t('sg.limitationsApplied', { limitations: declaredLimitations.join(', ') })}
+              </div>
+            )}
+
+            {/* F4-3: a clash can still reach the list by hand (quick
+                add) — generated exercises are adapted automatically,
+                hand-added ones get the same warning the plan editor
+                shows (SIM-P1-02). Warn, don't block: the user may
+                have recovered. It renders above Start/Save, so it is
+                always seen before the session opens. */}
+            {(() => {
+              const conflicts = findLimitationClashes(exercises, declaredLimitations);
+              if (conflicts.length === 0) return null;
+              return (
+                <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-200">
+                  {t('sg.clashWarning', {
+                    names: conflicts.join(', '),
+                    limitations: declaredLimitations.join(', '),
+                  })}
+                </div>
+              );
+            })()}
 
             {/* Exercise Rows — P1-2 (UI/UX audit phase 3): two-line
                 layout. Line 1 carries the full exercise name (wraps,
