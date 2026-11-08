@@ -1250,6 +1250,13 @@ export const en = {
   // ── Settings (QA4-004 additions) ────────────────────────────────────
   'settings.accountSecurity': 'Account & Security',
   'settings.cloudSynced': 'Cloud Synced',
+  'settings.syncQuarantineTitle': 'These items could not be backed up and are being skipped:',
+  'settings.syncQuarantineItem': '{collection}: {reason}',
+  'settings.syncCollectionBodyMetrics': 'Body measurement',
+  'settings.syncCollectionWorkouts': 'Workout',
+  'settings.syncCollectionMeals': 'Meal',
+  'settings.syncCollectionPlans': 'Planned workout',
+  'settings.syncCollectionPrs': 'Personal record',
   'settings.syncing': 'Syncing...',
   'settings.syncIdle': 'Sync Idle',
   'settings.localOnly': 'Local Device Only',

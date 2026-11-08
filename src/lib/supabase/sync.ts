@@ -2,7 +2,7 @@ import { getSupabase } from './client';
 import { normalizeDateToLocalDay } from '../formatters';
 import { useStore, resolveAvatar, buildFreshHistoryState, PROGRESS_PHOTOS_KEY, stampTombstoneDeletes, clearTombstoneStamps } from '../store';
 import { getTabLeaderGuard } from '../tab-leader';
-import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, BodyMetricEntry, PlannedWorkout } from '../types';
+import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, BodyMetricEntry, PlannedWorkout, MacroGoals } from '../types';
 import {
   mergeRemotePlans,
   mergeRemoteRecords,
@@ -26,7 +26,7 @@ import {
   type TombstoneCollection,
 } from './reconcile';
 import { isCrossAccountSwitch as isCrossAccountSwitchFn, decideStartFreshGate, isGuestProfileId } from '../start-fresh-guard';
-import { hasRetainedHistory } from '../history-fork';
+import { hasRetainedHistory, ARCHIVED_HISTORY_KEY, ARCHIVED_HISTORY_PREV_KEY } from '../history-fork';
 import { DEFAULT_BODYWEIGHT_KG } from '../defaults';
 import { getInitialCoachBlocksState, type CoachBlocksState } from '../block-engine';
 
@@ -236,6 +236,90 @@ export function bodyMetricFromRemoteRow(r: any): BodyMetricEntry {
     // R1/DI-08: carry the server stamp into the local row.
     ...(r.updated_at ? { updatedAt: r.updated_at } : {}),
   };
+}
+
+/** The remote body_metrics fields the push plan needs (D-Q2-1). */
+export interface RemoteBodyMetricRow {
+  id: string;
+  date: string;
+  updated_at?: string | null;
+}
+
+export interface BodyMetricPushPlan {
+  /** Upsert keyed on `id` — no foreign row holds these dates. */
+  idUpserts: BodyMetricEntry[];
+  /**
+   * Upsert keyed on `(user_id, date)` — atomically replaces the
+   * foreign row holding the date, in one statement.
+   */
+  dateUpserts: BodyMetricEntry[];
+  /**
+   * Rows the push must not touch this cycle: the remote side holds
+   * the date with an equal-or-newer stamp, or the row's identity is
+   * tangled (its id also exists remotely under another date) and
+   * only the pull merge can resolve it.
+   */
+  skipped: BodyMetricEntry[];
+}
+
+/**
+ * D-Q2-1: plan one body-metrics push against the remote rows.
+ *
+ * body_metrics has a UNIQUE(user_id, date) constraint, but the push
+ * gate historically compared rows by id only. A local metric whose
+ * date is already held server-side under a DIFFERENT id (the classic
+ * case: this device superseded a pulled row locally, or two devices
+ * logged the same day) passed the id gate as "absent remotely" and
+ * its upsert 409'd on body_metrics_user_date_unique — every cycle,
+ * forever, holding the whole sync in the error state.
+ *
+ * The plan extends the R1/DI-08 stamp discipline from ids to dates:
+ * per date, the newest-stamped contender wins, judged by
+ * shouldPushRow exactly like the id gate.
+ * - No foreign holder for the date → the classic id gate decides.
+ * - A foreign row holds the date and the local row is strictly
+ *   newer → upsert on the (user_id, date) conflict target: Postgres
+ *   rewrites the holder row into ours in a single statement, so the
+ *   date is never left empty and can never 409.
+ * - The foreign row is equal-or-newer (or either stamp is
+ *   unparseable) → skip; the pull adopts the remote row and the
+ *   local dedupe supersedes ours.
+ * - Our id ALSO exists remotely under a different date (a date edit
+ *   raced a same-date create) → skip: rewriting either row could
+ *   collide with the other; the pull merge + dedupe untangles
+ *   identity first, then a later push proceeds cleanly.
+ *
+ * Pure function — the push path and the tests both consume it.
+ */
+export function planBodyMetricPush(
+  localRows: BodyMetricEntry[],
+  remoteRows: RemoteBodyMetricRow[],
+): BodyMetricPushPlan {
+  const remoteById = new Map(remoteRows.map((r) => [r.id, r]));
+  const remoteByDate = new Map(remoteRows.map((r) => [r.date, r]));
+  const idUpserts: BodyMetricEntry[] = [];
+  const dateUpserts: BodyMetricEntry[] = [];
+  const skipped: BodyMetricEntry[] = [];
+  for (const row of localRows) {
+    const partner = remoteByDate.get(row.date);
+    if (partner && partner.id !== row.id) {
+      if (remoteById.has(row.id)) {
+        skipped.push(row);
+      } else if (shouldPushRow(row.updatedAt, partner.updated_at)) {
+        dateUpserts.push(row);
+      } else {
+        skipped.push(row);
+      }
+      continue;
+    }
+    const remote = remoteById.get(row.id);
+    if (remote === undefined || shouldPushRow(row.updatedAt, remote.updated_at)) {
+      idUpserts.push(row);
+    } else {
+      skipped.push(row);
+    }
+  }
+  return { idUpserts, dateUpserts, skipped };
 }
 
 /**
@@ -632,6 +716,194 @@ export function syncRetryDelayMs(attempt: number): number {
   return Math.min(15_000 * 2 ** Math.max(0, attempt), 300_000);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-row push quarantine (deep-test defect 2 / report D1, 2026-11-08).
+//
+// pushLocalData used to record the FIRST upsert error and throw after
+// attempting all steps (finding F29), so ONE permanently-rejected row
+// failed every cycle and held the red "Backup hit a server problem"
+// banner up forever — while everything else actually synced. A row the
+// server will reject identically forever (constraint violation, invalid
+// value shape, unknown column, RLS denial) can never heal by retrying,
+// so it is quarantined: excluded from future pushes, recorded here with
+// its error, and surfaced in Settings in plain words. The cycle then
+// completes as 'synced' for everything else.
+//
+// TRANSIENT failures (network, 5xx, timeouts, stamp-fetch failures) are
+// NOT quarantined — they keep the classic whole-cycle error state + R6
+// backoff. The permanent/transient line is the error's code: Postgres
+// SQLSTATEs for constraint/value errors and PostgREST schema errors are
+// deterministic properties of the row; everything else is retried.
+//
+// Release rules: a quarantined row is retried once its local updatedAt
+// stamp changes (the user edited it — possibly fixing the problem); it
+// is pruned when the row is deleted locally (the tombstone flow owns
+// the server copy); a successful push clears it.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const SYNC_QUARANTINE_KEY = 'ascend_sync_quarantine_v1';
+
+export type SyncQuarantineCollection =
+  | 'personal_records'
+  | 'workouts'
+  | 'meals'
+  | 'body_metrics'
+  | 'planned_workouts';
+
+export interface QuarantinedSyncRow {
+  collection: SyncQuarantineCollection;
+  rowId: string;
+  /** Local updatedAt stamp at quarantine time — the release trigger. */
+  stamp: string | null;
+  code: string | null;
+  message: string;
+  quarantinedAt: string;
+}
+
+const PERMANENT_ROW_ERROR_CODES = new Set([
+  '23505', // unique_violation
+  '23503', // foreign_key_violation
+  '23502', // not_null_violation
+  '23514', // check_violation
+  '22007', // invalid_datetime_format
+  '22008', // datetime_field_overflow
+  '22003', // numeric_value_out_of_range
+  '22P02', // invalid_text_representation
+  '42501', // insufficient_privilege (RLS denial — deterministic per row)
+  '42703', // undefined_column (pre-migration app build)
+  'PGRST204', // PostgREST schema cache: column not found
+]);
+
+/** True when `err` is a deterministic per-row rejection (see above). */
+export function isPermanentRowError(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code;
+  return typeof code === 'string' && PERMANENT_ROW_ERROR_CODES.has(code);
+}
+
+/**
+ * The DI-02 missing-column signature: a deploy that predates a column
+ * migration gets PGRST204 / 42703 "column ... does not exist" from
+ * PostgREST. Used to trigger the bare-payload retry (and classify the
+ * 42703 case before quarantine can claim it).
+ */
+export function isMissingColumnError(err: unknown): boolean {
+  const e = err as { code?: unknown; message?: unknown } | null;
+  const msg = typeof e?.message === 'string' ? e.message : '';
+  return (
+    e?.code === 'PGRST204' ||
+    e?.code === '42703' ||
+    /column .* does not exist/i.test(msg) ||
+    /could not find the .* column/i.test(msg)
+  );
+}
+
+function readSyncQuarantineMap(): Record<string, QuarantinedSyncRow[]> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(SYNC_QUARANTINE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, QuarantinedSyncRow[]>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeSyncQuarantineMap(map: Record<string, QuarantinedSyncRow[]>): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(SYNC_QUARANTINE_KEY, JSON.stringify(map));
+  } catch {
+    /* storage full/blocked — quarantine degrades to in-cycle only */
+  }
+}
+
+export function readSyncQuarantine(userId: string): QuarantinedSyncRow[] {
+  const entries = readSyncQuarantineMap()[userId];
+  if (!Array.isArray(entries)) return [];
+  return entries.filter(
+    (e): e is QuarantinedSyncRow => !!e && typeof e === 'object' && typeof e.rowId === 'string' && typeof e.collection === 'string',
+  );
+}
+
+export function quarantineSyncRow(userId: string, entry: QuarantinedSyncRow): void {
+  const map = readSyncQuarantineMap();
+  const list = readSyncQuarantine(userId).filter((e) => !(e.collection === entry.collection && e.rowId === entry.rowId));
+  list.push(entry);
+  map[userId] = list;
+  writeSyncQuarantineMap(map);
+}
+
+export function releaseSyncQuarantine(userId: string, collection: SyncQuarantineCollection, rowIds: string[]): void {
+  if (rowIds.length === 0) return;
+  const ids = new Set(rowIds);
+  const map = readSyncQuarantineMap();
+  const list = readSyncQuarantine(userId);
+  const kept = list.filter((e) => !(e.collection === collection && ids.has(e.rowId)));
+  if (kept.length === list.length) return;
+  map[userId] = kept;
+  writeSyncQuarantineMap(map);
+}
+
+/** Drop entries whose local row no longer exists (deleted → tombstone flow owns it). */
+export function pruneSyncQuarantine(userId: string, collection: SyncQuarantineCollection, liveRowIds: Set<string>): void {
+  const map = readSyncQuarantineMap();
+  const list = readSyncQuarantine(userId);
+  const kept = list.filter((e) => e.collection !== collection || liveRowIds.has(e.rowId));
+  if (kept.length === list.length) return;
+  map[userId] = kept;
+  writeSyncQuarantineMap(map);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Defect 3 (report D-F1, 2026-11-08): macro goals lost on
+// sign-out → sign-in.
+//
+// Mechanism: macro goals live ONLY in the local store — no server
+// table/column holds them (pushLocalData syncs the profile's athlete
+// `goals`, never calories/macros). The keep-data logout ARCHIVES the
+// live state (buildFullBackup shape — macroGoals included) under
+// ARCHIVED_HISTORY_KEY, then resets live state via
+// buildFreshHistoryState(), which sets macroGoals: null. The sign-in
+// pull rebuilds the synced collections from the server but has no
+// macro-goal source, and the archive was only ever applied by the
+// manual Settings "Restore archived history" — so the goals stayed
+// null and Today silently substituted a profile-derived estimate.
+//
+// Fix (client-side, no migration): on sign-in, when the user has no
+// macro goals locally and none were pulled, re-apply the goals from
+// that same logout archive. The archive's profile id must match the
+// signing-in user — on a shared device, another account's goals must
+// never leak in. Cross-device restore remains impossible without a
+// server column; that migration is proposed in the PR, not run.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Extract macro goals from a logout archive (full-backup shape) for
+ * `userId`. Returns null unless the archive belongs to that user and
+ * carries a well-formed goals object.
+ */
+export function macroGoalsFromArchive(archive: unknown, userId: string): MacroGoals | null {
+  if (!archive || typeof archive !== 'object') return null;
+  const a = archive as { profile?: { id?: unknown } | null; macroGoals?: unknown };
+  if (!a.profile || a.profile.id !== userId) return null;
+  const g = a.macroGoals as { calories?: unknown; proteinG?: unknown } | null;
+  if (!g || typeof g !== 'object') return null;
+  if (typeof g.calories !== 'number' || !Number.isFinite(g.calories)) return null;
+  if (typeof g.proteinG !== 'number' || !Number.isFinite(g.proteinG)) return null;
+  return g as MacroGoals;
+}
+
+function readLocalArchive(key: string): unknown {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 
 export interface AuthUser {
   id: string;
@@ -897,6 +1169,10 @@ class SupabaseSyncEngine {
       pendingMergeChoice: this.pendingMergeChoiceFor !== null,
       // QA-hardening R6: classified sync failure (null when healthy).
       errorKind: this.errorKind,
+      // Defect 2: rows the server permanently rejected (see the
+      // quarantine block above) — Settings surfaces these in plain
+      // words; they never hold the cycle in 'error' by themselves.
+      quarantined: this.currentUser ? readSyncQuarantine(this.currentUser.id) : ([] as QuarantinedSyncRow[]),
     };
   }
 
@@ -2310,6 +2586,20 @@ class SupabaseSyncEngine {
           updates.tombstoneStamps = stamps;
         }
       }
+      // Defect 3 (D-F1): macro goals are device-local — the pull has
+      // no server source for them, and a keep-data logout nulled them
+      // (buildFreshHistoryState). Re-apply them from that logout's
+      // archive when this user has none locally and none were pulled,
+      // so sign-out → sign-in on this device never loses them. The
+      // archive is user-checked inside macroGoalsFromArchive; an
+      // existing local value is never overwritten. (See the helper's
+      // comment block for the full mechanism.)
+      if (!updates.macroGoals && !freshState.macroGoals) {
+        const restored =
+          macroGoalsFromArchive(readLocalArchive(ARCHIVED_HISTORY_KEY), user.id) ??
+          macroGoalsFromArchive(readLocalArchive(ARCHIVED_HISTORY_PREV_KEY), user.id);
+        if (restored) updates.macroGoals = restored;
+      }
       // The captured needsLocalUpdate reflects pre-round-trip state;
       // the only thing that matters now is whether updates still has keys.
       needsLocalUpdate = Object.keys(updates).length > 0;
@@ -2372,6 +2662,37 @@ class SupabaseSyncEngine {
         stamps.set((row as any).id as string, ((row as any).updated_at as string | null) ?? null);
       }
       return stamps;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * D-Q2-1: fetch the remote body_metrics rows (id, date, updated_at)
+   * for the date-aware push plan. Same fail-safe contract as
+   * fetchRemoteStamps: null on ANY failure, and the caller then
+   * skips the table's upserts and records an error rather than
+   * pushing ungated.
+   */
+  private async fetchRemoteBodyMetricRows(
+    userId: string,
+  ): Promise<RemoteBodyMetricRow[] | null> {
+    try {
+      const supabase = getSupabase();
+      if (!supabase) return null;
+      const { data, error } = await fetchAllUserRowsPaged(
+        supabase,
+        'body_metrics',
+        'id,date,updated_at',
+        'user_id',
+        userId,
+      );
+      if (error) return null;
+      return (data || []).map((r: any) => ({
+        id: r.id as string,
+        date: r.date as string,
+        updated_at: (r.updated_at as string | null) ?? null,
+      }));
     } catch {
       return null;
     }
@@ -2473,80 +2794,124 @@ class SupabaseSyncEngine {
    * Body-metric upsert with the DI-02 missing-column retry, applied
    * ONLY to gate-passing rows. Extracted from pushLocalData so the
    * R1/DI-08 gate can run first without duplicating the retry.
+   *
+   * D-Q2-1: the caller picks the conflict target — 'id' for the
+   * classic batch, 'user_id,date' for rows atomically replacing a
+   * foreign holder of their date (see planBodyMetricPush). Returns
+   * the upsert error (after the DI-02 retry) or null on success, so
+   * the caller knows which batches actually landed.
    */
-  private async pushBodyMetricRows(
-    rows: BodyMetricEntry[],
-    userId: string,
-    record: (e: { message?: string } | null | undefined) => void,
-  ): Promise<void> {
+  /**
+   * Defect 2: shared row-batch push with permanent-failure isolation.
+   * Upserts the batch; on a missing-column error with a `bareVariant`,
+   * retries bare (the DI-02 / LOOP-2 pre-migration tolerance — never a
+   * mask for other errors). A PERMANENT batch rejection fans out to
+   * per-row upserts: Postgres aborts the whole statement on one bad
+   * row, and quarantining the healthy rows along with the poison row
+   * would be exactly the F29 failure mode this defect removes. A
+   * TRANSIENT error (network / 5xx / no deterministic code) is
+   * reported as-is and the caller keeps the classic whole-cycle error
+   * behavior — no fan-out, no quarantine.
+   */
+  private async pushRowBatch(opts: {
+    table: string;
+    payloads: any[];
+    onConflict?: string;
+    bareVariant?: (rows: any[]) => any[];
+    bareNote?: string;
+  }): Promise<{ okIds: string[]; permanentFailures: { id: string; error: unknown }[]; transientError: unknown }> {
+    const outcome = {
+      okIds: [] as string[],
+      permanentFailures: [] as { id: string; error: unknown }[],
+      transientError: null as unknown,
+    };
     const supabase = getSupabase();
-    if (!supabase) return;
-    const metricRows = rows.map((b) => bodyMetricRowForPush(b, userId));
-    const { error: metricUpsertError } = await supabase.from('body_metrics').upsert(metricRows, { onConflict: 'id' });
-    if (metricUpsertError) {
-      // Gauntlet DI-02: measurement columns exist only after the
-      // 2026102801 migration. Pre-migration, PostgREST rejects rows
-      // carrying them — retry without them (same missing-column
-      // pattern as planned_workouts extras). Any other error is
-      // recorded, never masked by the retry.
-      const errMsg = metricUpsertError.message || '';
-      const missingMeasurementColumn =
-        metricUpsertError.code === 'PGRST204' || metricUpsertError.code === '42703' ||
-        /column .* does not exist/i.test(errMsg) ||
-        /could not find the .* column/i.test(errMsg);
-      if (missingMeasurementColumn) {
-        const bareRows = metricRows.map(({ body_fat_pct: _bf, chest_in: _c, waist_in: _w, hips_in: _h, ...rest }) => rest);
-        const { error: bareError } = await supabase.from('body_metrics').upsert(bareRows, { onConflict: 'id' });
-        record(bareError);
-      } else {
-        record(metricUpsertError);
-      }
+    if (!supabase || opts.payloads.length === 0) return outcome;
+    const upsert = (rows: any[]) =>
+      supabase.from(opts.table).upsert(rows, opts.onConflict ? { onConflict: opts.onConflict } : undefined);
+    let { error } = await upsert(opts.payloads);
+    if (error && opts.bareVariant && isMissingColumnError(error)) {
+      if (opts.bareNote) console.warn(opts.bareNote);
+      ({ error } = await upsert(opts.bareVariant(opts.payloads)));
     }
+    if (!error) {
+      outcome.okIds = opts.payloads.map((r) => r.id as string);
+      return outcome;
+    }
+    if (!isPermanentRowError(error)) {
+      outcome.transientError = error;
+      return outcome;
+    }
+    for (const row of opts.payloads) {
+      let res = await upsert([row]);
+      if (res.error && opts.bareVariant && isMissingColumnError(res.error)) {
+        res = await upsert(opts.bareVariant([row]));
+      }
+      if (!res.error) outcome.okIds.push(row.id as string);
+      else if (isPermanentRowError(res.error)) outcome.permanentFailures.push({ id: row.id as string, error: res.error });
+      else if (!outcome.transientError) outcome.transientError = res.error;
+    }
+    return outcome;
   }
 
   /**
-   * Plan upsert with the QA4-006 extras missing-column retry, applied
-   * ONLY to gate-passing rows. Extracted from pushLocalData so the
-   * R1/DI-08 gate can run first without duplicating the retry.
+   * Defect 2: fold a pushRowBatch outcome into the quarantine store and
+   * the cycle's error record. Landed rows are released; permanent
+   * failures are quarantined (never recorded as cycle errors — the
+   * cycle is 'synced' with them noted); a transient error goes through
+   * `record` exactly as before (F29 → error state + R6 backoff).
    */
-  private async pushPlanRows(
-    rows: PlannedWorkout[],
+  private applyPushOutcome(
     userId: string,
+    collection: SyncQuarantineCollection,
+    localRows: { id: string; updatedAt?: unknown }[],
+    outcome: { okIds: string[]; permanentFailures: { id: string; error: unknown }[]; transientError: unknown },
     record: (e: { message?: string } | null | undefined) => void,
-  ): Promise<void> {
-    const supabase = getSupabase();
-    if (!supabase) return;
-    const planRows = rows.map((p) => ({
-      id: p.id,
-      user_id: userId,
-      name: p.name,
-      exercises: p.exercises || [],
-      // Own stamp, not `now` (see the profile comment in pushLocalData).
-      updated_at: p.updatedAt || new Date().toISOString(),
-      extras: buildPlanExtras(p) ?? null,
-    }));
-    const { error: planUpsertError } = await supabase
-      .from('planned_workouts')
-      .upsert(planRows, { onConflict: 'id' });
-    if (planUpsertError) {
-      // LOOP-2: the bare retry exists ONLY for the pre-migration case
-      // where the `extras` column itself is missing. Any other error
-      // must not be masked by a silent retry without extras.
-      const errMsg = planUpsertError.message || '';
-      const missingExtrasColumn =
-        planUpsertError.code === 'PGRST204' ||
-        planUpsertError.code === '42703' ||
-        /column .* does not exist/i.test(errMsg) ||
-        /could not find the .* column/i.test(errMsg);
-      if (missingExtrasColumn) {
-        const bareRows = planRows.map(({ extras: _extras, ...rest }) => rest);
-        const { error: bareError } = await supabase.from('planned_workouts').upsert(bareRows, { onConflict: 'id' });
-        record(bareError);
-      } else {
-        console.error('Supabase planned_workouts upsert error:', planUpsertError);
-        record(planUpsertError);
-      }
+  ): void {
+    if (outcome.okIds.length > 0) releaseSyncQuarantine(userId, collection, outcome.okIds);
+    for (const failure of outcome.permanentFailures) {
+      const local = localRows.find((r) => r.id === failure.id);
+      const e = failure.error as { code?: unknown; message?: unknown } | null;
+      quarantineSyncRow(userId, {
+        collection,
+        rowId: failure.id,
+        stamp: typeof local?.updatedAt === 'string' ? local.updatedAt : null,
+        code: typeof e?.code === 'string' ? e.code : null,
+        message: typeof e?.message === 'string' ? e.message : String(failure.error),
+        quarantinedAt: new Date().toISOString(),
+      });
+      console.warn(
+        `[sync] quarantined ${collection} row ${failure.id} (${typeof e?.code === 'string' ? e.code : 'permanent'}): permanently rejected by the server; excluded from future pushes until edited`,
+      );
     }
+    if (outcome.transientError) record(outcome.transientError as { message?: string });
+  }
+
+  /**
+   * Defect 2: drop quarantined rows from a push candidate list. A row
+   * whose stamp changed since quarantine (the user edited it) is let
+   * through for one retry; entries whose local row is gone are pruned
+   * (deletion → the tombstone flow owns the server copy).
+   */
+  private applyQuarantineFilter<T extends { id: string; updatedAt?: unknown }>(
+    userId: string,
+    collection: SyncQuarantineCollection,
+    candidates: T[],
+    liveRowIds: Set<string>,
+  ): T[] {
+    pruneSyncQuarantine(userId, collection, liveRowIds);
+    const quarantined = new Map(
+      readSyncQuarantine(userId)
+        .filter((q) => q.collection === collection)
+        .map((q) => [q.rowId, q] as const),
+    );
+    if (quarantined.size === 0) return candidates;
+    return candidates.filter((row) => {
+      const entry = quarantined.get(row.id);
+      if (!entry) return true;
+      const stamp = typeof row.updatedAt === 'string' ? row.updatedAt : null;
+      return stamp !== entry.stamp;
+    });
   }
 
   private async pushLocalData(userId: string) {
@@ -2583,6 +2948,10 @@ class SupabaseSyncEngine {
     // 'error' instead of a false 'synced'. Deletion propagation (step 7)
     // is deliberately excluded: it is best-effort by design and keeps
     // its tombstones for retry on the next push.
+    // Defect 2 carve-out: PERMANENT per-row rejections are quarantined
+    // by applyPushOutcome instead of recorded here — only transient
+    // failures (and the non-row-batched profile/coach-blocks steps)
+    // can still fail the cycle.
     // Mutable holder (not a plain `let`): TS narrows a captured `let`
     // to its initializer type across the awaits below, which would make
     // the final check see `never`. A property read is re-evaluated.
@@ -2661,7 +3030,13 @@ class SupabaseSyncEngine {
       if (prStamps === null) {
         record({ message: 'Could not read remote PR stamps; PR push skipped' });
       } else {
-        const { toUpsert } = filterRowsForPush(visibleRows(state.prs, 'personal_records'), prStamps);
+        const { toUpsert: gatePassing } = filterRowsForPush(visibleRows(state.prs, 'personal_records'), prStamps);
+        const toUpsert = this.applyQuarantineFilter(
+          userId,
+          'personal_records',
+          gatePassing,
+          new Set(state.prs.map((r) => r.id)),
+        );
         if (toUpsert.length > 0) {
           const prRows = toUpsert.map((p) => ({
             id: p.id,
@@ -2678,8 +3053,8 @@ class SupabaseSyncEngine {
             // where there is nothing to clobber.
             updated_at: p.updatedAt || new Date().toISOString(),
           }));
-          const { error: prError } = await supabase.from('personal_records').upsert(prRows, { onConflict: 'id' });
-          record(prError);
+          const outcome = await this.pushRowBatch({ table: 'personal_records', payloads: prRows, onConflict: 'id' });
+          this.applyPushOutcome(userId, 'personal_records', toUpsert, outcome, record);
         }
       }
     }
@@ -2690,7 +3065,13 @@ class SupabaseSyncEngine {
       if (workoutStamps === null) {
         record({ message: 'Could not read remote workout stamps; workout push skipped' });
       } else {
-        const { toUpsert } = filterRowsForPush(visibleRows(state.workouts, 'workouts'), workoutStamps);
+        const { toUpsert: gatePassing } = filterRowsForPush(visibleRows(state.workouts, 'workouts'), workoutStamps);
+        const toUpsert = this.applyQuarantineFilter(
+          userId,
+          'workouts',
+          gatePassing,
+          new Set(state.workouts.map((r) => r.id)),
+        );
         if (toUpsert.length > 0) {
           const workoutRows = toUpsert.map((w) => ({
             id: w.id,
@@ -2702,8 +3083,8 @@ class SupabaseSyncEngine {
             exercises: w.exercises || [],
             updated_at: w.updatedAt || new Date().toISOString(),
           }));
-          const { error: workoutError } = await supabase.from('workouts').upsert(workoutRows, { onConflict: 'id' });
-          record(workoutError);
+          const outcome = await this.pushRowBatch({ table: 'workouts', payloads: workoutRows, onConflict: 'id' });
+          this.applyPushOutcome(userId, 'workouts', toUpsert, outcome, record);
         }
       }
     }
@@ -2714,7 +3095,13 @@ class SupabaseSyncEngine {
       if (mealStamps === null) {
         record({ message: 'Could not read remote meal stamps; meal push skipped' });
       } else {
-        const { toUpsert } = filterRowsForPush(visibleRows(state.meals, 'meals'), mealStamps);
+        const { toUpsert: gatePassing } = filterRowsForPush(visibleRows(state.meals, 'meals'), mealStamps);
+        const toUpsert = this.applyQuarantineFilter(
+          userId,
+          'meals',
+          gatePassing,
+          new Set(state.meals.map((r) => r.id)),
+        );
         if (toUpsert.length > 0) {
           const mealRows = toUpsert.map((m) => ({
             id: m.id,
@@ -2724,23 +3111,112 @@ class SupabaseSyncEngine {
             foods: m.foods || [],
             updated_at: m.updatedAt || new Date().toISOString(),
           }));
-          const { error: mealError } = await supabase.from('meals').upsert(mealRows, { onConflict: 'id' });
-          record(mealError);
+          const outcome = await this.pushRowBatch({ table: 'meals', payloads: mealRows, onConflict: 'id' });
+          this.applyPushOutcome(userId, 'meals', toUpsert, outcome, record);
         }
       }
     }
 
-    // 5. Body Metrics (gated; bodyMetricRowForPush already carries
-    // each entry's own stamp, defaulting to `now` only for
-    // stamp-less rows, which reach here solely when absent remotely).
+    // 5. Body Metrics — D-Q2-1: the gate is date-aware, not just
+    // id-aware (see planBodyMetricPush). Local state can also carry
+    // same-date duplicates (legacy blobs, pre-guard baselines): the
+    // dedupe picks one contender per date, because upserting a
+    // second same-date row is exactly what 409'd. Losers are
+    // SUPERSEDED — removed locally and tombstoned, mirroring the
+    // pull path — but only once their date is settled server-side
+    // (the winner landed, or the remote row already holds the date),
+    // so a date that should have a metric is never left empty by a
+    // failed or partial step; and never when the loser IS the
+    // server's row for the date (the pull owns that resolution).
     if (state.bodyMetrics && state.bodyMetrics.length > 0) {
-      const metricStamps = await this.fetchRemoteStamps('body_metrics', 'user_id', userId);
-      if (metricStamps === null) {
-        record({ message: 'Could not read remote body-metric stamps; body-metric push skipped' });
+      const remoteMetrics = await this.fetchRemoteBodyMetricRows(userId);
+      if (remoteMetrics === null) {
+        record({ message: 'Could not read remote body-metric rows; body-metric push skipped' });
       } else {
-        const { toUpsert } = filterRowsForPush(visibleRows(state.bodyMetrics, 'body_metrics'), metricStamps);
-        if (toUpsert.length > 0) {
-          await this.pushBodyMetricRows(toUpsert, userId, record);
+        const { rows: deduped, supersededIds } = dedupeBodyMetricsByDate(
+          visibleRows(state.bodyMetrics, 'body_metrics'),
+        );
+        const contenders = this.applyQuarantineFilter(
+          userId,
+          'body_metrics',
+          deduped,
+          new Set(state.bodyMetrics.map((b) => b.id)),
+        );
+        const plan = planBodyMetricPush(contenders, remoteMetrics);
+        const landedIds = new Set<string>();
+        // Gauntlet DI-02: measurement columns exist only after the
+        // 2026102801 migration — the bare variant retries without
+        // them (handled inside pushRowBatch; other errors never masked).
+        const bareBodyMetrics = (rows: any[]) =>
+          rows.map(({ body_fat_pct: _bf, chest_in: _c, waist_in: _w, hips_in: _h, ...rest }) => rest);
+        if (plan.idUpserts.length > 0) {
+          const outcome = await this.pushRowBatch({
+            table: 'body_metrics',
+            payloads: plan.idUpserts.map((r) => bodyMetricRowForPush(r, userId)),
+            onConflict: 'id',
+            bareVariant: bareBodyMetrics,
+            bareNote: '[sync] body_metrics measurement columns not present on server yet — retrying without them',
+          });
+          this.applyPushOutcome(userId, 'body_metrics', plan.idUpserts, outcome, record);
+          outcome.okIds.forEach((id) => landedIds.add(id));
+        }
+        if (plan.dateUpserts.length > 0) {
+          const outcome = await this.pushRowBatch({
+            table: 'body_metrics',
+            payloads: plan.dateUpserts.map((r) => bodyMetricRowForPush(r, userId)),
+            onConflict: 'user_id,date',
+            bareVariant: bareBodyMetrics,
+            bareNote: '[sync] body_metrics measurement columns not present on server yet — retrying without them',
+          });
+          this.applyPushOutcome(userId, 'body_metrics', plan.dateUpserts, outcome, record);
+          outcome.okIds.forEach((id) => landedIds.add(id));
+        }
+        if (supersededIds.length > 0) {
+          const remoteHolderByDate = new Map(remoteMetrics.map((r) => [r.date, r.id]));
+          const settledDates = new Set<string>();
+          // Holders a landed date-upsert rewrote into our row: their
+          // ids no longer exist server-side, so a loser carrying one
+          // is safe to supersede (its tombstone just confirms an
+          // already-absent row in step 7).
+          const replacedHolderIds = new Set<string>();
+          for (const row of [...plan.idUpserts, ...plan.dateUpserts]) {
+            if (landedIds.has(row.id)) settledDates.add(row.date);
+          }
+          for (const row of plan.dateUpserts) {
+            if (!landedIds.has(row.id)) continue;
+            const holder = remoteHolderByDate.get(row.date);
+            if (holder && holder !== row.id) replacedHolderIds.add(holder);
+          }
+          for (const row of plan.skipped) {
+            // Skipped only because the remote side already holds
+            // this date (newer holder, our own current row, or an
+            // identity tangle the pull resolves) — settled either way.
+            if (remoteHolderByDate.has(row.date)) settledDates.add(row.date);
+          }
+          const fresh = useStore.getState();
+          const localById = new Map((fresh.bodyMetrics || []).map((b) => [b.id, b]));
+          const toSupersede = supersededIds.filter((id) => {
+            const loser = localById.get(id);
+            if (!loser) return false;
+            if (!settledDates.has(loser.date)) return false;
+            if (remoteHolderByDate.get(loser.date) === id && !replacedHolderIds.has(id)) {
+              return false;
+            }
+            return true;
+          });
+          if (toSupersede.length > 0) {
+            useStore.setState({
+              bodyMetrics: (fresh.bodyMetrics || []).filter((b) => !toSupersede.includes(b.id)),
+              deletedBodyMetricIds: [
+                ...new Set([...(fresh.deletedBodyMetricIds || []), ...toSupersede]),
+              ],
+              tombstoneStamps: stampTombstoneDeletes(
+                fresh.tombstoneStamps,
+                'body_metrics',
+                toSupersede,
+              ),
+            });
+          }
         }
       }
     }
@@ -2755,9 +3231,32 @@ class SupabaseSyncEngine {
       if (planStamps === null) {
         record({ message: 'Could not read remote plan stamps; plan push skipped' });
       } else {
-        const { toUpsert } = filterRowsForPush(visibleRows(state.plannedWorkouts, 'planned_workouts'), planStamps);
+        const { toUpsert: gatePassing } = filterRowsForPush(visibleRows(state.plannedWorkouts, 'planned_workouts'), planStamps);
+        const toUpsert = this.applyQuarantineFilter(
+          userId,
+          'planned_workouts',
+          gatePassing,
+          new Set(state.plannedWorkouts.map((p) => p.id)),
+        );
         if (toUpsert.length > 0) {
-          await this.pushPlanRows(toUpsert, userId, record);
+          const planRows = toUpsert.map((p) => ({
+            id: p.id,
+            user_id: userId,
+            name: p.name,
+            exercises: p.exercises || [],
+            // Own stamp, not `now` (see the profile comment in pushLocalData).
+            updated_at: p.updatedAt || new Date().toISOString(),
+            extras: buildPlanExtras(p) ?? null,
+          }));
+          const outcome = await this.pushRowBatch({
+            table: 'planned_workouts',
+            payloads: planRows,
+            onConflict: 'id',
+            // LOOP-2: the bare retry exists ONLY for the pre-migration
+            // case where the `extras` column itself is missing.
+            bareVariant: (rows) => rows.map(({ extras: _extras, ...rest }) => rest),
+          });
+          this.applyPushOutcome(userId, 'planned_workouts', toUpsert, outcome, record);
         }
       }
     }

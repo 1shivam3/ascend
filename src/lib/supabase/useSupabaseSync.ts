@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { syncEngine, SyncStatus, AuthUser } from './sync';
+import { syncEngine, SyncStatus, AuthUser, QuarantinedSyncRow } from './sync';
 
 export function useSupabaseSync() {
   const [state, setState] = useState<{
@@ -13,6 +13,8 @@ export function useSupabaseSync() {
     pendingMergeChoice: boolean;
     // QA-hardening R6: classified sync failure (offline/auth/server).
     errorKind: 'offline' | 'auth' | 'server' | null;
+    // Defect 2: permanently-rejected rows held in sync quarantine.
+    quarantined: QuarantinedSyncRow[];
   }>(syncEngine.getStatus());
 
   useEffect(() => {
@@ -27,6 +29,7 @@ export function useSupabaseSync() {
         user,
         pendingMergeChoice: syncEngine.getStatus().pendingMergeChoice,
         errorKind: syncEngine.getStatus().errorKind,
+        quarantined: syncEngine.getStatus().quarantined,
       });
     });
     return () => unsubscribe();
