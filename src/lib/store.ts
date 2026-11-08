@@ -1644,7 +1644,17 @@ export const useAppStore = create<AppState>()(
             // R1/DI-08: new row, stamped at creation.
             updatedAt: new Date().toISOString(),
           };
-          nextMetrics = [...(nextMetrics || []), entry];
+          // D-Q2-1: never stack the baseline onto a date the user
+          // already logged. The boot-recovery twin of this code has
+          // the same guard (DI-R2); this path lacked it, so a profile
+          // save on a weigh-in day appended a second same-date row
+          // under a different id — a row the sync push can never
+          // land (body_metrics_user_date_unique), poisoning every
+          // cycle until a pull dedupes it.
+          const hasRowOnBaselineDate = (nextMetrics || []).some((m) => m.date === entry.date);
+          if (!hasRowOnBaselineDate) {
+            nextMetrics = [...(nextMetrics || []), entry];
+          }
         }
         let nextFavorites = state.favoriteFoods;
         // Preview-fix B1a: seed defaults only when the field is

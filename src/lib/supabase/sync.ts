@@ -238,6 +238,90 @@ export function bodyMetricFromRemoteRow(r: any): BodyMetricEntry {
   };
 }
 
+/** The remote body_metrics fields the push plan needs (D-Q2-1). */
+export interface RemoteBodyMetricRow {
+  id: string;
+  date: string;
+  updated_at?: string | null;
+}
+
+export interface BodyMetricPushPlan {
+  /** Upsert keyed on `id` — no foreign row holds these dates. */
+  idUpserts: BodyMetricEntry[];
+  /**
+   * Upsert keyed on `(user_id, date)` — atomically replaces the
+   * foreign row holding the date, in one statement.
+   */
+  dateUpserts: BodyMetricEntry[];
+  /**
+   * Rows the push must not touch this cycle: the remote side holds
+   * the date with an equal-or-newer stamp, or the row's identity is
+   * tangled (its id also exists remotely under another date) and
+   * only the pull merge can resolve it.
+   */
+  skipped: BodyMetricEntry[];
+}
+
+/**
+ * D-Q2-1: plan one body-metrics push against the remote rows.
+ *
+ * body_metrics has a UNIQUE(user_id, date) constraint, but the push
+ * gate historically compared rows by id only. A local metric whose
+ * date is already held server-side under a DIFFERENT id (the classic
+ * case: this device superseded a pulled row locally, or two devices
+ * logged the same day) passed the id gate as "absent remotely" and
+ * its upsert 409'd on body_metrics_user_date_unique — every cycle,
+ * forever, holding the whole sync in the error state.
+ *
+ * The plan extends the R1/DI-08 stamp discipline from ids to dates:
+ * per date, the newest-stamped contender wins, judged by
+ * shouldPushRow exactly like the id gate.
+ * - No foreign holder for the date → the classic id gate decides.
+ * - A foreign row holds the date and the local row is strictly
+ *   newer → upsert on the (user_id, date) conflict target: Postgres
+ *   rewrites the holder row into ours in a single statement, so the
+ *   date is never left empty and can never 409.
+ * - The foreign row is equal-or-newer (or either stamp is
+ *   unparseable) → skip; the pull adopts the remote row and the
+ *   local dedupe supersedes ours.
+ * - Our id ALSO exists remotely under a different date (a date edit
+ *   raced a same-date create) → skip: rewriting either row could
+ *   collide with the other; the pull merge + dedupe untangles
+ *   identity first, then a later push proceeds cleanly.
+ *
+ * Pure function — the push path and the tests both consume it.
+ */
+export function planBodyMetricPush(
+  localRows: BodyMetricEntry[],
+  remoteRows: RemoteBodyMetricRow[],
+): BodyMetricPushPlan {
+  const remoteById = new Map(remoteRows.map((r) => [r.id, r]));
+  const remoteByDate = new Map(remoteRows.map((r) => [r.date, r]));
+  const idUpserts: BodyMetricEntry[] = [];
+  const dateUpserts: BodyMetricEntry[] = [];
+  const skipped: BodyMetricEntry[] = [];
+  for (const row of localRows) {
+    const partner = remoteByDate.get(row.date);
+    if (partner && partner.id !== row.id) {
+      if (remoteById.has(row.id)) {
+        skipped.push(row);
+      } else if (shouldPushRow(row.updatedAt, partner.updated_at)) {
+        dateUpserts.push(row);
+      } else {
+        skipped.push(row);
+      }
+      continue;
+    }
+    const remote = remoteById.get(row.id);
+    if (remote === undefined || shouldPushRow(row.updatedAt, remote.updated_at)) {
+      idUpserts.push(row);
+    } else {
+      skipped.push(row);
+    }
+  }
+  return { idUpserts, dateUpserts, skipped };
+}
+
 /**
  * F-11 (Build-my-block audit): coach block state sync.
  *
@@ -2378,6 +2462,37 @@ class SupabaseSyncEngine {
   }
 
   /**
+   * D-Q2-1: fetch the remote body_metrics rows (id, date, updated_at)
+   * for the date-aware push plan. Same fail-safe contract as
+   * fetchRemoteStamps: null on ANY failure, and the caller then
+   * skips the table's upserts and records an error rather than
+   * pushing ungated.
+   */
+  private async fetchRemoteBodyMetricRows(
+    userId: string,
+  ): Promise<RemoteBodyMetricRow[] | null> {
+    try {
+      const supabase = getSupabase();
+      if (!supabase) return null;
+      const { data, error } = await fetchAllUserRowsPaged(
+        supabase,
+        'body_metrics',
+        'id,date,updated_at',
+        'user_id',
+        userId,
+      );
+      if (error) return null;
+      return (data || []).map((r: any) => ({
+        id: r.id as string,
+        date: r.date as string,
+        updated_at: (r.updated_at as string | null) ?? null,
+      }));
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * S1/S2: read the server tombstone layer (deletions made on other
    * devices, stamped), grouped by collection. Returns null when the
    * layer is unavailable — pre-migration the sync_tombstones table
@@ -2473,35 +2588,39 @@ class SupabaseSyncEngine {
    * Body-metric upsert with the DI-02 missing-column retry, applied
    * ONLY to gate-passing rows. Extracted from pushLocalData so the
    * R1/DI-08 gate can run first without duplicating the retry.
+   *
+   * D-Q2-1: the caller picks the conflict target — 'id' for the
+   * classic batch, 'user_id,date' for rows atomically replacing a
+   * foreign holder of their date (see planBodyMetricPush). Returns
+   * the upsert error (after the DI-02 retry) or null on success, so
+   * the caller knows which batches actually landed.
    */
   private async pushBodyMetricRows(
     rows: BodyMetricEntry[],
     userId: string,
-    record: (e: { message?: string } | null | undefined) => void,
-  ): Promise<void> {
+    onConflict: string = 'id',
+  ): Promise<{ message?: string; code?: string } | null> {
     const supabase = getSupabase();
-    if (!supabase) return;
+    if (!supabase) return null;
     const metricRows = rows.map((b) => bodyMetricRowForPush(b, userId));
-    const { error: metricUpsertError } = await supabase.from('body_metrics').upsert(metricRows, { onConflict: 'id' });
-    if (metricUpsertError) {
-      // Gauntlet DI-02: measurement columns exist only after the
-      // 2026102801 migration. Pre-migration, PostgREST rejects rows
-      // carrying them — retry without them (same missing-column
-      // pattern as planned_workouts extras). Any other error is
-      // recorded, never masked by the retry.
-      const errMsg = metricUpsertError.message || '';
-      const missingMeasurementColumn =
-        metricUpsertError.code === 'PGRST204' || metricUpsertError.code === '42703' ||
-        /column .* does not exist/i.test(errMsg) ||
-        /could not find the .* column/i.test(errMsg);
-      if (missingMeasurementColumn) {
-        const bareRows = metricRows.map(({ body_fat_pct: _bf, chest_in: _c, waist_in: _w, hips_in: _h, ...rest }) => rest);
-        const { error: bareError } = await supabase.from('body_metrics').upsert(bareRows, { onConflict: 'id' });
-        record(bareError);
-      } else {
-        record(metricUpsertError);
-      }
+    const { error: metricUpsertError } = await supabase.from('body_metrics').upsert(metricRows, { onConflict });
+    if (!metricUpsertError) return null;
+    // Gauntlet DI-02: measurement columns exist only after the
+    // 2026102801 migration. Pre-migration, PostgREST rejects rows
+    // carrying them — retry without them (same missing-column
+    // pattern as planned_workouts extras). Any other error is
+    // returned, never masked by the retry.
+    const errMsg = metricUpsertError.message || '';
+    const missingMeasurementColumn =
+      metricUpsertError.code === 'PGRST204' || metricUpsertError.code === '42703' ||
+      /column .* does not exist/i.test(errMsg) ||
+      /could not find the .* column/i.test(errMsg);
+    if (missingMeasurementColumn) {
+      const bareRows = metricRows.map(({ body_fat_pct: _bf, chest_in: _c, waist_in: _w, hips_in: _h, ...rest }) => rest);
+      const { error: bareError } = await supabase.from('body_metrics').upsert(bareRows, { onConflict });
+      return bareError ?? null;
     }
+    return metricUpsertError;
   }
 
   /**
@@ -2730,17 +2849,83 @@ class SupabaseSyncEngine {
       }
     }
 
-    // 5. Body Metrics (gated; bodyMetricRowForPush already carries
-    // each entry's own stamp, defaulting to `now` only for
-    // stamp-less rows, which reach here solely when absent remotely).
+    // 5. Body Metrics — D-Q2-1: the gate is date-aware, not just
+    // id-aware (see planBodyMetricPush). Local state can also carry
+    // same-date duplicates (legacy blobs, pre-guard baselines): the
+    // dedupe picks one contender per date, because upserting a
+    // second same-date row is exactly what 409'd. Losers are
+    // SUPERSEDED — removed locally and tombstoned, mirroring the
+    // pull path — but only once their date is settled server-side
+    // (the winner landed, or the remote row already holds the date),
+    // so a date that should have a metric is never left empty by a
+    // failed or partial step; and never when the loser IS the
+    // server's row for the date (the pull owns that resolution).
     if (state.bodyMetrics && state.bodyMetrics.length > 0) {
-      const metricStamps = await this.fetchRemoteStamps('body_metrics', 'user_id', userId);
-      if (metricStamps === null) {
-        record({ message: 'Could not read remote body-metric stamps; body-metric push skipped' });
+      const remoteMetrics = await this.fetchRemoteBodyMetricRows(userId);
+      if (remoteMetrics === null) {
+        record({ message: 'Could not read remote body-metric rows; body-metric push skipped' });
       } else {
-        const { toUpsert } = filterRowsForPush(visibleRows(state.bodyMetrics, 'body_metrics'), metricStamps);
-        if (toUpsert.length > 0) {
-          await this.pushBodyMetricRows(toUpsert, userId, record);
+        const { rows: contenders, supersededIds } = dedupeBodyMetricsByDate(
+          visibleRows(state.bodyMetrics, 'body_metrics'),
+        );
+        const plan = planBodyMetricPush(contenders, remoteMetrics);
+        const landedIds = new Set<string>();
+        if (plan.idUpserts.length > 0) {
+          const idError = await this.pushBodyMetricRows(plan.idUpserts, userId, 'id');
+          if (idError) record(idError);
+          else plan.idUpserts.forEach((r) => landedIds.add(r.id));
+        }
+        if (plan.dateUpserts.length > 0) {
+          const dateError = await this.pushBodyMetricRows(plan.dateUpserts, userId, 'user_id,date');
+          if (dateError) record(dateError);
+          else plan.dateUpserts.forEach((r) => landedIds.add(r.id));
+        }
+        if (supersededIds.length > 0) {
+          const remoteHolderByDate = new Map(remoteMetrics.map((r) => [r.date, r.id]));
+          const settledDates = new Set<string>();
+          // Holders a landed date-upsert rewrote into our row: their
+          // ids no longer exist server-side, so a loser carrying one
+          // is safe to supersede (its tombstone just confirms an
+          // already-absent row in step 7).
+          const replacedHolderIds = new Set<string>();
+          for (const row of [...plan.idUpserts, ...plan.dateUpserts]) {
+            if (landedIds.has(row.id)) settledDates.add(row.date);
+          }
+          for (const row of plan.dateUpserts) {
+            if (!landedIds.has(row.id)) continue;
+            const holder = remoteHolderByDate.get(row.date);
+            if (holder && holder !== row.id) replacedHolderIds.add(holder);
+          }
+          for (const row of plan.skipped) {
+            // Skipped only because the remote side already holds
+            // this date (newer holder, our own current row, or an
+            // identity tangle the pull resolves) — settled either way.
+            if (remoteHolderByDate.has(row.date)) settledDates.add(row.date);
+          }
+          const fresh = useStore.getState();
+          const localById = new Map((fresh.bodyMetrics || []).map((b) => [b.id, b]));
+          const toSupersede = supersededIds.filter((id) => {
+            const loser = localById.get(id);
+            if (!loser) return false;
+            if (!settledDates.has(loser.date)) return false;
+            if (remoteHolderByDate.get(loser.date) === id && !replacedHolderIds.has(id)) {
+              return false;
+            }
+            return true;
+          });
+          if (toSupersede.length > 0) {
+            useStore.setState({
+              bodyMetrics: (fresh.bodyMetrics || []).filter((b) => !toSupersede.includes(b.id)),
+              deletedBodyMetricIds: [
+                ...new Set([...(fresh.deletedBodyMetricIds || []), ...toSupersede]),
+              ],
+              tombstoneStamps: stampTombstoneDeletes(
+                fresh.tombstoneStamps,
+                'body_metrics',
+                toSupersede,
+              ),
+            });
+          }
         }
       }
     }
