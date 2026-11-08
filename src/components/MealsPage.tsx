@@ -1385,7 +1385,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
   // ── Fast/festival day pattern + nutrition coach ──────────────────────
   const dayKind = mealDayKinds[todayDate];
-  const displayGoals = dayScaledGoals(effectiveGoals, dayKind);
+  const displayGoals = dayScaledGoals(effectiveGoals, dayKind, profile);
   // F16 (preview-fix): macro-split percentages from the displayed
   // grams, not from the day-kind-scaled calorie total — see
   // macroSplitPercentages. Computed once so the three cards, the

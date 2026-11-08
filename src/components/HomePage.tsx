@@ -526,7 +526,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     // fallback derivation too (was: calories 2400 / protein bw x 2.0
     // here vs bw x 1.8 on the Fuel screen).
     const effectiveGoals = effectiveMacroGoals(macroGoals, profile);
-    const todayScaled = dayScaledGoals(effectiveGoals, mealDayKinds?.[todayStr]);
+    const todayScaled = dayScaledGoals(effectiveGoals, mealDayKinds?.[todayStr], profile);
     const calTarget = targetsNeedBodyStats
       ? null
       : (todayScaled?.calories ?? effectiveGoals?.calories ?? fallbackMacroGoals(profile).calories);
