@@ -22,7 +22,7 @@
 import { calculateRecommendedMacroGoals, type ActivityLevel } from './macros';
 import { getDayKindTargets } from './nutrition-coach';
 import { hasRealBodyStats } from './body-stats';
-import { hasKnownAge } from './minor-targets';
+import { enforceMinorMacroGoals, hasKnownAge } from './minor-targets';
 import {
   resolvePrimaryGoal,
   type AthleteGoal,
@@ -171,13 +171,25 @@ export function macroSplitPercentages(
 export function dayScaledGoals(
   baseGoals: MacroGoals | null | undefined,
   dayKind: MealDayKind | null | undefined,
+  profile?: EffectiveGoalsProfile | null,
 ): MacroGoals | null {
   if (!baseGoals) return null;
   const scaled = getDayKindTargets(dayKind, baseGoals);
   if (!scaled) return baseGoals;
-  return {
+  const merged: MacroGoals = {
     ...baseGoals,
     calories: scaled.calories,
     proteinG: scaled.proteinG ?? baseGoals.proteinG,
   };
+  // Owner decision (2026-11-08): PR #108 clamped minors at target
+  // computation and on every write path, but deliberately left this
+  // display scaling unclamped — a minor who declared a one-meal fast
+  // still SAW a ×0.7 target (festival: +400). That gap is now closed:
+  // when a profile is supplied, the scaled result goes through the
+  // SAME minor enforcement (same maintenance figure, same ±10 kcal
+  // band, protein preserved) as the store write path. Adults,
+  // unknown ages, and callers without a profile pass through
+  // untouched — byte-identical to before.
+  if (!profile) return merged;
+  return enforceMinorMacroGoals(merged, profile, profile.activityLevel) ?? merged;
 }

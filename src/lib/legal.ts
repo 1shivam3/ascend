@@ -11,7 +11,7 @@
 export const SUPPORT_EMAIL = 'shivamvats744@gmail.com';
 
 /** Last-updated line rendered on the legal pages. */
-export const LEGAL_LAST_UPDATED = 'November 5, 2026';
+export const LEGAL_LAST_UPDATED = 'November 8, 2026';
 
 /** Policy document version — bump together with LEGAL_LAST_UPDATED on changes. */
-export const LEGAL_VERSION = '2.11';
+export const LEGAL_VERSION = '2.12';

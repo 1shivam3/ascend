@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { effectiveMacroGoals, dayScaledGoals } from '@/lib/effective-goals';
+import { effectiveMacroGoals, dayScaledGoals, type EffectiveGoalsProfile } from '@/lib/effective-goals';
+import { minorMaintenanceFor, MINOR_MAINTENANCE_TOLERANCE_KCAL } from '@/lib/minor-targets';
 import type { MacroGoals } from '@/lib/types';
 
 /**
@@ -72,5 +73,67 @@ describe('dayScaledGoals', () => {
 
   it('returns null when there are no base goals', () => {
     expect(dayScaledGoals(null, 'festival_feast')).toBeNull();
+  });
+});
+
+describe('dayScaledGoals — minor day-kind clamp (owner decision 2026-11-08)', () => {
+  // PR #108 clamped minors at target computation and on every write
+  // path, but deliberately left the day-kind DISPLAY scaling
+  // unclamped: a minor declaring a one-meal fast still saw a x0.7
+  // target, a festival day +400. The owner closed that gap on
+  // 2026-11-08 — after day-kind scaling, a known minor's displayed
+  // target must sit inside the same maintenance band (±10 kcal) the
+  // write-path clamp uses. Adults and unknown ages are unchanged.
+  const minorProfile: EffectiveGoalsProfile = {
+    bodyweightKg: 60,
+    heightCm: 165,
+    age: 16,
+    gender: 'male',
+    bodyweightSource: 'user',
+    heightSource: 'user',
+  };
+  const maintenance = minorMaintenanceFor(minorProfile)!;
+  const minorBase: MacroGoals = {
+    calories: maintenance,
+    proteinG: 108,
+    carbsG: 300,
+    fatG: 70,
+  };
+
+  it('minor + declared one-meal fast: displayed target stays in the maintenance band', () => {
+    const out = dayScaledGoals(minorBase, 'one_meal_fast', minorProfile)!;
+    expect(Math.abs(out.calories - maintenance)).toBeLessThanOrEqual(
+      MINOR_MAINTENANCE_TOLERANCE_KCAL,
+    );
+    // Mirrors the main-path clamp: protein grams are preserved.
+    expect(out.proteinG).toBe(108);
+  });
+
+  it('minor + declared festival day: displayed target stays in the maintenance band', () => {
+    const out = dayScaledGoals(minorBase, 'festival_feast', minorProfile)!;
+    expect(Math.abs(out.calories - maintenance)).toBeLessThanOrEqual(
+      MINOR_MAINTENANCE_TOLERANCE_KCAL,
+    );
+    expect(out.proteinG).toBe(108);
+  });
+
+  it('adult + one-meal fast: x0.7 scaling unchanged', () => {
+    const adultProfile: EffectiveGoalsProfile = { ...minorProfile, age: 30 };
+    const out = dayScaledGoals(stored, 'one_meal_fast', adultProfile)!;
+    expect(out.calories).toBe(Math.round(2600 * 0.7));
+    expect(out.proteinG).toBe(150);
+  });
+
+  it('adult + festival day: +400 unchanged', () => {
+    const adultProfile: EffectiveGoalsProfile = { ...minorProfile, age: 30 };
+    const out = dayScaledGoals(stored, 'festival_feast', adultProfile)!;
+    expect(out.calories).toBe(3000);
+    expect(out.proteinG).toBe(150);
+  });
+
+  it('unknown age + one-meal fast: scaling unchanged (no clamp without a known age)', () => {
+    const unknownAgeProfile: EffectiveGoalsProfile = { ...minorProfile, age: undefined };
+    const out = dayScaledGoals(stored, 'one_meal_fast', unknownAgeProfile)!;
+    expect(out.calories).toBe(Math.round(2600 * 0.7));
   });
 });

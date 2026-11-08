@@ -1385,7 +1385,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
   // ── Fast/festival day pattern + nutrition coach ──────────────────────
   const dayKind = mealDayKinds[todayDate];
-  const displayGoals = dayScaledGoals(effectiveGoals, dayKind);
+  const displayGoals = dayScaledGoals(effectiveGoals, dayKind, profile);
   // F16 (preview-fix): macro-split percentages from the displayed
   // grams, not from the day-kind-scaled calorie total — see
   // macroSplitPercentages. Computed once so the three cards, the
@@ -1398,7 +1398,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     displayGoals?.carbsG || splitFallback.carbsG,
     displayGoals?.fatG || splitFallback.fatG,
   );
-  const dayTargets = effectiveGoals ? getDayKindTargets(dayKind, effectiveGoals) : null;
+  const dayTargets = effectiveGoals ? getDayKindTargets(dayKind, effectiveGoals, profile) : null;
   const [, setHintTick] = useState(0);
   const currentHour = new Date().getHours();
   const proteinSuggestion = uiPreferences.coachEnabled && !isHintDismissed(todayDate, 'protein')

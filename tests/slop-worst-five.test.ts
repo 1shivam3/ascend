@@ -149,8 +149,10 @@ describe('Fix 3 — README and Terms tell the truth', () => {
     // truthfulness alignment (sign-in methods, Form Coach, Clarity).
     // Free-vision fallback (2026-11-05, user decision): bumped to 2.11
     // for the meal-photo OpenRouter :free fallback disclosure.
-    expect(LEGAL_VERSION).toBe('2.11');
-    expect(LEGAL_LAST_UPDATED).toBe('November 5, 2026');
+    // Owner decision (2026-11-08): bumped to 2.12 — the "Macro Lens"
+    // codename removed from the privacy and terms pages.
+    expect(LEGAL_VERSION).toBe('2.12');
+    expect(LEGAL_LAST_UPDATED).toBe('November 8, 2026');
   });
 });
 

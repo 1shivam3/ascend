@@ -3248,6 +3248,8 @@ export const en = {
   'nutritionCoach.dayKindNoGrainFast': 'Fasting day (no grains): protein can still come from paneer, curd, milk, nuts and sabudana/fruit meals. Targets stay the same — treat them as guidance, not rules. If you have diabetes or take glucose-lowering medication, check with your doctor before fasting days.',
   'nutritionCoach.dayKindOneMealFast': 'One-meal day: calories are guided ~30% lower and protein stays at target — try to get most of it into that one meal. If you have diabetes or take glucose-lowering medication, check with your doctor before one-meal days — long gaps between meals can be risky on that medication.',
   'nutritionCoach.dayKindFestivalFeast': 'Festival day: a +400 kcal buffer is built into today. Enjoy the food — one day never decides anything.',
+  'nutritionCoach.dayKindOneMealFastMinor': 'One-meal day noted — your target stays at your maintenance level, and protein stays at target too. If you have diabetes or take glucose-lowering medication, check with your doctor before one-meal days — long gaps between meals can be risky on that medication.',
+  'nutritionCoach.dayKindFestivalFeastMinor': 'Festival day noted — your target stays at your maintenance level. Enjoy the food — one day never decides anything.',
   // Item-4 (2026-11-05): toUserMessage copy as keys — the sanitizer
   // attaches the key next to the English text (user-error.ts).
   'userError.cancelled': 'Canceled.',

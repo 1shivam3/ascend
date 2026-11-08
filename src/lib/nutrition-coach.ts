@@ -1,7 +1,8 @@
-import { FOOD_DB } from './macros';
+import { FOOD_DB, type ActivityLevel } from './macros';
 import { formatCalories, formatNumber } from './formatters';
 import type { DietPreference, MacroGoals, MealDayKind } from './types';
 import type { LocalizedSentence } from './coach-i18n';
+import { minorMaintenanceFor, type MinorTargetProfile } from './minor-targets';
 
 /**
  * Nutrition coach — vegetarian protein guidance, whole-day adaptation,
@@ -241,9 +242,23 @@ export interface DayKindTargets {
  */
 export function getDayKindTargets(
   kind: MealDayKind | null | undefined,
-  goals: MacroGoals
+  goals: MacroGoals,
+  profile?: (MinorTargetProfile & { activityLevel?: ActivityLevel }) | null
 ): DayKindTargets | null {
   if (!kind) return null;
+  // Owner decision (2026-11-08), PR #125 commit 3: when the profile is
+  // one the minor clamp actually holds at maintenance — the exact
+  // condition enforceMinorMacroGoals uses (minorMaintenanceFor
+  // non-null: age 13–17 with real body stats) — dayScaledGoals keeps
+  // the DISPLAYED target at maintenance, so the note rendered beside
+  // it must not claim the ×0.7 cut or the +400 buffer either. The
+  // numbers returned here stay as computed: the displayed number comes
+  // from dayScaledGoals, which applies the clamp; this note is what
+  // MealsPage renders. Profiles the clamp cannot hold (adults, unknown
+  // ages, placeholder stats — where the scaled number genuinely shows)
+  // keep the original notes byte-identical.
+  const minorAtMaintenance =
+    minorMaintenanceFor(profile, profile?.activityLevel) !== null;
   switch (kind) {
     case 'no_grain_fast':
       return {
@@ -253,6 +268,14 @@ export function getDayKindTargets(
         noteI18n: { key: 'nutritionCoach.dayKindNoGrainFast' },
       };
     case 'one_meal_fast':
+      if (minorAtMaintenance) {
+        return {
+          calories: Math.round(goals.calories * 0.7),
+          proteinG: goals.proteinG,
+          note: 'One-meal day noted — your target stays at your maintenance level, and protein stays at target too. If you have diabetes or take glucose-lowering medication, check with your doctor before one-meal days — long gaps between meals can be risky on that medication.',
+          noteI18n: { key: 'nutritionCoach.dayKindOneMealFastMinor' },
+        };
+      }
       return {
         calories: Math.round(goals.calories * 0.7),
         proteinG: goals.proteinG,
@@ -260,6 +283,14 @@ export function getDayKindTargets(
         noteI18n: { key: 'nutritionCoach.dayKindOneMealFast' },
       };
     case 'festival_feast':
+      if (minorAtMaintenance) {
+        return {
+          calories: goals.calories + 400,
+          proteinG: goals.proteinG,
+          note: 'Festival day noted — your target stays at your maintenance level. Enjoy the food — one day never decides anything.',
+          noteI18n: { key: 'nutritionCoach.dayKindFestivalFeastMinor' },
+        };
+      }
       return {
         calories: goals.calories + 400,
         proteinG: goals.proteinG,
