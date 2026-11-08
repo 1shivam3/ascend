@@ -127,6 +127,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     signOut,
     deleteAccount,
     errorKind: syncErrorKind,
+    quarantined,
   } = useSupabaseSync();
   const logout = useStore((state) => state.logout);
   const clearAllData = useStore((state) => state.clearAllData);
@@ -696,6 +697,33 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             )}
           </div>
         </div>
+        {/* Defect 2: rows the server permanently rejected sit in sync
+            quarantine (everything else still backs up). Plain words:
+            what kind of item + the server's reason. Editing the item
+            retries it automatically. */}
+        {user && quarantined.length > 0 && (
+          <div className="rounded-xl border border-border bg-bg-secondary p-3 space-y-1">
+            <p className="text-xs font-semibold text-text-primary">{t('settings.syncQuarantineTitle')}</p>
+            {quarantined.map((q) => (
+              <p key={`${q.collection}:${q.rowId}`} className="text-2xs text-text-muted">
+                {t('settings.syncQuarantineItem', {
+                  collection: t(
+                    q.collection === 'body_metrics'
+                      ? 'settings.syncCollectionBodyMetrics'
+                      : q.collection === 'workouts'
+                        ? 'settings.syncCollectionWorkouts'
+                        : q.collection === 'meals'
+                          ? 'settings.syncCollectionMeals'
+                          : q.collection === 'planned_workouts'
+                            ? 'settings.syncCollectionPlans'
+                            : 'settings.syncCollectionPrs',
+                  ),
+                  reason: q.message,
+                })}
+              </p>
+            ))}
+          </div>
+        )}
         {/* Sign-in methods card (Task 1.3): the offered methods are
             Google and email & password ONLY — no Apple sign-in and
             no email-link/magic-link flow exist in this app, and the

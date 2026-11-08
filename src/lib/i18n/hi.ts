@@ -1260,6 +1260,13 @@ export const hi: Partial<Record<StringKey, string>> = {
   // ── Settings (QA4-004 additions) ────────────────────────────────────
   'settings.accountSecurity': 'खाता और सुरक्षा',
   'settings.cloudSynced': 'क्लाउड सिंक है',
+  'settings.syncQuarantineTitle': 'ये आइटम बैकअप नहीं हो सके और छोड़े जा रहे हैं:',
+  'settings.syncQuarantineItem': '{collection}: {reason}',
+  'settings.syncCollectionBodyMetrics': 'शरीर माप',
+  'settings.syncCollectionWorkouts': 'वर्कआउट',
+  'settings.syncCollectionMeals': 'भोजन',
+  'settings.syncCollectionPlans': 'योजनाबद्ध वर्कआउट',
+  'settings.syncCollectionPrs': 'व्यक्तिगत रिकॉर्ड',
   'settings.syncing': 'सिंक हो रहा है...',
   'settings.syncIdle': 'सिंक रुका है',
   'settings.localOnly': 'सिर्फ़ इस डिवाइस पर',
