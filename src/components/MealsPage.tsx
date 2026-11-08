@@ -1398,7 +1398,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     displayGoals?.carbsG || splitFallback.carbsG,
     displayGoals?.fatG || splitFallback.fatG,
   );
-  const dayTargets = effectiveGoals ? getDayKindTargets(dayKind, effectiveGoals) : null;
+  const dayTargets = effectiveGoals ? getDayKindTargets(dayKind, effectiveGoals, profile) : null;
   const [, setHintTick] = useState(0);
   const currentHour = new Date().getHours();
   const proteinSuggestion = uiPreferences.coachEnabled && !isHintDismissed(todayDate, 'protein')

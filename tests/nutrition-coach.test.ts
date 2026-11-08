@@ -8,6 +8,7 @@ import {
 } from '../src/lib/nutrition-coach';
 import { FOOD_DB } from '../src/lib/macros';
 import { useStore } from '../src/lib/store';
+import type { MinorTargetProfile } from '../src/lib/minor-targets';
 
 class MockStorage {
   private map = new Map<string, string>();
@@ -167,6 +168,74 @@ describe('fast / festival day targets', () => {
   it('normal day returns null', () => {
     expect(getDayKindTargets(null, goals)).toBeNull();
     expect(getDayKindTargets(undefined, goals)).toBeNull();
+  });
+});
+
+describe('day-kind notes for minors (owner decision 2026-11-08)', () => {
+  // PR #125 commit 2 clamped a known minor's DISPLAYED day-kind target
+  // to maintenance (dayScaledGoals), but the note rendered beside it
+  // still claimed the ×0.7 cut / +400 buffer. The owner ordered the
+  // note fixed too: for a profile the minor clamp actually holds
+  // (age 13–17 with real body stats — minorMaintenanceFor non-null),
+  // the note must state maintenance and claim neither scaling.
+  const goals = { calories: 2000, proteinG: 130, carbsG: 220, fatG: 65 };
+  const minorProfile: MinorTargetProfile = {
+    bodyweightKg: 60,
+    heightCm: 165,
+    age: 16,
+    gender: 'male',
+    bodyweightSource: 'user',
+    heightSource: 'user',
+  };
+
+  it('minor + one-meal fast: note states maintenance, claims no reduction, keeps the safety caution', () => {
+    const t = getDayKindTargets('one_meal_fast', goals, minorProfile)!;
+    expect(t.note).toContain('maintenance');
+    expect(t.note).not.toContain('30%');
+    // The adult claim is "calories are guided ~30% lower" — assert its
+    // wording is gone ('lower' alone would also match the retained
+    // "glucose-lowering medication" safety phrase).
+    expect(t.note).not.toContain('guided');
+    expect(t.noteI18n).toEqual({ key: 'nutritionCoach.dayKindOneMealFastMinor' });
+    // The diabetes/medication caution survives — only the false
+    // scaling claim is removed.
+    expect(t.note).toMatch(/diabetes/i);
+    expect(t.note).toMatch(/doctor/i);
+  });
+
+  it('minor + festival day: note states maintenance, claims no +400 buffer', () => {
+    const t = getDayKindTargets('festival_feast', goals, minorProfile)!;
+    expect(t.note).toContain('maintenance');
+    expect(t.note).not.toContain('+400');
+    expect(t.note).not.toMatch(/buffer/i);
+    expect(t.noteI18n).toEqual({ key: 'nutritionCoach.dayKindFestivalFeastMinor' });
+  });
+
+  it('minor + no-grain fast: original note unchanged (it never claimed scaling)', () => {
+    const t = getDayKindTargets('no_grain_fast', goals, minorProfile)!;
+    expect(t.noteI18n).toEqual({ key: 'nutritionCoach.dayKindNoGrainFast' });
+    expect(t.note).toContain('Targets stay the same');
+  });
+
+  it('adult + one-meal fast / festival: original note strings unchanged', () => {
+    const adultProfile: MinorTargetProfile = { ...minorProfile, age: 30 };
+    const fast = getDayKindTargets('one_meal_fast', goals, adultProfile)!;
+    expect(fast.note).toContain('~30% lower');
+    expect(fast.noteI18n).toEqual({ key: 'nutritionCoach.dayKindOneMealFast' });
+    const feast = getDayKindTargets('festival_feast', goals, adultProfile)!;
+    expect(feast.note).toContain('+400 kcal buffer');
+    expect(feast.noteI18n).toEqual({ key: 'nutritionCoach.dayKindFestivalFeast' });
+  });
+
+  it('minor with placeholder stats: clamp cannot hold, so the original note stays (it matches the scaled number shown)', () => {
+    const placeholderProfile: MinorTargetProfile = {
+      ...minorProfile,
+      bodyweightSource: 'default',
+      heightSource: 'default',
+    };
+    const t = getDayKindTargets('festival_feast', goals, placeholderProfile)!;
+    expect(t.note).toContain('+400 kcal buffer');
+    expect(t.noteI18n).toEqual({ key: 'nutritionCoach.dayKindFestivalFeast' });
   });
 });
 
