@@ -2,7 +2,7 @@ import { getSupabase } from './client';
 import { normalizeDateToLocalDay } from '../formatters';
 import { useStore, resolveAvatar, buildFreshHistoryState, PROGRESS_PHOTOS_KEY, stampTombstoneDeletes, clearTombstoneStamps } from '../store';
 import { getTabLeaderGuard } from '../tab-leader';
-import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, BodyMetricEntry, PlannedWorkout } from '../types';
+import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, BodyMetricEntry, PlannedWorkout, MacroGoals } from '../types';
 import {
   mergeRemotePlans,
   mergeRemoteRecords,
@@ -26,7 +26,7 @@ import {
   type TombstoneCollection,
 } from './reconcile';
 import { isCrossAccountSwitch as isCrossAccountSwitchFn, decideStartFreshGate, isGuestProfileId } from '../start-fresh-guard';
-import { hasRetainedHistory } from '../history-fork';
+import { hasRetainedHistory, ARCHIVED_HISTORY_KEY, ARCHIVED_HISTORY_PREV_KEY } from '../history-fork';
 import { DEFAULT_BODYWEIGHT_KG } from '../defaults';
 import { getInitialCoachBlocksState, type CoachBlocksState } from '../block-engine';
 
@@ -853,6 +853,55 @@ export function pruneSyncQuarantine(userId: string, collection: SyncQuarantineCo
   if (kept.length === list.length) return;
   map[userId] = kept;
   writeSyncQuarantineMap(map);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Defect 3 (report D-F1, 2026-11-08): macro goals lost on
+// sign-out → sign-in.
+//
+// Mechanism: macro goals live ONLY in the local store — no server
+// table/column holds them (pushLocalData syncs the profile's athlete
+// `goals`, never calories/macros). The keep-data logout ARCHIVES the
+// live state (buildFullBackup shape — macroGoals included) under
+// ARCHIVED_HISTORY_KEY, then resets live state via
+// buildFreshHistoryState(), which sets macroGoals: null. The sign-in
+// pull rebuilds the synced collections from the server but has no
+// macro-goal source, and the archive was only ever applied by the
+// manual Settings "Restore archived history" — so the goals stayed
+// null and Today silently substituted a profile-derived estimate.
+//
+// Fix (client-side, no migration): on sign-in, when the user has no
+// macro goals locally and none were pulled, re-apply the goals from
+// that same logout archive. The archive's profile id must match the
+// signing-in user — on a shared device, another account's goals must
+// never leak in. Cross-device restore remains impossible without a
+// server column; that migration is proposed in the PR, not run.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Extract macro goals from a logout archive (full-backup shape) for
+ * `userId`. Returns null unless the archive belongs to that user and
+ * carries a well-formed goals object.
+ */
+export function macroGoalsFromArchive(archive: unknown, userId: string): MacroGoals | null {
+  if (!archive || typeof archive !== 'object') return null;
+  const a = archive as { profile?: { id?: unknown } | null; macroGoals?: unknown };
+  if (!a.profile || a.profile.id !== userId) return null;
+  const g = a.macroGoals as { calories?: unknown; proteinG?: unknown } | null;
+  if (!g || typeof g !== 'object') return null;
+  if (typeof g.calories !== 'number' || !Number.isFinite(g.calories)) return null;
+  if (typeof g.proteinG !== 'number' || !Number.isFinite(g.proteinG)) return null;
+  return g as MacroGoals;
+}
+
+function readLocalArchive(key: string): unknown {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 }
 
 
@@ -2536,6 +2585,20 @@ class SupabaseSyncEngine {
           }
           updates.tombstoneStamps = stamps;
         }
+      }
+      // Defect 3 (D-F1): macro goals are device-local — the pull has
+      // no server source for them, and a keep-data logout nulled them
+      // (buildFreshHistoryState). Re-apply them from that logout's
+      // archive when this user has none locally and none were pulled,
+      // so sign-out → sign-in on this device never loses them. The
+      // archive is user-checked inside macroGoalsFromArchive; an
+      // existing local value is never overwritten. (See the helper's
+      // comment block for the full mechanism.)
+      if (!updates.macroGoals && !freshState.macroGoals) {
+        const restored =
+          macroGoalsFromArchive(readLocalArchive(ARCHIVED_HISTORY_KEY), user.id) ??
+          macroGoalsFromArchive(readLocalArchive(ARCHIVED_HISTORY_PREV_KEY), user.id);
+        if (restored) updates.macroGoals = restored;
       }
       // The captured needsLocalUpdate reflects pre-round-trip state;
       // the only thing that matters now is whether updates still has keys.
