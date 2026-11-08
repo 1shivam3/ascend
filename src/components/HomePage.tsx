@@ -1319,6 +1319,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                   : null}
         </p>
 
+        {!(sessionInfo.isRestDay && sessionInfo.status !== 'completed' && !activeWorkoutDraft) && (
         <button
           type="button"
           onClick={() => {
@@ -1352,15 +1353,19 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             ? t('home.viewCompletedWorkout')
             : t('train.startWorkout')}
         </button>
-        {/* Audit phase 5, task 5.1(j): rest-day secondary — primary
-            stays "Start Workout" (starts the next planned session);
-            this opens the plan picker so a rest day can still become
-            a training day by choice. */}
+        )}
+        {/* Owner decision 2026-11-08 (reverses the audit phase 5
+            5.1(j) rest-day arrangement): on a rest day the primary
+            "Start Workout" is NOT rendered at all — under that label
+            it started the next planned session, contradicting the
+            card's own "no workout scheduled" line. Train anyway is
+            the single rest-day action; it opens the plan picker so a
+            rest day can still become a training day by choice. */}
         {sessionInfo.isRestDay && sessionInfo.status !== 'completed' && !activeWorkoutDraft && (
           <button
             type="button"
             onClick={() => setIsChangeWorkoutOpen(true)}
-            className="btn-secondary w-full mt-3 py-3 px-4 rounded-xl text-sm font-bold active:scale-[0.99] transition-all cursor-pointer"
+            className="btn-secondary w-full mt-5 py-3 px-4 rounded-xl text-sm font-bold active:scale-[0.99] transition-all cursor-pointer"
           >
             {t('home.trainAnyway')}
           </button>

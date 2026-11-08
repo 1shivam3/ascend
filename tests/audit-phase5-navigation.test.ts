@@ -163,6 +163,15 @@ describe('5.1(j) — Today CTA derives from a single state', () => {
     expect(en).toContain("'home.trainAnyway': 'Train anyway'");
     expect(hi).toContain("'home.trainAnyway': 'फिर भी ट्रेनिंग करें'");
   });
+
+  it('rest day hides the primary Start Workout — Train anyway is the only action (owner decision 2026-11-08)', () => {
+    const home = read('src/components/HomePage.tsx');
+    // The primary CTA is wrapped in the negated rest-day condition:
+    // on a rest day (not completed, no draft) it is not rendered.
+    expect(home).toContain("!(sessionInfo.isRestDay && sessionInfo.status !== 'completed' && !activeWorkoutDraft)");
+    // The reversed phase-5 rationale must not survive in the source.
+    expect(home).not.toContain('stays "Start Workout" (starts the next planned session)');
+  });
 });
 
 describe('5.1(k) — Customize Today drag handles', () => {
