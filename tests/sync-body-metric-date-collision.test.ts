@@ -299,6 +299,38 @@ describe('push: same-day body-metric collision (D-Q2-1)', () => {
     expect(server.tombstoneUpserts.some((t) => t.record_id === 'bm-old')).toBe(true);
   });
 
+  it('local duplicate pair where the loser id holds a DIFFERENT date on the server: the loser is NOT superseded (identity tangle)', async () => {
+    // Review finding (code-review pass 2026-11-10): the supersede
+    // guard checked only whether the loser holds its OWN date
+    // remotely. Here bm-old's id is the server's row for 2026-11-07 —
+    // tombstoning it would make step 7 delete THAT row, a metric for
+    // a date this push never touched. planBodyMetricPush already
+    // refuses this exact tangle for upserts (remoteById check); the
+    // supersede must refuse it too and leave identity resolution to
+    // the pull merge.
+    const E = '2026-11-07';
+    server.bodyMetrics.set('bm-old', serverRow('bm-old', E, 79, T1));
+    useStore.setState({
+      bodyMetrics: [metric('bm-new', D, 82, T2), metric('bm-old', D, 80, T1)],
+    });
+
+    await expect(engine.pushLocalData('user_1')).resolves.toBeUndefined();
+
+    // The winner still lands on D.
+    const rowsForD = [...server.bodyMetrics.values()].filter((r) => r.date === D);
+    expect(rowsForD).toHaveLength(1);
+    expect(rowsForD[0].id).toBe('bm-new');
+    // The server's row for E survives untouched — no delete, no tombstone.
+    const rowsForE = [...server.bodyMetrics.values()].filter((r) => r.date === E);
+    expect(rowsForE).toHaveLength(1);
+    expect(rowsForE[0].id).toBe('bm-old');
+    expect(server.tombstoneUpserts.some((t) => t.record_id === 'bm-old')).toBe(false);
+    // And the loser stays local, untombstoned, for the pull to untangle.
+    const state = useStore.getState();
+    expect(state.bodyMetrics.map((b) => b.id)).toEqual(['bm-new', 'bm-old']);
+    expect(state.deletedBodyMetricIds || []).not.toContain('bm-old');
+  });
+
   it('when the winner cannot land (transient upsert failure), the loser stays local and untombstoned', async () => {
     server.upsertError = { message: 'fetch failed' };
     useStore.setState({
