@@ -34,6 +34,7 @@ import { recordBackupExported } from '@/lib/backup-nudge';
 import { buildCombinedCsvExport } from '@/lib/csv-export';
 import { getLocalTodayStr, formatDateTime } from '@/lib/formatters';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
+import type { SyncQuarantineCollection } from '@/lib/supabase/sync';
 import { useAppNavigation } from '@/lib/navigation';
 import { getTelemetryConsent, setTelemetryConsent, TelemetryConsent, TELEMETRY_CONSENT_EVENT } from '@/lib/telemetry';
 import ConfirmationModal from '@/components/ConfirmationModal';
@@ -88,6 +89,15 @@ export interface SettingsViewProps {
   onNavigate?: (tab: 'home' | 'workout' | 'progress' | 'meals' | 'prs' | 'profile' | 'settings') => void;
   isModal?: boolean;
 }
+
+/** Defect 2: plain-words label per sync-quarantine collection. */
+const SYNC_COLLECTION_LABEL_KEYS: Record<SyncQuarantineCollection, StringKey> = {
+  body_metrics: 'settings.syncCollectionBodyMetrics',
+  workouts: 'settings.syncCollectionWorkouts',
+  meals: 'settings.syncCollectionMeals',
+  planned_workouts: 'settings.syncCollectionPlans',
+  personal_records: 'settings.syncCollectionPrs',
+};
 
 export default function SettingsView({ onBack, onNavigate, isModal = false }: SettingsViewProps) {
   const storeProfile = useStore((state) => state.profile);
@@ -707,17 +717,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             {quarantined.map((q) => (
               <p key={`${q.collection}:${q.rowId}`} className="text-2xs text-text-muted">
                 {t('settings.syncQuarantineItem', {
-                  collection: t(
-                    q.collection === 'body_metrics'
-                      ? 'settings.syncCollectionBodyMetrics'
-                      : q.collection === 'workouts'
-                        ? 'settings.syncCollectionWorkouts'
-                        : q.collection === 'meals'
-                          ? 'settings.syncCollectionMeals'
-                          : q.collection === 'planned_workouts'
-                            ? 'settings.syncCollectionPlans'
-                            : 'settings.syncCollectionPrs',
-                  ),
+                  collection: t(SYNC_COLLECTION_LABEL_KEYS[q.collection] ?? 'settings.syncCollectionPrs'),
                   reason: q.message,
                 })}
               </p>

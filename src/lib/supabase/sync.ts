@@ -2791,18 +2791,10 @@ class SupabaseSyncEngine {
   }
 
   /**
-   * Body-metric upsert with the DI-02 missing-column retry, applied
-   * ONLY to gate-passing rows. Extracted from pushLocalData so the
-   * R1/DI-08 gate can run first without duplicating the retry.
-   *
-   * D-Q2-1: the caller picks the conflict target — 'id' for the
-   * classic batch, 'user_id,date' for rows atomically replacing a
-   * foreign holder of their date (see planBodyMetricPush). Returns
-   * the upsert error (after the DI-02 retry) or null on success, so
-   * the caller knows which batches actually landed.
-   */
-  /**
    * Defect 2: shared row-batch push with permanent-failure isolation.
+   * The caller picks the conflict target via opts.onConflict — 'id'
+   * for classic batches, 'user_id,date' for rows atomically replacing
+   * a foreign holder of their date (D-Q2-1, see planBodyMetricPush).
    * Upserts the batch; on a missing-column error with a `bareVariant`,
    * retries bare (the DI-02 / LOOP-2 pre-migration tolerance — never a
    * mask for other errors). A PERMANENT batch rejection fans out to
@@ -3173,6 +3165,7 @@ class SupabaseSyncEngine {
         }
         if (supersededIds.length > 0) {
           const remoteHolderByDate = new Map(remoteMetrics.map((r) => [r.date, r.id]));
+          const remoteById = new Map(remoteMetrics.map((r) => [r.id, r]));
           const settledDates = new Set<string>();
           // Holders a landed date-upsert rewrote into our row: their
           // ids no longer exist server-side, so a loser carrying one
@@ -3199,6 +3192,16 @@ class SupabaseSyncEngine {
             const loser = localById.get(id);
             if (!loser) return false;
             if (!settledDates.has(loser.date)) return false;
+            // Identity tangle (review finding, 2026-11-10): this id
+            // is the server's row for a DIFFERENT date — tombstoning
+            // it would make step 7 delete that date's row, which this
+            // push never touched. planBodyMetricPush refuses the same
+            // tangle for upserts; leave identity resolution to the
+            // pull merge.
+            const remoteRowWithLoserId = remoteById.get(id);
+            if (remoteRowWithLoserId && remoteRowWithLoserId.date !== loser.date) {
+              return false;
+            }
             if (remoteHolderByDate.get(loser.date) === id && !replacedHolderIds.has(id)) {
               return false;
             }
