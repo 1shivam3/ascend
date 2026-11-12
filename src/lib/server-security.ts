@@ -40,6 +40,32 @@ export function getServerOpenRouterApiKey(): string | undefined {
 }
 
 /**
+ * Resolves the server-side Cloudflare account ID for Workers AI.
+ * The account ID is not itself a secret, but it is only ever used server-side
+ * and never echoed into error messages or logs.
+ */
+export function getServerCloudflareAccountId(): string | undefined {
+  const envId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
+  if (envId && envId.length > 5) {
+    return envId;
+  }
+  return undefined;
+}
+
+/**
+ * Resolves the server-side Cloudflare API token for Workers AI.
+ * The token needs the Account > Workers AI > Read permission. It is never
+ * logged; callers must not interpolate it into error strings.
+ */
+export function getServerCloudflareApiToken(): string | undefined {
+  const envKey = process.env.CLOUDFLARE_API_TOKEN?.trim();
+  if (envKey && envKey.length > 5) {
+    return envKey;
+  }
+  return undefined;
+}
+
+/**
  * Redacts any potential API keys, tokens, or credentials from error strings or logs.
  */
 export function redactSecrets(message: string): string {
