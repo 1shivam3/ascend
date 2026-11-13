@@ -308,10 +308,15 @@ export class TabLeaderGuard {
 
   private onUnload(): void {
     this.broadcast({ type: 'bye', tabId: this.tabId });
-    if (this.leader) {
+    // Record-based proof, NOT the in-memory leader flag: since
+    // Phase 2.4, stop() resets the flags, and a stop-then-unload
+    // sequence must still remove this tab's record (a follower
+    // takes over immediately instead of waiting out STALE_MS).
+    // The flag could also lag a takeover in the other direction —
+    // the record is the truth (see the header's heartbeat race).
+    if (this.isProvenLeader()) {
       try {
-        const record = this.readRecord();
-        if (record?.tabId === this.tabId) this.deps.storage.removeItem(TAB_LEADER_KEY);
+        this.deps.storage.removeItem(TAB_LEADER_KEY);
       } catch {}
     }
   }

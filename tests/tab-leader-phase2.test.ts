@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   TabLeaderGuard,
+  TAB_LEADER_KEY,
   type BroadcastChannelLike,
   type TabLeaderDeps,
 } from '../src/lib/tab-leader';
@@ -36,6 +37,7 @@ function makeWorld() {
   const now = { t: 1_000_000 };
   const channels: FakeChannel[] = [];
   let idCounter = 0;
+  const unloadCbs: Array<() => void> = [];
   const makeGuard = () => {
     const channel = new FakeChannel();
     channel.peers = channels;
@@ -47,11 +49,14 @@ function makeWorld() {
       clearInterval: () => {},
       createChannel: () => channel,
       newId: () => `tab-${++idCounter}`,
-      addUnloadListener: () => {},
+      addUnloadListener: (cb) => {
+        unloadCbs.push(cb);
+      },
     };
     return new TabLeaderGuard(deps);
   };
-  return { storage, now, makeGuard };
+  const fireUnload = () => unloadCbs.forEach((cb) => cb());
+  return { storage, now, makeGuard, fireUnload };
 }
 
 describe('§13 stop() resets the leader flags', () => {
@@ -103,5 +108,17 @@ describe('§13 stop() resets the leader flags', () => {
     guard.start();
     expect(guard.isLeader()).toBe(true);
     expect(guard.shouldSuppressWrites()).toBe(false);
+  });
+
+  it('stop() then unload still removes the leader record (regression: the flag reset must not orphan it)', () => {
+    const { storage, makeGuard, fireUnload } = makeWorld();
+    const guard = makeGuard();
+    guard.start();
+    expect(guard.isLeader()).toBe(true);
+    // stop() resets the in-memory flags (2.4) — the unload cleanup
+    // keys off the stored record instead, so the record still goes.
+    guard.stop();
+    fireUnload();
+    expect(storage.getItem(TAB_LEADER_KEY)).toBeNull();
   });
 });
