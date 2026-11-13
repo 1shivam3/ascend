@@ -1087,19 +1087,49 @@ export function hasSyncedContentChanged(
  */
 export const LAST_PUSHED_SIGNATURE_KEY = 'ascend_last_pushed_signature';
 
-export function readLastPushedSignature(): string | null {
+/**
+ * §8 (Phase 1.2): the adoption baseline is scoped PER USER. The original
+ * key held one global string, so account A's baseline could satisfy
+ * account B's adoption check whenever the datasets' signatures
+ * coincided. Scoped keys make that unrepresentable: a baseline exists
+ * only for the user whose push wrote it.
+ */
+export function lastPushedSignatureKey(userId: string): string {
+  return `${LAST_PUSHED_SIGNATURE_KEY}:${userId}`;
+}
+
+/**
+ * Migration for the pre-scoping value: the legacy unscoped key is
+ * DISCARDED on first contact, never honored. Losing it costs one full
+ * per-row reconciliation on the next pull (adoption stays off until
+ * the next successful push re-baselines) — it can never lose data.
+ */
+function discardLegacyAdoptionSignature(): void {
+  try {
+    if (typeof window === 'undefined') return;
+    if (localStorage.getItem(LAST_PUSHED_SIGNATURE_KEY) !== null) {
+      localStorage.removeItem(LAST_PUSHED_SIGNATURE_KEY);
+    }
+  } catch {
+    // Best-effort: a leftover legacy key is inert — nothing reads it.
+  }
+}
+
+export function readLastPushedSignature(userId: string): string | null {
   try {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem(LAST_PUSHED_SIGNATURE_KEY);
+    discardLegacyAdoptionSignature();
+    return localStorage.getItem(lastPushedSignatureKey(userId));
   } catch {
     return null;
   }
 }
 
-export function writeLastPushedSignature(signature: string): void {
+export function writeLastPushedSignature(userId: string, signature: string): void {
   try {
     if (typeof window === 'undefined') return;
-    localStorage.setItem(LAST_PUSHED_SIGNATURE_KEY, signature);
+    discardLegacyAdoptionSignature();
+    localStorage.setItem(lastPushedSignatureKey(userId), signature);
   } catch {
     // Best-effort only: a failed write leaves the older signature,
     // which fails safe to "do not adopt" on the next pull.
@@ -2453,7 +2483,7 @@ class SupabaseSyncEngine {
         const adoptRemoteChanges =
           !isCrossAccountSwitch &&
           shouldAdoptRemoteChanges(
-            readLastPushedSignature(),
+            readLastPushedSignature(user.id),
             syncedStateSignature({
               profile: freshState.profile,
               prs: freshState.prs || [],
@@ -3338,6 +3368,7 @@ class SupabaseSyncEngine {
     // next pull would adopt over it). A later pull adopts remote edits
     // only while the fresh local signature still equals this value.
     writeLastPushedSignature(
+      userId,
       syncedStateSignature({
         profile: state.profile,
         prs: state.prs || [],
