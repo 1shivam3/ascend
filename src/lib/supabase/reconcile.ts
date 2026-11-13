@@ -162,6 +162,15 @@ export interface PullSliceInput {
  * The F28 signature mechanism itself is untouched — only the
  * conflict branch's decision rule changed.
  */
+/** A local edit the pull is about to discard (§9 conflict record). */
+export interface PullConflict {
+  slice: PullSliceKey;
+  id: string;
+  loser: 'local';
+  loserStamp: string | null;
+  winnerStamp: string | null;
+}
+
 export function recomputePullSlices<T extends { id: string }>(
   fresh: Record<PullSliceKey, { local: T[]; tombstones: Iterable<string> }>,
   // Remote rows are id-shaped: the caller's mappers produce the local
@@ -171,6 +180,11 @@ export function recomputePullSlices<T extends { id: string }>(
   isCrossAccountSwitch: boolean,
   adoptRemoteChanges = false,
   getStamp: PullStampReader = defaultPullStampReader,
+  // §9: invoked once per local row the newest-wins branch replaces
+  // with DIFFERENT remote content — the moment a local edit is
+  // actually lost. Identical content under a newer stamp is a
+  // no-op adoption, not a conflict, and is not reported.
+  onConflict?: (conflict: PullConflict) => void,
 ): Partial<Record<PullSliceKey, T[]>> {
   const slices: Partial<Record<PullSliceKey, T[]>> = {};
   (Object.keys(remote) as PullSliceKey[]).forEach((key) => {
@@ -227,13 +241,32 @@ export function recomputePullSlices<T extends { id: string }>(
       for (const row of local) {
         const replacement = tomb.has(row.id) ? undefined : remoteById.get(row.id);
         if (replacement !== undefined) {
-          const winner = resolvePullWinner(
-            getStamp(row as { id: string; updatedAt?: unknown }),
-            getStamp(replacement as unknown as { id: string; updatedAt?: unknown }),
+          const localStamp = getStamp(row as { id: string; updatedAt?: unknown });
+          const remoteStamp = getStamp(
+            replacement as unknown as { id: string; updatedAt?: unknown },
           );
+          const winner = resolvePullWinner(localStamp, remoteStamp);
           if (winner === 'remote') {
             merged.push(replacement);
-            if (JSON.stringify(replacement) !== JSON.stringify(row)) changed = true;
+            if (JSON.stringify(replacement) !== JSON.stringify(row)) {
+              changed = true;
+              // §9: a conflict is a lost EDIT — content excluding
+              // the stamp itself. A stamp-only difference (same
+              // content, newer stamp) discards nothing.
+              const contentOf = (r: unknown) => {
+                const { updatedAt: _stamp, ...rest } = (r ?? {}) as Record<string, unknown>;
+                return JSON.stringify(rest);
+              };
+              if (contentOf(replacement) !== contentOf(row)) {
+                onConflict?.({
+                  slice: key,
+                  id: row.id,
+                  loser: 'local',
+                  loserStamp: localStamp ?? null,
+                  winnerStamp: remoteStamp ?? null,
+                });
+              }
+            }
           } else {
             merged.push(row);
           }
@@ -319,39 +352,57 @@ export function shouldDropStaleProfileUpdate(args: {
  * instead. These pure helpers are the whole decision surface, so the
  * rule is vitest-pinnable without a Supabase client:
  *
- * - `shouldPushRow`: upsert a row only when it is absent remotely,
- *   or its local stamp parses AND is strictly newer than the remote
- *   stamp. Every other case — remote newer, tie, local missing /
- *   unparseable, remote missing / unparseable — skips the upsert, so
- *   a row with a missing or unparseable local stamp NEVER overwrites
- *   remote (same fail-to-remote direction as isLocalProfileNewer).
- *   Rows absent remotely are safe to upsert: there is nothing to
- *   clobber, and the payload carries the local stamp (or `now` when
- *   the row has none — the next pull then adopts that stamp back).
- * - `resolvePullWinner`: for a row present on both sides with
- *   different content, the strictly-newer stamp wins. Equal parseable
- *   stamps with different content are a TIE and go to REMOTE, so two
- *   devices converge instead of flip-flopping. A missing/unparseable
- *   local stamp loses to a parseable remote stamp (local cannot prove
- *   it is newer). A parseable local stamp beats a missing remote
- *   stamp on pull (keep local) — but the push gate still refuses to
- *   upload it, so a corrupt remote stamp strands the row safely
- *   instead of letting it clobber anything. When NEITHER side parses,
- *   there is no ordering information at all: pull keeps local (the
- *   historical behaviour, which keeps the existing adoption tests
- *   green) and the push gate still protects the remote copy — the
- *   row converges the moment either side is edited and stamped.
+ * - `resolvePullWinner` is THE edit-vs-edit rule; `shouldPushRow`
+ *   is the same rule read from the push side (Phase 2.2, §9 — the
+ *   two used to diverge on missing stamps: pull kept a local winner
+ *   the push gate refused to upload, stranding the row and letting
+ *   devices diverge permanently on legacy stamp-less rows. The
+ *   DI-08 "strands safely" arms below are SUPERSEDED by the unified
+ *   table; the loss each overwrite risks is now at least recorded,
+ *   see the conflict log note.)
+ *
+ *   UNIFIED RULE TABLE (edit vs edit; an unparseable stamp is a
+ *   missing stamp, on both sides, everywhere):
+ *     local newer (both parse)     -> local wins: pull keeps, push uploads
+ *     remote newer (both parse)    -> remote wins: pull adopts, push skips
+ *     tie (both parse, equal)      -> remote wins (convergence)
+ *     local missing, remote parses -> remote wins
+ *     local parses, remote missing -> local wins: pull keeps, push uploads
+ *     both missing                 -> local wins: pull keeps, push uploads
+ *                                     (the payload stamps the row, so the
+ *                                     server copy gains ordering and every
+ *                                     device converges on the next pull)
+ *     row absent remotely          -> push uploads (nothing to clobber)
+ *
+ *   Delete vs edit has its own single function (resolveDeleteVsEdit,
+ *   shared by pull and push): deletion strictly newer or TIED ->
+ *   delete; edit strictly newer -> keep; tombstone unstamped +
+ *   row parseable -> keep; row stamp missing -> delete (the row
+ *   cannot prove it is newer than the deletion).
+ *
+ *   Deliberate exception: isLocalProfileNewer (the profile
+ *   stale-update race guard) keeps its stricter both-must-parse
+ *   rule — it guards an apply-time race, not a merge, and a false
+ *   negative there only defers to the next sync.
+ *
+ * CLOCK-SKEW ASSUMPTION (§9): "newest" is judged by DEVICE clocks —
+ * row stamps are written by whichever device edited the row, so two
+ * devices with skewed clocks can pick the wrong winner. Mitigation
+ * in place: tombstone deleted_at values are SERVER-stamped (the
+ * sync_tombstones DB default), so delete-vs-edit compares one
+ * server stamp against one device stamp; fully server-stamped row
+ * edits would need a DB trigger on every synced table (migration,
+ * not yet proposed). The conflict log below keeps the evidence
+ * when a pick loses an edit.
  *
  * KNOWN RESIDUALS (not fixed here, by scope):
- * - DI-08.5 clock skew: "newest" is judged by device clocks. Two
- *   devices with skewed clocks can still pick the wrong winner.
- *   Server-side stamping would need a DB migration and is out of
- *   scope for this change.
  * - Deletion boundary: CLOSED by the sync-convergence pass (S1/S2)
  *   — deletions are now stamp-gated and converge through the
  *   server tombstone layer; see "Sync convergence S1/S2" below.
  * - No conflict UI: the user chose the rule, not a conflict screen.
- *   The losing side's content is not preserved anywhere.
+ *   The losing side's CONTENT is not preserved — but since §9 its
+ *   id and both stamps are recorded in the local conflict log
+ *   (sync.ts: recordSyncConflicts), so a lost edit is diagnosable.
  */
 
 /** Parse an edit stamp to epoch ms, or null when missing/unparseable. */
@@ -381,19 +432,16 @@ export function resolvePullWinner(
 
 /**
  * Push-side gate for one row. `remoteUpdatedAt` is undefined when the
- * row is absent remotely. True only for absent-remote or
- * strictly-newer-local; false for every other case (remote newer,
- * tie, either stamp missing/unparseable).
+ * row is absent remotely (always push: nothing to clobber). Otherwise
+ * this is exactly resolvePullWinner (§9 unified rule — see the table
+ * above): the push uploads precisely the rows the pull would keep.
  */
 export function shouldPushRow(
   localUpdatedAt: string | undefined | null,
   remoteUpdatedAt: string | undefined | null,
 ): boolean {
   if (remoteUpdatedAt === undefined) return true;
-  const local = parseEditStamp(localUpdatedAt);
-  const remote = parseEditStamp(remoteUpdatedAt);
-  if (local === null || remote === null) return false;
-  return local > remote;
+  return resolvePullWinner(localUpdatedAt, remoteUpdatedAt) === 'local';
 }
 
 export interface PushGateResult<T> {

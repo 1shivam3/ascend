@@ -22,6 +22,7 @@ import {
   stampedTombstones,
   tombstoneStampKey,
   type PullSliceKey,
+  type PullConflict,
   type StampedTombstone,
   type TombstoneCollection,
 } from './reconcile';
@@ -1010,6 +1011,63 @@ export function readSyncQuarantine(userId: string): QuarantinedSyncRow[] {
   return entries
     .map(normalizeQuarantineEntry)
     .filter((e): e is QuarantinedSyncRow => e !== null);
+}
+
+// ── §9 conflict log (Phase 2.2) ─────────────────────────────────
+// Newest-wins discards the loser's CONTENT by design (the user
+// chose the rule, not a conflict screen) — but a lost edit must at
+// least leave a trace: each local row the pull replaces with
+// different remote content is recorded here (id + both stamps),
+// capped at the newest 50, readable for diagnostics. Best-effort
+// storage: a failed write never breaks sync.
+
+export const SYNC_CONFLICTS_KEY = 'ascend_sync_conflicts_v1';
+const SYNC_CONFLICTS_CAP = 50;
+
+export interface SyncConflictRecord {
+  slice: string;
+  id: string;
+  loser: 'local';
+  loserStamp: string | null;
+  winnerStamp: string | null;
+  at: string;
+}
+
+export function readSyncConflicts(): SyncConflictRecord[] {
+  try {
+    if (typeof window === 'undefined') return [];
+    const raw = localStorage.getItem(SYNC_CONFLICTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (e): e is SyncConflictRecord =>
+        !!e &&
+        typeof e === 'object' &&
+        typeof (e as SyncConflictRecord).id === 'string' &&
+        typeof (e as SyncConflictRecord).slice === 'string' &&
+        typeof (e as SyncConflictRecord).at === 'string',
+    );
+  } catch {
+    return [];
+  }
+}
+
+export function recordSyncConflicts(
+  entries: Array<Omit<SyncConflictRecord, 'at'>>,
+): void {
+  if (entries.length === 0) return;
+  try {
+    if (typeof window === 'undefined') return;
+    const at = new Date().toISOString();
+    const next = [
+      ...readSyncConflicts(),
+      ...entries.map((e) => ({ ...e, at })),
+    ].slice(-SYNC_CONFLICTS_CAP);
+    localStorage.setItem(SYNC_CONFLICTS_KEY, JSON.stringify(next));
+  } catch {
+    // Best-effort diagnostics — never break sync over the log.
+  }
 }
 
 export function quarantineSyncRow(userId: string, entry: QuarantinedSyncRow): void {
@@ -2759,7 +2817,20 @@ class SupabaseSyncEngine {
               coachBlocks: freshState.coachBlocks,
             }),
           );
-        return recomputePullSlices(freshInput, pullRemote, isCrossAccountSwitch, adoptRemoteChanges);
+        // §9: collect the local edits this recompute discards and
+        // leave them in the conflict log (id + stamps) — the rule
+        // destroys the loser's content by design, never silently.
+        const pullConflicts: PullConflict[] = [];
+        const slices = recomputePullSlices(
+          freshInput,
+          pullRemote,
+          isCrossAccountSwitch,
+          adoptRemoteChanges,
+          undefined,
+          (c) => pullConflicts.push(c),
+        );
+        recordSyncConflicts(pullConflicts);
+        return slices;
       })();
       for (const key of Object.keys(pullRemote) as PullSliceKey[]) {
         if (key in freshSlices) {
