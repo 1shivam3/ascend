@@ -19,6 +19,8 @@ import {
   PlannedWorkout,
   ValidateApplicationResult,
   PolicyDecisionApplicationAudit,
+  DecisionStatus,
+  EffectiveDecisionStatus,
 } from '@/lib/types';
 import {
   ExerciseOutcomeEvidence,
@@ -229,8 +231,10 @@ export interface TrainingDecisionRecord {
     sufficiency: EvidenceSufficiencyAudit;
   };
 
-  /** User interaction state (always 'pending' when created) */
-  status: 'pending' | 'accepted' | 'overridden' | 'dismissed';
+  /** User interaction state (always 'pending' when created).
+   *  §20: the shared DecisionStatus vocabulary — see types.ts for
+   *  why 'applied' is derived, never stored. */
+  status: DecisionStatus;
 
   /** Timestamp when decision was accepted by athlete */
   acceptedAt?: string;
@@ -1124,6 +1128,24 @@ export function evaluateTrainingDecisionPolicyV0(
  * Validates whether an accepted Policy v0 decision can be safely and deterministically applied
  * to a selected future workout plan template.
  */
+/**
+ * §20: a policy decision's EFFECTIVE status — the one selector
+ * every surface should read. 'applied' is derived: the stored
+ * status stays 'accepted' (the application validator requires
+ * exactly that before it can answer alreadyApplied on a re-apply),
+ * and application is proven by the record's appliedAt stamp or an
+ * audit entry in policyDecisionApplications naming the decision.
+ */
+export function decisionEffectiveStatus(
+  decision: TrainingDecisionRecord,
+  applications?: PolicyDecisionApplicationAudit[] | null
+): EffectiveDecisionStatus {
+  if (decision.status !== 'accepted') return decision.status;
+  if (decision.appliedAt) return 'applied';
+  if (applications?.some((a) => a.decisionId === decision.id)) return 'applied';
+  return 'accepted';
+}
+
 export function validatePolicyDecisionApplication(
   decision: TrainingDecisionRecord,
   plan: PlannedWorkout,

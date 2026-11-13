@@ -48,6 +48,10 @@ import {
   type ActiveCoachBlock,
   type CoachBlocksState,
 } from './block-engine';
+
+// §19: isBlockEnded moved to block-engine (the lifecycle owner);
+// re-exported here for the existing import sites.
+export { isBlockEnded } from './block-engine';
 import { mainCompoundKey } from './percent-1rm';
 import { calculateWorkoutVolumeKg } from './volume';
 import { earliestDataDate } from './scheduled-days';
@@ -890,12 +894,6 @@ export interface BlockDebrief {
   liftChanges: { name: string; fromKg: number | null; toKg: number | null; line: string }[];
   learned: string[];
   endDate: string;
-}
-
-/** True when the block's final Sunday has passed. */
-export function isBlockEnded(block: ActiveCoachBlock, todayStr: string): boolean {
-  const end = addDaysStr(block.startMonday, block.weeks.length * 7 - 1);
-  return todayStr > end;
 }
 
 export function buildBlockDebrief(input: {

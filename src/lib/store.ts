@@ -66,6 +66,7 @@ import { buildAthleteModel, type AthleteModel } from './athlete-model';
 import { useCoachChatStore, COACH_CHAT_STORAGE_KEY } from './coach-chat-store';
 import {
   applyPlateauProposalToPlan,
+  archivePastBlock,
   buildPlateauProposals,
   deriveAdoptionSchemes,
   generateBlockProposal,
@@ -73,7 +74,9 @@ import {
   managedPlanIdByExerciseKey,
   materializeProposal,
   resolveManagedPolicy,
+  settleCoachBlocks as settleCoachBlocksState,
   snapshotPlateauExpectations,
+  MAX_DISMISSED_PROPOSALS,
   type BlockProposal,
   type CoachBlocksState,
 } from './block-engine';
@@ -546,6 +549,8 @@ export interface AppState {
   athleteModel: AthleteModel | null;
   acceptTrainingDecision: (exerciseName: string, decision?: TrainingDecision) => void;
   overrideTrainingDecision: (exerciseName: string, customWeight?: number, decision?: TrainingDecision) => void;
+  /** §20: the missing 'no' — dismissal under the one convention. */
+  dismissTrainingDecision: (exerciseName: string, decision?: TrainingDecision) => void;
   recordTrainingDecision: (decision: TrainingDecision) => void;
   refreshLifterProfile: () => void;
   refreshAthleteModel: () => void;
@@ -584,6 +589,9 @@ export interface AppState {
   applyScheduleRevision: (weekMonday: string) => void;
   /** Close out the active block (debrief acknowledged / next block starts). */
   completeActiveBlock: () => void;
+  /** §19: persist 'completed' for an active block whose weeks ran
+   *  out. Runs on rehydration; safe to call any time. */
+  settleCoachBlocks: () => void;
 
   // Policy v0 Decisions Ledger
   policyDecisionRecords: Record<string, TrainingDecisionRecord>;
@@ -3258,6 +3266,25 @@ export const useAppStore = create<AppState>()(
         });
       },
 
+      dismissTrainingDecision: (exerciseName: string, decision?: TrainingDecision) => {
+        set((state) => {
+          const existing = state.trainingDecisions[exerciseName] || decision;
+          if (!existing) return state;
+          const updated: TrainingDecision = {
+            ...existing,
+            status: 'dismissed',
+            timestamp: new Date().toISOString(),
+          };
+          return {
+            trainingDecisions: {
+              ...state.trainingDecisions,
+              [exerciseName]: updated,
+            },
+            decisionsLedgerHistory: [updated, ...state.decisionsLedgerHistory.filter((d) => d.id !== existing.id).slice(0, 49)],
+          };
+        });
+      },
+
       recordTrainingDecision: (decision: TrainingDecision) => {
         set((state) => ({
           trainingDecisions: {
@@ -3328,9 +3355,32 @@ export const useAppStore = create<AppState>()(
       },
 
       dismissBlockProposal: () => {
-        set((state) => ({
-          coachBlocks: { ...state.coachBlocks, pendingProposal: null },
-        }));
+        set((state) => {
+          const pending = state.coachBlocks.pendingProposal;
+          if (!pending) return state;
+          // §19: dismissal is recorded under the one convention —
+          // status 'dismissed' — not just a cleared slot.
+          return {
+            coachBlocks: {
+              ...state.coachBlocks,
+              pendingProposal: null,
+              dismissedProposals: [
+                {
+                  ...pending,
+                  status: 'dismissed' as const,
+                  dismissedOn: getLocalTodayStr(),
+                },
+                ...(state.coachBlocks.dismissedProposals ?? []),
+              ].slice(0, MAX_DISMISSED_PROPOSALS),
+            },
+          };
+        });
+      },
+
+      settleCoachBlocks: () => {
+        const state = get();
+        const settled = settleCoachBlocksState(state.coachBlocks, getLocalTodayStr());
+        if (settled !== state.coachBlocks) set({ coachBlocks: settled });
       },
 
       updatePendingProposal: (edited) => {
@@ -3366,6 +3416,24 @@ export const useAppStore = create<AppState>()(
         // with no plans in it — a block that could never run. The
         // proposal stays pending so the user can adjust and retry.
         if (plans.length === state.plannedWorkouts.length) return false;
+        // §19: archiving goes through the one helper — cap overflow
+        // folds into the compacted count, never a silent drop.
+        const archivedPrevious = previous
+          ? archivePastBlock(
+              state.coachBlocks.pastBlocks,
+              {
+                ...previous,
+                // F-02: a block swapped out before its final week
+                // did not complete — label it 'replaced'. Only a
+                // block that had already run its course is
+                // truthfully 'completed'.
+                status: (isBlockEnded(previous, todayStr)
+                  ? 'completed'
+                  : 'replaced') as 'completed' | 'replaced',
+              },
+              state.coachBlocks.compactedBlockCount ?? 0
+            )
+          : null;
         set({
           plannedWorkouts: plans,
           weeklySchedule: schedule,
@@ -3373,21 +3441,12 @@ export const useAppStore = create<AppState>()(
             ...state.coachBlocks,
             pendingProposal: null,
             activeBlock,
-            pastBlocks: previous
-              ? [
-                  {
-                    ...previous,
-                    // F-02: a block swapped out before its final week
-                    // did not complete — label it 'replaced'. Only a
-                    // block that had already run its course is
-                    // truthfully 'completed'.
-                    status: (isBlockEnded(previous, todayStr)
-                      ? 'completed'
-                      : 'replaced') as 'completed' | 'replaced',
-                  },
-                  ...state.coachBlocks.pastBlocks,
-                ].slice(0, 8)
+            pastBlocks: archivedPrevious
+              ? archivedPrevious.pastBlocks
               : state.coachBlocks.pastBlocks,
+            compactedBlockCount: archivedPrevious
+              ? archivedPrevious.compactedBlockCount
+              : state.coachBlocks.compactedBlockCount,
           },
         });
         // The schedule changed shape — rebuild through the store's own
@@ -3648,14 +3707,18 @@ export const useAppStore = create<AppState>()(
         set((state) => {
           const active = state.coachBlocks.activeBlock;
           if (!active) return state;
+          // §19: same archive helper as approve/settle.
+          const archived = archivePastBlock(
+            state.coachBlocks.pastBlocks,
+            { ...active, status: 'completed' as const },
+            state.coachBlocks.compactedBlockCount ?? 0
+          );
           return {
             coachBlocks: {
               ...state.coachBlocks,
               activeBlock: null,
-              pastBlocks: [
-                { ...active, status: 'completed' as const },
-                ...state.coachBlocks.pastBlocks,
-              ].slice(0, 8),
+              pastBlocks: archived.pastBlocks,
+              compactedBlockCount: archived.compactedBlockCount,
             },
           };
         });
@@ -4838,6 +4901,15 @@ export const useAppStore = create<AppState>()(
             state.refreshStreak();
           } catch {
             // Streak maintenance must never block hydration.
+          }
+
+          // §19: settle the coach-block lifecycle — a block whose
+          // weeks ran out is persisted as 'completed' at launch,
+          // not left 'active' until a successor is approved.
+          try {
+            state.settleCoachBlocks();
+          } catch {
+            // Block settling must never block hydration either.
           }
 
           // Custom-exercise muscle registry: hydrate the classifier's

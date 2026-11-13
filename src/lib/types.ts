@@ -880,6 +880,26 @@ export type TrainingDecisionReason =
   | 'low_readiness'
   | 'user_override';
 
+/**
+ * §20: THE decision-status vocabulary — one union for every
+ * decision family (per-exercise TrainingDecision below and the
+ * policy TrainingDecisionRecord in training-decision-policy.ts).
+ * Dismissal is always the literal 'dismissed'.
+ *
+ * 'applied' is deliberately NOT a stored status: for policy
+ * decisions it is DERIVED by decisionEffectiveStatus (policy
+ * module) from the record + the application audit list — flipping
+ * the stored status on apply would break re-application
+ * idempotency, whose validator requires 'accepted' before it can
+ * answer alreadyApplied. For TrainingDecision, accepting IS the
+ * application (the prescription updates in place).
+ */
+export type DecisionStatus = 'pending' | 'accepted' | 'overridden' | 'dismissed';
+
+/** A decision's effective status, including the derived terminal
+ *  'applied' for policy decisions that reached a plan. */
+export type EffectiveDecisionStatus = DecisionStatus | 'applied';
+
 export interface TrainingDecision {
   id: string;
   exerciseName: string;
@@ -912,7 +932,7 @@ export interface TrainingDecision {
   deltaPercent: number;
   confidence: 'high' | 'established' | 'early_signal' | 'calibrating' | 'medium';
   evidenceCount: number;
-  status: 'pending' | 'accepted' | 'overridden';
+  status: DecisionStatus;
   userOverrideWeight?: number;
   timestamp: string;
 }
@@ -1035,6 +1055,7 @@ export type {
 } from './training-decision-policy';
 export {
   canPersistDecisionToLedger,
+  decisionEffectiveStatus,
   validatePolicyDecisionApplication,
 } from './training-decision-policy';
 
