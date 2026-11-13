@@ -971,24 +971,57 @@ export function migratePersistedState(
     next.xp = { ...getInitialXpState(), ...state.xp };
   }
 
+  // §23 (Phase 3.1): baselines become ONE field. Every pre-3.1
+  // record encoded baseline only in its notes text (the flag was
+  // never written); backfill the flag from that legacy encoding —
+  // the same test the old dual readers used (flag OR notes) — so
+  // the flag-only readers see exactly what the dual readers saw.
+  if (Array.isArray(state.prs)) {
+    let prsChanged = false;
+    const mappedPrs = state.prs.map((pr: any) => {
+      if (
+        pr && typeof pr === 'object' && pr.isBaseline !== true &&
+        typeof pr.notes === 'string' && pr.notes.includes('Baseline')
+      ) {
+        prsChanged = true;
+        return { ...pr, isBaseline: true };
+      }
+      return pr;
+    });
+    // Reference-preserving: untouched collections pass through as
+    // the SAME array (QA4-012 pins that contract for migrate).
+    if (prsChanged) next.prs = mappedPrs;
+  }
+
   // §17 (Phase 3.4): canonicalize persisted workout sets to the one
   // stored encoding (status only, legacy `completed` boolean
   // stripped, 'pending' never persists). Runs at EVERY version —
   // the normalizer is idempotent and resolution-preserving, so
   // already-canonical blobs pass through unchanged in meaning.
+  // Reference-preserving at every level: a workout/exercise/set
+  // that needs no change keeps its object identity.
   if (Array.isArray(state.workouts)) {
-    next.workouts = state.workouts.map((w: any) =>
-      w && Array.isArray(w.exercises)
-        ? {
-            ...w,
-            exercises: w.exercises.map((ex: any) =>
-              ex && Array.isArray(ex.sets)
-                ? { ...ex, sets: ex.sets.map((s: any) => normalizePersistedWorkoutSet(s)) }
-                : ex,
-            ),
-          }
-        : w,
-    );
+    let workoutsChanged = false;
+    const mappedWorkouts = state.workouts.map((w: any) => {
+      if (!w || !Array.isArray(w.exercises)) return w;
+      let wChanged = false;
+      const exercises = w.exercises.map((ex: any) => {
+        if (!ex || !Array.isArray(ex.sets)) return ex;
+        let exChanged = false;
+        const sets = ex.sets.map((s: any) => {
+          const n = normalizePersistedWorkoutSet(s);
+          if (n !== s) exChanged = true;
+          return n;
+        });
+        if (!exChanged) return ex;
+        wChanged = true;
+        return { ...ex, sets };
+      });
+      if (!wChanged) return w;
+      workoutsChanged = true;
+      return { ...w, exercises };
+    });
+    if (workoutsChanged) next.workouts = mappedWorkouts;
   }
 
   return next;
@@ -2418,11 +2451,24 @@ export const useAppStore = create<AppState>()(
         // QA-hardening R1: restore the PRs the deletion recomputed away.
         get().reconcileDerivedPRs((workout.exercises || []).map((e) => e.name));
       },
-      updateWorkout: (id, updated) => set((state) => ({
-        // Gauntlet DI-15: clamp/validate at the store boundary, exactly
-        // like updateMeal / updatePR.
-        workouts: state.workouts.map(w => w.id === id ? stampEditedRow(sanitizeWorkoutUpdate(w, updated)) : w),
-      })),
+      updateWorkout: (id, updated) => {
+        const before = get().workouts.find((w) => w.id === id);
+        set((state) => ({
+          // Gauntlet DI-15: clamp/validate at the store boundary, exactly
+          // like updateMeal / updatePR.
+          workouts: state.workouts.map(w => w.id === id ? stampEditedRow(sanitizeWorkoutUpdate(w, updated)) : w),
+        }));
+        // §23 (Phase 3.1): a set-level edit can mint or un-mint derived
+        // PRs exactly like a delete can — reconcile the affected
+        // exercises (old ∪ new names) against the new history, the
+        // same recompute deleteWorkout/insertWorkoutAt already ran.
+        // Before this, only the WorkoutPage editor's private planner
+        // kept records honest; every other edit path left stale PRs.
+        const names = new Set<string>();
+        for (const e of before?.exercises || []) if (e?.name) names.add(e.name);
+        for (const e of updated.exercises || []) if (e?.name) names.add(e.name);
+        if (names.size > 0) get().reconcileDerivedPRs([...names]);
+      },
 
       addMeal: (meal) => {
         // QA4-028: idempotency guard, mirroring addWorkout — a fast

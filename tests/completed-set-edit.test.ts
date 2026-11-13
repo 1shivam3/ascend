@@ -274,7 +274,18 @@ describe('store end-to-end — edit a completed set through the real actions', (
     expect(after.workouts[0].exercises[0].sets[0].weight).toBe(10);
     expect(calculateWorkoutVolumeKg(after.workouts[0])).toBe(50);
     expect(after.prs).toHaveLength(1);
-    expect(after.prs[0]).toMatchObject({ id: 'pr1', weightKg: 10, oneRepMax: 11.7 });
+    // §23 (Phase 3.1): the re-base now happens INSIDE updateWorkout —
+    // the store reconciles derived records from the one replay, so
+    // the stale record is replaced by the replay's deterministic-id
+    // record before the page planner (computed from the pre-update
+    // snapshot) even runs; its update arm lands on a gone id and
+    // no-ops. Content and count are what the flow guarantees.
+    expect(after.prs[0]).toMatchObject({
+      id: 'pr-auto-bench-press-2026-11-02-1rm-10-5',
+      weightKg: 10,
+      oneRepMax: 11.7,
+      isBaseline: true,
+    });
   });
 
   it('updateWorkout clamps an out-of-range set weight at the boundary', () => {

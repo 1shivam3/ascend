@@ -471,7 +471,9 @@ function LiftCard({
       : Math.round(item.best1RMKg * 10) / 10;
   const isMain = isMainCompoundLift(item.exercise);
   const toGo = Math.max(0, Math.round((item.nextMilestone - display1RM) * 10) / 10);
-  const isBaselineLift = item.prs.length === 1 && (item.prs[0].isBaseline || item.prs[0].notes?.includes('Baseline'));
+  // §23 (Phase 3.1): the isBaseline flag is the only encoding now
+  // (writers set it; the persist migration backfilled old records).
+  const isBaselineLift = item.prs.length === 1 && !!item.prs[0].isBaseline;
 
   const filteredPrList = useMemo(() => {
     if (!prTypeFilter || prTypeFilter === 'all') return item.prs;
@@ -639,7 +641,7 @@ function LiftCard({
                           <span>{t('prs.oneRmPr')}</span>
                         </span>
                       )}
-                      {(p.isBaseline || p.notes?.includes('Baseline')) && (
+                      {!!p.isBaseline && (
                         <span className="text-[0.5625rem] font-sans font-semibold text-amber-500 bg-amber-500/10 px-1 py-0.2 rounded border border-amber-500/20">
                           {t('prs.baseline')}
                         </span>

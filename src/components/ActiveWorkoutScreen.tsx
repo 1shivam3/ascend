@@ -30,6 +30,7 @@ import {
   Search,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
+import { computeSessionBest, gateSessionOutcome, outcomeNote } from '@/lib/pr-reevaluation';
 import { getDemoForExercise } from '@/lib/exercise-media';
 import FormCuesSheet from '@/components/FormCuesSheet';
 import FormCoachModal from '@/features/form-coach/components/FormCoachModal';
@@ -1755,6 +1756,33 @@ export default function ActiveWorkoutScreen({
       startTimer(restDuration);
 
       const completedW = (targetSet.weight === undefined && isCurrentBodyweight) ? 0 : (targetSet.weight ?? 0);
+      // §23 (Phase 3.1): the summary's PR flag is the LIVE session
+      // outcome — the same computeSessionBest/gate the finish path
+      // and the history replay use — checked against the stored
+      // best. (The old read, `targetSet.isPR`, was a flag no code
+      // path ever wrote, so the badge never appeared.)
+      const setsSoFar = currentExercise.sets.map((s, j) =>
+        j === setIdx
+          ? { ...s, weight: completedW, completed: true, status: 'completed' as const }
+          : s,
+      );
+      const storedBestKg = prs
+        .filter((p) => p.exercise.toLowerCase() === currentExercise.name.toLowerCase())
+        .reduce((m, p) => Math.max(m, p.oneRepMax || 0), 0);
+      const liveOutcome = gateSessionOutcome(
+        computeSessionBest(
+          currentExercise.name,
+          setsSoFar,
+          workouts,
+          profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG,
+        ),
+        storedBestKg,
+      );
+      const completedWKg = targetSet.unit === 'lbs' ? lbsToKg(completedW) : completedW;
+      const liveIsPR =
+        !!liveOutcome &&
+        Math.abs(liveOutcome.weightKg - completedWKg) <= 0.051 &&
+        liveOutcome.reps === targetSet.reps;
       setCompletedSetSummary({
         exerciseName: currentExercise.name || 'Exercise',
         setIndex: setIdx,
@@ -1762,7 +1790,7 @@ export default function ActiveWorkoutScreen({
         weight: completedW,
         reps: targetSet.reps,
         unit: userUnit,
-        isPR: !!targetSet.isPR,
+        isPR: liveIsPR,
         rpe: targetSet.rpe,
       });
 
@@ -2108,93 +2136,39 @@ export default function ActiveWorkoutScreen({
       if (hasCompletedSets) {
         const userBW = profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG;
         for (const ex of validExercises) {
-          const isBW = isBodyweightExercise(ex.name);
           const existingPRs = prs.filter((p) => p.exercise.toLowerCase() === ex.name.toLowerCase());
           const currentBest1RMKg =
             existingPRs.length > 0 ? Math.max(...existingPRs.map((p) => p.oneRepMax)) : 0;
 
-          // PR detection (Both 1RM PRs and Rep PRs at working loads)
-          let topSet = { weightKg: 0, reps: 0, e1RMKg: 0 };
-          let bestRepPR: { weightKg: number; weightLbs: number; reps: number; prevReps: number; e1RMKg: number } | null = null;
-
-          for (const s of ex.sets) {
-            if (s.isWarmup || !isSetCompleted(s)) continue;
-            const sWeight = parseFloat(String(s.weight)) || 0;
-            const sReps = parseInt(String(s.reps), 10) || 0;
-            if (sReps > 0 && (sWeight > 0 || isBW)) {
-              const wKg = s.unit === 'lbs' ? lbsToKg(sWeight) : sWeight;
-              // SIM-P1-06: never let an above-cap load feed PR detection,
-              // even if it arrived via import or an older client.
-              if (!isBW && wKg > MAX_WORKOUT_WEIGHT_KG) continue;
-              const effectiveLoadKg = getEffectiveExerciseLoad(ex.name, wKg, userBW);
-              const e1rm = calculateOneRepMax(effectiveLoadKg, sReps);
-              if (e1rm > topSet.e1RMKg) {
-                topSet = { weightKg: Math.round(wKg * 10) / 10, reps: sReps, e1RMKg: Math.round(e1rm * 10) / 10 };
-              }
-
-              // Scan past workouts to check if this is a Rep PR at this specific working weight
-              let maxPrevRepsAtWeight = 0;
-              for (const pastWk of workouts) {
-                for (const pastEx of pastWk.exercises) {
-                  if (pastEx.name.toLowerCase() === ex.name.toLowerCase()) {
-                    for (const pastSet of pastEx.sets) {
-                      if (pastSet.isWarmup || !isSetCompleted(pastSet)) continue;
-                      const pw = parseFloat(String(pastSet.weight)) || 0;
-                      const pr = parseInt(String(pastSet.reps), 10) || 0;
-                      const pwKg = pastSet.unit === 'lbs' ? lbsToKg(pw) : pw;
-                      if (Math.abs(pwKg - wKg) < 1.0 && pr > maxPrevRepsAtWeight) {
-                        maxPrevRepsAtWeight = pr;
-                      }
-                    }
-                  }
-                }
-              }
-
-              if (maxPrevRepsAtWeight > 0 && sReps > maxPrevRepsAtWeight) {
-                if (!bestRepPR || (sReps - maxPrevRepsAtWeight > bestRepPR.reps - bestRepPR.prevReps)) {
-                  bestRepPR = {
-                    weightKg: Math.round(wKg * 10) / 10,
-                    weightLbs: Math.round(kgToLbs(wKg) * 10) / 10,
-                    reps: sReps,
-                    prevReps: maxPrevRepsAtWeight,
-                    e1RMKg: Math.round(e1rm * 10) / 10,
-                  };
-                }
-              }
-            }
-          }
-
-          if (topSet.e1RMKg > currentBest1RMKg && topSet.e1RMKg > 0) {
+          // §23 (Phase 3.1): finish detection IS the shared session
+          // computation — computeSessionBest + gateSessionOutcome are
+          // exactly what the derived-PR replay re-runs over history,
+          // so the banner count, the stored record and every later
+          // recompute agree by construction. (This block used to be a
+          // private third copy of the same logic, free to drift.)
+          // One deliberate unification: a first-exposure outcome of
+          // either kind is a baseline and is not counted as a new PR
+          // (the old copy counted first-exposure rep PRs).
+          const best = computeSessionBest(ex.name, ex.sets, workouts, userBW);
+          const outcome = gateSessionOutcome(best, currentBest1RMKg);
+          if (outcome) {
             const isFirstExposure = existingPRs.length === 0;
-            const prId = safeRandomId('pr');
             addPR({
-              id: prId,
+              id: safeRandomId(outcome.kind === '1rm' ? 'pr' : 'pr_rep'),
               exercise: ex.name,
-              weightKg: topSet.weightKg,
-              weightLbs: Math.round(kgToLbs(topSet.weightKg) * 10) / 10,
-              reps: topSet.reps,
-              oneRepMax: topSet.e1RMKg,
+              weightKg: outcome.weightKg,
+              weightLbs: outcome.weightLbs,
+              reps: outcome.reps,
+              oneRepMax: outcome.oneRepMax,
               date: today,
-              notes: isFirstExposure ? 'Baseline established from first session' : 'All-Time 1RM PR',
-              prType: '1rm',
+              notes: outcomeNote(outcome, isFirstExposure, userUnit),
+              prType: outcome.kind,
+              // §23: the baseline fact is the field, not only the note.
+              isBaseline: isFirstExposure ? true : undefined,
             });
             if (!isFirstExposure) {
               newPRsCount++;
             }
-          } else if (bestRepPR) {
-            const prId = safeRandomId('pr_rep');
-            addPR({
-              id: prId,
-              exercise: ex.name,
-              weightKg: bestRepPR.weightKg,
-              weightLbs: bestRepPR.weightLbs,
-              reps: bestRepPR.reps,
-              oneRepMax: bestRepPR.e1RMKg,
-              date: today,
-              notes: `Rep PR: +${bestRepPR.reps - bestRepPR.prevReps} reps at ${userUnit === 'lbs' ? bestRepPR.weightLbs : bestRepPR.weightKg} ${userUnit}`,
-              prType: 'reps',
-            });
-            newPRsCount++;
           }
         }
       }

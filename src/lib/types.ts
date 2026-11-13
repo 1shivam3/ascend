@@ -247,7 +247,11 @@ export interface WorkoutSet {
    */
   completed?: boolean;
   rpe?: number;
-  isPR?: boolean;
+  // §23 (Phase 3.1): there is deliberately NO `isPR` field — it was
+  // declared for years and never written by any code path, while
+  // four surfaces read it. PR-ness is computed at read time from
+  // the one replay (computeSessionPRMarks / isPRSet in
+  // pr-reevaluation.ts). Do not re-add a stored flag.
   isWarmup?: boolean;
 
   // Prescribed / target values (optional for backwards compatibility with legacy records)

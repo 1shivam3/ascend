@@ -10,11 +10,13 @@ import type { PersonalRecord } from './types';
  * newer all-time Bench PR. Two causes:
  *
  *  1. Baselines were filtered on the `isBaseline` flag only, but the
- *     finish flow never sets that flag — first-session records are
+ *     finish flow never set that flag — first-session records were
  *     marked by their notes ('Baseline established from first
- *     session'). The PR page's own rule checks BOTH (PRsPage), and
- *     the finish flow does not count a first-exposure baseline as a
- *     new PR. The card now uses the same rule.
+ *     session'), so the F8 fix read flag OR notes. §23 (Phase 3.1)
+ *     closed the dual encoding at the source: every minting path
+ *     now writes the flag, and the persist migration backfills it
+ *     from the legacy notes encoding — so the flag alone is the
+ *     rule again (isBaselinePR below).
  *  2. The displayed count was the length of a list already truncated
  *     to 3 highlight rows, so the headline number was capped at 3 no
  *     matter how many records the week actually held.
@@ -31,7 +33,10 @@ import type { PersonalRecord } from './types';
  */
 
 export function isBaselinePR(pr: PersonalRecord): boolean {
-  return !!pr.isBaseline || (pr.notes?.includes('Baseline') ?? false);
+  // §23 (Phase 3.1): the flag is the ONLY baseline encoding. Writers
+  // set it at mint time; the persist migration backfilled it for
+  // every pre-3.1 record from the notes text the dual rule used.
+  return !!pr.isBaseline;
 }
 
 export interface WeeklyRecapPRSelection {

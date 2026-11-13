@@ -120,7 +120,7 @@ import {
 } from '@/lib/workout-schedule';
 import { plural, safeRandomId, getLocalTodayStr, formatLocalDate, parseLocalDate, formatNumber, formatDuration, formatDate, formatDateShort, formatMonthName } from '@/lib/formatters';
 import { calculateWorkoutVolumeKg } from '@/lib/volume';
-import { planPRChangesAfterSetEdit } from '@/lib/pr-reevaluation';
+import { planPRChangesAfterSetEdit, computeSessionPRMarks, isPRSet, type SessionPRMark } from '@/lib/pr-reevaluation';
 import { getSessionDuration } from '@/lib/workout-elapsed';
 import { useAppNavigation } from '@/lib/navigation';
 import { kgToLbs, lbsToKg } from '@/lib/units';
@@ -700,12 +700,15 @@ function HistorySetChip({
   setIndex,
   set,
   displayNumber,
+  prMarks,
 }: {
   workout: WorkoutEntry;
   exerciseIndex: number;
   setIndex: number;
   set: WorkoutSet;
   displayNumber: number;
+  /** §23: read-time PR marks from the page's one replay (badge source). */
+  prMarks?: SessionPRMark[];
 }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -909,7 +912,7 @@ function HistorySetChip({
             @{rpeVal}
           </span>
         )}
-        {isDone && set.isPR && (
+        {isDone && exercise && prMarks && isPRSet(prMarks, workout.id, exercise.name, set) && (
           <span
             className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold"
             title="Personal Record Set"
@@ -1126,6 +1129,14 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const profile = useStore((state) => state.profile);
   const prs = useStore((state) => state.prs);
   const workouts = useStore((state) => state.workouts);
+  // §23 (Phase 3.1): read-time PR marks for the history badges — the
+  // ONE replay over history + records, so a badge can never disagree
+  // with the PR store again (the old `set.isPR` flag was never
+  // written and the badge was silently always off).
+  const prMarks = useMemo(
+    () => computeSessionPRMarks(workouts, prs, profile?.bodyweightKg ?? DEFAULT_BODYWEIGHT_KG),
+    [workouts, prs, profile?.bodyweightKg],
+  );
   const addWorkout = useStore((state) => state.addWorkout);
   const deleteWorkout = useStore((state) => state.deleteWorkout);
   const addPR = useStore((state) => state.addPR);
@@ -1979,6 +1990,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             oneRepMax: topSet.e1RMKg,
             date,
             notes: isFirstExposure ? 'Baseline established from first session' : 'Auto-detected from workout session',
+            // §23 (Phase 3.1): the baseline fact is the field.
+            isBaseline: isFirstExposure ? true : undefined,
           });
           // Only celebrate as a "New PR" when there's a baseline to beat.
           // First-exposure sets establish the baseline silently.
@@ -3033,6 +3046,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                                     setIndex={p.setIdx}
                                     set={p.set}
                                     displayNumber={j + 1}
+                                    prMarks={prMarks}
                                   />
                                 ));
                               })()}
