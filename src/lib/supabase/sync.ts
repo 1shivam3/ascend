@@ -22,9 +22,21 @@ import {
   stampedTombstones,
   tombstoneStampKey,
   type PullSliceKey,
+  type PullConflict,
   type StampedTombstone,
   type TombstoneCollection,
 } from './reconcile';
+import {
+  syncStateReducer,
+  initialSyncState,
+  isSyncRunning,
+  toLegacySyncStatus,
+  syncStateError,
+  type SyncState,
+  type SyncEvent,
+  type LegacySyncStatus,
+  type SyncErrorKind,
+} from './sync-state';
 import { decideStartFreshGate, isGuestProfileId } from '../start-fresh-guard';
 import { classifyIdentity, isCrossAccountProfile } from '../identity';
 import { hasRetainedHistory, readArchiveGenerations } from '../history-fork';
@@ -387,32 +399,14 @@ export function isCoachBlocksStateEmpty(
 }
 
 /**
- * Adoption decision for the singleton coach-blocks row:
- *  - no usable remote state -> never adopt;
- *  - cross-account switch -> adopt (the reset already zeroed local;
- *    the row is the NEW account's own state);
- *  - same account -> adopt only into an EMPTY local state (the
- *    fresh-device recovery case F-11 exists for). When both sides
- *    have a block, the local one wins and the push below overwrites
- *    the row — the local state carries no updated_at stamp, so
- *    content-level last-sync-wins is the honest rule here.
- */
-export function shouldAdoptCoachBlocks(args: {
-  isCrossAccountSwitch: boolean;
-  local: CoachBlocksState | null | undefined;
-  remote: CoachBlocksState | null;
-}): boolean {
-  const { isCrossAccountSwitch, local, remote } = args;
-  if (!remote || isCoachBlocksStateEmpty(remote)) return false;
-  if (isCrossAccountSwitch) return true;
-  return isCoachBlocksStateEmpty(local);
-}
-
-/**
  * S3 (sync convergence): stamp-gated coach-blocks adoption.
  *
- * shouldAdoptCoachBlocks above never adopts when both sides are
- * non-empty, so two devices with a block each diverged silently —
+ * The pre-S3 adoption rule (shouldAdoptCoachBlocks, removed in
+ * Phase 2.3 §11 — grep proved it had no production caller; its
+ * cases are covered against the live gate in
+ * tests/coach-blocks-stamp-sync.test.ts) never adopted when both
+ * sides were non-empty, so two devices with a block each diverged
+ * silently —
  * whichever pushed last won the row, and the other device never
  * learned. The gate below keeps the F-11 cases (no remote → keep;
  * cross-account → adopt; empty local → adopt) and adds ordering for
@@ -443,9 +437,64 @@ export interface CoachBlocksSyncMeta {
 
 export const COACH_BLOCKS_SYNC_META_KEY = 'ascend_coach_blocks_sync_meta';
 
-/** Content signature for the singleton state (JSON, key order is stable for store-produced states). */
+/**
+ * Canonical (sorted-key) serialization: object keys are sorted at
+ * every level, array order is preserved (sequence is content).
+ * Two states with identical content but different key order — a
+ * payload round-trip can reorder keys — serialize identically.
+ */
+export function canonicalStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value) ?? 'null';
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((v) => canonicalStringify(v)).join(',')}]`;
+  }
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj).sort();
+  return `{${keys
+    .map((k) => `${JSON.stringify(k)}:${canonicalStringify(obj[k])}`)
+    .join(',')}}`;
+}
+
+/**
+ * Content signature for the singleton state (§11, Phase 2.3:
+ * canonical — key order is NOT content; the pre-2.3 JSON.stringify
+ * signature read a key-reordered round-trip as a divergence and
+ * poisoned the baseline). NOTE: signature VALUES changed with
+ * canonicalization; a persisted pre-2.3 baseline simply reads as
+ * "local changed" once, resolves keep-local (the safe side), and
+ * the next settle re-seeds it in canonical form.
+ */
 export function coachBlocksSignature(state: CoachBlocksState | null | undefined): string {
-  return JSON.stringify(state ?? null);
+  return canonicalStringify(state ?? null);
+}
+
+/**
+ * The baseline-maintenance transition (§11, Phase 2.3), pure so the
+ * store subscription stays a thin caller. Returns the meta to
+ * persist, or null when nothing needs writing:
+ *  - no baseline -> null (the engine seeds baselines at settle);
+ *  - state diverges from the baseline sig -> stamp localEditedAt;
+ *  - state MATCHES the baseline sig again (an edit was reverted)
+ *    -> CLEAR localEditedAt. The field's contract is "null while
+ *    it matches"; before 2.3 the subscription only ever set the
+ *    stamp, so a reverted edit left a stale divergence time that
+ *    the gate could read as a live edit.
+ */
+export function nextCoachBlocksSyncMeta(
+  meta: CoachBlocksSyncMeta | null,
+  currentSignature: string,
+  nowIso: string,
+): CoachBlocksSyncMeta | null {
+  if (!meta) return null;
+  if (currentSignature !== meta.sig) {
+    return meta.localEditedAt === nowIso ? null : { ...meta, localEditedAt: nowIso };
+  }
+  if (meta.localEditedAt !== null) {
+    return { ...meta, localEditedAt: null };
+  }
+  return null;
 }
 
 export function readCoachBlocksSyncMeta(): CoachBlocksSyncMeta | null {
@@ -712,7 +761,7 @@ export function isMissingCoachBlocksTable(
 /**
  * Task 2.2: verdict for the accountHasCloudData probe (Task 1.4's
  * merge choice). Pure + exported so the decision is unit-testable
- * without a Supabase client, in the style of shouldAdoptCoachBlocks.
+ * without a Supabase client, in the style of decideCoachBlocksSync.
  *
  * - 'has-data': at least one probed table returned a row.
  * - 'no-data': every probe answered cleanly and found nothing.
@@ -744,9 +793,12 @@ export function resolveCloudDataProbe(
   return sawRow ? 'has-data' : 'no-data';
 }
 
-export type SyncStatus = 'unconfigured' | 'offline' | 'idle' | 'syncing' | 'synced' | 'error';
-
 /**
+ * §1/§2 (Phase 2.1): the status string is a PROJECTION of the one
+ * SyncState (sync-state.ts) — kept as the type of the legacy
+ * listener surface. SyncErrorKind lives in sync-state.ts too (the
+ * error state carries it); re-exported here for existing imports.
+ *
  * QA-hardening R6: sync failures are classified so the UI can speak
  * plainly instead of showing one generic "Sync failed" (or worse, a
  * raw PostgREST message). Classes: 'offline' (no connectivity /
@@ -754,7 +806,8 @@ export type SyncStatus = 'unconfigured' | 'offline' | 'idle' | 'syncing' | 'sync
  * retrying cannot heal it; the user must sign in again), 'server'
  * (5xx, timeouts, and everything else — safe to retry with backoff).
  */
-export type SyncErrorKind = 'offline' | 'auth' | 'server';
+export type SyncStatus = LegacySyncStatus;
+export type { SyncErrorKind } from './sync-state';
 
 export function classifySyncError(err: unknown): SyncErrorKind {
   const e: any = err as any;
@@ -973,6 +1026,63 @@ export function readSyncQuarantine(userId: string): QuarantinedSyncRow[] {
   return entries
     .map(normalizeQuarantineEntry)
     .filter((e): e is QuarantinedSyncRow => e !== null);
+}
+
+// ── §9 conflict log (Phase 2.2) ─────────────────────────────────
+// Newest-wins discards the loser's CONTENT by design (the user
+// chose the rule, not a conflict screen) — but a lost edit must at
+// least leave a trace: each local row the pull replaces with
+// different remote content is recorded here (id + both stamps),
+// capped at the newest 50, readable for diagnostics. Best-effort
+// storage: a failed write never breaks sync.
+
+export const SYNC_CONFLICTS_KEY = 'ascend_sync_conflicts_v1';
+const SYNC_CONFLICTS_CAP = 50;
+
+export interface SyncConflictRecord {
+  slice: string;
+  id: string;
+  loser: 'local';
+  loserStamp: string | null;
+  winnerStamp: string | null;
+  at: string;
+}
+
+export function readSyncConflicts(): SyncConflictRecord[] {
+  try {
+    if (typeof window === 'undefined') return [];
+    const raw = localStorage.getItem(SYNC_CONFLICTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (e): e is SyncConflictRecord =>
+        !!e &&
+        typeof e === 'object' &&
+        typeof (e as SyncConflictRecord).id === 'string' &&
+        typeof (e as SyncConflictRecord).slice === 'string' &&
+        typeof (e as SyncConflictRecord).at === 'string',
+    );
+  } catch {
+    return [];
+  }
+}
+
+export function recordSyncConflicts(
+  entries: Array<Omit<SyncConflictRecord, 'at'>>,
+): void {
+  if (entries.length === 0) return;
+  try {
+    if (typeof window === 'undefined') return;
+    const at = new Date().toISOString();
+    const next = [
+      ...readSyncConflicts(),
+      ...entries.map((e) => ({ ...e, at })),
+    ].slice(-SYNC_CONFLICTS_CAP);
+    localStorage.setItem(SYNC_CONFLICTS_KEY, JSON.stringify(next));
+  } catch {
+    // Best-effort diagnostics — never break sync over the log.
+  }
 }
 
 export function quarantineSyncRow(userId: string, entry: QuarantinedSyncRow): void {
@@ -1308,18 +1418,36 @@ export async function resolveSessionUser(supabase: {
 }
 
 class SupabaseSyncEngine {
-  private status: SyncStatus = 'unconfigured';
+  /**
+   * §1/§2 (Phase 2.1): THE sync state — one discriminated union,
+   * transitions only via dispatch() -> syncStateReducer. The fields
+   * it replaced (status string, errorMessage, errorKind, isSyncing)
+   * survive only as projections in getStatus()/notify().
+   * lastSyncedAt stays a plain field: it is HISTORY (when the last
+   * success happened), not state — an error after a success must
+   * not erase it. retryAttempt is the engine-owned backoff ladder,
+   * mirrored into the state on each transition.
+   */
+  private state: SyncState = initialSyncState;
   private lastSyncedAt: string | null = null;
-  private errorMessage: string | null = null;
-  /** QA-hardening R6: classified failure + backoff retry state. */
-  private errorKind: SyncErrorKind | null = null;
   private retryAttempt = 0;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * §1: bumped whenever the session is torn down (sign-out, account
+   * deletion). A sync run captures it at start; a completion whose
+   * captured generation no longer matches is DISCARDED — an
+   * in-flight sync must never write 'synced' (or an error, or pull
+   * updates) over a sign-out.
+   */
+  private generation = 0;
   private currentUser: AuthUser | null = null;
   private listeners: Set<SyncListener> = new Set();
   private debounceTimer: any = null;
-  private isSyncing = false;
   private initialized = false;
+  /** Derived, never stored: the one source of truth for "running". */
+  private get isSyncing(): boolean {
+    return isSyncRunning(this.state);
+  }
   /**
    * Tracks the in-flight sync promise so concurrent callers share a single
    * network round-trip instead of racing against each other.
@@ -1336,28 +1464,64 @@ class SupabaseSyncEngine {
    *  proceeded, so the cloud probe runs at most once per sign-in. */
   private mergeGateEvaluatedKey: string | null = null;
 
+  /** The one state, for the UI hook and diagnostics. */
+  public getState(): SyncState {
+    return this.state;
+  }
+
+  /** Every state change goes through here: reducer + publish. */
+  private dispatch(event: SyncEvent) {
+    this.state = syncStateReducer(this.state, event);
+    this.notify();
+  }
+
+  /**
+   * §1: session teardown shared by signOut and deleteAccount —
+   * clears ALL timers and the backoff ladder, detaches the
+   * in-flight promise (its own finally identity-checks before
+   * clearing, so it cannot detach a newer run), bumps the
+   * generation so the in-flight completion is discarded, and lands
+   * the machine in signed-out.
+   */
+  private resetSyncSession() {
+    this.generation += 1;
+    this.clearSyncRetryTimer();
+    clearTimeout(this.debounceTimer);
+    this.retryAttempt = 0;
+    this.pendingSyncPromise = null;
+    this.dispatch({ type: 'session-lost' });
+  }
+
   public subscribe(cb: SyncListener) {
     this.listeners.add(cb);
-    cb(this.status, this.lastSyncedAt, this.errorMessage, this.currentUser);
+    cb(
+      toLegacySyncStatus(this.state),
+      this.lastSyncedAt,
+      syncStateError(this.state)?.message ?? null,
+      this.currentUser,
+    );
     return () => {
       this.listeners.delete(cb);
     };
   }
 
   private notify() {
-    this.listeners.forEach((cb) => cb(this.status, this.lastSyncedAt, this.errorMessage, this.currentUser));
+    const status = toLegacySyncStatus(this.state);
+    const error = syncStateError(this.state)?.message ?? null;
+    this.listeners.forEach((cb) => cb(status, this.lastSyncedAt, error, this.currentUser));
   }
 
   public getStatus() {
+    const error = syncStateError(this.state);
     return {
-      status: this.status,
+      status: toLegacySyncStatus(this.state),
       lastSyncedAt: this.lastSyncedAt,
-      error: this.errorMessage,
+      error: error?.message ?? null,
       user: this.currentUser,
       // S4: a merge choice is waiting on the user (MergeChoiceModal).
       pendingMergeChoice: this.pendingMergeChoiceFor !== null,
       // QA-hardening R6: classified sync failure (null when healthy).
-      errorKind: this.errorKind,
+      errorKind: error?.kind ?? null,
       // Defect 2: rows the server permanently rejected (see the
       // quarantine block above) — Settings surfaces these in plain
       // words; they never hold the cycle in 'error' by themselves.
@@ -1370,7 +1534,7 @@ class SupabaseSyncEngine {
   }
 
   public getSyncStatus() {
-    return this.status;
+    return toLegacySyncStatus(this.state);
   }
 
   public init() {
@@ -1379,24 +1543,27 @@ class SupabaseSyncEngine {
 
     const supabase = getSupabase();
     if (!supabase) {
-      this.status = 'unconfigured';
-      this.notify();
+      this.dispatch({ type: 'init', hasClient: false, online: true });
       return;
     }
 
     if (!navigator.onLine) {
-      this.status = 'offline';
-      this.notify();
+      this.dispatch({ type: 'init', hasClient: true, online: false });
+    } else {
+      this.dispatch({ type: 'init', hasClient: true, online: true });
     }
 
-    // Window online/offline listeners
+    // Window online/offline listeners. §1: the offline event goes
+    // through the machine — during an in-flight sync it is QUEUED
+    // (the syncing state's wentOffline flag), never overwriting
+    // the outcome.
     window.addEventListener('online', () => {
+      this.dispatch({ type: 'came-online' });
       this.triggerSyncNow();
     });
 
     window.addEventListener('offline', () => {
-      this.status = 'offline';
-      this.notify();
+      this.dispatch({ type: 'went-offline' });
     });
 
     // Listen to Supabase auth state changes (OAuth callbacks, token refresh, magic link)
@@ -1456,13 +1623,15 @@ class SupabaseSyncEngine {
       // own pull-applied changes; adoptions settle the baseline
       // before applying, so they never land here as "edits".)
       if (state.coachBlocks !== prevState.coachBlocks) {
-        const meta = readCoachBlocksSyncMeta();
-        if (meta && coachBlocksSignature(state.coachBlocks) !== meta.sig) {
-          writeCoachBlocksSyncMeta({
-            ...meta,
-            localEditedAt: new Date().toISOString(),
-          });
-        }
+        // §11 (Phase 2.3): one pure transition maintains the stamp —
+        // set on divergence, CLEARED when the state returns to the
+        // baseline signature (a reverted edit is not an edit).
+        const nextMeta = nextCoachBlocksSyncMeta(
+          readCoachBlocksSyncMeta(),
+          coachBlocksSignature(state.coachBlocks),
+          new Date().toISOString(),
+        );
+        if (nextMeta) writeCoachBlocksSyncMeta(nextMeta);
       }
       if (!navigator.onLine) return;
       // QA4-010: a follower tab never pushes — its in-memory state is
@@ -1714,8 +1883,7 @@ class SupabaseSyncEngine {
     if (persisted) {
       if (persisted.userId === user.id && persisted.dataSignature === dataSignature) {
         this.pendingMergeChoiceFor = user.id;
-        this.status = 'idle';
-        this.notify();
+        this.dispatch({ type: 'merge-choice', pending: true });
         return true;
       }
       clearPendingMergeChoice();
@@ -1742,8 +1910,7 @@ class SupabaseSyncEngine {
     if (verdict === 'gate') {
       this.pendingMergeChoiceFor = user.id;
       writePendingMergeChoice(user.id, dataSignature);
-      this.status = 'idle';
-      this.notify();
+      this.dispatch({ type: 'merge-choice', pending: true });
       return true;
     }
     this.mergeGateEvaluatedKey = evalKey;
@@ -1769,9 +1936,15 @@ class SupabaseSyncEngine {
     if (choice === 'archive') {
       const archived = useStore.getState().startFreshFromRetainedHistory();
       if (!archived) {
-        this.errorMessage = "Could not archive this device's data";
-        this.status = 'error';
-        this.notify();
+        // §2: a failure outside a sync run — the machine's
+        // standalone-failure lands it in 'error' (the gate itself
+        // stays pending via pendingMergeChoiceFor; the modal and
+        // the choice survive for a retry).
+        this.dispatch({
+          type: 'standalone-failure',
+          errorKind: 'server',
+          message: "Could not archive this device's data",
+        });
         return { error: 'archive_failed' };
       }
     }
@@ -1779,8 +1952,7 @@ class SupabaseSyncEngine {
     this.pendingMergeChoiceFor = null;
     clearPendingMergeChoice();
     clearSignInIntent();
-    this.errorMessage = null;
-    this.notify();
+    this.dispatch({ type: 'merge-choice', pending: false });
     await this.triggerSyncNow();
     return {};
   }
@@ -1806,7 +1978,7 @@ class SupabaseSyncEngine {
     if (this.pendingMergeChoiceFor === userId) {
       this.pendingMergeChoiceFor = null;
       clearPendingMergeChoice();
-      this.notify();
+      this.dispatch({ type: 'merge-choice', pending: false });
     }
   }
 
@@ -1887,8 +2059,10 @@ class SupabaseSyncEngine {
   }
 
   public async signOut(options?: { clearLocalData?: boolean }): Promise<{ error?: string }> {
-    clearTimeout(this.debounceTimer);
-    this.isSyncing = false;
+    // §1: full session teardown — timers, backoff ladder, in-flight
+    // detachment + generation bump (a late completion is discarded),
+    // machine to signed-out.
+    this.resetSyncSession();
     this.currentUser = null;
     // S4: a pending merge choice belongs to the signed-in session;
     // the next sign-in re-evaluates from its own intent flag.
@@ -1896,7 +2070,6 @@ class SupabaseSyncEngine {
     this.mergeGateEvaluatedKey = null;
     clearPendingMergeChoice();
     clearSignInIntent();
-    this.status = 'unconfigured';
     this.notify();
 
     if (typeof window !== 'undefined') {
@@ -1984,8 +2157,9 @@ class SupabaseSyncEngine {
   }
 
    public async deleteAccount(): Promise<{ success: boolean; error?: string }> {
-     clearTimeout(this.debounceTimer);
-     this.isSyncing = false;
+     // §1: same session teardown as signOut (timers, ladder,
+     // in-flight detachment, generation bump, machine to signed-out).
+     this.resetSyncSession();
      const supabase = getSupabase();
 
      let apiError: string | undefined;
@@ -2033,7 +2207,6 @@ class SupabaseSyncEngine {
      }
 
      this.currentUser = null;
-     this.status = 'unconfigured';
      this.notify();
 
      // Comprehensive local wipe
@@ -2094,11 +2267,18 @@ class SupabaseSyncEngine {
    */
   private recordSyncFailure(err: unknown) {
     const e: any = err as any;
-    this.status = 'error';
-    this.errorMessage = e?.message || 'Sync failed';
-    this.errorKind = classifySyncError(err);
-    this.notify();
-    if (this.errorKind !== 'auth') {
+    const errorKind = classifySyncError(err);
+    // §2: kind, message, attempt and the retry time land in the
+    // state together — one write, no window where they disagree.
+    this.dispatch({
+      type: 'sync-failed',
+      errorKind,
+      message: e?.message || 'Sync failed',
+      attempt: this.retryAttempt,
+      nextRetryAt:
+        errorKind === 'auth' ? null : Date.now() + syncRetryDelayMs(this.retryAttempt),
+    });
+    if (errorKind !== 'auth') {
       this.scheduleSyncRetry();
     }
   }
@@ -2122,11 +2302,20 @@ class SupabaseSyncEngine {
     }
   }
 
-  /** A healthy sync (or a fresh manual attempt) ends the failure state. */
-  private markSyncHealthy() {
-    this.errorKind = null;
+  /**
+   * A healthy sync ends the failure state: record the time, reset
+   * the backoff ladder, cancel any pending retry, and land the
+   * machine in 'synced' — one transition (§2; replaces the old
+   * markSyncHealthy + status write pair at each success site).
+   */
+  private markSyncSucceeded() {
+    this.lastSyncedAt = new Date().toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
     this.retryAttempt = 0;
     this.clearSyncRetryTimer();
+    this.dispatch({ type: 'sync-succeeded', at: this.lastSyncedAt });
   }
 
   private scheduleDebouncedPush() {
@@ -2168,29 +2357,28 @@ class SupabaseSyncEngine {
 
       if (!hasActiveSession) {
         this.currentUser = null;
-        this.status = 'unconfigured';
-        this.notify();
+        this.dispatch({ type: 'session-lost' });
         return;
       }
     }
 
     const supabase = getSupabase();
     if (!supabase) {
-      this.status = 'unconfigured';
-      this.notify();
+      this.dispatch({ type: 'client-missing' });
       return;
     }
 
     if (!navigator.onLine) {
-      this.status = 'offline';
-      this.notify();
+      this.dispatch({ type: 'went-offline' });
       return;
     }
 
-    this.isSyncing = true;
-    this.status = 'syncing';
-    this.errorMessage = null;
-    this.notify();
+    // §1: entering 'syncing' clears any old error kind + message
+    // together (they exist only inside the error state).
+    this.dispatch({ type: 'sync-started', now: Date.now(), attempt: this.retryAttempt });
+    // §1 generation guard: if the session is torn down while this
+    // run is in flight, every completion below is discarded.
+    const gen = this.generation;
 
     const sync = async () => {
     try {
@@ -2208,21 +2396,19 @@ class SupabaseSyncEngine {
         profile: useStore.getState().profile,
       });
 
+      if (gen !== this.generation) return;
+
       if (identity.kind === 'account-offline-stale') {
         // Keep the last known user; report an ordinary sync failure
         // (the classifier reads the fetch error as offline) with the
         // usual backoff, and retry later.
-        this.isSyncing = false;
         this.recordSyncFailure(sessionError ?? new Error('Session check failed'));
-        this.notify();
         return;
       }
 
       if (!user) {
         this.currentUser = null;
-        this.status = 'unconfigured';
-        this.isSyncing = false;
-        this.notify();
+        this.dispatch({ type: 'session-lost' });
         return;
       }
 
@@ -2720,7 +2906,20 @@ class SupabaseSyncEngine {
               coachBlocks: freshState.coachBlocks,
             }),
           );
-        return recomputePullSlices(freshInput, pullRemote, isCrossAccountSwitch, adoptRemoteChanges);
+        // §9: collect the local edits this recompute discards and
+        // leave them in the conflict log (id + stamps) — the rule
+        // destroys the loser's content by design, never silently.
+        const pullConflicts: PullConflict[] = [];
+        const slices = recomputePullSlices(
+          freshInput,
+          pullRemote,
+          isCrossAccountSwitch,
+          adoptRemoteChanges,
+          undefined,
+          (c) => pullConflicts.push(c),
+        );
+        recordSyncConflicts(pullConflicts);
+        return slices;
       })();
       for (const key of Object.keys(pullRemote) as PullSliceKey[]) {
         if (key in freshSlices) {
@@ -2747,6 +2946,10 @@ class SupabaseSyncEngine {
       ) {
         delete updates.profile;
       }
+      // §1 generation guard: the pull has landed; before ANY of it
+      // is applied (store writes, baseline settles, the push), a
+      // session torn down mid-flight discards the whole run.
+      if (gen !== this.generation) return;
       // F-11: coach-blocks adoption, decided HERE against the fresh
       // state (not the pre-round-trip capture), so a block approved
       // or proposed mid-sync is never overwritten by the pull. On a
@@ -2878,25 +3081,24 @@ class SupabaseSyncEngine {
         await this.pushLocalData(user.id);
       }
 
-      this.status = 'synced';
-      this.lastSyncedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      this.markSyncHealthy();
-      this.notify();
+      // §1: a sign-out during the push discards the success too.
+      if (gen !== this.generation) return;
+      this.markSyncSucceeded();
      } catch (err: any) {
+      if (gen !== this.generation) return;
       console.error('Supabase sync error:', err);
       this.recordSyncFailure(err);
-    } finally {
-      this.isSyncing = false;
-      this.pendingSyncPromise = null;
     }
     };
 
-    this.pendingSyncPromise = sync()
-      .finally(() => {
-        this.pendingSyncPromise = null;
-      });
-
-    return this.pendingSyncPromise;
+    // Identity-guarded cleanup: a detached (signed-out) run must
+    // not clear the promise of a NEWER run when it settles.
+    let tracked: Promise<void>;
+    tracked = sync().finally(() => {
+      if (this.pendingSyncPromise === tracked) this.pendingSyncPromise = null;
+    });
+    this.pendingSyncPromise = tracked;
+    return tracked;
   }
 
   /**
@@ -3803,6 +4005,11 @@ class SupabaseSyncEngine {
     const supabase = getSupabase();
     if (!supabase || !navigator.onLine) return;
 
+    // §2: a push-only run passes through the SAME transitions as a
+    // full sync (syncing -> synced / error) — one machine for both.
+    this.dispatch({ type: 'sync-started', now: Date.now(), attempt: this.retryAttempt });
+    const gen = this.generation;
+
     const sync = async () => {
       try {
         // §27: same session resolution as the full sync — a failed
@@ -3810,14 +4017,17 @@ class SupabaseSyncEngine {
         // never a silent "signed out".
         const { user, checkFailed, error } = await resolveSessionUser(supabase);
         if (checkFailed) throw error ?? new Error('Session check failed');
-        if (!user) return;
+        if (gen !== this.generation) return;
+        if (!user) {
+          this.dispatch({ type: 'session-lost' });
+          return;
+        }
 
         await this.pushLocalData(user.id);
-        this.status = 'synced';
-        this.lastSyncedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        this.markSyncHealthy();
-        this.notify();
+        if (gen !== this.generation) return;
+        this.markSyncSucceeded();
       } catch (err: any) {
+        if (gen !== this.generation) return;
         // F29: a failed push used to leave the previous (usually
         // 'synced') status in place. Report the failure honestly; the
         // UI renders 'error' from this status.
@@ -3826,12 +4036,12 @@ class SupabaseSyncEngine {
       }
     };
 
-    this.pendingSyncPromise = sync()
-      .finally(() => {
-        this.pendingSyncPromise = null;
-      });
-
-    return this.pendingSyncPromise;
+    let tracked: Promise<void>;
+    tracked = sync().finally(() => {
+      if (this.pendingSyncPromise === tracked) this.pendingSyncPromise = null;
+    });
+    this.pendingSyncPromise = tracked;
+    return tracked;
   }
 }
 

@@ -34,6 +34,7 @@ import { recordBackupExported } from '@/lib/backup-nudge';
 import { buildCombinedCsvExport } from '@/lib/csv-export';
 import { getLocalTodayStr, formatDateTime } from '@/lib/formatters';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
+import { selectSyncLabel } from '@/lib/supabase/sync-state';
 import type { SyncQuarantineCollection } from '@/lib/supabase/sync';
 import { useAppNavigation } from '@/lib/navigation';
 import { getTelemetryConsent, setTelemetryConsent, TelemetryConsent, TELEMETRY_CONSENT_EVENT } from '@/lib/telemetry';
@@ -147,15 +148,19 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
 
   // Cloud Sync
   const {
-    status: syncStatus,
+    syncState,
     lastSyncedAt,
     syncNow,
     user,
     signOut,
     deleteAccount,
-    errorKind: syncErrorKind,
     quarantined,
   } = useSupabaseSync();
+  // §2 (Phase 2.1): Settings describes the ONE sync state through
+  // the shared selector — the same derivation as the banner and the
+  // Today caption (B3: 'offline' no longer falls through to
+  // 'Sync Idle' here while the banner says failed).
+  const syncLabel = selectSyncLabel(syncState, !!user);
   const logout = useStore((state) => state.logout);
   const clearAllData = useStore((state) => state.clearAllData);
   const restoreArchivedHistory = useStore((state) => state.restoreArchivedHistory);
@@ -679,25 +684,17 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               <div className="flex items-center gap-1.5">
                 <span
                   className={`inline-block w-2 h-2 rounded-full ${
-                    syncStatus === 'synced'
+                    syncLabel.tone === 'ok'
                       ? 'bg-sage'
-                      : syncStatus === 'syncing'
+                      : syncLabel.tone === 'busy'
                       ? 'bg-amber-400'
+                      : syncLabel.tone === 'error'
+                      ? 'bg-red-500'
                       : 'bg-text-muted'
                   }`}
                 />
                 <span className="text-2xs font-mono text-text-muted">
-                  {user
-                    ? syncStatus === 'synced'
-                      ? t('settings.cloudSynced')
-                      : syncStatus === 'syncing'
-                      ? t('settings.syncing')
-                      // QA-hardening R6: same classified state as the
-                      // banner/Today caption — an error is not 'idle'.
-                      : syncStatus === 'error'
-                      ? (syncErrorKind === 'offline' ? t('home.syncOffline') : t('home.syncFailed'))
-                      : t('settings.syncIdle')
-                    : t('settings.localOnly')}
+                  {user ? t(syncLabel.key) : t('settings.localOnly')}
                 </span>
               </div>
             </div>

@@ -48,8 +48,10 @@ describe('F29: failed push must not report synced', () => {
     vi.clearAllMocks();
     upsertByTable.clear();
     useStore.getState().clearAllData();
-    engine.status = 'unconfigured';
-    engine.errorMessage = null;
+    // Phase 2.1 (§1/§2): the engine's status/errorMessage fields
+    // are gone — status is a projection of the one SyncState, read
+    // via getStatus()/getState(). (This file used to poke the
+    // private fields directly.)
     engine.pendingSyncPromise = null;
     Object.defineProperty(global, 'navigator', {
       value: { onLine: true },
@@ -73,7 +75,8 @@ describe('F29: failed push must not report synced', () => {
     useStore.setState({ workouts: [workout] });
     upsertByTable.set('workouts', { error: { message: 'boom' } });
     await engine.syncPush();
-    expect(engine.status).toBe('error');
-    expect(engine.errorMessage).toMatch(/boom/);
+    expect(syncEngine.getStatus().status).toBe('error');
+    expect(syncEngine.getStatus().error).toMatch(/boom/);
+    expect(syncEngine.getState().kind).toBe('error');
   });
 });

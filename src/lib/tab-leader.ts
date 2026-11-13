@@ -35,6 +35,18 @@
  *   on its next heartbeat (≤ HEARTBEAT_MS later). Writes in that
  *   sub-second window can still interleave — the window is bounded
  *   and self-healing, not zero.
+ * - Heartbeat race (§13, documented Phase 2.4): leadership truth is
+ *   the stored record + its heartbeat timestamp, NOT any tab's
+ *   in-memory flag. Between heartbeats a tab's flag can be stale by
+ *   up to HEARTBEAT_MS (longer under background throttling), which
+ *   is why writers prove leadership against the record at write
+ *   time (isProvenLeader / isOtherLeaderActive) instead of trusting
+ *   the flag. A programmatic stop() leaves the record in place: it
+ *   goes stale within STALE_MS and another tab's tick claims it.
+ *   The design accepts these bounded windows deliberately — the
+ *   alternative (Web Locks + storage transactions) is not
+ *   available across every supported browser — and fails OPEN
+ *   when storage is unavailable (see below).
  * - Suppression covers the zustand blob, the emergency snapshot and
  *   sync pushes. A few features write their OWN localStorage keys
  *   (notification prefs, progress photos, avatar mirror); those are
@@ -186,6 +198,15 @@ export class TabLeaderGuard {
       } catch {}
       this.channel = null;
     }
+    // §13 (Phase 2.4): reset the leader flags. A stopped guard must
+    // not keep reporting leadership (or another tab's presence) from
+    // before the stop — readers and a later start() begin from the
+    // clean state. setState notifies subscribers of the reset.
+    // NOTE: stop() deliberately does NOT remove the leader record
+    // from storage (that is onUnload's job, on real tab exit): the
+    // record ages out within STALE_MS, and a remaining tab's tick
+    // claims leadership then — see the heartbeat race in the header.
+    this.setState(false, false);
   }
 
   /** Follower action: become the leader; the old leader steps down. */
@@ -287,10 +308,15 @@ export class TabLeaderGuard {
 
   private onUnload(): void {
     this.broadcast({ type: 'bye', tabId: this.tabId });
-    if (this.leader) {
+    // Record-based proof, NOT the in-memory leader flag: since
+    // Phase 2.4, stop() resets the flags, and a stop-then-unload
+    // sequence must still remove this tab's record (a follower
+    // takes over immediately instead of waiting out STALE_MS).
+    // The flag could also lag a takeover in the other direction —
+    // the record is the truth (see the header's heartbeat race).
+    if (this.isProvenLeader()) {
       try {
-        const record = this.readRecord();
-        if (record?.tabId === this.tabId) this.deps.storage.removeItem(TAB_LEADER_KEY);
+        this.deps.storage.removeItem(TAB_LEADER_KEY);
       } catch {}
     }
   }

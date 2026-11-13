@@ -99,9 +99,17 @@ describe('push gate (shouldPushRow / filterRowsForPush)', () => {
     expect(shouldPushRow(NEW, NEW)).toBe(false);
   });
 
-  it('unparseable remote stamp fails to remote (never overwrites)', () => {
-    expect(shouldPushRow(NEW, 'garbage')).toBe(false);
-    expect(shouldPushRow(NEW, null)).toBe(false);
+  it('missing/unparseable remote stamp: the parseable local stamp wins (§9 unified rule)', () => {
+    // Phase 2.2 §9 SUPERSEDES the DI-08 arm this test used to pin
+    // ("fails to remote, never overwrites"): pull already kept the
+    // local winner in this case, so the gate refusing to upload it
+    // stranded the row and let devices diverge permanently. Push
+    // now follows the pull winner exactly — an unparseable stamp
+    // is a missing stamp, on both sides. The overwrite risk is
+    // bounded (a stamp-less remote row predates stamping) and the
+    // loss is recorded in the §9 conflict log.
+    expect(shouldPushRow(NEW, 'garbage')).toBe(true);
+    expect(shouldPushRow(NEW, null)).toBe(true);
   });
 
   it('row absent remotely is upserted even without a local stamp', () => {

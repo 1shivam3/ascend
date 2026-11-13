@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
 import { useTranslation } from '@/lib/i18n';
 import type { SyncErrorKind } from '@/lib/supabase/sync';
+import type { SyncState } from '@/lib/supabase/sync-state';
 
 /**
  * Gauntlet R3: persistent sync-failure surface.
@@ -30,6 +31,11 @@ export function shouldShowSyncError(status: string, hasUser: boolean): boolean {
   return hasUser && status === 'error';
 }
 
+/** §2 (Phase 2.1): the banner reads the ONE sync state directly. */
+export function shouldShowSyncErrorForState(state: SyncState, hasUser: boolean): boolean {
+  return hasUser && state.kind === 'error';
+}
+
 /** R6: the banner message key for a classified sync failure. */
 export function syncErrorMessageKey(
   kind: SyncErrorKind | null
@@ -49,7 +55,7 @@ export function syncErrorMessageKey(
 const DISMISS_KEY = 'ascend_sync_banner_dismissed_kind';
 
 export default function SyncErrorBanner() {
-  const { status, user, errorKind, syncNow } = useSupabaseSync();
+  const { syncState, user, errorKind, syncNow } = useSupabaseSync();
   const { t } = useTranslation();
   const [dismissedKind, setDismissedKind] = useState<string | null>(() => {
     try {
@@ -59,7 +65,7 @@ export default function SyncErrorBanner() {
     }
   });
 
-  if (!shouldShowSyncError(status, !!user)) return null;
+  if (!shouldShowSyncErrorForState(syncState, !!user)) return null;
   if (dismissedKind !== null && dismissedKind === (errorKind ?? 'unknown')) return null;
 
   const dismiss = () => {
