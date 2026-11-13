@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { syncEngine } from '../src/lib/supabase/sync';
-import { useStore } from '../src/lib/store';
+import { useStore, selectHasCompletedOnboarding } from '../src/lib/store';
 import { resetRateLimitStoreForTests } from '../src/lib/rate-limit';
 import {
   createDeletionToken,
@@ -252,7 +252,7 @@ describe('Account Deletion & Data Safety Specification', () => {
         unit: 'kg',
         createdAt: '2026-01-01',
       },
-      hasCompletedOnboarding: true,
+      // §26: completion is derived from profile presence — no flag to seed.
     });
     expect(useStore.getState().profile?.name).toBe('Test Athlete');
 
@@ -271,7 +271,7 @@ describe('Account Deletion & Data Safety Specification', () => {
 
     expect(result.success).toBe(true);
     expect(useStore.getState().profile).toBeNull();
-    expect(useStore.getState().hasCompletedOnboarding).toBe(false);
+    expect(selectHasCompletedOnboarding(useStore.getState())).toBe(false); // §26 derived
 
     expect(mockStorage.getItem('ascend_store')).toBeNull();
     expect(mockStorage.getItem('ascend_emergency_snapshot')).toBeNull();

@@ -343,7 +343,6 @@ export interface AppState {
   /** Per-date fasting/festival meal pattern. Absent date = normal day. */
   mealDayKinds: Record<string, MealDayKind>;
   setMealDayKind: (date: string, kind: MealDayKind | null) => void;
-  hasCompletedOnboarding: boolean;
   _hasHydrated: boolean;
 
   // Athlete Multi-Goal Selection
@@ -996,6 +995,9 @@ export function migratePersistedState(
     next.themeMode = themeModeFromLegacy(state.theme, state.hasCustomTheme);
   }
   if ('hasCustomTheme' in next) delete next.hasCustomTheme;
+  // §26: the stored completion boolean is gone — completion is
+  // derived from profile presence (selectHasCompletedOnboarding).
+  if ('hasCompletedOnboarding' in next) delete next.hasCompletedOnboarding;
 
   // §23 (Phase 3.1): baselines become ONE field. Every pre-3.1
   // record encoded baseline only in its notes text (the flag was
@@ -1325,6 +1327,22 @@ function writeThemeBootKeys(mode: ThemeMode, resolved: Theme): void {
   } catch {}
 }
 
+/**
+ * §26: onboarding completion is DERIVED, never stored. The entry
+ * gate has always keyed on profile presence (the profile is
+ * staged locally through onboarding and committed only at
+ * completion — see Onboarding.tsx), so profile presence IS the
+ * completion fact. The old parallel boolean was written at ~10
+ * sites and could disagree with the profile it described; every
+ * writer set it in the same action that set or nulled the
+ * profile, so the derivation is exactly equivalent.
+ */
+export function selectHasCompletedOnboarding(state: {
+  profile: UserProfile | null;
+}): boolean {
+  return state.profile != null;
+}
+
 export function partializeAppState(state: AppState): Record<string, unknown> {
   return {
   profile: state.profile,
@@ -1350,7 +1368,6 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   favoriteFoods: state.favoriteFoods,
   customFoods: state.customFoods,
   mealDayKinds: state.mealDayKinds,
-  hasCompletedOnboarding: state.hasCompletedOnboarding,
   waterLogs: state.waterLogs,
   waterBatches: state.waterBatches,
   hydrationConfig: state.hydrationConfig,
@@ -1595,7 +1612,6 @@ export const useAppStore = create<AppState>()(
       favoriteFoods: DEFAULT_FAVORITE_FOODS,
       customFoods: [],
       mealDayKinds: {},
-      hasCompletedOnboarding: false,
       _hasHydrated: false,
 
       // Athlete Multi-Goal Selection
@@ -2040,7 +2056,6 @@ export const useAppStore = create<AppState>()(
           profile: { ...profile, goals: nextGoals, updatedAt: new Date().toISOString() },
           goals: nextGoals,
           macroGoals: nextMacroGoals,
-          hasCompletedOnboarding: true,
           bodyMetrics: nextMetrics,
           favoriteFoods: nextFavorites,
         };
@@ -4073,7 +4088,6 @@ export const useAppStore = create<AppState>()(
           favoriteFoods: DEFAULT_FAVORITE_FOODS,
           customFoods: [],
           mealDayKinds: {},
-          hasCompletedOnboarding: false,
           waterLogs: {},
           waterBatches: {},
           hydrationConfig: DEFAULT_HYDRATION_CONFIG,
@@ -4153,6 +4167,10 @@ export const useAppStore = create<AppState>()(
             markLoggedOut();
             localStorage.removeItem('ascend_emergency_snapshot');
             localStorage.removeItem('ascend_profile');
+            // §25: a saved onboarding resume point belongs to the
+            // flow that created it — never greet the next person
+            // on this device mid-flow.
+            localStorage.removeItem('ascend_onboarding_screen');
           } catch {}
         }
 
@@ -4169,7 +4187,6 @@ export const useAppStore = create<AppState>()(
             favoriteFoods: DEFAULT_FAVORITE_FOODS,
             customFoods: [],
             mealDayKinds: {},
-            hasCompletedOnboarding: false,
             waterLogs: {},
             waterBatches: {},
             hydrationConfig: DEFAULT_HYDRATION_CONFIG,
@@ -4235,7 +4252,6 @@ export const useAppStore = create<AppState>()(
 
         set({
           profile: null,
-          hasCompletedOnboarding: false,
           activeWorkoutDraft: null,
           lifterProfile: null,
           athleteModel: null,
@@ -4283,7 +4299,6 @@ export const useAppStore = create<AppState>()(
         if (!get().archiveRetainedHistory()) return false;
         set({
           profile: null,
-          hasCompletedOnboarding: false,
           ...buildFreshHistoryState(),
           lastActiveTab: 'home',
         });
@@ -4377,10 +4392,10 @@ export const useAppStore = create<AppState>()(
           // current state over it — the archive stays repeatable.
           const ok = get().importAllData(parsed, { archiveFirst: false });
           if (!ok) return false;
-          // The archive was written from a logged-out state, so its
-          // hasCompletedOnboarding is false — a restore from inside
-          // the app must not kick the user back to onboarding.
-          set({ hasCompletedOnboarding: true });
+          // §26: no completion flag to repair here — completion
+          // is derived from profile presence, and the archive
+          // carries the profile it was written with, so a restore
+          // lands exactly as onboarded as the archive was.
           if (Array.isArray(parsed.progressPhotos)) {
             const valid = parsed.progressPhotos
               .filter(
@@ -4647,10 +4662,6 @@ export const useAppStore = create<AppState>()(
               ? resolveTheme(restoredThemeMode, systemThemeNow())
               : state.theme,
             themeMode: restoredThemeMode ?? state.themeMode,
-            hasCompletedOnboarding:
-              data.hasCompletedOnboarding !== undefined
-                ? data.hasCompletedOnboarding
-                : (data.profile ? true : state.hasCompletedOnboarding),
             plannedWorkouts: Array.isArray(data.plannedWorkouts)
               ? data.plannedWorkouts.map((e: any) => (e && typeof e === 'object' ? { ...e, updatedAt: new Date().toISOString() } : e))
               : state.plannedWorkouts,
@@ -5040,7 +5051,7 @@ export const useAppStore = create<AppState>()(
                     try {
                       const parsedProfile = JSON.parse(rawProfile);
                       if (parsedProfile?.name) {
-                        useAppStore.setState({ profile: parsedProfile, hasCompletedOnboarding: true });
+                        useAppStore.setState({ profile: parsedProfile });
                       }
                     } catch {
                       // Ignore malformed profile backup
@@ -5281,7 +5292,7 @@ useAppStore.subscribe((state) => {
   const workoutCount = state.workouts?.length || 0;
   if (workoutCount !== lastLifterProfileWorkoutCount) {
     lastLifterProfileWorkoutCount = workoutCount;
-    if (workoutCount > 0 && state.hasCompletedOnboarding) {
+    if (workoutCount > 0 && selectHasCompletedOnboarding(state)) {
       state.refreshLifterProfile();
     }
   }
@@ -5326,9 +5337,9 @@ useAppStore.subscribe((state) => {
     lastAthleteModelSignature = signature;
     // No hasInputs gate: deleting the last workout/check-in must refresh
     // to the honest empty model, not leave the old one (and its pain
-    // facts) on screen. Logout/clear-all set hasCompletedOnboarding
-    // false, which keeps their explicit null in place.
-    if (state.hasCompletedOnboarding) {
+    // facts) on screen. Logout/clear-all null the profile, which (via
+    // the §26 derivation) keeps their explicit null in place.
+    if (selectHasCompletedOnboarding(state)) {
       state.refreshAthleteModel();
     }
   }
@@ -5453,7 +5464,6 @@ if (typeof window !== 'undefined') {
             userMode: state.userMode,
             theme: state.theme,
             themeMode: state.themeMode,
-            hasCompletedOnboarding: state.hasCompletedOnboarding,
             savedAt: new Date().toISOString(),
           };
           localStorage.setItem('ascend_emergency_snapshot', JSON.stringify(snapshot));

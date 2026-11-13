@@ -98,7 +98,7 @@ describe('Phase 6 — Settings, Profile & Navigation Verification', () => {
       theme: 'dark',
       themeMode: 'dark', // §35: was hasCustomTheme: true — the explicit-dark pair
       userMode: 'intermediate',
-      hasCompletedOnboarding: true,
+      // §26: completion derives from the profile seeded above.
       _hasHydrated: true,
     });
 

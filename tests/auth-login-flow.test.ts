@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { getSupabaseCredentials, saveCustomSupabaseCredentials } from '../src/lib/supabase/config';
 import { syncEngine } from '../src/lib/supabase/sync';
-import { useStore } from '../src/lib/store';
+import { useStore, selectHasCompletedOnboarding } from '../src/lib/store';
 
 // Mock storage for tests
 class MockStorage implements Storage {
@@ -236,7 +236,7 @@ describe('Authentication & Login Recovery Flow', () => {
 
     it('synthesizes an athlete profile when returning user has remote workouts but profiles row was missing', async () => {
       mockStorage.clear();
-      useStore.setState({ profile: null, prs: [], workouts: [], meals: [], hasCompletedOnboarding: false });
+      useStore.setState({ profile: null, prs: [], workouts: [], meals: [] }); // §26: no flag — profile null IS not-onboarded
 
       mockSupabase.auth.getSession.mockResolvedValue({
         data: { session: { user: { id: 'usr_returning_hero', email: 'hero@ascend.app', user_metadata: { full_name: 'Iron Hero' } } } },
@@ -290,7 +290,7 @@ describe('Authentication & Login Recovery Flow', () => {
       expect(state.profile).not.toBeNull();
       expect(state.profile?.id).toBe('usr_returning_hero');
       expect(state.profile?.name).toBe('Iron Hero');
-      expect(state.hasCompletedOnboarding).toBe(true);
+      expect(selectHasCompletedOnboarding(state)).toBe(true); // §26 derived from the adopted profile
       expect(state.workouts.length).toBe(1);
     });
 

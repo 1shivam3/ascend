@@ -6,7 +6,7 @@ import {
   hasRetainedHistory,
   readArchivedHistory,
 } from '../src/lib/history-fork';
-import { useStore } from '@/lib/store';
+import { useStore, selectHasCompletedOnboarding } from '@/lib/store';
 
 // Logout-to-onboarding (user order): Settings "Log Out" (keep-data)
 // must land on onboarding directly, not the saved-history fork. The
@@ -56,7 +56,7 @@ describe('logout → onboarding (no fork), history archived', () => {
     (globalThis as any).localStorage = storage;
     useStore.setState({
       profile: { name: 'Athlete' },
-      hasCompletedOnboarding: true,
+      // §26: no flag to seed — the seeded profile carries completion.
       workouts: [{ id: 'w1', date: '2026-10-20', exercises: [] }],
       meals: [{ id: 'm1', date: '2026-10-20', name: 'Lunch', foods: [] }],
       plannedWorkouts: [{ id: 'p1', name: 'Plan', exercises: [], createdAt: '2026-01-01' }],
@@ -80,7 +80,7 @@ describe('logout → onboarding (no fork), history archived', () => {
     // hasRetainedHistory is true; after logout both inputs say
     // onboarding: no profile, nothing retained.
     expect(s.profile).toBeNull();
-    expect(s.hasCompletedOnboarding).toBe(false);
+    expect(selectHasCompletedOnboarding(s)).toBe(false); // §26: logout nulls the profile, derivation follows
     expect(hasRetainedHistory(liveRetainedInput())).toBe(false);
     expect(s.workouts).toEqual([]);
     expect(s.meals).toEqual([]);
@@ -176,7 +176,7 @@ describe('Log Out & Clear unchanged (full wipe)', () => {
     (globalThis as any).localStorage = storage;
     useStore.setState({
       profile: { name: 'Athlete' },
-      hasCompletedOnboarding: true,
+      // §26: no flag to seed — the seeded profile carries completion.
       workouts: [{ id: 'w1', date: '2026-10-20', exercises: [] }],
       meals: [{ id: 'm1', date: '2026-10-20', name: 'Lunch', foods: [] }],
     } as never);

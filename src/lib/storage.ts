@@ -538,7 +538,8 @@ export function importFullBackupJSON(jsonString: string): boolean {
     const nextState: Record<string, any> = {
       ...currentState,
       ...data,
-      hasCompletedOnboarding: true,
+      // §26: no completion flag to force — completion derives
+      // from the restored profile's presence.
       _hasHydrated: true,
     };
     // F12 (preview-fix) + gauntlet DI-07: same entry-date rule as
