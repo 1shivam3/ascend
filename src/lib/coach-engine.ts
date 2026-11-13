@@ -778,6 +778,24 @@ export function recentCheckinsBefore(
  * poor check-ins), and rapid weight loss.
  * Conservative by design: thin data or conflicting signals push toward caution.
  */
+/**
+ * §D1 (Phase 5): THE readiness band thresholds — the single
+ * definition both calculateReadiness branches use. (Phase 0
+ * found the thresholds written twice: a bandFor helper for the
+ * no-history branch and an inlined copy in the history branch;
+ * a divergence test in tests/readiness-band-phase5.test.ts
+ * fails if a second copy reappears.)
+ *
+ * 'primed' is intentionally UNREACHABLE without training
+ * history: the no-history branch clamps its score to ≤ 79
+ * (conservative cap — with zero load data the coach may say
+ * 'ready', never 'primed'), and flagged pain caps the history
+ * branch at 79 the same way.
+ */
+export function readinessBandForScore(s: number): ReadinessResult['band'] {
+  return s >= 80 ? 'primed' : s >= 60 ? 'ready' : s >= 40 ? 'caution' : 'rest';
+}
+
 export function calculateReadiness(
   workouts: WorkoutEntry[],
   bodyMetrics: BodyMetricEntry[],
@@ -826,8 +844,6 @@ export function calculateReadiness(
     }
     return score;
   };
-  const bandFor = (s: number): ReadinessResult['band'] =>
-    s >= 80 ? 'primed' : s >= 60 ? 'ready' : s >= 40 ? 'caution' : 'rest';
 
   if (sorted.length === 0) {
     // No training history: a flat baseline, but the manual check-in and any
@@ -853,7 +869,7 @@ export function calculateReadiness(
     const shownFactors = factors.slice(0, 5);
     return {
       score,
-      band: bandFor(score),
+      band: readinessBandForScore(score),
       factors: shownFactors,
       // The no-history sentence is always factors[0] in this branch: it is
       // pushed first, before any check-in or device factor below.
@@ -1000,11 +1016,7 @@ export function calculateReadiness(
   // would be an incoherent coach (see checkinAreaAdjustment).
   if (checkinHasPain) score = Math.min(score, 79);
 
-  let band: ReadinessResult['band'];
-  if (score >= 80) band = 'primed';
-  else if (score >= 60) band = 'ready';
-  else if (score >= 40) band = 'caution';
-  else band = 'rest';
+  const band = readinessBandForScore(score);
 
   if (factors.length === 0) {
     factors.push(
