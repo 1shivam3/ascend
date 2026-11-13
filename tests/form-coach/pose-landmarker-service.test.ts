@@ -83,7 +83,8 @@ describe('PoseLandmarkerService', () => {
 
   it('enforces strictly monotonic positive integer timestamps for inference', async () => {
     const service = new PoseLandmarkerService({ targetFps: 30 });
-    (service as any).status = 'ready';
+    // §33: the private state is the union now — ready carries mode+delegate.
+    (service as any).state = { status: 'ready', mode: 'main', delegate: 'gpu' };
 
     const mockLandmarker = {
       detectForVideo: vi.fn().mockReturnValue({ landmarks: [], worldLandmarks: [] }),
@@ -123,8 +124,8 @@ describe('PoseLandmarkerService', () => {
 
     (service as any).worker = mockWorker;
     (service as any).directLandmarker = mockLandmarker;
-    (service as any).status = 'ready';
-    (service as any).isWorkerActive = true;
+    // §33: one state field (was: status + isWorkerActive pokes).
+    (service as any).state = { status: 'ready', mode: 'worker', delegate: 'gpu' };
     (service as any).isInferenceInFlight = true;
 
     service.destroy();
@@ -135,5 +136,27 @@ describe('PoseLandmarkerService', () => {
     expect(service.getStatus()).toBe('uninitialized');
     expect((service as any).isInferenceInFlight).toBe(false);
     expect(service.isUsingWorker()).toBe(false);
+  });
+});
+
+describe('§33 pose service state union', () => {
+  it('a fresh service is uninitialized with no mode/delegate facts', () => {
+    const service = new PoseLandmarkerService();
+    expect(service.getState()).toEqual({ status: 'uninitialized' });
+    expect(service.getStatus()).toBe('uninitialized');
+    expect(service.isUsingWorker()).toBe(false);
+    expect(service.getErrorMessage()).toBeNull();
+  });
+
+  it('the SSR failure lands in the error member, message carried in the state', async () => {
+    const service = new PoseLandmarkerService();
+    await service.initialize();
+    expect(service.getState()).toEqual({
+      status: 'error',
+      message: 'Window is not defined (SSR context).',
+    });
+    // The legacy accessors are projections of the same state.
+    expect(service.getStatus()).toBe('error');
+    expect(service.getErrorMessage()).toContain('Window is not defined');
   });
 });

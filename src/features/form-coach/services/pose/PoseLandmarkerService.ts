@@ -31,6 +31,20 @@ export type PoseServiceStatus =
   | 'ready'
   | 'error';
 
+/**
+ * §33: the service's ONE state. Mode (worker vs main thread)
+ * and delegate (gpu vs cpu) used to be a side boolean
+ * (isWorkerActive) plus an unrecorded delegate choice — a
+ * 'ready' service could not say how it was running. Now
+ * 'ready' carries both facts, 'error' carries its message,
+ * and the legacy accessors below are pure projections.
+ */
+export type PoseServiceState =
+  | { status: 'uninitialized' }
+  | { status: 'loading' }
+  | { status: 'ready'; mode: 'worker' | 'main'; delegate: 'gpu' | 'cpu' }
+  | { status: 'error'; message: string };
+
 export interface PoseServiceConfig {
   wasmPath?: string;
   modelPath?: string;
@@ -39,15 +53,13 @@ export interface PoseServiceConfig {
 }
 
 export class PoseLandmarkerService {
-  private status: PoseServiceStatus = 'uninitialized';
-  private errorMessage: string | null = null;
+  private state: PoseServiceState = { status: 'uninitialized' };
 
   private directLandmarker: PoseLandmarker | null = null;
   private directVision: any = null;
   private directOptions: PoseLandmarkerOptions | null = null;
 
   private worker: Worker | null = null;
-  private isWorkerActive = false;
 
   private initPromise: Promise<void> | null = null;
   private currentFrameCallback: ((result: PoseInferenceResult) => void) | null = null;
@@ -70,16 +82,25 @@ export class PoseLandmarkerService {
     this.minIntervalMs = Math.round(1000 / this.config.targetFps);
   }
 
+  /** The one state (§33) — prefer this in new code. */
+  getState(): PoseServiceState {
+    return this.state;
+  }
+
   getStatus(): PoseServiceStatus {
-    return this.status;
+    return this.state.status;
   }
 
   getErrorMessage(): string | null {
-    return this.errorMessage;
+    return this.state.status === 'error' ? this.state.message : null;
   }
 
   isUsingWorker(): boolean {
-    return this.isWorkerActive;
+    return this.state.status === 'ready' && this.state.mode === 'worker';
+  }
+
+  private get inWorkerMode(): boolean {
+    return this.state.status === 'ready' && this.state.mode === 'worker';
   }
 
   /**
@@ -87,16 +108,17 @@ export class PoseLandmarkerService {
    * Attempts Web Worker first; falls back to direct main-thread inference if Worker fails.
    */
   async initialize(): Promise<void> {
-    if (this.status === 'ready') return;
+    if (this.state.status === 'ready') return;
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = (async () => {
-      this.status = 'loading';
-      this.errorMessage = null;
+      this.state = { status: 'loading' };
 
       if (typeof window === 'undefined') {
-        this.status = 'error';
-        this.errorMessage = 'Window is not defined (SSR context).';
+        this.state = {
+          status: 'error',
+          message: 'Window is not defined (SSR context).',
+        };
         return;
       }
 
@@ -107,10 +129,9 @@ export class PoseLandmarkerService {
       // 1. Try Worker-based inference first
       if (this.config.useWorker && typeof Worker !== 'undefined') {
         try {
-          const workerReady = await this.initWorker(resolvedWasmPath, resolvedModelPath);
-          if (workerReady) {
-            this.isWorkerActive = true;
-            this.status = 'ready';
+          const workerDelegate = await this.initWorker(resolvedWasmPath, resolvedModelPath);
+          if (workerDelegate) {
+            this.state = { status: 'ready', mode: 'worker', delegate: workerDelegate };
             this.lastSentTimestamp = 0;
             return;
           }
@@ -148,6 +169,7 @@ export class PoseLandmarkerService {
         };
 
         // Attempt GPU delegate first, fallback to CPU delegate if WebGL fails
+        let directDelegate: 'gpu' | 'cpu' = 'gpu';
         try {
           this.directLandmarker = await PoseLandmarker.createFromOptions(this.directVision, optionsGPU);
           this.directOptions = optionsGPU;
@@ -155,14 +177,16 @@ export class PoseLandmarkerService {
           console.warn('[FormCoach] Direct GPU delegate failed, falling back to CPU:', gpuErr?.message || gpuErr);
           this.directLandmarker = await PoseLandmarker.createFromOptions(this.directVision, optionsCPU);
           this.directOptions = optionsCPU;
+          directDelegate = 'cpu';
         }
 
-        this.isWorkerActive = false;
-        this.status = 'ready';
+        this.state = { status: 'ready', mode: 'main', delegate: directDelegate };
         this.lastSentTimestamp = 0;
       } catch (directErr: any) {
-        this.status = 'error';
-        this.errorMessage = directErr?.message || 'Failed to initialize MediaPipe Pose Landmarker.';
+        this.state = {
+          status: 'error',
+          message: directErr?.message || 'Failed to initialize MediaPipe Pose Landmarker.',
+        };
         throw directErr;
       }
     })();
@@ -173,13 +197,18 @@ export class PoseLandmarkerService {
       this.initPromise = null;
       throw err;
     } finally {
-      if ((this.status as PoseServiceStatus) !== 'ready') {
+      // Via the accessor: the state legitimately changed during
+      // the await (that's what this check exists for), which a
+      // direct field read's narrowing would misjudge.
+      if (this.getStatus() !== 'ready') {
         this.initPromise = null;
       }
     }
   }
 
-  private initWorker(wasmPath: string, modelPath: string): Promise<boolean> {
+  /** Resolves the worker's delegate ('gpu' | 'cpu') on success,
+   * false when the worker never became ready. */
+  private initWorker(wasmPath: string, modelPath: string): Promise<'gpu' | 'cpu' | false> {
     return new Promise((resolve, reject) => {
       try {
         const worker = new Worker(new URL('./pose.worker.ts', import.meta.url), {
@@ -197,7 +226,11 @@ export class PoseLandmarkerService {
           if (type === 'INIT_SUCCESS') {
             clearTimeout(timeout);
             this.worker = worker;
-            resolve(true);
+            // The worker reports the delegate it initialized
+            // (§33); an older cached worker that doesn't is
+            // assumed gpu-first, as its creation order dictates.
+            const d = (event.data as { delegate?: unknown }).delegate;
+            resolve(d === 'CPU' ? 'cpu' : 'gpu');
           } else if (type === 'INIT_ERROR') {
             clearTimeout(timeout);
             worker.terminate();
@@ -271,7 +304,7 @@ export class PoseLandmarkerService {
     timestampMs: number,
     onResult: (result: PoseInferenceResult) => void
   ): Promise<boolean> {
-    if (this.status !== 'ready') return false;
+    if (this.state.status !== 'ready') return false;
     const minReadyState = typeof HTMLMediaElement !== 'undefined' ? HTMLMediaElement.HAVE_CURRENT_DATA : 2;
     if (videoElement.readyState < minReadyState) return false;
 
@@ -297,7 +330,7 @@ export class PoseLandmarkerService {
     this.lastSentTimestamp = safeTimestamp;
 
     // Route to Worker
-    if (this.isWorkerActive && this.worker) {
+    if (this.inWorkerMode && this.worker) {
       try {
         if (typeof createImageBitmap === 'function') {
           const bitmap = await createImageBitmap(videoElement);
@@ -387,8 +420,7 @@ export class PoseLandmarkerService {
 
     this.directVision = null;
     this.directOptions = null;
-    this.status = 'uninitialized';
+    this.state = { status: 'uninitialized' };
     this.isInferenceInFlight = false;
-    this.isWorkerActive = false;
   }
 }
