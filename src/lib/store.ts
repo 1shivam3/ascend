@@ -3182,10 +3182,14 @@ export const useAppStore = create<AppState>()(
       }),
 
       saveWorkoutDraft: (draft) => {
-        // §15 (Phase 3.3): an empty-exercises draft is not a state —
-        // saving one CLEARS the slot explicitly, instead of leaving
-        // a phantom draft every reader then has to special-case.
-        if (!draft || !draft.exercises || draft.exercises.length === 0) {
+        // §15 (Phase 3.3): the draft persists exactly as given —
+        // including a zero-exercise draft, which is a REAL state:
+        // it carries the session's start timestamp, and the
+        // elapsed timer derives from it across remounts (final-cert
+        // J2.3). An earlier §15 draft of this change cleared the
+        // slot on empty exercises; the J2.3 gate caught that as a
+        // regression and it was reverted the same day.
+        if (!draft) {
           set({ activeWorkoutDraft: null });
           return;
         }

@@ -17,9 +17,10 @@
  *
  * §15 — the draft type was defined twice; two autosave effects
  * wrote one slot with no ownership rule. Now: one definition, an
- * explicit ownership predicate for autosaves, an empty draft is a
- * clear, and staleness (>12h) is a named, testable fact the resume
- * surface prompts on.
+ * explicit ownership predicate for autosaves, and staleness
+ * (>12h) is a named, testable fact the resume surface prompts on.
+ * (A zero-exercise draft still persists — it carries the session
+ * start timestamp; see the J2.3 correction in the §15 tests.)
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore, migratePersistedState, shouldAutosaveDraft, isStaleDraft } from '../src/lib/store';
@@ -158,17 +159,17 @@ describe('§15 draft — one slot, explicit ownership', () => {
     useStore.getState().clearAllData();
   });
 
-  it('saving an empty-exercises draft clears the slot (explicit cleanup)', () => {
+  it('a zero-exercise draft PERSISTS — it carries the session start (J2.3)', () => {
+    // §15 correction (phase gates): an earlier §15 draft cleared
+    // the slot on empty exercises, but a just-started session has
+    // no exercises yet and its draft is the elapsed timer's only
+    // source (final-cert J2.3 pins this). The clear is reverted;
+    // this test pins the corrected behavior.
     const store = useStore.getState();
-    store.saveWorkoutDraft({
-      date: TODAY, exercises: [{ name: 'Bench Press', sets: [mkSet({})] }],
-      sessionStartTime: 1000, savedAt: new Date().toISOString(),
-    } as any);
-    expect(useStore.getState().activeWorkoutDraft).not.toBeNull();
     store.saveWorkoutDraft({
       date: TODAY, exercises: [], sessionStartTime: 1000, savedAt: new Date().toISOString(),
     } as any);
-    expect(useStore.getState().activeWorkoutDraft).toBeNull();
+    expect(useStore.getState().activeWorkoutDraft?.sessionStartTime).toBe(1000);
   });
 
   it('shouldAutosaveDraft: empty slot, own session, or a strictly newer session', () => {
