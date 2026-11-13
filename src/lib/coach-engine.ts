@@ -567,6 +567,16 @@ export interface ManualCheckin {
    * older entries — treated as {}.
    */
   notes?: Record<string, string>;
+  /**
+   * ISO timestamp of when the Coach-tab check-in flow was COMPLETED
+   * (§24, Phase 3.6). Every answer saves the record immediately, so
+   * the record's existence only proves a first answer; "done today"
+   * is this stamp (see hasCompletedCheckin in coach-session).
+   * Absent on older entries and on partial flows — including records
+   * written by the readiness sheet's quick ratings, which never run
+   * the full question flow.
+   */
+  completedAt?: string;
 }
 
 export interface ReadinessResult {

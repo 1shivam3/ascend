@@ -36,7 +36,10 @@ import { useToday } from '@/lib/use-today';
 import {
   adjustSession,
   checkinSteps,
+  hasCompletedCheckin,
+  nextCheckinStep,
   proteinTargetG,
+  stampCheckinCompletion,
   weekAdherenceSummary,
 } from '@/lib/coach-session';
 import type { CheckinStep } from '@/lib/coach-session';
@@ -216,14 +219,24 @@ export default function CoachChatTab({
   const [noteDraft, setNoteDraft] = useState('');
   const [swaps, setSwaps] = useState<Record<string, string>>({});
   const [showWhy, setShowWhy] = useState(false);
-  const [stepIndex, setStepIndex] = useState(0);
+  // §24 (Phase 3.6): progress is a set of answered question IDS, not
+  // an index into the soreness-dependent step list — an index remaps
+  // when soreness changes mid-flow. A record already completed today
+  // (completedAt stamped) reopens in the done state.
+  const [answeredSteps, setAnsweredSteps] = useState<CheckinStep[]>(() => {
+    const todays = dailyCheckins?.[todayStr];
+    return hasCompletedCheckin(todays) ? checkinSteps(todays!.soreness) : [];
+  });
 
   const steps = checkinSteps(soreness);
-  const done = stepIndex >= steps.length;
-  const currentStep: CheckinStep | undefined = steps[stepIndex];
+  const currentStep: CheckinStep | undefined = nextCheckinStep(answeredSteps, soreness);
+  const done = currentStep === undefined;
 
   /** Every answer saves immediately, so readiness visibly responds. */
-  const saveCheckin = (patch: Partial<ManualCheckin>) => {
+  const saveCheckin = (
+    patch: Partial<ManualCheckin>,
+    answered: readonly CheckinStep[] = answeredSteps,
+  ) => {
     const next: ManualCheckin = {
       sleep,
       soreness,
@@ -233,13 +246,21 @@ export default function CoachChatTab({
       notes,
       ...patch,
     };
-    setDailyCheckin(todayStr, next);
+    setDailyCheckin(
+      todayStr,
+      stampCheckinCompletion(
+        next,
+        answered,
+        patch.soreness ?? soreness,
+        new Date().toISOString(),
+      ),
+    );
   };
 
   /** A fresh draft per question — a note never leaks across steps. */
   useEffect(() => {
     setNoteDraft('');
-  }, [stepIndex]);
+  }, [currentStep]);
 
   /**
    * UX-18: send the typed note for the CURRENT question. The note is
@@ -260,11 +281,15 @@ export default function CoachChatTab({
   const toggleArea = (list: MuscleGroup[], area: MuscleGroup): MuscleGroup[] =>
     list.includes(area) ? list.filter((a) => a !== area) : [...list, area];
 
-  /** Answer the current question and move to the next one. */
+  /** Answer the current question (by id) and move to the next one. */
   const answer = (patch: Partial<ManualCheckin>, apply: () => void) => {
+    if (!currentStep) return;
     apply();
-    saveCheckin(patch);
-    setStepIndex((i) => i + 1);
+    const nextAnswered = answeredSteps.includes(currentStep)
+      ? answeredSteps
+      : [...answeredSteps, currentStep];
+    setAnsweredSteps(nextAnswered);
+    saveCheckin(patch, nextAnswered);
   };
 
   const session = useMemo(() => {
@@ -376,8 +401,9 @@ export default function CoachChatTab({
     setNotes({ ...(next.notes ?? {}) });
     setPainYes((next.painAreas ?? []).length > 0);
     setTrainAroundPain(false);
-    saveCheckin(next);
-    setStepIndex(checkinSteps(next.soreness).length);
+    const allSteps = checkinSteps(next.soreness);
+    setAnsweredSteps(allSteps);
+    saveCheckin(next, allSteps);
   };
 
   const startSession = () => {
@@ -467,10 +493,7 @@ export default function CoachChatTab({
             </div>
             <button
               type="button"
-              onClick={() => {
-                saveCheckin({ soreAreas });
-                setStepIndex((i) => i + 1);
-              }}
+              onClick={() => answer({ soreAreas }, () => {})}
               className="px-4 py-2 rounded-full bg-accent text-accent-on text-sm font-bold cursor-pointer"
             >
               {t('coachChat.chatAreasDone')}
@@ -550,10 +573,7 @@ export default function CoachChatTab({
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    saveCheckin({ painAreas });
-                    setStepIndex((i) => i + 1);
-                  }}
+                  onClick={() => answer({ painAreas }, () => {})}
                   className="px-4 py-2 rounded-full bg-accent text-accent-on text-sm font-bold cursor-pointer"
                 >
                   {t('coachChat.chatAreasDone')}
@@ -763,7 +783,7 @@ export default function CoachChatTab({
           {done ? (
             <button
               type="button"
-              onClick={() => setStepIndex(0)}
+              onClick={() => setAnsweredSteps([])}
               className="text-xs font-bold text-accent-text cursor-pointer"
             >
               {t('coachChat.chatEdit')}
@@ -801,9 +821,11 @@ export default function CoachChatTab({
           </CoachBubble>
         )}
 
-        {/* Completed Q&A pairs */}
-        {steps.slice(0, stepIndex).map((step, i) => (
-          <React.Fragment key={`${step}-${i}`}>
+        {/* Completed Q&A pairs — the answered ids, in question order */}
+        {steps
+          .filter((step) => answeredSteps.includes(step))
+          .map((step) => (
+            <React.Fragment key={step}>
             <CoachBubble>{t(questionKey(step))}</CoachBubble>
             <UserBubble>{answerText(step)}</UserBubble>
             {notes[step] && <UserBubble>{notes[step]}</UserBubble>}
