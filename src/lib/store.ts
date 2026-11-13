@@ -4159,6 +4159,16 @@ export const useAppStore = create<AppState>()(
                     id: typeof data.profile.id === 'string' && data.profile.id.trim()
                       ? data.profile.id.trim()
                       : undefined,
+                    // §6 provenance (Phase 1.4): a backup that recorded
+                    // its owning account keeps it, so a same-account
+                    // restore stays same-account. Every import is
+                    // flagged: without createdByUid, identity routing
+                    // treats the profile as cross-account.
+                    createdByUid:
+                      typeof data.profile.createdByUid === 'string' && data.profile.createdByUid.trim()
+                        ? data.profile.createdByUid.trim()
+                        : undefined,
+                    importedFromBackup: true,
                     name: typeof data.profile.name === 'string' ? data.profile.name.trim().slice(0, 100) : undefined,
                     gender:
                       data.profile.gender === 'male' ||

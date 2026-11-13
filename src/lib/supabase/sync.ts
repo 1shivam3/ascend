@@ -25,7 +25,8 @@ import {
   type StampedTombstone,
   type TombstoneCollection,
 } from './reconcile';
-import { isCrossAccountSwitch as isCrossAccountSwitchFn, decideStartFreshGate, isGuestProfileId } from '../start-fresh-guard';
+import { decideStartFreshGate, isGuestProfileId } from '../start-fresh-guard';
+import { classifyIdentity, isCrossAccountProfile } from '../identity';
 import { hasRetainedHistory, ARCHIVED_HISTORY_KEY, ARCHIVED_HISTORY_PREV_KEY } from '../history-fork';
 import { clearLoggedOutLatch, isLoggedOutLatchSet, markLoggedOut } from '../logged-out-latch';
 import { DEFAULT_BODYWEIGHT_KG } from '../defaults';
@@ -1210,6 +1211,24 @@ export function shouldAdoptRemoteChanges(
   return lastPushedSignature !== null && lastPushedSignature === freshSignature;
 }
 
+/**
+ * The ONE session resolution both sync paths use (§27 symmetry,
+ * Phase 1.4): distinguishes "the check resolved — here is the user
+ * (or genuinely none)" from "the check FAILED" (network). Callers
+ * must never fold a failure into `user: null`; classifyIdentity
+ * (src/lib/identity.ts) decides what a failure means.
+ */
+export async function resolveSessionUser(supabase: {
+  auth: { getUser: () => Promise<{ data: { user: any } }> };
+}): Promise<{ user: any | null; checkFailed: boolean; error?: unknown }> {
+  try {
+    const res = await supabase.auth.getUser();
+    return { user: res?.data?.user ?? null, checkFailed: false };
+  } catch (error) {
+    return { user: null, checkFailed: true, error };
+  }
+}
+
 class SupabaseSyncEngine {
   private status: SyncStatus = 'unconfigured';
   private lastSyncedAt: string | null = null;
@@ -2097,9 +2116,29 @@ class SupabaseSyncEngine {
 
     const sync = async () => {
     try {
-      // 1. Ensure active session
-      const userRes = await supabase.auth.getUser().catch(() => null);
-      const user = userRes?.data?.user;
+      // 1. Ensure active session. Phase 1.4 (§5): a FAILED check
+      // (network) is not "signed out" — the old code caught the
+      // rejection into null and took the guest branch, clearing the
+      // user and flipping the app to its signed-out state on a
+      // transient error. The identity classifier decides instead.
+      const { user, checkFailed: sessionCheckFailed, error: sessionError } =
+        await resolveSessionUser(supabase);
+      const identity = classifyIdentity({
+        sessionUser: user ? { id: user.id, isAnonymous: Boolean(user.is_anonymous) } : null,
+        sessionCheckFailed,
+        lastKnownUserId: this.currentUser?.id ?? null,
+        profile: useStore.getState().profile,
+      });
+
+      if (identity.kind === 'account-offline-stale') {
+        // Keep the last known user; report an ordinary sync failure
+        // (the classifier reads the fetch error as offline) with the
+        // usual backoff, and retry later.
+        this.isSyncing = false;
+        this.recordSyncFailure(sessionError ?? new Error('Session check failed'));
+        this.notify();
+        return;
+      }
 
       if (!user) {
         this.currentUser = null;
@@ -2180,7 +2219,10 @@ class SupabaseSyncEngine {
       // is safe only together with the sign-out-first gate in
       // startFreshAfterVerifiedSignOut: without it, a signed-in
       // Start-fresh would merge while a session is still live.
-      const isCrossAccountSwitch = isCrossAccountSwitchFn(localState.profile?.id, user.id);
+      // Phase 1.4 (§5/§6): the rule itself lives in identity.ts and
+      // reads provenance (createdByUid / importedFromBackup) before
+      // falling back to the F20 id shapes.
+      const isCrossAccountSwitch = isCrossAccountProfile(localState.profile, user.id);
 
       // 3. Reconcile Cloud -> Local (Recovery on phone, device switch, or account switch)
       let needsLocalUpdate = false;
@@ -2222,6 +2264,10 @@ class SupabaseSyncEngine {
           updates.profile = {
             ...(isCrossAccountSwitch ? {} : localState.profile || {}),
             id: rp.id,
+            // §6 provenance: this profile now provably belongs to
+            // the session account (Phase 1.4).
+            createdByUid: user.id,
+            importedFromBackup: undefined,
             name: rp.name,
             gender: rp.gender,
             bodyweightKg: Number(rp.bodyweight_kg) || DEFAULT_BODYWEIGHT_KG,
@@ -2252,6 +2298,10 @@ class SupabaseSyncEngine {
           updates.profile = {
             ...localState.profile,
             id: user.id,
+            // §6 provenance: the guest profile just linked to this
+            // account (Phase 1.4).
+            createdByUid: user.id,
+            importedFromBackup: undefined,
             name: resolvedName,
           };
           needsLocalUpdate = true;
@@ -2264,6 +2314,7 @@ class SupabaseSyncEngine {
         // Cloud account has records, but profiles row was missing/empty. Synthesize athlete profile so returning user is not locked out.
         updates.profile = {
           id: user.id,
+          createdByUid: user.id,
           name: extractedName || '',
           gender: 'male',
           bodyweightKg: DEFAULT_BODYWEIGHT_KG,
@@ -3045,6 +3096,13 @@ class SupabaseSyncEngine {
 
     const state = useStore.getState();
 
+    // Phase 1.4 (§5/§27): the push NEVER runs over a cross-account
+    // profile. The debounced path reaches here without a pull, and
+    // pushing would re-home the other account's rows under this
+    // session's uid. A full sync classifies first (its pull archives
+    // + replaces), after which this guard passes again.
+    if (isCrossAccountProfile(state.profile, userId)) return;
+
     // S1/S2: the server tombstone layer, read once per push. null =
     // unavailable (pre-migration) → every consumer below falls back
     // to the pre-convergence behaviour. Rows another device deleted
@@ -3638,7 +3696,11 @@ class SupabaseSyncEngine {
 
     const sync = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        // §27: same session resolution as the full sync — a failed
+        // check throws into the failure path below (offline backoff),
+        // never a silent "signed out".
+        const { user, checkFailed, error } = await resolveSessionUser(supabase);
+        if (checkFailed) throw error ?? new Error('Session check failed');
         if (!user) return;
 
         await this.pushLocalData(user.id);

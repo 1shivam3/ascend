@@ -148,6 +148,24 @@ export interface BodyMetricEntry {
 
 export interface UserProfile {
   id: string;
+  /**
+   * Provenance for identity routing (Phase 1.4, §5/§6): the auth uid
+   * whose account this profile belongs to, stamped when the profile
+   * is rebuilt from the server row, linked to an account, or carried
+   * in from a backup that recorded it. Absent = legacy profile —
+   * identity falls back to the id-shape rules. Excluded from the sync
+   * upsert/pull field lists (LOCAL ONLY, like bodyweightSource), but
+   * backups DO carry it by design: a same-account restore on another
+   * device must stay same-account. See src/lib/identity.ts.
+   */
+  createdByUid?: string;
+  /**
+   * Set by backup/archive import when the profile arrived via
+   * importAllData. An imported profile with no createdByUid is
+   * treated as cross-account at sync (imports are cross unless
+   * marked same); cleared when a pull stamps createdByUid.
+   */
+  importedFromBackup?: boolean;
   name: string;
   gender: Gender;
   bodyweightKg: number;
