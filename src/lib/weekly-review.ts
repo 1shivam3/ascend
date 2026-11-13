@@ -31,12 +31,13 @@ import type {
   Unit,
   WeeklySchedule,
   WorkoutEntry,
+  WorkoutSet,
 } from './types';
 import { getMondayOfWeek, parseLocalDate, formatVolume } from './formatters';
 import { getExerciseMuscle, getExerciseSecondaryMuscles } from './exercise-library';
 import { calculateOneRepMax } from './strength-standards';
 import { canonicalizeExerciseName } from './workout-outcome-evidence';
-import { isSetCompleted } from './types';
+import { isSetCompleted, dayPlanRef } from './types';
 import type { AthleteModel } from './athlete-model';
 import type { ManualCheckin, StallFlag } from './coach-engine';
 import type { LocalizedSentence } from './coach-i18n';
@@ -47,6 +48,10 @@ import {
   type ActiveCoachBlock,
   type CoachBlocksState,
 } from './block-engine';
+
+// §19: isBlockEnded moved to block-engine (the lifecycle owner);
+// re-exported here for the existing import sites.
+export { isBlockEnded } from './block-engine';
 import { mainCompoundKey } from './percent-1rm';
 import { calculateWorkoutVolumeKg } from './volume';
 import { earliestDataDate } from './scheduled-days';
@@ -247,8 +252,12 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
   const { workouts, weeklySchedule } = input;
 
   // Adherence: scheduled days vs days actually trained.
+  // §18: via the one read (dayPlanRef). The historical predicate is
+  // preserved exactly — a configured day that is not a rest day
+  // counts (including unassigned days; narrowing that is a separate
+  // product decision, not part of the representation change).
   const scheduledDays = WEEKDAYS.filter(
-    (d) => weeklySchedule[d] && weeklySchedule[d].workoutPlanId !== 'rest'
+    (d) => weeklySchedule[d] && dayPlanRef(weeklySchedule[d]).kind !== 'rest'
   );
   const trainedDays = new Set(
     workouts.filter((w) => inWeek(w.date, monday)).map((w) => weekdayOf(w.date))
@@ -635,13 +644,15 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
     (model?.adherence.plannedSessions ?? 0) >= 8
   ) {
     const fromIdx = WEEKDAYS.indexOf(mostSkipped);
-    const planId = weeklySchedule[mostSkipped]?.workoutPlanId;
+    const skippedRef = dayPlanRef(weeklySchedule[mostSkipped]);
+    const planId = skippedRef.kind === 'plan' ? skippedRef.planId : undefined;
     const freeDay = WEEKDAYS.find(
       (d, i) =>
         Math.abs(i - fromIdx) === 1 &&
-        (!weeklySchedule[d] || weeklySchedule[d].workoutPlanId === 'rest')
+        // Historical predicate, preserved: no entry at all, or a rest day.
+        (!weeklySchedule[d] || dayPlanRef(weeklySchedule[d]).kind === 'rest')
     );
-    if (planId && planId !== 'rest' && freeDay) {
+    if (planId && freeDay) {
       revisions.push({
         kind: 'schedule_move',
         fromDay: mostSkipped,
@@ -831,7 +842,10 @@ export function buildSessionDebrief(input: {
     const planEx = plan.exercises.find(
       (pe) => canonicalizeExerciseName(pe.name) === canonicalizeExerciseName(ex.name)
     );
-    const done = ex.sets.filter((s) => s.completed === true || s.status === 'completed');
+    // §17: the one resolver — the old dual read (raw boolean OR
+    // status) disagreed with it on flag-less legacy sets. (The cast:
+    // this input shape carries unit as a loose string.)
+    const done = ex.sets.filter((s) => isSetCompleted(s as WorkoutSet));
     const working = done.filter((s) => s.reps > 0);
     if (!planEx || working.length === 0) continue;
     const topReps = Math.max(...working.map((s) => s.reps));
@@ -882,12 +896,6 @@ export interface BlockDebrief {
   endDate: string;
 }
 
-/** True when the block's final Sunday has passed. */
-export function isBlockEnded(block: ActiveCoachBlock, todayStr: string): boolean {
-  const end = addDaysStr(block.startMonday, block.weeks.length * 7 - 1);
-  return todayStr > end;
-}
-
 export function buildBlockDebrief(input: {
   block: ActiveCoachBlock;
   workouts: WorkoutEntry[];
@@ -902,8 +910,9 @@ export function buildBlockDebrief(input: {
   // Completion: scheduled block sessions vs days trained in the window.
   const blockPlans = input.plannedWorkouts.filter((p) => block.planIds.includes(p.id));
   const planDays = WEEKDAYS.filter((d) => {
-    const pid = input.weeklySchedule[d]?.workoutPlanId;
-    return pid && block.planIds.includes(pid);
+    // §18: via the one read (dayPlanRef).
+    const ref = dayPlanRef(input.weeklySchedule[d]);
+    return ref.kind === 'plan' && block.planIds.includes(ref.planId);
   });
   const plannedPerWeek = planDays.length || blockPlans.length;
   const plannedTotal = plannedPerWeek * block.weeks.length;

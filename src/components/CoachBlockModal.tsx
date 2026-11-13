@@ -25,7 +25,7 @@ import {
   type BlockIntake,
 } from '@/lib/block-intake';
 import type { BlockProposal } from '@/lib/block-engine';
-import { ATHLETE_GOAL_CONFIGS, type AthleteGoal } from '@/lib/types';
+import { ATHLETE_GOAL_CONFIGS, dayPlanRef, type AthleteGoal } from '@/lib/types';
 import type { EquipmentAccess } from '@/lib/workout-engine';
 import { estimateSessionMinutes, MAX_WORKOUT_WEIGHT_KG } from '@/lib/workout-engine';
 import { canonicalizeExerciseName } from '@/lib/workout-outcome-evidence';
@@ -173,9 +173,10 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
     return proposal.days
       .filter((d) => d.exercises.length > 0)
       .map((d) => {
-        const current = weeklySchedule[d.weekday]?.workoutPlanId;
-        const currentName = current
-          ? plannedWorkouts.find((p) => p.id === current)?.name
+        // §18: the day's current plan via the one read (dayPlanRef).
+        const ref = dayPlanRef(weeklySchedule[d.weekday]);
+        const currentName = ref.kind === 'plan'
+          ? plannedWorkouts.find((p) => p.id === ref.planId)?.name
           : null;
         return t('coachBlock.scheduleLine', {
           day: WEEKDAY_LABEL[d.weekday],

@@ -321,8 +321,12 @@ describe('readiness score', () => {
 describe("coach's voice", () => {
   it('celebrates a PR specifically, not generically', () => {
     const history = [benchSession(7, 80, 8, 8)];
+    // §23 (Phase 3.1): the PR comes from the performance beating
+    // history through the one replay — the old fixture set a
+    // `set.isPR` flag that no production code ever wrote (the field
+    // is removed), which made this test pass on a fiction.
     const workout = wentry(daysAgo(0), [
-      wex('Barbell Bench Press', [wset(85, 8, 9, 'kg', { isPR: true }), wset(85, 8, 9)]),
+      wex('Barbell Bench Press', [wset(85, 8, 9, 'kg'), wset(85, 8, 9)]),
     ]);
     const take = generateCoachTake(workout, history);
     expect(take.toLowerCase()).toContain('pr');

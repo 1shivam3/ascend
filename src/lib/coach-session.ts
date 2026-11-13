@@ -61,6 +61,49 @@ export function checkinSteps(soreness: number): CheckinStep[] {
   return steps;
 }
 
+/**
+ * §24 (Phase 3.6): flow progress is a SET of answered question ids,
+ * never a bare index into the list above. The list is rebuilt from
+ * the current soreness on every render, so an index silently remaps
+ * when soreness changes mid-flow (the areas question appears /
+ * disappears): the current question changes under the user and the
+ * answered-thread rendering slices the wrong questions. Keyed by id,
+ * a soreness change only changes which question is due next — every
+ * answer already given stays attached to its own question.
+ */
+export function nextCheckinStep(
+  answered: readonly CheckinStep[],
+  soreness: number,
+): CheckinStep | undefined {
+  const done = new Set(answered);
+  return checkinSteps(soreness).find((s) => !done.has(s));
+}
+
+/**
+ * §24: stamp `completedAt` on the check-in record when the flow
+ * (for the CURRENT soreness) has no unanswered question left. Every
+ * answer saves the record immediately, so record existence only
+ * proves the FIRST answer — completion is this stamp. The first
+ * completion wins: a later save never moves or clears the stamp.
+ */
+export function stampCheckinCompletion(
+  record: ManualCheckin,
+  answered: readonly CheckinStep[],
+  soreness: number,
+  nowIso: string,
+): ManualCheckin {
+  if (record.completedAt) return record;
+  if (nextCheckinStep(answered, soreness) !== undefined) return record;
+  return { ...record, completedAt: nowIso };
+}
+
+/** §24: "done today" = a record whose flow actually completed. */
+export function hasCompletedCheckin(
+  record: ManualCheckin | null | undefined,
+): boolean {
+  return typeof record?.completedAt === 'string' && record.completedAt.length > 0;
+}
+
 export interface SessionExercise {
   exercise: PlannedExercise;
   /** True when the exercise needs gym equipment and location is home. */

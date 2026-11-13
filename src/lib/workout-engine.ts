@@ -30,7 +30,8 @@ import {
 
 export type { MovementFamily } from './exercise-library';
 import { getTodayDayOfWeek, getWorkoutBodyParts } from './workout-schedule';
-import { resolvePlannedDay } from './scheduled-days';
+import { resolvePlannedDay, workoutHasCompletedSet } from './scheduled-days';
+import { dayPlanRef } from './types';
 import { calculateSetEffortDrift } from './lifter-twin';
 import { canonicalizeExerciseName } from './workout-outcome-evidence';
 import { kgToLbs, lbsToKg } from './units';
@@ -69,9 +70,12 @@ export function clampWorkoutReps(reps: number): number {
  * Normalizes a set at save time: floors, ceilings, and status derivation.
  *
  * Rules:
- * - If set is active-completed and reps > 0: status is 'completed', completed is true.
- * - Else if status was 'skipped': status is 'skipped', completed is false.
- * - Else: status is 'not_attempted', completed is false.
+ * - If set is active-completed and reps > 0: status is 'completed'.
+ * - Else if status was 'skipped': status is 'skipped'.
+ * - Else: status is 'not_attempted'.
+ * - §17 (Phase 3.4): `status` is the ONLY stored encoding — the
+ *   legacy `completed` boolean is stripped here so new history is
+ *   born canonical (normalizePersistedWorkoutSet's shape).
  * - Preserves all prescription fields (prescribedWeight, prescribedReps, prescribedRpe, prescribedUnit).
  */
 export function finalizeWorkoutSet(set: WorkoutSet): WorkoutSet {
@@ -106,11 +110,11 @@ export function finalizeWorkoutSet(set: WorkoutSet): WorkoutSet {
     finalStatus = 'not_attempted';
   }
 
+  const { completed: _legacyCompleted, ...rest } = set;
   return {
-    ...set,
+    ...rest,
     weight: w,
     reps: r,
-    completed: isCompleted,
     status: finalStatus,
   };
 }
@@ -128,7 +132,9 @@ export function finalizeWorkoutSet(set: WorkoutSet): WorkoutSet {
  */
 export function shouldPreserveWorkoutSet(set: WorkoutSet): boolean {
   const hasPrescription = set.prescribedWeight !== undefined || set.prescribedReps !== undefined;
-  return set.completed || set.status === 'skipped' || hasPrescription || (set.reps > 0);
+  // §17: read completion through the one resolver, never the raw
+  // legacy boolean (canonical sets do not carry it).
+  return isSetCompleted(set) || set.status === 'skipped' || hasPrescription || (set.reps > 0);
 }
 
 export interface NextSessionTargetInput {
@@ -1166,7 +1172,7 @@ export function getProgressionRecommendation(
 
   const lastSession = sessions[0];
   // Filter out explicit warmups and unperformed sets
-  const explicitWorkSets = lastSession.sets.filter((s) => !s.isWarmup && s.reps > 0 && s.completed !== false);
+  const explicitWorkSets = lastSession.sets.filter((s) => !s.isWarmup && s.reps > 0 && isSetCompleted(s));
   const candidateSets = explicitWorkSets.length > 0 ? explicitWorkSets : lastSession.sets.filter((s) => s.reps > 0);
 
   const isBW = isBodyweightExercise(exerciseName);
@@ -2169,7 +2175,13 @@ export function parseVoiceWorkout(
   };
 }
 
-export type TodaySessionStatus = 'in_progress' | 'completed' | 'planned' | 'none';
+/**
+ * §16 (Phase 3.3): the Today state is ONE discriminated result —
+ * rest is its own status (it used to be 'planned' + an isRestDay
+ * side flag, two encodings free to disagree), and 'completed'
+ * requires a workout that performed ≥1 completed set.
+ */
+export type TodaySessionStatus = 'in_progress' | 'completed' | 'planned' | 'rest' | 'none';
 
 export interface TodaySessionInfo {
   status: TodaySessionStatus;
@@ -2184,10 +2196,24 @@ export interface TodaySessionInfo {
   volumeKg?: number;
   durationMin?: number;
   prCount?: number;
+  /** True exactly when status === 'rest' (kept for existing readers). */
   isRestDay?: boolean;
   scheduledDay?: string;
   bodyParts?: string[];
   plannedWorkoutId?: string;
+  /**
+   * The workout the completed state describes — returned by the
+   * resolver itself so a surface never re-derives it (B5: Home's
+   * label came from here while its click handler used a second,
+   * inline derivation that could be null).
+   */
+  completedWorkout?: WorkoutEntry;
+  /**
+   * A workout entry exists for today but performed zero completed
+   * sets (the zero-set save). It stays in history; it is labelled
+   * as an empty log, never as a completion.
+   */
+  emptyLogToday?: boolean;
 }
 
 /**
@@ -2215,13 +2241,19 @@ export function getTodaySessionState(
     };
   }
 
-  // 2. Completed workout for today
+  // 2. Completed workout for today — §16: only when a workout
+  // actually performed ≥1 completed set. A zero-set entry (the
+  // finish flow can save one) stays in history but completes
+  // nothing; the day resolves as scheduled below, flagged
+  // emptyLogToday so the surface can label the empty log.
   const todayWorkouts = workouts.filter((w) => w.date && w.date.startsWith(todayStr));
-  if (todayWorkouts.length > 0) {
-    const w = todayWorkouts[0];
+  const completedToday = todayWorkouts.filter((w) => workoutHasCompletedSet(w));
+  const emptyLogToday = todayWorkouts.length > 0 && completedToday.length === 0;
+  if (completedToday.length > 0) {
+    const w = completedToday[0];
     let vol = 0;
     let sets = 0;
-    for (const tw of todayWorkouts) {
+    for (const tw of completedToday) {
       for (const ex of tw.exercises) {
         for (const s of ex.sets) {
           if (typeof s.weight === 'number' && s.weight > 0 && s.reps > 0) {
@@ -2245,6 +2277,7 @@ export function getTodaySessionState(
       totalSets: sets,
       volumeKg: Math.round(vol),
       durationMin: w.durationMinutes || 0,
+      completedWorkout: w,
     };
   }
 
@@ -2292,6 +2325,7 @@ export function getTodaySessionState(
             isDraft: false,
             isDone: false,
             isRestDay: false,
+            emptyLogToday: emptyLogToday || undefined,
             scheduledDay: todayDay,
             bodyParts,
             plannedWorkoutId: nextPlan.id,
@@ -2299,7 +2333,8 @@ export function getTodaySessionState(
         }
 
         return {
-          status: 'planned',
+          // §16: rest is its own status now, not 'planned' + a flag.
+          status: 'rest',
           title: dayConfig?.customTitle || 'Rest & Recovery',
           subtitle: nextPlan ? `Scheduled Rest Day • Next up: ${nextPlan.name}` : 'Scheduled Rest Day • Hydrate, sleep, and hit your protein target',
           exercises: nextPlan ? nextPlan.exercises.map((e) => e.name) : [],
@@ -2311,13 +2346,15 @@ export function getTodaySessionState(
           scheduledDay: todayDay,
           bodyParts: [],
           plannedWorkoutId: nextPlan?.id,
+          emptyLogToday: emptyLogToday || undefined,
         };
     } else if (resolution.kind === 'planned' && resolution.plan) {
       let matchedPlan = resolution.plan;
 
       // If schedule references a builtin template but the user has created custom plans, prioritize user's plan
       const userCustomPlans = plannedWorkouts.filter((p) => !p.id.startsWith('builtin_'));
-      if (dayConfig?.workoutPlanId?.startsWith('builtin_') && userCustomPlans.length > 0) {
+      const scheduledRef = dayPlanRef(dayConfig);
+      if (scheduledRef.kind === 'plan' && scheduledRef.planId.startsWith('builtin_') && userCustomPlans.length > 0) {
         matchedPlan = userCustomPlans[0];
       }
 
@@ -2350,6 +2387,7 @@ export function getTodaySessionState(
           scheduledDay: todayDay,
           bodyParts,
           plannedWorkoutId: matchedPlan.id,
+          emptyLogToday: emptyLogToday || undefined,
         };
       }
     }
@@ -2383,6 +2421,7 @@ export function getTodaySessionState(
       isRestDay: false,
       bodyParts,
       plannedWorkoutId: plan.id,
+      emptyLogToday: emptyLogToday || undefined,
     };
   }
 
@@ -2395,6 +2434,7 @@ export function getTodaySessionState(
     primaryActionLabel: 'Start Workout',
     isDraft: false,
     isDone: false,
+    emptyLogToday: emptyLogToday || undefined,
   };
 }
 

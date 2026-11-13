@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '../src/lib/store';
-import { PlannedWorkout } from '../src/lib/types';
+import { PlannedWorkout, dayPlanRef } from '../src/lib/types';
 
 function makePlan(id: string, name: string): PlannedWorkout {
   return {
@@ -52,7 +52,9 @@ describe('Plan deletion (Train tab)', () => {
 
     const after = useStore.getState();
     expect(after.plannedWorkouts).toEqual([]);
-    expect(after.weeklySchedule.tuesday.workoutPlanId).toBe('rest');
+    // §18: the fallback writes the rest REF ({ kind: 'rest' }, no
+    // plan id) — read through dayPlanRef, not the old encoding.
+    expect(dayPlanRef(after.weeklySchedule.tuesday).kind).toBe('rest');
   });
 
   it('leaves unrelated schedule days untouched', () => {

@@ -22,6 +22,7 @@ import {
   DayOfWeek,
   Gender,
   MacroGoals,
+  PersonalRecord,
   Unit,
   WorkoutEntry,
   WorkoutExercise,
@@ -40,6 +41,7 @@ import { getWeekDateStrings, plural, formatKg, getLocalTodayStr, parseLocalDate,
 import { EXERCISE_LIBRARY, findLibraryExercise } from './exercise-library';
 import type { MuscleGroup } from './exercise-library';
 import { isPlaceholderSubstitute } from './workout-engine';
+import { computeSessionPRMarks, isPRSet } from './pr-reevaluation';
 import { DAY_ORDER, type LocalizedSentence } from './coach-i18n';
 import { DEFAULT_BODYWEIGHT_KG } from './defaults';
 import { kgToLbs, lbsToKg } from './units';
@@ -567,6 +569,16 @@ export interface ManualCheckin {
    * older entries — treated as {}.
    */
   notes?: Record<string, string>;
+  /**
+   * ISO timestamp of when the Coach-tab check-in flow was COMPLETED
+   * (§24, Phase 3.6). Every answer saves the record immediately, so
+   * the record's existence only proves a first answer; "done today"
+   * is this stamp (see hasCompletedCheckin in coach-session).
+   * Absent on older entries and on partial flows — including records
+   * written by the readiness sheet's quick ratings, which never run
+   * the full question flow.
+   */
+  completedAt?: string;
 }
 
 export interface ReadinessResult {
@@ -1023,12 +1035,19 @@ interface SessionInsight {
  * celebrates specific PRs, diagnoses stalls, flags effort anomalies, and always
  * ends with what to do next. Never a robotic recap of what you just did.
  */
-export function generateCoachTake(workout: WorkoutEntry, history: WorkoutEntry[], bodyweightKg = DEFAULT_BODYWEIGHT_KG): string {
+export function generateCoachTake(workout: WorkoutEntry, history: WorkoutEntry[], bodyweightKg = DEFAULT_BODYWEIGHT_KG, prs: PersonalRecord[] = []): string {
   if (!workout || !(workout.exercises || []).length) {
     return 'Session logged — even a quiet entry keeps the streak honest, and today\'s data makes next week\'s plan smarter.';
   }
 
   const prior = (history || []).filter((w) => w.id !== workout.id);
+  // §23 (Phase 3.1): PR-ness comes from the ONE replay — the old
+  // `set.isPR` read was a flag no code path ever wrote, so this
+  // Take could say "no PR" beside a banner celebrating one. `prs`
+  // carries user-owned records when the caller has them (this
+  // function's callers pass history only; owned records then gate
+  // through the replay's history-derived running best alone).
+  const sessionMarks = computeSessionPRMarks([...prior, workout], prs, bodyweightKg);
   // Bodyweight comes from the athlete's profile; 75 kg is only the last-resort
   // fallback so tonnage math never divides by zero.
   const safeBodyweightKg = bodyweightKg && bodyweightKg > 0 ? bodyweightKg : DEFAULT_BODYWEIGHT_KG;
@@ -1045,7 +1064,9 @@ export function generateCoachTake(workout: WorkoutEntry, history: WorkoutEntry[]
     const best = sessionBestE1rmKg(ex);
     const prevSessions = getExerciseHistorySessions(ex.name, prior, 'kg');
     const prevBest = prevSessions.length > 0 ? Math.max(...prevSessions.map((s) => s.bestE1RM)) : 0;
-    const isPr = done.some((s) => s.isPR === true);
+    const isPr = sessionMarks.some(
+      (m) => m.workoutId === workout.id && m.exerciseKey === ex.name.trim().toLowerCase(),
+    );
     insights.push({
       exercise: ex.name,
       avgRpe: avgExerciseRpe(ex),
@@ -1056,7 +1077,7 @@ export function generateCoachTake(workout: WorkoutEntry, history: WorkoutEntry[]
     });
   }
 
-  const prs = insights.filter((i) => i.isPr || i.isNewE1rmRecord);
+  const prInsights = insights.filter((i) => i.isPr || i.isNewE1rmRecord);
   const anomalies = insights.filter(
     (i) => i.avgRpe !== undefined && i.avgRpe >= 9.5 && i.prevBestE1rm > 0 && i.bestE1rm < i.prevBestE1rm * 0.85
   );
@@ -1073,12 +1094,12 @@ export function generateCoachTake(workout: WorkoutEntry, history: WorkoutEntry[]
       `Heads up on ${a.exercise} — it moved like a max-effort lift (RPE ${fmtRpe(a.avgRpe!)}) at weights ` +
       `well below your best, which usually means the bar isn't the problem; sleep, stress, or yesterday's fatigue is.`
     );
-  } else if (prs.length > 0) {
-    const p = prs[0];
+  } else if (prInsights.length > 0) {
+    const p = prInsights[0];
     const detail = p.isPr
       ? `a genuine PR on ${p.exercise}`
       : `a new estimated max on ${p.exercise} (${formatKg(p.bestE1rm)})`;
-    const extra = prs.length > 1 ? `, plus ${prs.length - 1} more personal best${prs.length > 2 ? 's' : ''} elsewhere` : '';
+    const extra = prInsights.length > 1 ? `, plus ${prInsights.length - 1} more personal best${prInsights.length > 2 ? 's' : ''} elsewhere` : '';
     const compoundingNote =
       prior.length === 0
         ? `first session logged — this is the baseline everything gets measured against from here`
@@ -1122,7 +1143,7 @@ export function generateCoachTake(workout: WorkoutEntry, history: WorkoutEntry[]
       `Don't chase the numbers on days like this — cap the session at technique work and easy volume, ` +
       `eat well tonight, and judge tomorrow by how you feel, not by today's bar speed.`
     );
-  } else if (prs.length === 0 && !volumeLandmark && insights.length > 0) {
+  } else if (prInsights.length === 0 && !volumeLandmark && insights.length > 0) {
     sentences.push(
       `Nothing stalling, nothing alarming — this is the productive middle where most progress actually happens.`
     );
@@ -1157,7 +1178,9 @@ export interface CoachWeeklyReview {
 export function generateCoachWeeklyReview(
   weekWorkouts: WorkoutEntry[],
   lastWeek: WorkoutEntry[],
-  bodyMetrics: BodyMetricEntry[]
+  bodyMetrics: BodyMetricEntry[],
+  allWorkouts?: WorkoutEntry[],
+  prs: PersonalRecord[] = []
 ): CoachWeeklyReview {
   const thisW = weekWorkouts || [];
   const lastW = lastWeek || [];
@@ -1179,8 +1202,22 @@ export function generateCoachWeeklyReview(
   } else if (thisTon > 0 && lastTon === 0 && lastW.length === 0) {
     workedBits.push(`you got back under the bar after a quiet week — the hardest session is always the first one back`);
   }
+  // §23 (Phase 3.1): PR sets counted from the ONE replay, not the
+  // never-written `set.isPR` flag (always 0 before). Callers with
+  // full history pass it; otherwise the two weeks at hand gate the
+  // replay, which can only over-count a first-week-back PR.
+  const weekMarks = computeSessionPRMarks(
+    allWorkouts ?? [...lastW, ...thisW],
+    prs,
+    DEFAULT_BODYWEIGHT_KG
+  );
   const prCount = thisW.reduce(
-    (n, w) => n + (w.exercises || []).reduce((m, e) => m + (e.sets || []).filter((s) => s.isPR).length, 0),
+    (n, w) =>
+      n +
+      (w.exercises || []).reduce(
+        (m, e) => m + (e.sets || []).filter((s) => isPRSet(weekMarks, w.id, e.name, s)).length,
+        0
+      ),
     0
   );
   if (prCount > 0) workedBits.push(`${prCount} ${plural(prCount, 'PR')} on the board`);

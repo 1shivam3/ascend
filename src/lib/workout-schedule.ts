@@ -1,4 +1,4 @@
-import { DayOfWeek, DayScheduleConfig, WeeklySchedule, PlannedWorkout } from './types';
+import { DayOfWeek, DayScheduleConfig, WeeklySchedule, PlannedWorkout, dayPlanRef } from './types';
 
 export const DAYS_OF_WEEK: DayOfWeek[] = [
   'monday',
@@ -205,13 +205,13 @@ export function generateSplitWeeklySchedule(
 
     const plans = [pushDay, pullDay, legDay];
     const schedule: WeeklySchedule = {
-      monday: { workoutPlanId: pushDay.id, customTitle: pushDay.name, bodyParts: getWorkoutBodyParts(pushDay.exercises) },
-      tuesday: { workoutPlanId: pullDay.id, customTitle: pullDay.name, bodyParts: getWorkoutBodyParts(pullDay.exercises) },
-      wednesday: { workoutPlanId: legDay.id, customTitle: legDay.name, bodyParts: getWorkoutBodyParts(legDay.exercises) },
-      thursday: { workoutPlanId: pushDay.id, customTitle: pushDay.name, bodyParts: getWorkoutBodyParts(pushDay.exercises) },
-      friday: { workoutPlanId: pullDay.id, customTitle: pullDay.name, bodyParts: getWorkoutBodyParts(pullDay.exercises) },
-      saturday: { workoutPlanId: legDay.id, customTitle: legDay.name, bodyParts: getWorkoutBodyParts(legDay.exercises) },
-      sunday: { workoutPlanId: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] },
+      monday: { kind: 'plan', workoutPlanId: pushDay.id, customTitle: pushDay.name, bodyParts: getWorkoutBodyParts(pushDay.exercises) },
+      tuesday: { kind: 'plan', workoutPlanId: pullDay.id, customTitle: pullDay.name, bodyParts: getWorkoutBodyParts(pullDay.exercises) },
+      wednesday: { kind: 'plan', workoutPlanId: legDay.id, customTitle: legDay.name, bodyParts: getWorkoutBodyParts(legDay.exercises) },
+      thursday: { kind: 'plan', workoutPlanId: pushDay.id, customTitle: pushDay.name, bodyParts: getWorkoutBodyParts(pushDay.exercises) },
+      friday: { kind: 'plan', workoutPlanId: pullDay.id, customTitle: pullDay.name, bodyParts: getWorkoutBodyParts(pullDay.exercises) },
+      saturday: { kind: 'plan', workoutPlanId: legDay.id, customTitle: legDay.name, bodyParts: getWorkoutBodyParts(legDay.exercises) },
+      sunday: { kind: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] },
     };
 
     return {
@@ -261,13 +261,13 @@ export function generateSplitWeeklySchedule(
 
     const plans = [chestBack, shouldersArms, legsAbs];
     const schedule: WeeklySchedule = {
-      monday: { workoutPlanId: chestBack.id, customTitle: chestBack.name, bodyParts: getWorkoutBodyParts(chestBack.exercises) },
-      tuesday: { workoutPlanId: shouldersArms.id, customTitle: shouldersArms.name, bodyParts: getWorkoutBodyParts(shouldersArms.exercises) },
-      wednesday: { workoutPlanId: legsAbs.id, customTitle: legsAbs.name, bodyParts: getWorkoutBodyParts(legsAbs.exercises) },
-      thursday: { workoutPlanId: chestBack.id, customTitle: chestBack.name, bodyParts: getWorkoutBodyParts(chestBack.exercises) },
-      friday: { workoutPlanId: shouldersArms.id, customTitle: shouldersArms.name, bodyParts: getWorkoutBodyParts(shouldersArms.exercises) },
-      saturday: { workoutPlanId: legsAbs.id, customTitle: legsAbs.name, bodyParts: getWorkoutBodyParts(legsAbs.exercises) },
-      sunday: { workoutPlanId: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] },
+      monday: { kind: 'plan', workoutPlanId: chestBack.id, customTitle: chestBack.name, bodyParts: getWorkoutBodyParts(chestBack.exercises) },
+      tuesday: { kind: 'plan', workoutPlanId: shouldersArms.id, customTitle: shouldersArms.name, bodyParts: getWorkoutBodyParts(shouldersArms.exercises) },
+      wednesday: { kind: 'plan', workoutPlanId: legsAbs.id, customTitle: legsAbs.name, bodyParts: getWorkoutBodyParts(legsAbs.exercises) },
+      thursday: { kind: 'plan', workoutPlanId: chestBack.id, customTitle: chestBack.name, bodyParts: getWorkoutBodyParts(chestBack.exercises) },
+      friday: { kind: 'plan', workoutPlanId: shouldersArms.id, customTitle: shouldersArms.name, bodyParts: getWorkoutBodyParts(shouldersArms.exercises) },
+      saturday: { kind: 'plan', workoutPlanId: legsAbs.id, customTitle: legsAbs.name, bodyParts: getWorkoutBodyParts(legsAbs.exercises) },
+      sunday: { kind: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] },
     };
 
     return {
@@ -332,13 +332,13 @@ export function generateSplitWeeklySchedule(
 
     const plans = [chest, back, shoulders, arms, legs];
     const schedule: WeeklySchedule = {
-      monday: { workoutPlanId: chest.id, customTitle: chest.name, bodyParts: getWorkoutBodyParts(chest.exercises) },
-      tuesday: { workoutPlanId: back.id, customTitle: back.name, bodyParts: getWorkoutBodyParts(back.exercises) },
-      wednesday: { workoutPlanId: shoulders.id, customTitle: shoulders.name, bodyParts: getWorkoutBodyParts(shoulders.exercises) },
-      thursday: { workoutPlanId: arms.id, customTitle: arms.name, bodyParts: getWorkoutBodyParts(arms.exercises) },
-      friday: { workoutPlanId: legs.id, customTitle: legs.name, bodyParts: getWorkoutBodyParts(legs.exercises) },
-      saturday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-      sunday: { workoutPlanId: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] },
+      monday: { kind: 'plan', workoutPlanId: chest.id, customTitle: chest.name, bodyParts: getWorkoutBodyParts(chest.exercises) },
+      tuesday: { kind: 'plan', workoutPlanId: back.id, customTitle: back.name, bodyParts: getWorkoutBodyParts(back.exercises) },
+      wednesday: { kind: 'plan', workoutPlanId: shoulders.id, customTitle: shoulders.name, bodyParts: getWorkoutBodyParts(shoulders.exercises) },
+      thursday: { kind: 'plan', workoutPlanId: arms.id, customTitle: arms.name, bodyParts: getWorkoutBodyParts(arms.exercises) },
+      friday: { kind: 'plan', workoutPlanId: legs.id, customTitle: legs.name, bodyParts: getWorkoutBodyParts(legs.exercises) },
+      saturday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+      sunday: { kind: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] },
     };
 
     return {
@@ -391,13 +391,13 @@ export function generateSplitWeeklySchedule(
 
     const plans = [fullBodyA, fullBodyB, fullBodyC];
     const schedule: WeeklySchedule = {
-      monday: { workoutPlanId: fullBodyA.id, customTitle: fullBodyA.name, bodyParts: getWorkoutBodyParts(fullBodyA.exercises) },
-      tuesday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-      wednesday: { workoutPlanId: fullBodyB.id, customTitle: fullBodyB.name, bodyParts: getWorkoutBodyParts(fullBodyB.exercises) },
-      thursday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-      friday: { workoutPlanId: fullBodyC.id, customTitle: fullBodyC.name, bodyParts: getWorkoutBodyParts(fullBodyC.exercises) },
-      saturday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-      sunday: { workoutPlanId: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] },
+      monday: { kind: 'plan', workoutPlanId: fullBodyA.id, customTitle: fullBodyA.name, bodyParts: getWorkoutBodyParts(fullBodyA.exercises) },
+      tuesday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+      wednesday: { kind: 'plan', workoutPlanId: fullBodyB.id, customTitle: fullBodyB.name, bodyParts: getWorkoutBodyParts(fullBodyB.exercises) },
+      thursday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+      friday: { kind: 'plan', workoutPlanId: fullBodyC.id, customTitle: fullBodyC.name, bodyParts: getWorkoutBodyParts(fullBodyC.exercises) },
+      saturday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+      sunday: { kind: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] },
     };
 
     return {
@@ -457,13 +457,13 @@ export function generateSplitWeeklySchedule(
 
   const plans = [upperA, lowerA, upperB, lowerB];
   const schedule: WeeklySchedule = {
-    monday: { workoutPlanId: upperA.id, customTitle: upperA.name, bodyParts: getWorkoutBodyParts(upperA.exercises) },
-    tuesday: { workoutPlanId: lowerA.id, customTitle: lowerA.name, bodyParts: getWorkoutBodyParts(lowerA.exercises) },
-    wednesday: { workoutPlanId: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] },
-    thursday: { workoutPlanId: upperB.id, customTitle: upperB.name, bodyParts: getWorkoutBodyParts(upperB.exercises) },
-    friday: { workoutPlanId: lowerB.id, customTitle: lowerB.name, bodyParts: getWorkoutBodyParts(lowerB.exercises) },
-    saturday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-    sunday: { workoutPlanId: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] },
+    monday: { kind: 'plan', workoutPlanId: upperA.id, customTitle: upperA.name, bodyParts: getWorkoutBodyParts(upperA.exercises) },
+    tuesday: { kind: 'plan', workoutPlanId: lowerA.id, customTitle: lowerA.name, bodyParts: getWorkoutBodyParts(lowerA.exercises) },
+    wednesday: { kind: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] },
+    thursday: { kind: 'plan', workoutPlanId: upperB.id, customTitle: upperB.name, bodyParts: getWorkoutBodyParts(upperB.exercises) },
+    friday: { kind: 'plan', workoutPlanId: lowerB.id, customTitle: lowerB.name, bodyParts: getWorkoutBodyParts(lowerB.exercises) },
+    saturday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+    sunday: { kind: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] },
   };
 
   return {
@@ -501,16 +501,17 @@ export function buildDefaultWeeklySchedule(
   }
 
   const schedule: WeeklySchedule = {
-    monday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-    tuesday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-    wednesday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-    thursday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-    friday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-    saturday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-    sunday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+    monday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+    tuesday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+    wednesday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+    thursday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+    friday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+    saturday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+    sunday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
   };
 
   const getPlanConfig = (plan: PlannedWorkout): DayScheduleConfig => ({
+    kind: 'plan',
     workoutPlanId: plan.id,
     customTitle: plan.name,
     bodyParts: getWorkoutBodyParts(plan.exercises),
@@ -536,7 +537,7 @@ export function buildDefaultWeeklySchedule(
     schedule.thursday = getPlanConfig(plans[3 % plans.length]);
     schedule.friday = getPlanConfig(plans[4 % plans.length]);
     schedule.saturday = getPlanConfig(plans[5 % plans.length]);
-    schedule.sunday = { workoutPlanId: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] };
+    schedule.sunday = { kind: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] };
     return schedule;
   }
 
@@ -547,8 +548,8 @@ export function buildDefaultWeeklySchedule(
     schedule.wednesday = getPlanConfig(plans[2 % plans.length]);
     schedule.thursday = getPlanConfig(plans[3 % plans.length]);
     schedule.friday = getPlanConfig(plans[4 % plans.length]);
-    schedule.saturday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
-    schedule.sunday = { workoutPlanId: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] };
+    schedule.saturday = { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.sunday = { kind: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] };
     return schedule;
   }
 
@@ -556,23 +557,23 @@ export function buildDefaultWeeklySchedule(
   if (daysPerWeek === 4) {
     schedule.monday = getPlanConfig(plans[0 % plans.length]);
     schedule.tuesday = getPlanConfig(plans[1 % plans.length]);
-    schedule.wednesday = { workoutPlanId: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] };
+    schedule.wednesday = { kind: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] };
     schedule.thursday = getPlanConfig(plans[2 % plans.length]);
     schedule.friday = getPlanConfig(plans[3 % plans.length]);
-    schedule.saturday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
-    schedule.sunday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.saturday = { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.sunday = { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] };
     return schedule;
   }
 
   // 3-Day Full Body or Push/Pull/Legs (Mon/Wed/Fri, Tue/Thu/Sat/Sun Rest)
   if (daysPerWeek === 3) {
     schedule.monday = getPlanConfig(plans[0 % plans.length]);
-    schedule.tuesday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.tuesday = { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] };
     schedule.wednesday = getPlanConfig(plans[1 % plans.length]);
-    schedule.thursday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.thursday = { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] };
     schedule.friday = getPlanConfig(plans[2 % plans.length]);
-    schedule.saturday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
-    schedule.sunday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.saturday = { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.sunday = { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] };
     return schedule;
   }
 
@@ -597,7 +598,7 @@ export function buildDefaultWeeklySchedule(
     schedule.thursday = getPlanConfig(plans[3] || plans[0]);
     schedule.friday = getPlanConfig(plans[4] || plans[1] || plans[0]);
     schedule.saturday = getPlanConfig(plans[5] || plans[2] || plans[0]);
-    schedule.sunday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.sunday = { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] };
     return schedule;
   }
 
@@ -607,30 +608,30 @@ export function buildDefaultWeeklySchedule(
     schedule.wednesday = getPlanConfig(plans[2] || plans[0]);
     schedule.thursday = getPlanConfig(plans[3] || plans[0]);
     schedule.friday = getPlanConfig(plans[4] || plans[1] || plans[0]);
-    schedule.saturday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
-    schedule.sunday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.saturday = { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.sunday = { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] };
     return schedule;
   }
 
   if (plans.length === 4) {
     schedule.monday = getPlanConfig(plans[0]);
     schedule.tuesday = getPlanConfig(plans[1] || plans[0]);
-    schedule.wednesday = { workoutPlanId: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] };
+    schedule.wednesday = { kind: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] };
     schedule.thursday = getPlanConfig(plans[2] || plans[0]);
     schedule.friday = getPlanConfig(plans[3] || plans[1] || plans[0]);
-    schedule.saturday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
-    schedule.sunday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.saturday = { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.sunday = { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] };
     return schedule;
   }
 
   if (plans.length === 3) {
     schedule.monday = getPlanConfig(plans[0]);
-    schedule.tuesday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.tuesday = { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] };
     schedule.wednesday = getPlanConfig(plans[1] || plans[0]);
-    schedule.thursday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.thursday = { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] };
     schedule.friday = getPlanConfig(plans[2] || plans[0]);
-    schedule.saturday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
-    schedule.sunday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.saturday = { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.sunday = { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] };
     return schedule;
   }
 
@@ -658,8 +659,12 @@ export function getScheduledWorkoutForDay(
   title: string;
 } {
   const dayConfig = schedule?.[day];
+  // §18: the day's assignment via the one read (dayPlanRef). The
+  // historical quirk is preserved: an unconfigured day reports as
+  // rest here (callers render it as a rest day).
+  const ref = dayPlanRef(dayConfig);
 
-  if (!dayConfig || dayConfig.workoutPlanId === 'rest') {
+  if (!dayConfig || ref.kind === 'rest') {
     return {
       plan: null,
       isRest: true,
@@ -668,11 +673,14 @@ export function getScheduledWorkoutForDay(
     };
   }
 
-  let foundPlan = plans.find((p) => p.id === dayConfig.workoutPlanId || p.name.toLowerCase() === dayConfig.workoutPlanId?.toLowerCase());
+  const scheduledPlanId = ref.kind === 'plan' ? ref.planId : undefined;
+  let foundPlan = scheduledPlanId
+    ? plans.find((p) => p.id === scheduledPlanId || p.name.toLowerCase() === scheduledPlanId.toLowerCase())
+    : undefined;
 
   // If schedule references a builtin template but the user has created custom plans, prioritize user's custom plan
   const userCustomPlans = plans.filter((p) => !p.id.startsWith('builtin_'));
-  if ((!foundPlan || dayConfig.workoutPlanId?.startsWith('builtin_')) && userCustomPlans.length > 0) {
+  if ((!foundPlan || scheduledPlanId?.startsWith('builtin_')) && userCustomPlans.length > 0) {
     foundPlan = userCustomPlans[0];
   }
 

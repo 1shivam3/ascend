@@ -30,6 +30,7 @@ import type {
   WeeklySchedule,
   WorkoutEntry,
 } from './types';
+import { dayPlanRef } from './types';
 import {
   adaptSplitForEquipment,
   estimateSessionMinutes,
@@ -153,12 +154,32 @@ export interface PlateauProposal {
   createdOn: string;
 }
 
+/**
+ * A block proposal the user said no to (§19). Dismissal uses the
+ * ONE convention across the app — status 'dismissed' (plateau
+ * proposals and both decision families use the same literal) —
+ * and the dismissal is RECORDED, not just a cleared slot, so the
+ * coach's history shows what was declined and when.
+ */
+export interface DismissedBlockProposal extends BlockProposal {
+  status: 'dismissed';
+  dismissedOn: string;
+}
+
 export interface CoachBlocksState {
   pendingProposal: BlockProposal | null;
   activeBlock: ActiveCoachBlock | null;
   pastBlocks: ActiveCoachBlock[];
   adoptedPlans: Record<string, AdoptedPlanState>;
   plateauProposals: PlateauProposal[];
+  /** §19: newest-first, capped at 3. Optional in the type because
+   *  blobs persisted before §19 lack it — readers normalize. */
+  dismissedProposals?: DismissedBlockProposal[];
+  /** §19: how many finished blocks the pastBlocks cap has folded
+   *  away. The cap keeps the newest 8 in full; this count is the
+   *  compact summary of the rest — archiving is never silent.
+   *  Optional for the same pre-§19 reason. */
+  compactedBlockCount?: number;
 }
 
 export function getInitialCoachBlocksState(): CoachBlocksState {
@@ -168,6 +189,70 @@ export function getInitialCoachBlocksState(): CoachBlocksState {
     pastBlocks: [],
     adoptedPlans: {},
     plateauProposals: [],
+    dismissedProposals: [],
+    compactedBlockCount: 0,
+  };
+}
+
+/** §19: the past-blocks history cap. */
+export const MAX_PAST_BLOCKS = 8;
+
+/** §19: newest-first cap on the dismissed-proposal record. */
+export const MAX_DISMISSED_PROPOSALS = 3;
+
+/** True when the block's final Sunday has passed. (Moved here
+ *  from weekly-review in §19 — the lifecycle owner is this module;
+ *  weekly-review re-exports it.) */
+export function isBlockEnded(block: ActiveCoachBlock, todayStr: string): boolean {
+  const end = addDaysStr(block.startMonday, block.weeks.length * 7 - 1);
+  return todayStr > end;
+}
+
+/**
+ * §19: prepend a finished block to the history under the cap.
+ * Overflow is folded into the compacted count — the archive
+ * shrinks, but the fact (and number) of the older blocks is
+ * never silently dropped.
+ */
+export function archivePastBlock(
+  pastBlocks: ActiveCoachBlock[],
+  block: ActiveCoachBlock,
+  compactedBlockCount: number
+): { pastBlocks: ActiveCoachBlock[]; compactedBlockCount: number } {
+  const next = [block, ...pastBlocks];
+  if (next.length <= MAX_PAST_BLOCKS) return { pastBlocks: next, compactedBlockCount };
+  return {
+    pastBlocks: next.slice(0, MAX_PAST_BLOCKS),
+    compactedBlockCount: compactedBlockCount + (next.length - MAX_PAST_BLOCKS),
+  };
+}
+
+/**
+ * §19 settle pass: a block whose weeks have run out IS completed
+ * — persist that instead of leaving it 'active' in storage until
+ * a successor happens to be approved (the approve path already
+ * labels the outgoing block; this covers blocks with no
+ * successor). Returns the SAME reference when nothing settles,
+ * so callers can skip the write. Pure; runs on rehydration.
+ */
+export function settleCoachBlocks(
+  blocks: CoachBlocksState,
+  todayStr: string
+): CoachBlocksState {
+  const active = blocks.activeBlock;
+  if (!active || active.status !== 'active' || !isBlockEnded(active, todayStr)) {
+    return blocks;
+  }
+  const archived = archivePastBlock(
+    blocks.pastBlocks ?? [],
+    { ...active, status: 'completed' },
+    blocks.compactedBlockCount ?? 0
+  );
+  return {
+    ...blocks,
+    activeBlock: null,
+    pastBlocks: archived.pastBlocks,
+    compactedBlockCount: archived.compactedBlockCount,
   };
 }
 
@@ -1326,15 +1411,17 @@ export function materializeProposal(
   // the lifter's own non-block plans are never touched.
   const blockIdByPlanId = new Map(existingPlans.map((p) => [p.id, p.coachBlockId]));
   for (const d of Object.keys(nextSchedule) as DayOfWeek[]) {
-    const pid = nextSchedule[d]?.workoutPlanId;
-    if (typeof pid !== 'string' || pid === 'rest') continue;
-    const owner = blockIdByPlanId.get(pid);
+    // §18: the day's plan via the one read (dayPlanRef).
+    const ref = dayPlanRef(nextSchedule[d]);
+    if (ref.kind !== 'plan') continue;
+    const owner = blockIdByPlanId.get(ref.planId);
     if (owner && owner !== proposal.id) {
-      nextSchedule[d] = { workoutPlanId: 'rest' };
+      nextSchedule[d] = { kind: 'rest' };
     }
   }
   for (const day of liveDays) {
     nextSchedule[day.weekday] = {
+      kind: 'plan',
       workoutPlanId: planIdByWeekday.get(day.weekday)!,
       bodyParts: getWorkoutBodyParts(day.exercises),
     };

@@ -1,14 +1,29 @@
-import type { DayOfWeek, PlannedWorkout, WeeklySchedule, WorkoutEntry } from './types';
+import type { DayOfWeek, DayScheduleConfig, PlannedWorkout, WeeklySchedule, WorkoutEntry } from './types';
+import { isSetCompleted, dayPlanRef } from './types';
 import { getLocalTodayStr, normalizeDateToLocalDay } from './formatters';
 import { getTodayDayOfWeek } from './workout-schedule';
+
+// §18 (Phase 3.3): dayPlanRef — the one schedule read — lives in
+// types.ts beside DayScheduleConfig (this module and
+// workout-schedule import each other; the leaf cannot sit in
+// either). Re-exported here so schedule consumers have one import.
+export { dayPlanRef, type DayPlanRef } from './types';
+
+/** §16: a day is completed by a workout only when the workout
+ *  actually performed something — ≥1 completed set. A zero-set
+ *  save stays in history but completes nothing. */
+export function workoutHasCompletedSet(w: WorkoutEntry | null | undefined): boolean {
+  if (!w) return false;
+  return (w.exercises || []).some((e) => (e.sets || []).some((s) => isSetCompleted(s)));
+}
 
 /**
  * FND-02 — the ONE definition of "a scheduled training day", pinned here
  * so it cannot drift between passes.
  *
  * A day counts iff ALL three hold:
- *   1. the day's config sets a workoutPlanId,
- *   2. that id is not 'rest',
+ *   1. the day's config resolves to a plan (dayPlanRef),
+ *   2. it is not a rest day,
  *   3. the plan still exists in plannedWorkouts (a schedule pointing at
  *      a deleted plan is not a plan — adherence already treated it that
  *      way, while the coach check-in and the week stats did not, which
@@ -43,9 +58,9 @@ export function getScheduledPlanEntries(
   const entries: ScheduledDayEntry[] = [];
   SCHEDULED_DAY_KEYS.forEach((day, weekday) => {
     const cfg = weeklySchedule?.[day];
-    const planId = cfg?.workoutPlanId;
-    if (cfg && planId && planId !== 'rest' && planIds.has(planId)) {
-      entries.push({ day, weekday, planId, customTitle: cfg.customTitle });
+    const ref = dayPlanRef(cfg);
+    if (cfg && ref.kind === 'plan' && planIds.has(ref.planId)) {
+      entries.push({ day, weekday, planId: ref.planId, customTitle: cfg.customTitle });
     }
   });
   return entries;
@@ -122,8 +137,9 @@ export function earliestDataDate(input: {
 // at all, and the reminder derivations counted a day whose plan no
 // longer exists. resolvePlannedDay is now the single definition:
 //
-//   completed  a workout is logged on the date (wins over everything)
-//   rest       the day's config is the rest override ('rest')
+//   completed  a workout with ≥1 completed set is logged on the date
+//              (wins over everything; §16 — a zero-set entry does not)
+//   rest       the day's config is a rest day (dayPlanRef)
 //   planned    the config names a plan that still exists (matched by
 //              id, or by name as Today's matcher has always done)
 //   none       no schedule, day unassigned, or the plan is gone
@@ -147,25 +163,30 @@ export function resolvePlannedDay<P extends { id: string; name: string }>(
   },
 ): PlannedDayResolution<P> {
   const day = getTodayDayOfWeek(dateStr);
+  // §16 (Phase 3.3): 'completed' requires a workout that performed
+  // ≥1 completed set — an entry's mere existence (a zero-set save)
+  // no longer completes the day, here or anywhere this resolver is
+  // the definition (habit matrix, reminders, adherence).
   const done = (input.workouts || []).find(
-    (w) => w.date && normalizeDateToLocalDay(w.date) === dateStr,
+    (w) => w.date && normalizeDateToLocalDay(w.date) === dateStr && workoutHasCompletedSet(w),
   );
   if (done) return { kind: 'completed', day, workout: done };
 
   const cfg = input.weeklySchedule?.[day];
-  if (cfg?.workoutPlanId === 'rest') {
-    return { kind: 'rest', day, customTitle: cfg.customTitle };
+  const ref = dayPlanRef(cfg);
+  if (ref.kind === 'rest') {
+    return { kind: 'rest', day, customTitle: cfg?.customTitle };
   }
-  if (cfg?.workoutPlanId) {
+  if (ref.kind === 'plan') {
     if (!input.plannedWorkouts) {
-      return { kind: 'planned', day, plan: null, customTitle: cfg.customTitle };
+      return { kind: 'planned', day, plan: null, customTitle: cfg?.customTitle };
     }
     const plan = input.plannedWorkouts.find(
       (p) =>
-        p.id === cfg.workoutPlanId ||
-        p.name.toLowerCase() === cfg.workoutPlanId!.toLowerCase(),
+        p.id === ref.planId ||
+        p.name.toLowerCase() === ref.planId.toLowerCase(),
     );
-    if (plan) return { kind: 'planned', day, plan, customTitle: cfg.customTitle };
+    if (plan) return { kind: 'planned', day, plan, customTitle: cfg?.customTitle };
   }
   return { kind: 'none', day };
 }

@@ -225,14 +225,33 @@ export interface PersonalRecord {
 
 export type SetExecutionStatus = 'pending' | 'completed' | 'skipped' | 'not_attempted';
 
+/**
+ * The statuses a PERSISTED history set may carry (§17, Phase 3.4):
+ * 'pending' is a live-draft concept and never persists — an
+ * entered-but-unfinished set is saved as 'not_attempted' with its
+ * reps kept as data (see normalizePersistedWorkoutSet).
+ */
+export type PersistedSetStatus = 'completed' | 'skipped' | 'not_attempted';
+
 export interface WorkoutSet {
   // Performed / actual execution values
   reps: number;
   weight?: number;
   unit: Unit;
+  /**
+   * LEGACY dual encoding (§17): the live draft still toggles this
+   * while a session runs, but persisted history no longer writes it
+   * (finalizeWorkoutSet strips it; stored history is canonicalized
+   * by normalizePersistedWorkoutSet). Read it ONLY through the
+   * resolvers below — never directly.
+   */
   completed?: boolean;
   rpe?: number;
-  isPR?: boolean;
+  // §23 (Phase 3.1): there is deliberately NO `isPR` field — it was
+  // declared for years and never written by any code path, while
+  // four surfaces read it. PR-ness is computed at read time from
+  // the one replay (computeSessionPRMarks / isPRSet in
+  // pr-reevaluation.ts). Do not re-add a stored flag.
   isWarmup?: boolean;
 
   // Prescribed / target values (optional for backwards compatibility with legacy records)
@@ -244,32 +263,39 @@ export interface WorkoutSet {
   // Provenance linking back to an applied policy decision (set only when verified via audit)
   appliedDecisionId?: string;
 
-  // Explicit execution status (optional for backwards compatibility with legacy records)
+  /**
+   * THE execution status (§17, Phase 3.4): the single stored truth
+   * for persisted sets. Optional on the type only because legacy
+   * records and live drafts may not have stamped it yet — the
+   * resolvers below define what an absent status means.
+   */
   status?: SetExecutionStatus;
 }
 
 /**
- * Execution Status Resolution Precedence:
- * ----------------------------------------
- * 1. Explicit `status` field:
- *    If `set.status` is provided ('completed' | 'skipped' | 'not_attempted' | 'pending'),
- *    it takes highest priority over legacy boolean flags.
+ * §17 (Phase 3.4): THE ONE status precedence implementation. The
+ * three public resolvers below all delegate here; they used to be
+ * three separate implementations that could disagree (and did —
+ * e.g. weekly-review read the raw boolean beside them).
  *
- * 2. Legacy `completed` boolean:
- *    If `set.status` is undefined:
- *    - `completed === true`: resolves to 'completed'.
- *    - `completed === false`:
- *        - if `reps > 0`: resolves to 'pending' (planned/entered set awaiting completion).
- *        - if `reps <= 0`: resolves to 'not_attempted'.
- *        (Note: legacy records are never silently assumed to be 'skipped').
- *
- * 3. Omitted `completed` field (historical stored records):
- *    If neither `status` nor `completed` is provided:
- *    - `reps > 0`: resolves to 'completed' (matches existing ASCEND behavior where historical
- *      records without `completed` but with positive reps represent logged sets).
- *    - `reps <= 0`: resolves to 'not_attempted'.
+ * Precedence:
+ * 1. Explicit `status` wins over every legacy encoding — including a
+ *    conflicting `completed: true` beside `status: 'skipped'`.
+ * 2. Legacy `completed === true` → 'completed';
+ *    `completed === false` → 'pending' when reps were entered
+ *    (a planned/entered set awaiting completion), else
+ *    'not_attempted'. (Legacy records are never assumed 'skipped'.)
+ * 3. Neither field (historical stored records): the ONE deliberate
+ *    context difference, named by `inferCompletedFromReps` —
+ *    history (true): reps > 0 means a logged set → 'completed'
+ *    (long-standing ASCEND behavior for flag-less records);
+ *    live draft (false): typed reps alone never complete a set →
+ *    'pending'.
  */
-export function getSetExecutionStatus(set: WorkoutSet): SetExecutionStatus {
+function resolveSetStatus(
+  set: WorkoutSet,
+  inferCompletedFromReps: boolean,
+): SetExecutionStatus {
   if (set?.status) {
     return set.status;
   }
@@ -277,44 +303,49 @@ export function getSetExecutionStatus(set: WorkoutSet): SetExecutionStatus {
     return 'completed';
   }
   if (set?.completed === false) {
-    return (set.reps && set.reps > 0) ? 'pending' : 'not_attempted';
+    return set.reps && set.reps > 0 ? 'pending' : 'not_attempted';
   }
-  return (set?.reps && set.reps > 0) ? 'completed' : 'not_attempted';
+  if (set?.reps && set.reps > 0) {
+    return inferCompletedFromReps ? 'completed' : 'pending';
+  }
+  return 'not_attempted';
 }
 
-/**
- * Determines whether a set counts as successfully completed.
- *
- * Precedence rules:
- * 1. If explicit `status` is present, returns true only when status === 'completed'.
- * 2. If `status` is omitted and `completed` boolean is present, returns `set.completed`.
- * 3. If neither is present (legacy historical records), returns true if `reps > 0`.
- */
+/** The set's execution status under HISTORY semantics. */
+export function getSetExecutionStatus(set: WorkoutSet): SetExecutionStatus {
+  return resolveSetStatus(set, true);
+}
+
+/** Whether a (history) set counts as successfully completed. */
 export function isSetCompleted(set: WorkoutSet): boolean {
-  if (set?.status) {
-    return set.status === 'completed';
-  }
-  if (typeof set?.completed === 'boolean') {
-    return set.completed;
-  }
-  return Boolean(set?.reps && set.reps > 0);
+  return resolveSetStatus(set, true) === 'completed';
 }
 
 /**
- * Determines whether a set in an active workout draft or active session has been completed.
- *
- * Precedence rules:
- * 1. If explicit `status` is present, returns true ONLY when status === 'completed'.
- *    Explicit `status` of 'skipped', 'pending', or 'not_attempted' ALWAYS returns false,
- *    even if a conflicting legacy `completed: true` flag exists.
- * 2. If `status` is omitted, returns true ONLY when `completed === true`.
- * 3. Never infers completion from positive reps or weights in an active draft.
+ * Whether a set in an ACTIVE workout draft/session is completed.
+ * Same precedence, draft semantics: never inferred from reps alone.
  */
 export function isActiveSetCompleted(set: WorkoutSet): boolean {
-  if (set?.status) {
-    return set.status === 'completed';
-  }
-  return set?.completed === true;
+  return resolveSetStatus(set, false) === 'completed';
+}
+
+/**
+ * §17 (Phase 3.4): canonicalize a set for PERSISTED history — one
+ * stored field (`status`, a PersistedSetStatus), the legacy
+ * `completed` boolean removed. Resolution follows the old
+ * precedence exactly, so no set changes meaning: an explicit status
+ * wins over a conflicting boolean, and a resolved 'pending' (entered
+ * but never finished) persists as 'not_attempted' with reps kept.
+ * Idempotent; applied by finalizeWorkoutSet (born canonical), the
+ * persist migration, and backup import.
+ */
+export function normalizePersistedWorkoutSet(set: WorkoutSet): WorkoutSet {
+  if (!set || typeof set !== 'object') return set;
+  const resolved = resolveSetStatus(set, true);
+  const status: PersistedSetStatus = resolved === 'pending' ? 'not_attempted' : resolved;
+  if (set.status === status && !('completed' in set)) return set;
+  const { completed: _legacyCompleted, ...rest } = set;
+  return { ...rest, status };
 }
 
 /**
@@ -372,6 +403,15 @@ export interface WorkoutEntry {
   kind?: 'run';
   /** Run program session id ('c25k-w3d2') when kind is 'run'. */
   runSessionId?: string;
+  /** §22: enrollment attempt this run belongs to (see
+   *  RunProgramState.enrollmentId). Absent on pre-§22 entries —
+   *  those attribute by date. */
+  runEnrollmentId?: string;
+  /** §22: structured interval counts for a run entry — the
+   *  completion threshold (RUN_COMPLETION_THRESHOLD) judges these.
+   *  Absent on pre-§22 entries, which count as completed. */
+  runIntervalsCompleted?: number;
+  runIntervalsTotal?: number;
   /** Optional user-entered distance for a run, in kilometres. */
   distanceKm?: number;
   /**
@@ -394,6 +434,21 @@ export interface WorkoutEntry {
   updatedAt?: string;
 }
 
+/**
+ * The ONE workout draft (§15, Phase 3.3 — this type used to be
+ * defined twice, here and in store.ts).
+ *
+ * Ownership: the store holds exactly ONE draft slot, keyed by
+ * session — `sessionStartTime` is the session's identity (its
+ * startedAt, epoch ms) and `savedAt` is its updatedAt (ISO,
+ * rewritten on every save). Two autosave effects write the slot
+ * (the live session screen and the logger modal); an autosave may
+ * only write its own session or a session that began after the
+ * slot was last saved — see shouldAutosaveDraft in store.ts.
+ * Explicit user actions (Start from Home, Resume, Discard/Undo)
+ * may replace the slot outright. Saving a draft with zero
+ * exercises CLEARS the slot — an empty draft is not a state.
+ */
 export interface ActiveWorkoutDraft {
   id?: string;
   name?: string;
@@ -402,7 +457,9 @@ export interface ActiveWorkoutDraft {
   exercises: WorkoutExercise[];
   startedFromPlan?: string | null;
   startedFromPlanId?: string | null;
+  /** startedAt: epoch ms when the session began; also the slot's session identity. */
   sessionStartTime?: number;
+  /** updatedAt: ISO time of the last save of this draft. */
   savedAt: string;
 }
 
@@ -607,12 +664,53 @@ export type DayType = 'training' | 'rest';
 export type DayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
 
 export interface DayScheduleConfig {
-  workoutPlanId?: string | 'rest'; // ID of PlannedWorkout or 'rest'
+  /**
+   * §18 (Phase 3.3): the day's assignment — THE representation.
+   * 'rest' = deliberate rest day; 'plan' = workoutPlanId names the
+   * plan; absent = unassigned ('none'). Before 3.3 the rest fact
+   * was smuggled through the plan-id field as the magic string
+   * 'rest'; the persist migration converts stored schedules, and
+   * dayPlanRef() (scheduled-days.ts) — the one read path — still
+   * resolves the legacy shape for un-migrated/old-client payloads.
+   */
+  kind?: 'rest' | 'plan';
+  /** Plan id (or, in legacy rows, plan name) — only when kind is 'plan'. Never 'rest'. */
+  workoutPlanId?: string;
   customTitle?: string;            // e.g. "Chest & Triceps"
   bodyParts?: string[];            // e.g. ["Chest", "Arms"]
 }
 
 export type WeeklySchedule = Record<DayOfWeek, DayScheduleConfig>;
+
+// ─── The one schedule read (§18, Phase 3.3) ─────────────────────────────────
+//
+// A day's assignment used to be encoded as a magic string: 'rest'
+// inside the plan-id field, re-interpreted at a dozen sites. The
+// config now carries `kind`; this resolver is the ONLY read path,
+// and it deliberately still understands the legacy shape so an
+// un-migrated stored schedule or an old client's sync payload
+// resolves exactly the same way. (Lives beside the type it
+// interprets: scheduled-days and workout-schedule import each
+// other's helpers, so the shared leaf cannot sit in either.)
+
+export type DayPlanRef =
+  | { kind: 'none' }
+  | { kind: 'rest' }
+  | { kind: 'plan'; planId: string };
+
+export function dayPlanRef(cfg: DayScheduleConfig | null | undefined): DayPlanRef {
+  if (!cfg) return { kind: 'none' };
+  if (cfg.kind === 'rest') return { kind: 'rest' };
+  if (cfg.kind === 'plan') {
+    return cfg.workoutPlanId && cfg.workoutPlanId !== 'rest'
+      ? { kind: 'plan', planId: cfg.workoutPlanId }
+      : { kind: 'none' };
+  }
+  // Legacy shape (pre-§18 rows): the plan-id field carried both facts.
+  if (cfg.workoutPlanId === 'rest') return { kind: 'rest' };
+  if (cfg.workoutPlanId) return { kind: 'plan', planId: cfg.workoutPlanId };
+  return { kind: 'none' };
+}
 
 export interface HydrationConfig {
   baseMl?: number;
@@ -791,6 +889,26 @@ export type TrainingDecisionReason =
   | 'low_readiness'
   | 'user_override';
 
+/**
+ * §20: THE decision-status vocabulary — one union for every
+ * decision family (per-exercise TrainingDecision below and the
+ * policy TrainingDecisionRecord in training-decision-policy.ts).
+ * Dismissal is always the literal 'dismissed'.
+ *
+ * 'applied' is deliberately NOT a stored status: for policy
+ * decisions it is DERIVED by decisionEffectiveStatus (policy
+ * module) from the record + the application audit list — flipping
+ * the stored status on apply would break re-application
+ * idempotency, whose validator requires 'accepted' before it can
+ * answer alreadyApplied. For TrainingDecision, accepting IS the
+ * application (the prescription updates in place).
+ */
+export type DecisionStatus = 'pending' | 'accepted' | 'overridden' | 'dismissed';
+
+/** A decision's effective status, including the derived terminal
+ *  'applied' for policy decisions that reached a plan. */
+export type EffectiveDecisionStatus = DecisionStatus | 'applied';
+
 export interface TrainingDecision {
   id: string;
   exerciseName: string;
@@ -823,7 +941,7 @@ export interface TrainingDecision {
   deltaPercent: number;
   confidence: 'high' | 'established' | 'early_signal' | 'calibrating' | 'medium';
   evidenceCount: number;
-  status: 'pending' | 'accepted' | 'overridden';
+  status: DecisionStatus;
   userOverrideWeight?: number;
   timestamp: string;
 }
@@ -946,6 +1064,7 @@ export type {
 } from './training-decision-policy';
 export {
   canPersistDecisionToLedger,
+  decisionEffectiveStatus,
   validatePolicyDecisionApplication,
 } from './training-decision-policy';
 

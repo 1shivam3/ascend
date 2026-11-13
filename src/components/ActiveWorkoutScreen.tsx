@@ -29,7 +29,9 @@ import {
   MoreHorizontal,
   Search,
 } from 'lucide-react';
-import { useStore } from '@/lib/store';
+import { useStore, shouldAutosaveDraft } from '@/lib/store';
+import { useRestTimer } from '@/lib/use-rest-timer';
+import { computeSessionBest, gateSessionOutcome, outcomeNote } from '@/lib/pr-reevaluation';
 import { getDemoForExercise } from '@/lib/exercise-media';
 import FormCuesSheet from '@/components/FormCuesSheet';
 import FormCoachModal from '@/features/form-coach/components/FormCoachModal';
@@ -539,11 +541,9 @@ export default function ActiveWorkoutScreen({
     }, 95);
   }, [registerBackHandler]);
 
-  // Rest Timer state (live-fix L4: the idle preset shown by the pill and
-  // the overlay is defaultRestDuration — one source, no stale copy).
-  const [restSecondsLeft, setRestSecondsLeft] = useState<number>(0);
-  const [isRestRunning, setIsRestRunning] = useState<boolean>(false);
-  const [isRestFinished, setIsRestFinished] = useState<boolean>(false);
+  // Rest Timer (§21, Phase 3.2): the timer is one state machine —
+  // see useRestTimer below (declared after defaultRestDuration,
+  // which it reads at start time). No flags or refs live here.
   const [isRestPopoverOpen, setIsRestPopoverOpen] = useState<boolean>(false);
 
   // Rest-timer sound fix — alert plumbing. The finish chime lives in
@@ -587,68 +587,9 @@ export default function ActiveWorkoutScreen({
   const [weightPrompt, setWeightPrompt] = useState<{ setIdx: number; mode: 'beginner' | 'toggle' } | null>(null);
   const weightPromptShownRef = useRef<Set<string>>(new Set());
 
-  // Live-fix L4: dismissing the Set Complete overlay pauses the rest
-  // timer (remaining time stays resumable from the pill) — it must never
-  // keep running invisibly after its UI is gone. Shared by the X button,
-  // the Escape handler, and the Android-back handler so every close path
-  // behaves identically. (Defined before the effects below: the back
-  // handler's deps array reads it during render.)
-  const dismissSetComplete = useCallback(() => {
-    setCompletedSetSummary(null);
-    if (isRestRunning) {
-      restTargetEndTimeRef.current = null;
-      setIsRestRunning(false);
-      cancelRestAlert();
-    }
-  }, [isRestRunning, cancelRestAlert]);
-
-  // Micro-fix L4 (round 2): the live path is the pill + popover, NOT the
-  // Set Complete overlay — the first round hid the pill only while the
-  // overlay was open, so pill + popover counted side by side and Escape
-  // did nothing on the popover. Dismissing the popover pauses the rest
-  // timer (remaining time stays resumable from the pill); collapsing the
-  // popover via its X button does NOT pause — Escape is the pause path.
-  const dismissRestPopover = useCallback(() => {
-    setIsRestPopoverOpen(false);
-    if (isRestRunning) {
-      restTargetEndTimeRef.current = null;
-      setIsRestRunning(false);
-      cancelRestAlert();
-    }
-  }, [isRestRunning, cancelRestAlert]);
-
-  useEffect(() => {
-    if (completedSetSummary) {
-      return registerBackHandler(() => {
-        dismissSetComplete();
-        return true;
-      }, 105);
-    }
-  }, [completedSetSummary, registerBackHandler, dismissSetComplete]);
-
-  // Escape closes the Set Complete overlay (it previously did nothing —
-  // the overlay is not a useModalA11y modal, so nothing handled the key).
-  useEffect(() => {
-    if (!completedSetSummary) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') dismissSetComplete();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [completedSetSummary, dismissSetComplete]);
-
-  // Micro-fix L4 (round 2): Escape closes the rest popover AND pauses
-  // (same dismiss+pause semantics as the overlay). Without this, Escape
-  // did nothing on the popover — the only close paths were Skip (which
-  // kills the timer) and re-tapping the pill (hidden once open).
-  useEffect(() => {
-    if (!isRestPopoverOpen || completedSetSummary) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') dismissRestPopover();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [isRestPopoverOpen, completedSetSummary, dismissRestPopover]);
+  // (The Set Complete / popover dismiss callbacks and their Escape
+  // + back-handler effects live below the rest-timer hook they
+  // pause — §21.)
 
   // Micro-fix L4 (round 2): single timer UI across transitions — when
   // the Set Complete overlay opens, the popover closes so pill + popover
@@ -740,6 +681,10 @@ export default function ActiveWorkoutScreen({
   // began (template exercises are pre-named on open).
   useEffect(() => {
     if (exercises.some((e) => e.sets.some((s) => isActiveSetCompleted(s)))) {
+      // §15 (Phase 3.3): one of the draft slot's two autosave
+      // writers (the logger modal is the other) — the ownership
+      // rule keeps this screen from overwriting a newer session.
+      if (!shouldAutosaveDraft(useStore.getState().activeWorkoutDraft, sessionStartTime)) return;
       saveWorkoutDraft({
         date: getLocalTodayStr(),
         name: workoutName,
@@ -1056,9 +1001,6 @@ export default function ActiveWorkoutScreen({
   // AudioContext at finish time, which Android starts suspended, so
   // the chime never sounded on real phones.
 
-  // Timestamp-based drift-free rest timer reference
-  const restTargetEndTimeRef = useRef<number | null>(null);
-
   // Elapsed workout timer — re-derived from the persisted start
   // timestamp on every tick (J2.3), so a throttled interval or a
   // remount can never leave a stale/reset value behind.
@@ -1070,43 +1012,35 @@ export default function ActiveWorkoutScreen({
     return () => clearInterval(timer);
   }, [sessionStartTime]);
 
-  // Countdown Rest Timer - timestamp based to eliminate mobile background/tab sleep drift
-  useEffect(() => {
-    if (!isRestRunning) return;
-    const updateTick = () => {
-      const endTime = restTargetEndTimeRef.current;
-      if (!endTime) return;
-      const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
-      if (remaining <= 0) {
-        setIsRestRunning(false);
-        setIsRestFinished(true);
-        setRestSecondsLeft(0);
-        restTargetEndTimeRef.current = null;
-        playRestDoneChime();
-        triggerHaptic('rest_done');
-        // The chime + haptic just fired in the foreground — the
-        // scheduled locked-screen alert must not fire a second later.
-        cancelRestAlert();
-      } else {
-        setRestSecondsLeft(remaining);
-      }
-    };
-
-    updateTick();
-    const interval = setInterval(updateTick, 500);
-
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        updateTick();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
-  }, [isRestRunning, cancelRestAlert]);
+  // §21 (Phase 3.2): the rest timer is ONE machine — useRestTimer
+  // (lib/use-rest-timer + lib/rest-timer). The countdown tick, the
+  // finish effects and the OS-alert scheduling all live in the
+  // hook; startTimer below is the single start path (the two
+  // hand-copied starts — set-toggle and voice-log — call it too;
+  // their copies never set the end time the countdown read, which
+  // froze the pill mid-"run"). Finish effects: chime + haptic in
+  // the foreground, and the scheduled locked-screen alert is
+  // cancelled so it cannot fire a second time.
+  const restTimer = useRestTimer({
+    defaultSeconds: defaultRestDuration,
+    onFinish: () => {
+      playRestDoneChime();
+      triggerHaptic('rest_done');
+      cancelRestAlert();
+    },
+    scheduleAlert: scheduleRestAlert,
+    cancelAlert: cancelRestAlert,
+    unlockAudio: unlockRestAudio,
+  });
+  const restSecondsLeft = restTimer.secondsLeft;
+  const isRestRunning = restTimer.status === 'running';
+  const isRestFinished = restTimer.status === 'finished';
+  const startTimer = restTimer.start;
+  // Wrapped: the hook's togglePause takes an optional start value,
+  // which must never receive a click event from direct onClick use.
+  const togglePauseTimer = () => restTimer.togglePause();
+  const adjustTimer = restTimer.adjust;
+  const skipTimer = restTimer.skip;
 
   // Rest-timer sound fix: leaving the workout (finish/discard/unmount)
   // must never leave a rest alert pending behind it.
@@ -1116,65 +1050,59 @@ export default function ActiveWorkoutScreen({
     };
   }, []);
 
-  // Start rest timer. Called only from user-gesture paths (set
-  // complete, pill, pause toggle), so it also unlocks the shared audio
-  // context while the gesture is on the stack, and schedules the
-  // locked-screen alert for the exact end time.
-  const startTimer = useCallback(
-    (seconds?: number) => {
-      const targetSec = seconds || defaultRestDuration;
-      const endTime = Date.now() + targetSec * 1000;
-      restTargetEndTimeRef.current = endTime;
-      setRestSecondsLeft(targetSec);
-      setIsRestRunning(true);
-      setIsRestFinished(false);
-      unlockRestAudio();
-      scheduleRestAlert(endTime);
-    },
-    [defaultRestDuration, scheduleRestAlert]
-  );
+  // Live-fix L4: dismissing the Set Complete overlay pauses the rest
+  // timer (remaining time stays resumable from the pill) — it must never
+  // keep running invisibly after its UI is gone. Shared by the X button,
+  // the Escape handler, and the Android-back handler so every close path
+  // behaves identically.
+  const dismissSetComplete = useCallback(() => {
+    setCompletedSetSummary(null);
+    if (restTimer.status === 'running') restTimer.pause();
+  }, [restTimer]);
 
-  const togglePauseTimer = () => {
-    if (restSecondsLeft === 0) {
-      startTimer();
-    } else if (isRestRunning) {
-      restTargetEndTimeRef.current = null;
-      setIsRestRunning(false);
-      cancelRestAlert();
-    } else {
-      const endTime = Date.now() + restSecondsLeft * 1000;
-      restTargetEndTimeRef.current = endTime;
-      setIsRestRunning(true);
-      unlockRestAudio();
-      scheduleRestAlert(endTime);
+  // Micro-fix L4 (round 2): the live path is the pill + popover, NOT the
+  // Set Complete overlay — the first round hid the pill only while the
+  // overlay was open, so pill + popover counted side by side and Escape
+  // did nothing on the popover. Dismissing the popover pauses the rest
+  // timer (remaining time stays resumable from the pill); collapsing the
+  // popover via its X button does NOT pause — Escape is the pause path.
+  const dismissRestPopover = useCallback(() => {
+    setIsRestPopoverOpen(false);
+    if (restTimer.status === 'running') restTimer.pause();
+  }, [restTimer]);
+
+  useEffect(() => {
+    if (completedSetSummary) {
+      return registerBackHandler(() => {
+        dismissSetComplete();
+        return true;
+      }, 105);
     }
-  };
+  }, [completedSetSummary, registerBackHandler, dismissSetComplete]);
 
-  const adjustTimer = (delta: number) => {
-    // The shifted end time is computed from the current ref BEFORE the
-    // state updater runs (updaters execute at render time) so the
-    // locked-screen alert can be moved to the same instant.
-    const endTime = restTargetEndTimeRef.current;
-    const shiftedEnd = endTime !== null ? endTime + delta * 1000 : null;
-    setRestSecondsLeft((prev) => {
-      const next = Math.max(0, prev + delta);
-      if (restTargetEndTimeRef.current) {
-        restTargetEndTimeRef.current += delta * 1000;
-      }
-      return next;
-    });
-    if (shiftedEnd !== null && isRestRunning) {
-      scheduleRestAlert(shiftedEnd);
-    }
-  };
+  // Escape closes the Set Complete overlay (it previously did nothing —
+  // the overlay is not a useModalA11y modal, so nothing handled the key).
+  useEffect(() => {
+    if (!completedSetSummary) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') dismissSetComplete();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [completedSetSummary, dismissSetComplete]);
 
-  const skipTimer = () => {
-    restTargetEndTimeRef.current = null;
-    setRestSecondsLeft(0);
-    setIsRestRunning(false);
-    setIsRestFinished(false);
-    cancelRestAlert();
-  };
+  // Micro-fix L4 (round 2): Escape closes the rest popover AND pauses
+  // (same dismiss+pause semantics as the overlay). Without this, Escape
+  // did nothing on the popover — the only close paths were Skip (which
+  // kills the timer) and re-tapping the pill (hidden once open).
+  useEffect(() => {
+    if (!isRestPopoverOpen || completedSetSummary) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') dismissRestPopover();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isRestPopoverOpen, completedSetSummary, dismissRestPopover]);
 
   const formatTime = (totalSec: number) => {
     const mins = Math.floor(totalSec / 60);
@@ -1583,14 +1511,11 @@ export default function ActiveWorkoutScreen({
     if (isNowCompleted) {
       triggerHaptic('set_complete');
       // Auto start rest timer immediately based on athlete goal & lift type
+      // (§21: through the single start path — this tap is the gesture
+      // that unlocks the chime audio, and the hook schedules the
+      // locked-screen alert for the same endsAt the countdown reads.)
       const restDuration = defaultRestDuration;
-      setRestSecondsLeft(restDuration);
-      setIsRestRunning(true);
-      setIsRestFinished(false);
-      // This tap is the gesture that unlocks the chime audio; the
-      // locked-screen alert tracks the same end time.
-      unlockRestAudio();
-      scheduleRestAlert(Date.now() + restDuration * 1000);
+      startTimer(restDuration);
       toast.info(
         t('workout.toastSetLogged', {
           n: setIdx + 1,
@@ -1755,6 +1680,33 @@ export default function ActiveWorkoutScreen({
       startTimer(restDuration);
 
       const completedW = (targetSet.weight === undefined && isCurrentBodyweight) ? 0 : (targetSet.weight ?? 0);
+      // §23 (Phase 3.1): the summary's PR flag is the LIVE session
+      // outcome — the same computeSessionBest/gate the finish path
+      // and the history replay use — checked against the stored
+      // best. (The old read, `targetSet.isPR`, was a flag no code
+      // path ever wrote, so the badge never appeared.)
+      const setsSoFar = currentExercise.sets.map((s, j) =>
+        j === setIdx
+          ? { ...s, weight: completedW, completed: true, status: 'completed' as const }
+          : s,
+      );
+      const storedBestKg = prs
+        .filter((p) => p.exercise.toLowerCase() === currentExercise.name.toLowerCase())
+        .reduce((m, p) => Math.max(m, p.oneRepMax || 0), 0);
+      const liveOutcome = gateSessionOutcome(
+        computeSessionBest(
+          currentExercise.name,
+          setsSoFar,
+          workouts,
+          profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG,
+        ),
+        storedBestKg,
+      );
+      const completedWKg = targetSet.unit === 'lbs' ? lbsToKg(completedW) : completedW;
+      const liveIsPR =
+        !!liveOutcome &&
+        Math.abs(liveOutcome.weightKg - completedWKg) <= 0.051 &&
+        liveOutcome.reps === targetSet.reps;
       setCompletedSetSummary({
         exerciseName: currentExercise.name || 'Exercise',
         setIndex: setIdx,
@@ -1762,7 +1714,7 @@ export default function ActiveWorkoutScreen({
         weight: completedW,
         reps: targetSet.reps,
         unit: userUnit,
-        isPR: !!targetSet.isPR,
+        isPR: liveIsPR,
         rpe: targetSet.rpe,
       });
 
@@ -1880,13 +1832,8 @@ export default function ActiveWorkoutScreen({
       })
     );
 
-    // Auto-trigger rest interval timer
-    const restDuration = defaultRestDuration;
-    setRestSecondsLeft(restDuration);
-    setIsRestRunning(true);
-    setIsRestFinished(false);
-    unlockRestAudio();
-    scheduleRestAlert(Date.now() + restDuration * 1000);
+    // Auto-trigger rest interval timer (§21: the single start path)
+    startTimer(defaultRestDuration);
   };
 
   // Warm-up sets generator preview
@@ -2060,15 +2007,22 @@ export default function ActiveWorkoutScreen({
 
   // Pause Workout & Save Draft to resume later
   const handlePauseWorkout = () => {
-    saveWorkoutDraft({
-      date: getLocalTodayStr(),
-      name: workoutName,
-      exercises,
-      startedFromPlan: workoutName,
-      sessionStartTime,
-      savedAt: new Date().toISOString(),
-    });
-    toast.info(t('workout.toastPaused'), t('workout.toastPausedTitle'));
+    // §15: pausing is this session's own save — the ownership rule
+    // applies, but leaving must never be blocked by it: if a newer
+    // session owns the slot, this one exits unsaved (and no "paused"
+    // toast lies about it).
+    const ownsSlot = shouldAutosaveDraft(useStore.getState().activeWorkoutDraft, sessionStartTime);
+    if (ownsSlot) {
+      saveWorkoutDraft({
+        date: getLocalTodayStr(),
+        name: workoutName,
+        exercises,
+        startedFromPlan: workoutName,
+        sessionStartTime,
+        savedAt: new Date().toISOString(),
+      });
+      toast.info(t('workout.toastPaused'), t('workout.toastPausedTitle'));
+    }
     if (onPause) {
       onPause();
     } else {
@@ -2108,93 +2062,39 @@ export default function ActiveWorkoutScreen({
       if (hasCompletedSets) {
         const userBW = profile?.bodyweightKg || DEFAULT_BODYWEIGHT_KG;
         for (const ex of validExercises) {
-          const isBW = isBodyweightExercise(ex.name);
           const existingPRs = prs.filter((p) => p.exercise.toLowerCase() === ex.name.toLowerCase());
           const currentBest1RMKg =
             existingPRs.length > 0 ? Math.max(...existingPRs.map((p) => p.oneRepMax)) : 0;
 
-          // PR detection (Both 1RM PRs and Rep PRs at working loads)
-          let topSet = { weightKg: 0, reps: 0, e1RMKg: 0 };
-          let bestRepPR: { weightKg: number; weightLbs: number; reps: number; prevReps: number; e1RMKg: number } | null = null;
-
-          for (const s of ex.sets) {
-            if (s.isWarmup || !isSetCompleted(s)) continue;
-            const sWeight = parseFloat(String(s.weight)) || 0;
-            const sReps = parseInt(String(s.reps), 10) || 0;
-            if (sReps > 0 && (sWeight > 0 || isBW)) {
-              const wKg = s.unit === 'lbs' ? lbsToKg(sWeight) : sWeight;
-              // SIM-P1-06: never let an above-cap load feed PR detection,
-              // even if it arrived via import or an older client.
-              if (!isBW && wKg > MAX_WORKOUT_WEIGHT_KG) continue;
-              const effectiveLoadKg = getEffectiveExerciseLoad(ex.name, wKg, userBW);
-              const e1rm = calculateOneRepMax(effectiveLoadKg, sReps);
-              if (e1rm > topSet.e1RMKg) {
-                topSet = { weightKg: Math.round(wKg * 10) / 10, reps: sReps, e1RMKg: Math.round(e1rm * 10) / 10 };
-              }
-
-              // Scan past workouts to check if this is a Rep PR at this specific working weight
-              let maxPrevRepsAtWeight = 0;
-              for (const pastWk of workouts) {
-                for (const pastEx of pastWk.exercises) {
-                  if (pastEx.name.toLowerCase() === ex.name.toLowerCase()) {
-                    for (const pastSet of pastEx.sets) {
-                      if (pastSet.isWarmup || !isSetCompleted(pastSet)) continue;
-                      const pw = parseFloat(String(pastSet.weight)) || 0;
-                      const pr = parseInt(String(pastSet.reps), 10) || 0;
-                      const pwKg = pastSet.unit === 'lbs' ? lbsToKg(pw) : pw;
-                      if (Math.abs(pwKg - wKg) < 1.0 && pr > maxPrevRepsAtWeight) {
-                        maxPrevRepsAtWeight = pr;
-                      }
-                    }
-                  }
-                }
-              }
-
-              if (maxPrevRepsAtWeight > 0 && sReps > maxPrevRepsAtWeight) {
-                if (!bestRepPR || (sReps - maxPrevRepsAtWeight > bestRepPR.reps - bestRepPR.prevReps)) {
-                  bestRepPR = {
-                    weightKg: Math.round(wKg * 10) / 10,
-                    weightLbs: Math.round(kgToLbs(wKg) * 10) / 10,
-                    reps: sReps,
-                    prevReps: maxPrevRepsAtWeight,
-                    e1RMKg: Math.round(e1rm * 10) / 10,
-                  };
-                }
-              }
-            }
-          }
-
-          if (topSet.e1RMKg > currentBest1RMKg && topSet.e1RMKg > 0) {
+          // §23 (Phase 3.1): finish detection IS the shared session
+          // computation — computeSessionBest + gateSessionOutcome are
+          // exactly what the derived-PR replay re-runs over history,
+          // so the banner count, the stored record and every later
+          // recompute agree by construction. (This block used to be a
+          // private third copy of the same logic, free to drift.)
+          // One deliberate unification: a first-exposure outcome of
+          // either kind is a baseline and is not counted as a new PR
+          // (the old copy counted first-exposure rep PRs).
+          const best = computeSessionBest(ex.name, ex.sets, workouts, userBW);
+          const outcome = gateSessionOutcome(best, currentBest1RMKg);
+          if (outcome) {
             const isFirstExposure = existingPRs.length === 0;
-            const prId = safeRandomId('pr');
             addPR({
-              id: prId,
+              id: safeRandomId(outcome.kind === '1rm' ? 'pr' : 'pr_rep'),
               exercise: ex.name,
-              weightKg: topSet.weightKg,
-              weightLbs: Math.round(kgToLbs(topSet.weightKg) * 10) / 10,
-              reps: topSet.reps,
-              oneRepMax: topSet.e1RMKg,
+              weightKg: outcome.weightKg,
+              weightLbs: outcome.weightLbs,
+              reps: outcome.reps,
+              oneRepMax: outcome.oneRepMax,
               date: today,
-              notes: isFirstExposure ? 'Baseline established from first session' : 'All-Time 1RM PR',
-              prType: '1rm',
+              notes: outcomeNote(outcome, isFirstExposure, userUnit),
+              prType: outcome.kind,
+              // §23: the baseline fact is the field, not only the note.
+              isBaseline: isFirstExposure ? true : undefined,
             });
             if (!isFirstExposure) {
               newPRsCount++;
             }
-          } else if (bestRepPR) {
-            const prId = safeRandomId('pr_rep');
-            addPR({
-              id: prId,
-              exercise: ex.name,
-              weightKg: bestRepPR.weightKg,
-              weightLbs: bestRepPR.weightLbs,
-              reps: bestRepPR.reps,
-              oneRepMax: bestRepPR.e1RMKg,
-              date: today,
-              notes: `Rep PR: +${bestRepPR.reps - bestRepPR.prevReps} reps at ${userUnit === 'lbs' ? bestRepPR.weightLbs : bestRepPR.weightKg} ${userUnit}`,
-              prType: 'reps',
-            });
-            newPRsCount++;
           }
         }
       }
@@ -3515,8 +3415,7 @@ export default function ActiveWorkoutScreen({
           type="button"
           onClick={() => {
             if (isRestFinished) {
-              setIsRestFinished(false);
-              setRestSecondsLeft(0);
+              skipTimer();
             } else if (!isRestRunning && restSecondsLeft === 0) {
               startTimer();
             } else {

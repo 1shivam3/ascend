@@ -26,6 +26,7 @@ import {
   CreatineConfig,
   CreatineSupply,
   DailyTimelineEvent,
+  ActiveWorkoutDraft,
   AICoachInsight,
   AITrainingProfile,
   AIPlannedWorkout,
@@ -38,6 +39,8 @@ import {
   DayScheduleConfig,
   WeeklySchedule,
   isSetCompleted,
+  normalizePersistedWorkoutSet,
+  dayPlanRef,
   TrainingDecisionRecord,
   CurrentPrescriptionTarget,
   DEFAULT_GOALS,
@@ -63,6 +66,7 @@ import { buildAthleteModel, type AthleteModel } from './athlete-model';
 import { useCoachChatStore, COACH_CHAT_STORAGE_KEY } from './coach-chat-store';
 import {
   applyPlateauProposalToPlan,
+  archivePastBlock,
   buildPlateauProposals,
   deriveAdoptionSchemes,
   generateBlockProposal,
@@ -70,7 +74,9 @@ import {
   managedPlanIdByExerciseKey,
   materializeProposal,
   resolveManagedPolicy,
+  settleCoachBlocks as settleCoachBlocksState,
   snapshotPlateauExpectations,
+  MAX_DISMISSED_PROPOSALS,
   type BlockProposal,
   type CoachBlocksState,
 } from './block-engine';
@@ -170,17 +176,9 @@ import { hasRealBodyStats } from './body-stats';
 
 export * from './types';
 
-export interface ActiveWorkoutDraft {
-  id?: string;
-  name?: string;
-  planId?: string;
-  date: string;
-  exercises: WorkoutExercise[];
-  startedFromPlan?: string | null;
-  startedFromPlanId?: string | null;
-  sessionStartTime?: number;
-  savedAt: string;
-}
+// §15 (Phase 3.3): ActiveWorkoutDraft is defined ONCE, in types.ts
+// (it used to be duplicated here verbatim). Its ownership contract
+// — one slot, keyed by sessionStartTime — is documented there.
 
 export interface UiPreferences {
   /** XP level card, streak card, monthly challenge card on Home. */
@@ -551,6 +549,8 @@ export interface AppState {
   athleteModel: AthleteModel | null;
   acceptTrainingDecision: (exerciseName: string, decision?: TrainingDecision) => void;
   overrideTrainingDecision: (exerciseName: string, customWeight?: number, decision?: TrainingDecision) => void;
+  /** §20: the missing 'no' — dismissal under the one convention. */
+  dismissTrainingDecision: (exerciseName: string, decision?: TrainingDecision) => void;
   recordTrainingDecision: (decision: TrainingDecision) => void;
   refreshLifterProfile: () => void;
   refreshAthleteModel: () => void;
@@ -589,6 +589,9 @@ export interface AppState {
   applyScheduleRevision: (weekMonday: string) => void;
   /** Close out the active block (debrief acknowledged / next block starts). */
   completeActiveBlock: () => void;
+  /** §19: persist 'completed' for an active block whose weeks ran
+   *  out. Runs on rehydration; safe to call any time. */
+  settleCoachBlocks: () => void;
 
   // Policy v0 Decisions Ledger
   policyDecisionRecords: Record<string, TrainingDecisionRecord>;
@@ -970,6 +973,111 @@ export function migratePersistedState(
     next.xp = { ...getInitialXpState(), ...state.xp };
   }
 
+  // §23 (Phase 3.1): baselines become ONE field. Every pre-3.1
+  // record encoded baseline only in its notes text (the flag was
+  // never written); backfill the flag from that legacy encoding —
+  // the same test the old dual readers used (flag OR notes) — so
+  // the flag-only readers see exactly what the dual readers saw.
+  if (Array.isArray(state.prs)) {
+    let prsChanged = false;
+    const mappedPrs = state.prs.map((pr: any) => {
+      if (
+        pr && typeof pr === 'object' && pr.isBaseline !== true &&
+        typeof pr.notes === 'string' && pr.notes.includes('Baseline')
+      ) {
+        prsChanged = true;
+        return { ...pr, isBaseline: true };
+      }
+      return pr;
+    });
+    // Reference-preserving: untouched collections pass through as
+    // the SAME array (QA4-012 pins that contract for migrate).
+    if (prsChanged) next.prs = mappedPrs;
+  }
+
+  // §17 (Phase 3.4): canonicalize persisted workout sets to the one
+  // stored encoding (status only, legacy `completed` boolean
+  // stripped, 'pending' never persists). Runs at EVERY version —
+  // the normalizer is idempotent and resolution-preserving, so
+  // already-canonical blobs pass through unchanged in meaning.
+  // Reference-preserving at every level: a workout/exercise/set
+  // that needs no change keeps its object identity.
+  if (Array.isArray(state.workouts)) {
+    let workoutsChanged = false;
+    const mappedWorkouts = state.workouts.map((w: any) => {
+      if (!w || !Array.isArray(w.exercises)) return w;
+      let wChanged = false;
+      const exercises = w.exercises.map((ex: any) => {
+        if (!ex || !Array.isArray(ex.sets)) return ex;
+        let exChanged = false;
+        const sets = ex.sets.map((s: any) => {
+          const n = normalizePersistedWorkoutSet(s);
+          if (n !== s) exChanged = true;
+          return n;
+        });
+        if (!exChanged) return ex;
+        wChanged = true;
+        return { ...ex, sets };
+      });
+      if (!wChanged) return w;
+      workoutsChanged = true;
+      return { ...w, exercises };
+    });
+    if (workoutsChanged) next.workouts = mappedWorkouts;
+  }
+
+  // §18 (Phase 3.3): schedule days become the kind union. Legacy
+  // rows stored rest as kind: 'rest' and plans as a bare
+  // id (or, older still, a plan NAME — the resolver's match rule);
+  // convert both to `kind`, and REPAIR dangling plan references on
+  // load: a plan ref that matches no planned workout (by id or by
+  // name) is cleared to unassigned instead of being tolerated
+  // forever. Reference-preserving when nothing changes.
+  if (state.weeklySchedule && typeof state.weeklySchedule === 'object') {
+    const planIds = new Set<string>();
+    const planNames = new Set<string>();
+    for (const p of Array.isArray(state.plannedWorkouts) ? state.plannedWorkouts : []) {
+      if (p?.id) planIds.add(p.id);
+      if (p?.name) planNames.add(String(p.name).toLowerCase());
+    }
+    let scheduleChanged = false;
+    const mappedSchedule: Record<string, unknown> = {};
+    for (const [day, cfg] of Object.entries(state.weeklySchedule as Record<string, any>)) {
+      if (!cfg || typeof cfg !== 'object') {
+        mappedSchedule[day] = cfg;
+        continue;
+      }
+      const legacyId = cfg.workoutPlanId;
+      if (cfg.kind === 'rest' || legacyId === 'rest') {
+        if (cfg.kind === 'rest' && legacyId === undefined) {
+          mappedSchedule[day] = cfg;
+        } else {
+          scheduleChanged = true;
+          const { workoutPlanId: _dropped, ...restCfg } = cfg;
+          mappedSchedule[day] = { ...restCfg, kind: 'rest' };
+        }
+      } else if (cfg.kind === 'plan' || (cfg.kind === undefined && typeof legacyId === 'string' && legacyId)) {
+        const resolves =
+          typeof legacyId === 'string' &&
+          (planIds.has(legacyId) || planNames.has(legacyId.toLowerCase()));
+        if (!resolves) {
+          // Dangling: repair to unassigned (keep title/bodyParts).
+          scheduleChanged = true;
+          const { workoutPlanId: _dropped, kind: _droppedKind, ...restCfg } = cfg;
+          mappedSchedule[day] = restCfg;
+        } else if (cfg.kind === 'plan') {
+          mappedSchedule[day] = cfg;
+        } else {
+          scheduleChanged = true;
+          mappedSchedule[day] = { ...cfg, kind: 'plan' };
+        }
+      } else {
+        mappedSchedule[day] = cfg;
+      }
+    }
+    if (scheduleChanged) next.weeklySchedule = mappedSchedule;
+  }
+
   return next;
 }
 
@@ -984,6 +1092,41 @@ export function migratePersistedState(
  */
 export function stampNewRow<T extends { updatedAt?: string }>(row: T): T {
   return { ...row, updatedAt: row.updatedAt ?? new Date().toISOString() };
+}
+
+/**
+ * §15 (Phase 3.3): the draft slot's autosave ownership rule. Two
+ * autosave effects write the one slot (live session screen, logger
+ * modal); an autosave may write only when the slot is empty, holds
+ * the SAME session (sessionStartTime identity), or holds a session
+ * that was last saved BEFORE this session began (an explicit newer
+ * start supersedes). A stale editor holding an older session must
+ * never silently overwrite a newer draft. Explicit user actions
+ * (Start, Resume, Discard/Undo) bypass this — they call
+ * saveWorkoutDraft directly, on purpose.
+ */
+export function shouldAutosaveDraft(
+  current: ActiveWorkoutDraft | null | undefined,
+  sessionStartTime: number | undefined,
+): boolean {
+  if (!current) return true;
+  if (sessionStartTime === undefined) return false;
+  if (current.sessionStartTime === sessionStartTime) return true;
+  const slotSavedAt = Date.parse(current.savedAt || '');
+  return Number.isFinite(slotSavedAt) && sessionStartTime > slotSavedAt;
+}
+
+/** §15: a draft older than 12h is stale — resuming it is a decision
+ *  the user makes at a prompt, not a silent restore. */
+export const DRAFT_STALE_AGE_MS = 12 * 60 * 60 * 1000;
+
+export function isStaleDraft(
+  draft: ActiveWorkoutDraft | null | undefined,
+  nowMs: number,
+): boolean {
+  if (!draft) return false;
+  const savedAt = Date.parse(draft.savedAt || '');
+  return Number.isFinite(savedAt) && nowMs - savedAt > DRAFT_STALE_AGE_MS;
 }
 
 export function stampEditedRow<T>(row: T): T & { updatedAt: string } {
@@ -1299,13 +1442,13 @@ export function buildFreshHistoryState(): Partial<AppState> {
     policyDecisionsLedgerHistory: [],
     policyDecisionApplications: [],
     weeklySchedule: {
-      monday: { workoutPlanId: 'rest' },
-      tuesday: { workoutPlanId: 'rest' },
-      wednesday: { workoutPlanId: 'rest' },
-      thursday: { workoutPlanId: 'rest' },
-      friday: { workoutPlanId: 'rest' },
-      saturday: { workoutPlanId: 'rest' },
-      sunday: { workoutPlanId: 'rest' },
+      monday: { kind: 'rest' },
+      tuesday: { kind: 'rest' },
+      wednesday: { kind: 'rest' },
+      thursday: { kind: 'rest' },
+      friday: { kind: 'rest' },
+      saturday: { kind: 'rest' },
+      sunday: { kind: 'rest' },
     },
     deletedPlanIds: [],
     deletedPrIds: [],
@@ -1427,13 +1570,13 @@ export const useAppStore = create<AppState>()(
 
       // Weekly Workout Schedule & Body Parts
       weeklySchedule: {
-        monday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-        tuesday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-        wednesday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-        thursday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-        friday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-        saturday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-        sunday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+        monday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+        tuesday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+        wednesday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+        thursday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+        friday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+        saturday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+        sunday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
       },
       setWeeklySchedule: (weeklySchedule) => set((state) => ({
         weeklySchedule,
@@ -1599,7 +1742,11 @@ export const useAppStore = create<AppState>()(
 
       // Run Program enrollment (opt-in; progress derives from logged runs)
       runProgram: null,
-      enrollRunProgram: (dateStr) => set({ runProgram: { enrolledDate: dateStr } }),
+      enrollRunProgram: (dateStr) =>
+        // §22: every (re-)enrollment mints a fresh enrollmentId —
+        // runs from a previous attempt keep their old stamp and
+        // stop counting; nothing is erased.
+        set({ runProgram: { enrolledDate: dateStr, enrollmentId: safeRandomId('enr') } }),
       leaveRunProgram: () => set({ runProgram: null }),
 
       // Coach Engine
@@ -2397,11 +2544,24 @@ export const useAppStore = create<AppState>()(
         // QA-hardening R1: restore the PRs the deletion recomputed away.
         get().reconcileDerivedPRs((workout.exercises || []).map((e) => e.name));
       },
-      updateWorkout: (id, updated) => set((state) => ({
-        // Gauntlet DI-15: clamp/validate at the store boundary, exactly
-        // like updateMeal / updatePR.
-        workouts: state.workouts.map(w => w.id === id ? stampEditedRow(sanitizeWorkoutUpdate(w, updated)) : w),
-      })),
+      updateWorkout: (id, updated) => {
+        const before = get().workouts.find((w) => w.id === id);
+        set((state) => ({
+          // Gauntlet DI-15: clamp/validate at the store boundary, exactly
+          // like updateMeal / updatePR.
+          workouts: state.workouts.map(w => w.id === id ? stampEditedRow(sanitizeWorkoutUpdate(w, updated)) : w),
+        }));
+        // §23 (Phase 3.1): a set-level edit can mint or un-mint derived
+        // PRs exactly like a delete can — reconcile the affected
+        // exercises (old ∪ new names) against the new history, the
+        // same recompute deleteWorkout/insertWorkoutAt already ran.
+        // Before this, only the WorkoutPage editor's private planner
+        // kept records honest; every other edit path left stale PRs.
+        const names = new Set<string>();
+        for (const e of before?.exercises || []) if (e?.name) names.add(e.name);
+        for (const e of updated.exercises || []) if (e?.name) names.add(e.name);
+        if (names.size > 0) get().reconcileDerivedPRs([...names]);
+      },
 
       addMeal: (meal) => {
         // QA4-028: idempotency guard, mirroring addWorkout — a fast
@@ -2684,7 +2844,9 @@ export const useAppStore = create<AppState>()(
         if (userCustomPlans.length > 0) {
           const freshCustomSched = buildDefaultWeeklySchedule(userCustomPlans, state.trainingProfile?.daysPerWeek || 4);
           for (const day of DAYS_OF_WEEK) {
-            if (day !== todayDay && baseSchedule[day]?.workoutPlanId?.startsWith('builtin_')) {
+            // §18: the day's plan via the one read (dayPlanRef).
+            const dayRef = dayPlanRef(baseSchedule[day]);
+            if (day !== todayDay && dayRef.kind === 'plan' && dayRef.planId.startsWith('builtin_')) {
               baseSchedule[day] = freshCustomSched[day] || baseSchedule[day];
             }
           }
@@ -2745,7 +2907,7 @@ export const useAppStore = create<AppState>()(
                     bodyParts: getWorkoutBodyParts(fallbackPlan.exercises),
                   }
                 : {
-                    workoutPlanId: 'rest',
+                    kind: 'rest',
                     customTitle: 'Rest Day',
                     bodyParts: [],
                   };
@@ -3020,6 +3182,13 @@ export const useAppStore = create<AppState>()(
       }),
 
       saveWorkoutDraft: (draft) => {
+        // §15 (Phase 3.3): the draft persists exactly as given —
+        // including a zero-exercise draft, which is a REAL state:
+        // it carries the session's start timestamp, and the
+        // elapsed timer derives from it across remounts (final-cert
+        // J2.3). An earlier §15 draft of this change cleared the
+        // slot on empty exercises; the J2.3 gate caught that as a
+        // regression and it was reverted the same day.
         if (!draft) {
           set({ activeWorkoutDraft: null });
           return;
@@ -3105,6 +3274,25 @@ export const useAppStore = create<AppState>()(
         });
       },
 
+      dismissTrainingDecision: (exerciseName: string, decision?: TrainingDecision) => {
+        set((state) => {
+          const existing = state.trainingDecisions[exerciseName] || decision;
+          if (!existing) return state;
+          const updated: TrainingDecision = {
+            ...existing,
+            status: 'dismissed',
+            timestamp: new Date().toISOString(),
+          };
+          return {
+            trainingDecisions: {
+              ...state.trainingDecisions,
+              [exerciseName]: updated,
+            },
+            decisionsLedgerHistory: [updated, ...state.decisionsLedgerHistory.filter((d) => d.id !== existing.id).slice(0, 49)],
+          };
+        });
+      },
+
       recordTrainingDecision: (decision: TrainingDecision) => {
         set((state) => ({
           trainingDecisions: {
@@ -3175,9 +3363,32 @@ export const useAppStore = create<AppState>()(
       },
 
       dismissBlockProposal: () => {
-        set((state) => ({
-          coachBlocks: { ...state.coachBlocks, pendingProposal: null },
-        }));
+        set((state) => {
+          const pending = state.coachBlocks.pendingProposal;
+          if (!pending) return state;
+          // §19: dismissal is recorded under the one convention —
+          // status 'dismissed' — not just a cleared slot.
+          return {
+            coachBlocks: {
+              ...state.coachBlocks,
+              pendingProposal: null,
+              dismissedProposals: [
+                {
+                  ...pending,
+                  status: 'dismissed' as const,
+                  dismissedOn: getLocalTodayStr(),
+                },
+                ...(state.coachBlocks.dismissedProposals ?? []),
+              ].slice(0, MAX_DISMISSED_PROPOSALS),
+            },
+          };
+        });
+      },
+
+      settleCoachBlocks: () => {
+        const state = get();
+        const settled = settleCoachBlocksState(state.coachBlocks, getLocalTodayStr());
+        if (settled !== state.coachBlocks) set({ coachBlocks: settled });
       },
 
       updatePendingProposal: (edited) => {
@@ -3213,6 +3424,24 @@ export const useAppStore = create<AppState>()(
         // with no plans in it — a block that could never run. The
         // proposal stays pending so the user can adjust and retry.
         if (plans.length === state.plannedWorkouts.length) return false;
+        // §19: archiving goes through the one helper — cap overflow
+        // folds into the compacted count, never a silent drop.
+        const archivedPrevious = previous
+          ? archivePastBlock(
+              state.coachBlocks.pastBlocks,
+              {
+                ...previous,
+                // F-02: a block swapped out before its final week
+                // did not complete — label it 'replaced'. Only a
+                // block that had already run its course is
+                // truthfully 'completed'.
+                status: (isBlockEnded(previous, todayStr)
+                  ? 'completed'
+                  : 'replaced') as 'completed' | 'replaced',
+              },
+              state.coachBlocks.compactedBlockCount ?? 0
+            )
+          : null;
         set({
           plannedWorkouts: plans,
           weeklySchedule: schedule,
@@ -3220,21 +3449,12 @@ export const useAppStore = create<AppState>()(
             ...state.coachBlocks,
             pendingProposal: null,
             activeBlock,
-            pastBlocks: previous
-              ? [
-                  {
-                    ...previous,
-                    // F-02: a block swapped out before its final week
-                    // did not complete — label it 'replaced'. Only a
-                    // block that had already run its course is
-                    // truthfully 'completed'.
-                    status: (isBlockEnded(previous, todayStr)
-                      ? 'completed'
-                      : 'replaced') as 'completed' | 'replaced',
-                  },
-                  ...state.coachBlocks.pastBlocks,
-                ].slice(0, 8)
+            pastBlocks: archivedPrevious
+              ? archivedPrevious.pastBlocks
               : state.coachBlocks.pastBlocks,
+            compactedBlockCount: archivedPrevious
+              ? archivedPrevious.compactedBlockCount
+              : state.coachBlocks.compactedBlockCount,
           },
         });
         // The schedule changed shape — rebuild through the store's own
@@ -3464,13 +3684,15 @@ export const useAppStore = create<AppState>()(
         // The proposal was made when toDay was free. If the athlete has
         // since scheduled something else there, the proposal is stale —
         // never overwrite a newer decision silently.
-        const currentTarget = state.weeklySchedule[revision.toDay]?.workoutPlanId;
-        if (currentTarget && currentTarget !== 'rest' && currentTarget !== revision.planId) {
+        // §18: via the one read (dayPlanRef); writes carry `kind`.
+        const targetRef = dayPlanRef(state.weeklySchedule[revision.toDay]);
+        if (targetRef.kind === 'plan' && targetRef.planId !== revision.planId) {
           return;
         }
         const nextSchedule: WeeklySchedule = { ...state.weeklySchedule };
-        nextSchedule[revision.fromDay] = { workoutPlanId: 'rest' };
+        nextSchedule[revision.fromDay] = { kind: 'rest' };
         nextSchedule[revision.toDay] = {
+          kind: 'plan',
           workoutPlanId: revision.planId,
           bodyParts: getWorkoutBodyParts(plan.exercises),
         };
@@ -3493,14 +3715,18 @@ export const useAppStore = create<AppState>()(
         set((state) => {
           const active = state.coachBlocks.activeBlock;
           if (!active) return state;
+          // §19: same archive helper as approve/settle.
+          const archived = archivePastBlock(
+            state.coachBlocks.pastBlocks,
+            { ...active, status: 'completed' as const },
+            state.coachBlocks.compactedBlockCount ?? 0
+          );
           return {
             coachBlocks: {
               ...state.coachBlocks,
               activeBlock: null,
-              pastBlocks: [
-                { ...active, status: 'completed' as const },
-                ...state.coachBlocks.pastBlocks,
-              ].slice(0, 8),
+              pastBlocks: archived.pastBlocks,
+              compactedBlockCount: archived.compactedBlockCount,
             },
           };
         });
@@ -4342,10 +4568,14 @@ export const useAppStore = create<AppState>()(
                                 const p = parseFloat(s.weight);
                                 if (!isNaN(p)) cleanWeight = p;
                               }
-                              return {
+                              // §17 (Phase 3.4): imported history is
+                              // canonicalized to the one stored set
+                              // encoding (status only), same as the
+                              // persist migration.
+                              return normalizePersistedWorkoutSet({
                                 ...s,
                                 weight: cleanWeight,
-                              };
+                              });
                             })
                           : [],
                       }))
@@ -4679,6 +4909,15 @@ export const useAppStore = create<AppState>()(
             state.refreshStreak();
           } catch {
             // Streak maintenance must never block hydration.
+          }
+
+          // §19: settle the coach-block lifecycle — a block whose
+          // weeks ran out is persisted as 'completed' at launch,
+          // not left 'active' until a successor is approved.
+          try {
+            state.settleCoachBlocks();
+          } catch {
+            // Block settling must never block hydration either.
           }
 
           // Custom-exercise muscle registry: hydrate the classifier's

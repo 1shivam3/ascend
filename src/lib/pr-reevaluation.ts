@@ -166,7 +166,13 @@ export function gateSessionOutcome(best: SessionBest, priorBest1RMKg: number): S
 const BASELINE_NOTE = 'Baseline established from first session';
 const ALL_TIME_NOTE = 'All-Time 1RM PR';
 
-function outcomeNote(outcome: SessionPROutcome, isFirstExposure: boolean, userUnit: Unit): string {
+/**
+ * The note a minted record carries. §23 (Phase 3.1): the note is
+ * display text + the derived-provenance marker — the BASELINE fact
+ * itself lives in the record's `isBaseline` field (written wherever
+ * this note is written), never in the text alone.
+ */
+export function outcomeNote(outcome: SessionPROutcome, isFirstExposure: boolean, userUnit: Unit): string {
   if (outcome.kind === '1rm') {
     return isFirstExposure ? BASELINE_NOTE : ALL_TIME_NOTE;
   }
@@ -285,6 +291,8 @@ export function planPRChangesAfterSetEdit(args: {
           oneRepMax: newOutcome.oneRepMax,
           prType: newOutcome.kind,
           notes: outcomeNote(newOutcome, isFirstExposure, userUnit),
+          // §23: the baseline fact is the field, kept in step with the note.
+          isBaseline: isFirstExposure,
         },
       },
     };
@@ -303,6 +311,7 @@ export function planPRChangesAfterSetEdit(args: {
         date: workoutDate,
         notes: outcomeNote(newOutcome, isFirstExposure, userUnit),
         prType: newOutcome.kind,
+        isBaseline: isFirstExposure ? true : undefined,
       },
     };
   }
@@ -403,48 +412,13 @@ export function planDerivedPRsAfterHistoryChange(args: {
       (pr) => pr.exercise.trim().toLowerCase() === key,
     );
     const derived = records.filter(isDerivedPR);
-    const owned = records.filter((pr) => !isDerivedPR(pr));
 
-    // Sessions containing the exercise, in the order finish detection
-    // met them: by date, ties broken by history order.
-    const sessions = (allWorkouts || [])
-      .map((w, index) => ({ w, index }))
-      .filter(({ w }) =>
-        (w.exercises || []).some((e) => e.name.trim().toLowerCase() === key),
-      )
-      .sort((a, b) =>
-        a.w.date === b.w.date ? a.index - b.index : a.w.date < b.w.date ? -1 : 1,
-      );
-
-    interface Expected {
-      date: string;
-      outcome: SessionPROutcome;
-      isFirstExposure: boolean;
-    }
-    const expected: Expected[] = [];
-    let runningBestKg = 0;
-    for (const { w } of sessions) {
-      const ownedBestByThen = owned
-        .filter((pr) => pr.date <= w.date)
-        .reduce((m, pr) => Math.max(m, pr.oneRepMax || 0), 0);
-      const gateBestKg = Math.max(runningBestKg, ownedBestByThen);
-      const sets = (w.exercises || [])
-        .filter((e) => e.name.trim().toLowerCase() === key)
-        .flatMap((e) => e.sets || []);
-      const history = (allWorkouts || []).filter((other) => other.id !== w.id);
-      const best = computeSessionBest(displayName, sets, history, bodyweightKg);
-      const outcome = gateSessionOutcome(best, gateBestKg);
-      if (outcome) {
-        expected.push({
-          date: w.date,
-          outcome,
-          isFirstExposure:
-            expected.length === 0 &&
-            !owned.some((pr) => pr.date <= w.date),
-        });
-        runningBestKg = Math.max(runningBestKg, outcome.oneRepMax);
-      }
-    }
+    const expected = replayExerciseOutcomes({
+      exerciseName: displayName,
+      prs,
+      allWorkouts,
+      bodyweightKg,
+    });
 
     const unmatched = [...derived];
     for (const exp of expected) {
@@ -464,6 +438,8 @@ export function planDerivedPRsAfterHistoryChange(args: {
           date: exp.date,
           notes: outcomeNote(exp.outcome, exp.isFirstExposure, userUnit),
           prType: exp.outcome.kind,
+          // §23: the baseline fact is the field, not only the note.
+          isBaseline: exp.isFirstExposure ? true : undefined,
         });
       }
     }
@@ -471,4 +447,146 @@ export function planDerivedPRsAfterHistoryChange(args: {
   }
 
   return { create, deleteIds };
+}
+
+export interface ReplayOutcome {
+  workoutId: string;
+  date: string;
+  outcome: SessionPROutcome;
+  isFirstExposure: boolean;
+}
+
+/**
+ * THE replay (§23, Phase 3.1): re-run finish detection over the
+ * sessions of one exercise in date order, gating each session
+ * against user-owned records dated on or before it plus the
+ * outcomes the replay itself has already produced — the same
+ * position finish detection was in. This is the single source both
+ * the record reconciler (above) and the read-time PR marks (below)
+ * derive from, so the stored records and every "was that a PR?"
+ * answer can never disagree.
+ */
+export function replayExerciseOutcomes(args: {
+  exerciseName: string;
+  prs: PersonalRecord[];
+  allWorkouts: WorkoutEntry[];
+  bodyweightKg: number;
+}): ReplayOutcome[] {
+  const { exerciseName, prs, allWorkouts, bodyweightKg } = args;
+  const key = exerciseName.trim().toLowerCase();
+  const owned = (prs || []).filter(
+    (pr) => pr.exercise.trim().toLowerCase() === key && !isDerivedPR(pr),
+  );
+
+  // Sessions containing the exercise, in the order finish detection
+  // met them: by date, ties broken by history order.
+  const sessions = (allWorkouts || [])
+    .map((w, index) => ({ w, index }))
+    .filter(({ w }) =>
+      (w.exercises || []).some((e) => e.name.trim().toLowerCase() === key),
+    )
+    .sort((a, b) =>
+      a.w.date === b.w.date ? a.index - b.index : a.w.date < b.w.date ? -1 : 1,
+    );
+
+  const outcomes: ReplayOutcome[] = [];
+  let runningBestKg = 0;
+  for (const { w } of sessions) {
+    const ownedBestByThen = owned
+      .filter((pr) => pr.date <= w.date)
+      .reduce((m, pr) => Math.max(m, pr.oneRepMax || 0), 0);
+    const gateBestKg = Math.max(runningBestKg, ownedBestByThen);
+    const sets = (w.exercises || [])
+      .filter((e) => e.name.trim().toLowerCase() === key)
+      .flatMap((e) => e.sets || []);
+    const history = (allWorkouts || []).filter((other) => other.id !== w.id);
+    const best = computeSessionBest(exerciseName, sets, history, bodyweightKg);
+    const outcome = gateSessionOutcome(best, gateBestKg);
+    if (outcome) {
+      outcomes.push({
+        workoutId: w.id,
+        date: w.date,
+        outcome,
+        isFirstExposure:
+          outcomes.length === 0 && !owned.some((pr) => pr.date <= w.date),
+      });
+      runningBestKg = Math.max(runningBestKg, outcome.oneRepMax);
+    }
+  }
+  return outcomes;
+}
+
+// ─── Read-time PR marks (§23) ───────────────────────────────────────────────
+//
+// `WorkoutSet.isPR` was never written by any code path, yet four
+// surfaces read it (history badge, set-complete summary, Coach's Take
+// x2) — each silently always-false or falling back to a private
+// recount. PR-ness is now computed at READ time from the same replay
+// that reconciles the stored records: a session has at most one mark
+// per exercise, and a set IS a PR set when it is the performance the
+// mark records.
+
+export interface SessionPRMark {
+  workoutId: string;
+  exercise: string;
+  exerciseKey: string;
+  kind: '1rm' | 'reps';
+  weightKg: number;
+  reps: number;
+  date: string;
+}
+
+export function computeSessionPRMarks(
+  allWorkouts: WorkoutEntry[],
+  prs: PersonalRecord[],
+  bodyweightKg: number,
+): SessionPRMark[] {
+  const names = new Map<string, string>();
+  for (const w of allWorkouts || []) {
+    for (const e of w.exercises || []) {
+      const key = (e.name || '').trim().toLowerCase();
+      if (key && !names.has(key)) names.set(key, e.name);
+    }
+  }
+  const marks: SessionPRMark[] = [];
+  for (const [key, displayName] of names) {
+    for (const r of replayExerciseOutcomes({
+      exerciseName: displayName,
+      prs,
+      allWorkouts,
+      bodyweightKg,
+    })) {
+      marks.push({
+        workoutId: r.workoutId,
+        exercise: displayName,
+        exerciseKey: key,
+        kind: r.outcome.kind,
+        weightKg: r.outcome.weightKg,
+        reps: r.outcome.reps,
+        date: r.date,
+      });
+    }
+  }
+  return marks;
+}
+
+/** Whether this exact set is the performance a session PR mark records. */
+export function isPRSet(
+  marks: SessionPRMark[],
+  workoutId: string,
+  exerciseName: string,
+  set: WorkoutSet,
+): boolean {
+  if (!set || set.isWarmup || !isSetCompleted(set)) return false;
+  const rawWeight = parseFloat(String(set.weight)) || 0;
+  const wKg = set.unit === 'lbs' ? lbsToKg(rawWeight) : rawWeight;
+  const reps = parseInt(String(set.reps), 10) || 0;
+  const key = (exerciseName || '').trim().toLowerCase();
+  return marks.some(
+    (m) =>
+      m.workoutId === workoutId &&
+      m.exerciseKey === key &&
+      Math.abs(m.weightKg - wKg) <= 0.051 &&
+      m.reps === reps,
+  );
 }

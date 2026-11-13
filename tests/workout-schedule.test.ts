@@ -4,7 +4,16 @@ import {
   generateSplitWeeklySchedule,
   getScheduledWorkoutForDay,
 } from '../src/lib/workout-schedule';
-import { PlannedWorkout } from '../src/lib/types';
+import { PlannedWorkout, dayPlanRef, type DayScheduleConfig } from '../src/lib/types';
+
+// §18: rest days are a discriminated ref now — { kind: 'rest' }
+// with NO plan id (the old encoding put the string 'rest' in
+// workoutPlanId). These tests read rest through dayPlanRef, the
+// one resolver; plan-day assertions keep reading the id directly.
+const expectRest = (day: DayScheduleConfig) => {
+  expect(dayPlanRef(day).kind).toBe('rest');
+  expect(day.workoutPlanId).toBeUndefined();
+};
 
 describe('Workout Schedule & Frequency Invariants', () => {
   const dummy4Plans: PlannedWorkout[] = [
@@ -18,7 +27,7 @@ describe('Workout Schedule & Frequency Invariants', () => {
     const schedule = buildDefaultWeeklySchedule(dummy4Plans, 6);
     const activeDays = Object.values(schedule).filter((d) => d.workoutPlanId && d.workoutPlanId !== 'rest');
     expect(activeDays.length).toBe(6);
-    expect(schedule.sunday.workoutPlanId).toBe('rest');
+    expectRest(schedule.sunday);
     expect(schedule.monday.workoutPlanId).toBe('upper_a');
     expect(schedule.tuesday.workoutPlanId).toBe('lower_a');
     expect(schedule.wednesday.workoutPlanId).toBe('upper_b');
@@ -31,8 +40,8 @@ describe('Workout Schedule & Frequency Invariants', () => {
     const schedule = buildDefaultWeeklySchedule(dummy4Plans, 5);
     const activeDays = Object.values(schedule).filter((d) => d.workoutPlanId && d.workoutPlanId !== 'rest');
     expect(activeDays.length).toBe(5);
-    expect(schedule.saturday.workoutPlanId).toBe('rest');
-    expect(schedule.sunday.workoutPlanId).toBe('rest');
+    expectRest(schedule.saturday);
+    expectRest(schedule.sunday);
   });
 
   it('strictly respects 3-day frequency even when plans.length === 4', () => {
@@ -42,10 +51,10 @@ describe('Workout Schedule & Frequency Invariants', () => {
     expect(schedule.monday.workoutPlanId).toBe('upper_a');
     expect(schedule.wednesday.workoutPlanId).toBe('lower_a');
     expect(schedule.friday.workoutPlanId).toBe('upper_b');
-    expect(schedule.tuesday.workoutPlanId).toBe('rest');
-    expect(schedule.thursday.workoutPlanId).toBe('rest');
-    expect(schedule.saturday.workoutPlanId).toBe('rest');
-    expect(schedule.sunday.workoutPlanId).toBe('rest');
+    expectRest(schedule.tuesday);
+    expectRest(schedule.thursday);
+    expectRest(schedule.saturday);
+    expectRest(schedule.sunday);
   });
 
   it('properly generates a 3-day Full Body split via generateSplitWeeklySchedule', () => {
@@ -54,12 +63,12 @@ describe('Workout Schedule & Frequency Invariants', () => {
     expect(fullBodySplit.splitName).toBe('Full Body (3-Day)');
     expect(fullBodySplit.plans.length).toBe(3);
     expect(fullBodySplit.schedule.monday.workoutPlanId).toBe('plan_full_body_a');
-    expect(fullBodySplit.schedule.tuesday.workoutPlanId).toBe('rest');
+    expectRest(fullBodySplit.schedule.tuesday);
     expect(fullBodySplit.schedule.wednesday.workoutPlanId).toBe('plan_full_body_b');
-    expect(fullBodySplit.schedule.thursday.workoutPlanId).toBe('rest');
+    expectRest(fullBodySplit.schedule.thursday);
     expect(fullBodySplit.schedule.friday.workoutPlanId).toBe('plan_full_body_c');
-    expect(fullBodySplit.schedule.saturday.workoutPlanId).toBe('rest');
-    expect(fullBodySplit.schedule.sunday.workoutPlanId).toBe('rest');
+    expectRest(fullBodySplit.schedule.saturday);
+    expectRest(fullBodySplit.schedule.sunday);
   });
 
   it('properly generates a 6-day PPL split via generateSplitWeeklySchedule', () => {
@@ -68,7 +77,7 @@ describe('Workout Schedule & Frequency Invariants', () => {
     expect(pplSplit.plans.length).toBe(3);
     const activeDays = Object.values(pplSplit.schedule).filter((d) => d.workoutPlanId && d.workoutPlanId !== 'rest');
     expect(activeDays.length).toBe(6);
-    expect(pplSplit.schedule.sunday.workoutPlanId).toBe('rest');
+    expectRest(pplSplit.schedule.sunday);
   });
 
   it('properly generates a 5-day Bro Split via generateSplitWeeklySchedule', () => {

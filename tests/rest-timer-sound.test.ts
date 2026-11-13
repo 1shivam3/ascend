@@ -14,8 +14,10 @@ import * as path from 'node:path';
  *  2. lib/local-notifications schedules/cancels the one-shot
  *     locked-screen rest alert with a fixed id, native + permission
  *     gated (unit, mocked Capacitor plugins).
- *  3. ActiveWorkoutScreen wires unlock + schedule/cancel into every
- *     rest start/pause/resume/adjust/skip/finish path (source pins).
+ *  3. The rest-alert wiring (unlock + schedule/cancel on every
+ *     start/pause/resume/adjust/skip/finish path) holds — since
+ *     §21 (Phase 3.2) it lives in lib/use-rest-timer, the single
+ *     start path both workout surfaces consume (source pins).
  */
 
 // ─── Capacitor plugin mocks (for the local-notifications unit tests) ─────────
@@ -256,11 +258,22 @@ describe('rest-done local notification', () => {
   });
 });
 
-// ─── 3. ActiveWorkoutScreen wiring (source pins) ─────────────────────────────
+// ─── 3. Rest-alert wiring (source pins) ──────────────────────────────────────
+//
+// §21 (Phase 3.2): the wiring these pins used to check inside
+// ActiveWorkoutScreen's hand-rolled timer now lives in ONE place —
+// lib/use-rest-timer — because the screen's three hand-copied start
+// paths were themselves the bug class (two never set the end time
+// the countdown read). The guarantees are unchanged; the pins moved
+// to the single start path that now provides them.
 
-describe('ActiveWorkoutScreen rest-alert wiring', () => {
+describe('rest-alert wiring — the one hook', () => {
   const screen = fs.readFileSync(
     path.join(process.cwd(), 'src/components/ActiveWorkoutScreen.tsx'),
+    'utf8'
+  );
+  const hook = fs.readFileSync(
+    path.join(process.cwd(), 'src/lib/use-rest-timer.ts'),
     'utf8'
   );
 
@@ -278,45 +291,54 @@ describe('ActiveWorkoutScreen rest-alert wiring', () => {
     expect(screen).toContain('void scheduleRestDoneNotification(');
   });
 
-  it('startTimer unlocks audio and schedules the alert (gesture path)', () => {
-    const start = screen.indexOf('const startTimer');
-    const body = screen.slice(start, screen.indexOf('const togglePauseTimer'));
-    expect(body).toContain('unlockRestAudio();');
-    expect(body).toContain('scheduleRestAlert(endTime);');
+  it('the screen wires its alert plumbing into the one hook', () => {
+    expect(screen).toContain('useRestTimer({');
+    expect(screen).toContain('scheduleAlert: scheduleRestAlert');
+    expect(screen).toContain('cancelAlert: cancelRestAlert');
+    expect(screen).toContain('unlockAudio: unlockRestAudio');
   });
 
-  it('pause, resume, skip and both overlay dismissals cancel/reschedule correctly', () => {
-    // Pause branch cancels; resume branch unlocks + reschedules.
-    const toggle = screen.slice(screen.indexOf('const togglePauseTimer'));
-    const toggleBody = toggle.slice(0, toggle.indexOf('const adjustTimer'));
-    expect(toggleBody).toContain('cancelRestAlert();');
-    expect(toggleBody).toContain('unlockRestAudio();');
-    expect(toggleBody).toContain('scheduleRestAlert(endTime);');
-    // Skip cancels.
-    const skip = screen.slice(screen.indexOf('const skipTimer'));
-    expect(skip.slice(0, skip.indexOf('};'))).toContain('cancelRestAlert();');
-    // Both dismiss-to-pause paths cancel.
-    expect(screen.split('cancelRestAlert();').length - 1).toBeGreaterThanOrEqual(5);
+  it('the single start path unlocks audio and schedules the alert for the held endsAt', () => {
+    const start = hook.slice(hook.indexOf('const start = useCallback'));
+    const body = start.slice(0, start.indexOf('const pause'));
+    expect(body).toContain('o.unlockAudio?.()');
+    expect(body).toContain('o.scheduleAlert(now + effective * 1000)');
+    expect(body).toContain("dispatch({ type: 'start', now, seconds: effective })");
+  });
+
+  it('pause and skip cancel the alert; resume unlocks + reschedules', () => {
+    const pause = hook.slice(hook.indexOf('const pause = useCallback'));
+    expect(pause.slice(0, pause.indexOf('const resume'))).toContain('cancelAlert?.()');
+    const resume = hook.slice(hook.indexOf('const resume = useCallback'));
+    const resumeBody = resume.slice(0, resume.indexOf('const togglePause'));
+    expect(resumeBody).toContain('o.unlockAudio?.()');
+    expect(resumeBody).toContain('o.scheduleAlert(now + s.secondsLeft * 1000)');
+    const skip = hook.slice(hook.indexOf('const skip = useCallback'));
+    expect(skip.slice(0, skip.indexOf('const reset'))).toContain('cancelAlert?.()');
   });
 
   it('adjust reschedules the alert on the shifted end time while running', () => {
-    const adjust = screen.slice(screen.indexOf('const adjustTimer'));
-    const body = adjust.slice(0, adjust.indexOf('const skipTimer'));
-    expect(body).toContain('scheduleRestAlert(shiftedEnd);');
-    expect(body).toContain('restTargetEndTimeRef.current += delta * 1000;');
+    const adjust = hook.slice(hook.indexOf('const adjust = useCallback'));
+    const body = adjust.slice(0, adjust.indexOf('const skip'));
+    expect(body).toContain('s.endsAt + deltaSeconds * 1000');
+    expect(body).toContain("dispatch({ type: 'adjust', deltaSeconds })");
   });
 
   it('foreground finish cancels the scheduled alert after the chime + haptic', () => {
     const finish = screen.indexOf("triggerHaptic('rest_done');");
     expect(finish).toBeGreaterThan(-1);
     expect(screen.slice(finish, finish + 200)).toContain('cancelRestAlert();');
+    // And it is the hook's onFinish — fired once per finish transition.
+    expect(screen.slice(0, finish)).toContain('onFinish: () => {');
   });
 
-  it('both set-complete auto-start paths unlock + schedule', () => {
-    expect(screen.split('unlockRestAudio();').length - 1).toBeGreaterThanOrEqual(4);
-    expect(
-      screen.split('scheduleRestAlert(Date.now() + restDuration * 1000);').length - 1
-    ).toBe(2);
+  it('every set-complete auto-start path goes through the single start', () => {
+    // Button completion, set-toggle completion, and voice-log
+    // completion — the latter two were historically hand-copied
+    // starts that never set the countdown's end time.
+    expect(screen.split('startTimer(restDuration);').length - 1).toBe(2);
+    expect(screen.split('startTimer(defaultRestDuration);').length - 1).toBe(1);
+    expect(screen).not.toContain('scheduleRestAlert(Date.now()');
   });
 
   it('unmount cancels any pending rest alert', () => {

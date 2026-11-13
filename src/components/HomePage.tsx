@@ -188,14 +188,13 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     );
   }, [todayStr, workouts, plannedWorkouts, activeWorkoutDraft, userUnit, weeklySchedule]);
 
-  // The session this card titles: getTodaySessionState describes the
-  // FIRST of today's workouts, so the completed-workout modal must open
-  // that same session (audit-3 FE-22 — was: the LAST, so on multi-session
-  // days the card and its Coach's Take modal described different workouts).
-  const completedWorkoutForToday = useMemo(() => {
-    const todayWks = workouts.filter((w) => w.date.split('T')[0] === todayStr);
-    return todayWks[0] || null;
-  }, [workouts, todayStr]);
+  // The session this card titles: the resolver returns it directly
+  // (§16, Phase 3.3 — B5 closed). This page used to re-derive it
+  // inline (audit-3 FE-22's first-of-today rule), a second derivation
+  // that could be null while the resolver's label said "completed" —
+  // the label/handler split. sessionInfo.completedWorkout is the
+  // one source now, for the button AND the modal below.
+  const completedWorkoutForToday = sessionInfo.completedWorkout ?? null;
 
   // Forgiving streak (streak-freeze system): active days = real workouts or
   // 3+ logged meals; one missed day auto-consumes a freeze, silently.
@@ -427,6 +426,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   // Routine selection handler (satisfies plan-sync test contract)
   const handleSelectWorkoutForToday = (plan: PlannedWorkout) => {
     setDaySchedule(todayDayOfWeek, {
+      kind: 'plan',
       workoutPlanId: plan.id,
       customTitle: plan.name,
       bodyParts: getWorkoutBodyParts(plan.exercises),
@@ -1317,6 +1317,14 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                   : null}
         </p>
 
+        {/* §16 (Phase 3.3): a zero-set save today is labelled as the
+            empty log it is — it never poses as a completed workout. */}
+        {sessionInfo.emptyLogToday && sessionInfo.status !== 'completed' && (
+          <p className="text-xs text-text-muted mt-1 font-normal">
+            {t('home.emptyLogToday')}
+          </p>
+        )}
+
         {!(sessionInfo.isRestDay && sessionInfo.status !== 'completed' && !activeWorkoutDraft) && (
         <button
           type="button"
@@ -1530,7 +1538,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 type="button"
                 onClick={() => {
                   setDaySchedule(todayDayOfWeek, {
-                    workoutPlanId: 'rest',
+                    kind: 'rest',
                     customTitle: 'Rest & Recovery',
                     bodyParts: [],
                   });

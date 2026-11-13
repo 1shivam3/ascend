@@ -13,7 +13,7 @@ import {
   finalizeWorkoutExercises,
 } from '../src/lib/workout-engine';
 import { useStore, partializeAppState } from '../src/lib/store';
-import type { PlannedWorkout } from '../src/lib/types';
+import { isSetCompleted, type PlannedWorkout } from '../src/lib/types';
 import { validateBodyMetricsForm } from '../src/components/BodyMetricsModal';
 
 const readSrc = (rel: string) =>
@@ -104,7 +104,12 @@ describe('QA4-026 finalize clamps negative/NaN-adjacent set values', () => {
     } as any);
     expect(out.weight).toBe(0);
     expect(out.reps).toBe(0);
-    expect(out.completed).toBe(false);
+    // §17 (Phase 3.4): finalize no longer WRITES the legacy
+    // `completed` boolean — stored history carries `status` only.
+    // The guarantee this test pins (a clamped-to-zero set does not
+    // count as performed) is read through the one resolver.
+    expect(out.completed).toBeUndefined();
+    expect(isSetCompleted(out as any)).toBe(false);
   });
 
   it('finalizeWorkoutSet clamps negative string values too', () => {

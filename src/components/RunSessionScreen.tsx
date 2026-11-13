@@ -1,13 +1,21 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { X, Pause, Play, SkipForward, Flag, Footprints } from 'lucide-react';
 import {
   buildIntervalSchedule,
   buildRunWorkoutEntry,
+  resolveEnrollmentId,
   type RunSession,
   type IntervalPhaseKind,
+  type RunProgramState,
 } from '@/lib/run-program';
+import {
+  initialRunPlayerState,
+  runPlayerReducer,
+  type RunPlayerAction,
+  type RunPlayerState,
+} from '@/lib/run-player';
 import type { WorkoutEntry } from '@/lib/types';
 import { getLocalTodayStr, safeRandomId } from '@/lib/formatters';
 import { useTranslation } from '@/lib/i18n';
@@ -15,6 +23,9 @@ import { useEscapeToClose } from '@/lib/use-escape-to-close';
 
 interface RunSessionScreenProps {
   session: RunSession;
+  /** §22: the enrollment this run belongs to — stamped onto the
+   *  saved entry so progress attribution survives re-enrollment. */
+  runProgram?: RunProgramState | null;
   onFinish: (entry: WorkoutEntry) => void;
   onCancel: () => void;
 }
@@ -67,25 +78,30 @@ function fmtClock(totalSeconds: number): string {
 /**
  * Run session player — walks the user through the interval schedule with
  * a big countdown, next-phase preview, and vibration + beep cues at every
- * transition (same cue language as the gym rest timer). Timing is
- * timestamp-based, so a busy main thread can't drift the phases.
+ * transition (same cue language as the gym rest timer).
+ *
+ * §22: the player is ONE reducer (lib/run-player) — phase, status,
+ * countdown and interval credit live in a single state. The only
+ * ref left is the wall-clock marker the tick measures against,
+ * which is effect bookkeeping, not player state.
  */
-export default function RunSessionScreen({ session, onFinish, onCancel }: RunSessionScreenProps) {
+export default function RunSessionScreen({ session, runProgram, onFinish, onCancel }: RunSessionScreenProps) {
   const { t } = useTranslation();
   const phases = useMemo(() => buildIntervalSchedule(session), [session]);
   const bodyTotal = phases.length - 2; // exclude warm-up + cool-down
 
-  const [phaseIdx, setPhaseIdx] = useState(0);
-  const [secondsLeft, setSecondsLeft] = useState(phases[0].seconds);
-  const [isRunning, setIsRunning] = useState(true);
-  const [finished, setFinished] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
+  const [player, dispatch] = useReducer(
+    (state: RunPlayerState, action: RunPlayerAction) => runPlayerReducer(state, action, phases),
+    phases,
+    initialRunPlayerState
+  );
   const [distance, setDistance] = useState('');
 
-  const phaseLeftRef = useRef(phases[0].seconds);
   const lastTickRef = useRef(0);
-  const completedBodyRef = useRef(0);
-  const phaseIdxRef = useRef(0);
+  const prevPlayerRef = useRef(player);
+
+  const finished = player.status === 'finished';
+  const isRunning = player.status === 'running';
 
   useEscapeToClose(!finished, onCancel);
 
@@ -98,26 +114,8 @@ export default function RunSessionScreen({ session, onFinish, onCancel }: RunSes
           ? t('run.warmup')
           : t('run.cooldown');
 
-  const advance = (natural: boolean) => {
-    const current = phases[phaseIdxRef.current];
-    if (natural && current && current.kind !== 'warmup' && current.kind !== 'cooldown') {
-      completedBodyRef.current += 1;
-    }
-    const next = phaseIdxRef.current + 1;
-    if (next >= phases.length) {
-      cue('finish');
-      setFinished(true);
-      setIsRunning(false);
-      return;
-    }
-    phaseIdxRef.current = next;
-    setPhaseIdx(next);
-    phaseLeftRef.current = phases[next].seconds;
-    setSecondsLeft(phases[next].seconds);
-    const kind = phases[next].kind;
-    cue(kind === 'run' ? 'run' : kind === 'walk' ? 'walk' : 'walk');
-  };
-
+  // Tick loop — only while running; dt is measured wall time, so a
+  // busy main thread can't drift the phases.
   useEffect(() => {
     if (!isRunning || finished) return;
     lastTickRef.current = Date.now();
@@ -125,20 +123,32 @@ export default function RunSessionScreen({ session, onFinish, onCancel }: RunSes
       const now = Date.now();
       const dt = (now - lastTickRef.current) / 1000;
       lastTickRef.current = now;
-      phaseLeftRef.current -= dt;
-      setElapsed((e) => e + dt);
-      if (phaseLeftRef.current <= 0) {
-        advance(true);
-      } else {
-        setSecondsLeft(Math.ceil(phaseLeftRef.current));
-      }
+      dispatch({ type: 'tick', dtSeconds: dt });
     }, 200);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRunning, finished, phaseIdx]);
+  }, [isRunning, finished]);
 
-  const current = phases[phaseIdx];
-  const nextPhase = phases[phaseIdx + 1];
+  // Transition cues — fired off state changes, mirroring the old
+  // advance() side effects: a phase change cues the new phase;
+  // reaching the end of the schedule cues finish; ending early
+  // (endNow — phaseIdx stays mid-schedule) cues nothing.
+  useEffect(() => {
+    const prev = prevPlayerRef.current;
+    prevPlayerRef.current = player;
+    if (player.status === 'finished' && prev.status !== 'finished' && player.phaseIdx >= phases.length) {
+      cue('finish');
+      return;
+    }
+    if (player.phaseIdx !== prev.phaseIdx && player.status !== 'finished') {
+      const kind = phases[player.phaseIdx]?.kind;
+      if (kind) cue(kind === 'run' ? 'run' : 'walk');
+    }
+  }, [player, phases]);
+
+  const current = phases[player.phaseIdx];
+  const nextPhase = phases[player.phaseIdx + 1];
+  const secondsLeft = Math.ceil(player.phaseLeft);
+  const elapsed = player.elapsed;
   const totalSeconds = useMemo(() => phases.reduce((a, p) => a + p.seconds, 0), [phases]);
   const overallPct = Math.min(100, Math.round((elapsed / totalSeconds) * 100));
 
@@ -157,8 +167,9 @@ export default function RunSessionScreen({ session, onFinish, onCancel }: RunSes
         session,
         date: getLocalTodayStr(),
         durationSeconds: elapsed,
-        intervalsCompleted: completedBodyRef.current,
+        intervalsCompleted: player.intervalsCompleted,
         intervalsTotal: bodyTotal,
+        ...(runProgram ? { enrollmentId: resolveEnrollmentId(runProgram) } : {}),
         ...(Number.isFinite(km) && km > 0 ? { distanceKm: km } : {}),
       }),
     );
@@ -194,7 +205,7 @@ export default function RunSessionScreen({ session, onFinish, onCancel }: RunSes
       {!finished ? (
         <div className="flex-1 flex flex-col items-center justify-center px-6 gap-5">
           <p className={`text-2xl font-black uppercase tracking-wide ${phaseColor}`}>
-            {phaseLabel(current.kind)}
+            {current ? phaseLabel(current.kind) : ''}
           </p>
           <p className="text-7xl font-black font-mono tabular-nums leading-none">
             {fmtClock(secondsLeft)}
@@ -222,7 +233,7 @@ export default function RunSessionScreen({ session, onFinish, onCancel }: RunSes
           <div className="flex items-center gap-3 pt-2">
             <button
               type="button"
-              onClick={() => setIsRunning((v) => !v)}
+              onClick={() => dispatch({ type: isRunning ? 'pause' : 'resume' })}
               className="w-16 h-16 rounded-full bg-accent text-accent-on flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-lg shadow-accent/25"
               aria-label={isRunning ? t('run.pause') : t('run.resume')}
             >
@@ -230,7 +241,7 @@ export default function RunSessionScreen({ session, onFinish, onCancel }: RunSes
             </button>
             <button
               type="button"
-              onClick={() => advance(false)}
+              onClick={() => dispatch({ type: 'skip' })}
               className="h-12 px-4 rounded-full bg-bg-secondary border border-border text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
             >
               <SkipForward className="w-4 h-4" />
@@ -238,10 +249,7 @@ export default function RunSessionScreen({ session, onFinish, onCancel }: RunSes
             </button>
             <button
               type="button"
-              onClick={() => {
-                setFinished(true);
-                setIsRunning(false);
-              }}
+              onClick={() => dispatch({ type: 'endNow' })}
               className="h-12 px-4 rounded-full bg-bg-secondary border border-border text-xs font-bold flex items-center gap-1.5 text-text-secondary active:scale-95 transition-all cursor-pointer"
             >
               <Flag className="w-4 h-4" />
@@ -249,7 +257,7 @@ export default function RunSessionScreen({ session, onFinish, onCancel }: RunSes
             </button>
           </div>
           <p className="text-2xs text-text-muted">
-            {t('run.intervalsDone', { done: completedBodyRef.current, total: bodyTotal })}
+            {t('run.intervalsDone', { done: player.intervalsCompleted, total: bodyTotal })}
           </p>
         </div>
       ) : (
@@ -261,7 +269,7 @@ export default function RunSessionScreen({ session, onFinish, onCancel }: RunSes
           <div className="card p-4 w-full max-w-xs space-y-2 text-center">
             <p className="text-3xl font-black font-mono tabular-nums">{fmtClock(elapsed)}</p>
             <p className="text-2xs text-text-muted">
-              {t('run.intervalsDone', { done: completedBodyRef.current, total: bodyTotal })}
+              {t('run.intervalsDone', { done: player.intervalsCompleted, total: bodyTotal })}
             </p>
             <label className="block text-left pt-1">
               <span className="text-2xs font-semibold text-text-secondary">{t('run.distanceLabel')}</span>

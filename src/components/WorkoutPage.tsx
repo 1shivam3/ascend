@@ -3,7 +3,8 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { tabListKeyDown } from '@/lib/tab-keyboard';
-import { useStore } from '@/lib/store';
+import { useStore, shouldAutosaveDraft, isStaleDraft } from '@/lib/store';
+import { useRestTimer } from '@/lib/use-rest-timer';
 import { resolveDefaultCoachSegment } from '@/lib/coach-session';
 import { renderLocalizedSentence } from '@/lib/coach-i18n';
 import { useTranslation } from '@/lib/i18n';
@@ -103,6 +104,7 @@ import {
   normalizeRunDistanceKm,
   describeSession,
   sessionTotalSeconds,
+  wouldUncompleteRunSession,
   type RunSession,
 } from '@/lib/run-program';
 import WorkoutDetailsView from '@/components/WorkoutDetailsView';
@@ -120,7 +122,7 @@ import {
 } from '@/lib/workout-schedule';
 import { plural, safeRandomId, getLocalTodayStr, formatLocalDate, parseLocalDate, formatNumber, formatDuration, formatDate, formatDateShort, formatMonthName } from '@/lib/formatters';
 import { calculateWorkoutVolumeKg } from '@/lib/volume';
-import { planPRChangesAfterSetEdit } from '@/lib/pr-reevaluation';
+import { planPRChangesAfterSetEdit, computeSessionPRMarks, isPRSet, type SessionPRMark } from '@/lib/pr-reevaluation';
 import { getSessionDuration } from '@/lib/workout-elapsed';
 import { useAppNavigation } from '@/lib/navigation';
 import { kgToLbs, lbsToKg } from '@/lib/units';
@@ -700,12 +702,15 @@ function HistorySetChip({
   setIndex,
   set,
   displayNumber,
+  prMarks,
 }: {
   workout: WorkoutEntry;
   exerciseIndex: number;
   setIndex: number;
   set: WorkoutSet;
   displayNumber: number;
+  /** §23: read-time PR marks from the page's one replay (badge source). */
+  prMarks?: SessionPRMark[];
 }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -909,7 +914,7 @@ function HistorySetChip({
             @{rpeVal}
           </span>
         )}
-        {isDone && set.isPR && (
+        {isDone && exercise && prMarks && isPRSet(prMarks, workout.id, exercise.name, set) && (
           <span
             className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold"
             title="Personal Record Set"
@@ -1126,6 +1131,14 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const profile = useStore((state) => state.profile);
   const prs = useStore((state) => state.prs);
   const workouts = useStore((state) => state.workouts);
+  // §23 (Phase 3.1): read-time PR marks for the history badges — the
+  // ONE replay over history + records, so a badge can never disagree
+  // with the PR store again (the old `set.isPR` flag was never
+  // written and the badge was silently always off).
+  const prMarks = useMemo(
+    () => computeSessionPRMarks(workouts, prs, profile?.bodyweightKg ?? DEFAULT_BODYWEIGHT_KG),
+    [workouts, prs, profile?.bodyweightKg],
+  );
   const addWorkout = useStore((state) => state.addWorkout);
   const deleteWorkout = useStore((state) => state.deleteWorkout);
   const addPR = useStore((state) => state.addPR);
@@ -1281,11 +1294,23 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const [startedFromPlanId, setStartedFromPlanId] = useState<string | null>(null);
   const [sharingPlan, setSharingPlan] = useState<PlannedWorkout | null>(null);
 
-  // ── Rest Timer State ───────────────────────────────────────────────────────
-  const [restSecondsLeft, setRestSecondsLeft] = useState<number>(0);
+  // ── Rest Timer (§21, Phase 3.2) ────────────────────────────────────────────
+  // The same one machine the live session screen uses
+  // (lib/use-rest-timer): this page's old decrement timer drifted
+  // whenever the tab slept, because it counted interval firings
+  // instead of deriving from an end time. restTotalSeconds stays
+  // local — it is the bar's preset selection, not timer state.
   const [restTotalSeconds, setRestTotalSeconds] = useState<number>(defaultRestSeconds);
-  const [isRestRunning, setIsRestRunning] = useState<boolean>(false);
-  const [isTimerFinished, setIsTimerFinished] = useState<boolean>(false);
+  const restTimer = useRestTimer({
+    defaultSeconds: defaultRestSeconds,
+    onFinish: () => {
+      playBeep();
+      toast.info(t('toast.restReady'), t('toast.titleSetReady'));
+    },
+  });
+  const restSecondsLeft = restTimer.secondsLeft;
+  const isRestRunning = restTimer.status === 'running';
+  const isTimerFinished = restTimer.status === 'finished';
 
   useEffect(() => {
     setRestTotalSeconds(defaultRestSeconds);
@@ -1490,8 +1515,13 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   }, [confirmDeleteId, registerBackHandler]);
 
   // ── Auto-save Draft to Local Storage ──────────────────────────────────────
+  // §15 (Phase 3.3): this is one of the slot's two autosave writers
+  // (the live session screen is the other). The ownership rule
+  // (shouldAutosaveDraft) keeps a stale editor from silently
+  // overwriting a newer session's draft.
   useEffect(() => {
     if (isModalOpen && exercises.some((e) => e.name.trim() || e.sets.some((s) => (typeof s.weight === 'number' && s.weight > 0) || s.reps > 0))) {
+      if (!shouldAutosaveDraft(useStore.getState().activeWorkoutDraft, sessionStartTime)) return;
       saveWorkoutDraft({
         date,
         name: startedFromPlan || undefined,
@@ -1504,6 +1534,19 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       });
     }
   }, [isModalOpen, exercises, date, startedFromPlan, startedFromPlanId, sessionStartTime, saveWorkoutDraft]);
+
+  // §15 (Phase 3.3): a draft older than 12h is resumed only after
+  // an explicit prompt — a day-old half-finished session is a
+  // decision, not a silent restore.
+  const [isStaleResumeConfirmOpen, setIsStaleResumeConfirmOpen] = useState(false);
+  const handleResumeClick = () => {
+    if (!activeWorkoutDraft) return;
+    if (isStaleDraft(activeWorkoutDraft, Date.now())) {
+      setIsStaleResumeConfirmOpen(true);
+      return;
+    }
+    handleResumeWorkout();
+  };
 
   const handleResumeWorkout = () => {
     if (!activeWorkoutDraft) return;
@@ -1762,6 +1805,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       const setDaySchedule = useStore.getState().setDaySchedule;
       if (setDaySchedule) {
         setDaySchedule(todayDayOfWeek, {
+          kind: 'plan',
           workoutPlanId: plan.id,
           customTitle: plan.name,
           bodyParts: getWorkoutBodyParts(plan.exercises),
@@ -1815,26 +1859,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     } catch {}
   };
 
-  // ─── Rest Timer Effect ───────────────────────────────────────────────────
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    if (isRestRunning && restSecondsLeft > 0) {
-      interval = setInterval(() => {
-        setRestSecondsLeft((prev) => {
-          if (prev <= 1) {
-            playBeep();
-            toast.info(t('toast.restReady'), t('toast.titleSetReady'));
-            setIsRestRunning(false);
-            setIsTimerFinished(true);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => { if (interval) clearInterval(interval); };
-  }, [isRestRunning, restSecondsLeft, toast]);
+  // ─── Rest Timer Handlers (§21: delegating to the one machine) ────────────
 
   const startTimer = (seconds: number) => {
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
@@ -1843,34 +1868,27 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       } catch {}
     }
     setRestTotalSeconds(seconds);
-    setRestSecondsLeft(seconds);
-    setIsRestRunning(true);
-    setIsTimerFinished(false);
+    restTimer.start(seconds);
   };
 
   const togglePauseTimer = () => {
     if (restSecondsLeft === 0) {
       startTimer(restTotalSeconds || 90);
     } else {
-      setIsRestRunning(r => !r);
+      restTimer.togglePause();
     }
   };
 
   const resetTimer = () => {
-    setIsRestRunning(false);
-    setIsTimerFinished(false);
-    setRestSecondsLeft(restTotalSeconds);
+    restTimer.reset(restTotalSeconds);
   };
 
   const skipTimer = () => {
-    setIsRestRunning(false);
-    setRestSecondsLeft(0);
-    setIsTimerFinished(false);
+    restTimer.skip();
   };
 
   const adjustTimer = (deltaSeconds: number) => {
-    setRestSecondsLeft(prev => Math.max(0, prev + deltaSeconds));
-    setIsTimerFinished(false);
+    restTimer.adjust(deltaSeconds);
   };
 
   const formatTimer = (secs: number) => {
@@ -1979,6 +1997,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             oneRepMax: topSet.e1RMKg,
             date,
             notes: isFirstExposure ? 'Baseline established from first session' : 'Auto-detected from workout session',
+            // §23 (Phase 3.1): the baseline fact is the field.
+            isBaseline: isFirstExposure ? true : undefined,
           });
           // Only celebrate as a "New PR" when there's a baseline to beat.
           // First-exposure sets establish the baseline silently.
@@ -2508,7 +2528,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             </button>
             <button
               type="button"
-              onClick={handleResumeWorkout}
+              onClick={handleResumeClick}
               className="btn-primary py-1.5 px-3 text-xs font-bold flex items-center gap-1.5"
             >
               <Play className="w-3 h-3 fill-white" />
@@ -3033,6 +3053,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                                     setIndex={p.setIdx}
                                     set={p.set}
                                     displayNumber={j + 1}
+                                    prMarks={prMarks}
                                   />
                                 ));
                               })()}
@@ -3048,6 +3069,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                         {confirmDeleteId === workout.id ? (
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-text-muted">Delete this workout?</span>
+                            {/* §22: deleting the only counted entry for a
+                                program session un-completes that session —
+                                say so before it happens. */}
+                            {wouldUncompleteRunSession(workout, workouts, runProgram) && (
+                              <span className="text-xs text-amber-400">{t('run.deleteUncomplete')}</span>
+                            )}
                             <button
                               type="button"
                               onClick={async () => {
@@ -3186,6 +3213,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       {activeRunSession && (
         <RunSessionScreen
           session={activeRunSession}
+          runProgram={runProgram}
           onFinish={(entry) => {
             addWorkout(entry);
             setActiveRunSession(null);
@@ -3261,6 +3289,20 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         confirmText={t('workout.deletePlanConfirm')}
         cancelText={t('workout.keepPlan')}
         variant="danger"
+      />
+
+      {/* ── Stale Draft Resume Prompt (§15, Phase 3.3) ─────────────────── */}
+      <ConfirmationModal
+        isOpen={isStaleResumeConfirmOpen}
+        onClose={() => setIsStaleResumeConfirmOpen(false)}
+        onConfirm={() => {
+          setIsStaleResumeConfirmOpen(false);
+          handleResumeWorkout();
+        }}
+        title={t('train.staleDraftTitle')}
+        message={t('train.staleDraftMsg')}
+        confirmText={t('train.staleDraftConfirm')}
+        cancelText={t('train.keepDraft')}
       />
 
       {/* ── Draft Discard Confirmation (F5) ─────────────────────────────── */}

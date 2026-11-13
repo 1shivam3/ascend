@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { useStore } from '@/lib/store';
+import { useStore, migratePersistedState } from '@/lib/store';
 import { getLocalTodayStr } from '@/lib/formatters';
 import { calculateMealMacros } from '@/lib/macros';
 import {
@@ -116,14 +116,23 @@ describe('F8 — weekly recap PR selection matches the PR store', () => {
     pr({ exercise: 'Bench Press', weightKg: 25, weightLbs: 55.1, reps: 5, oneRepMax: 29.2, notes: 'All-Time 1RM PR', prType: '1rm' }),
   ];
 
-  it('baselines are baselines by flag OR by notes (the PR page rule)', () => {
-    expect(isBaselinePR(auditedStore[0])).toBe(true);
+  // §23 (Phase 3.1): the audited store above is PRE-3.1 persisted
+  // data — baselines encoded in notes only, the flag never written.
+  // On load, the persist migration backfills the flag from that
+  // legacy encoding, and every reader (this card included) then
+  // reads the flag alone. The fixture therefore goes through the
+  // same migration real stored data does.
+  const migratedStore = (migratePersistedState({ prs: auditedStore }, 3) as any)
+    .prs as PersonalRecord[];
+
+  it('baselines are baselines by the flag (migration backfills it from the legacy notes)', () => {
+    expect(isBaselinePR(migratedStore[0])).toBe(true);
     expect(isBaselinePR(pr({ exercise: 'Squat', isBaseline: true }))).toBe(true);
-    expect(isBaselinePR(auditedStore[5])).toBe(false);
+    expect(isBaselinePR(migratedStore[5])).toBe(false);
   });
 
   it('the audited week counts 1 new PR, not 3, and highlights the all-time Bench', () => {
-    const { count, highlights } = selectWeeklyRecapPRs(auditedStore, WEEK_START, WEEK_END);
+    const { count, highlights } = selectWeeklyRecapPRs(migratedStore, WEEK_START, WEEK_END);
     expect(count).toBe(1);
     expect(highlights).toHaveLength(1);
     expect(highlights[0].exercise).toBe('Bench Press');

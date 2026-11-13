@@ -176,8 +176,12 @@ describe('L4 rest timer (static)', () => {
     const aw = src('src/components/ActiveWorkoutScreen.tsx');
     expect(aw).toContain('dismissSetComplete');
     expect(aw).toContain("e.key === 'Escape'");
-    expect(aw).toContain('restTargetEndTimeRef.current = null');
-    expect(aw).toContain('setIsRestRunning(false)');
+    // §21: the guarantee (dismiss pauses the timer) is unchanged;
+    // the mechanism is now the one rest-timer machine — the dismiss
+    // callback pauses it. The old pins named the deleted ref/flag
+    // implementation (restTargetEndTimeRef / setIsRestRunning).
+    expect(aw).toContain("if (restTimer.status === 'running') restTimer.pause();");
+    expect(aw).not.toContain('restTargetEndTimeRef');
     expect(aw).toContain('onClick={dismissSetComplete}');
   });
 

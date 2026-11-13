@@ -76,10 +76,13 @@ describe('open-items UX F-03 follow-up: segment switch loses nothing in progress
 
   it('the in-progress state at risk lives in CoachChatTab local state (root cause)', () => {
     const tab = readSrc('src/components/CoachChatTab.tsx');
-    // Current question step and the unsent per-question note draft
-    // are component-local — they survive ONLY if the component is
-    // never unmounted by a segment switch.
-    expect(tab).toContain('const [stepIndex, setStepIndex] = useState(0)');
+    // The answered-question set and the unsent per-question note
+    // draft are component-local — they survive ONLY if the
+    // component is never unmounted by a segment switch.
+    // (§24, Phase 3.6: the bare `stepIndex` this pin used to name
+    // was replaced by the id-keyed answered-steps state — the
+    // at-risk local state is now that set.)
+    expect(tab).toContain('const [answeredSteps, setAnsweredSteps] = useState<CheckinStep[]>');
     expect(tab).toContain("const [noteDraft, setNoteDraft] = useState('')");
   });
 
