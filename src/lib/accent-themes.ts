@@ -327,6 +327,42 @@ export function isCustomAccentUsable(hex: string): boolean {
   return ratio !== null && ratio >= 3;
 }
 
+export const ACCENT_THEME_IDS: readonly string[] = [
+  'vermilion',
+  'cobalt',
+  'forest',
+  'plum',
+  'teal',
+  'rose',
+  'custom',
+];
+
+/**
+ * §35: the ONE accent write rule, used by the persisted-blob
+ * sanitizer AND by setUiPreferences, so a value that could never
+ * be stored by one path can't slip in through the other. An
+ * unknown theme id falls back to vermilion; the hex is normalized
+ * (invalid → null); 'custom' with no valid hex is NEVER stored as
+ * 'custom' — it falls back to vermilion, which the user sees (the
+ * Settings custom-hex field shows its own invalid-input message
+ * for the interactive path).
+ */
+export function resolveAccentWrite(
+  theme: unknown,
+  customHex: unknown,
+): { accentTheme: string; customAccentHex: string | null } {
+  const accentTheme =
+    typeof theme === 'string' && ACCENT_THEME_IDS.includes(theme)
+      ? theme
+      : 'vermilion';
+  const customAccentHex =
+    typeof customHex === 'string' ? normalizeHex(customHex) : null;
+  if (accentTheme === 'custom' && !customAccentHex) {
+    return { accentTheme: 'vermilion', customAccentHex };
+  }
+  return { accentTheme, customAccentHex };
+}
+
 /** Resolve the full variant for a stored theme selection + mode. */
 export function resolveAccentVariant(
   theme: AccentThemeId,

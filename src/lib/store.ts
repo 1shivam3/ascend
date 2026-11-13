@@ -8,6 +8,9 @@ import {
   WorkoutExercise,
   MealEntry,
   Theme,
+  ThemeMode,
+  themeModeFromLegacy,
+  resolveTheme,
   NotificationPreferences,
   DEFAULT_NOTIFICATION_PREFERENCES,
   BodyMetricEntry,
@@ -53,7 +56,7 @@ import {
 } from './types';
 import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
 import { sanitizeTodayLayout, DEFAULT_TODAY_LAYOUT } from './today-layout';
-import { normalizeHex } from './accent-themes';
+import { resolveAccentWrite } from './accent-themes';
 import { purgeLocalAppData, purgeAppCaches, isRecognizedBackupData, buildFullBackup, getCustomBarcodes, getOrCreateGuestId } from './storage';
 import { appendArchive, readArchiveResult, hasRetainedHistory } from './history-fork';
 import { calculateHydrationTarget } from './habits';
@@ -281,8 +284,11 @@ export interface AppState {
   meals: MealEntry[];
   bodyMetrics: BodyMetricEntry[];
   progressPhotos: ProgressPhoto[];
+  /** §35: the resolved appearance (runtime — derived from
+   * themeMode, never the stored preference itself). */
   theme: Theme;
-  hasCustomTheme?: boolean;
+  /** §35: the stored preference: 'light' | 'dark' | 'system'. */
+  themeMode: ThemeMode;
   prTargets: Record<string, number>;
   macroGoals: MacroGoals | null;
   plannedWorkouts: PlannedWorkout[];
@@ -443,7 +449,12 @@ export interface AppState {
   
   setHasHydrated: (state: boolean) => void;
   setProfile: (profile: UserProfile) => void;
-  setTheme: (theme: Theme, isCustom?: boolean) => void;
+  /** §35: the one theme write. Explicit modes resolve to
+   * themselves; 'system' resolves from the OS at apply time. */
+  setThemeMode: (mode: ThemeMode) => void;
+  /** §35: system-following write — updates ONLY the resolved
+   * runtime theme (+ document + boot cache), never themeMode. */
+  applySystemTheme: (theme: Theme) => void;
   toggleTheme: () => void;
   resetThemeToSystem: () => void;
   
@@ -851,7 +862,7 @@ export function syncWorkoutReminderDays(
  */
 export const PERSIST_VERSION = 3;
 
-const ACCENT_THEME_IDS = ['vermilion', 'cobalt', 'forest', 'plum', 'teal', 'rose', 'custom'];
+
 
 /**
  * UX redesign — value validation for uiPreferences
@@ -873,13 +884,11 @@ export function sanitizeUiPreferences(
     ...DEFAULT_UI_PREFERENCES,
     ...(prefs as Record<string, unknown>),
   };
-  if (!ACCENT_THEME_IDS.includes(out.accentTheme as string)) {
-    out.accentTheme = 'vermilion';
-  }
-  const hex =
-    typeof out.customAccentHex === 'string' ? normalizeHex(out.customAccentHex) : null;
-  out.customAccentHex = hex;
-  if (out.accentTheme === 'custom' && !hex) out.accentTheme = 'vermilion';
+  // §35: the accent write rule lives in accent-themes
+  // (resolveAccentWrite) and is shared with setUiPreferences.
+  const accent = resolveAccentWrite(out.accentTheme, out.customAccentHex);
+  out.accentTheme = accent.accentTheme;
+  out.customAccentHex = accent.customAccentHex;
   // Invalid/missing density → the §5.2 account default (existing users
   // keep Detailed; fresh accounts get Simple). A stored valid value is
   // always honored.
@@ -972,6 +981,21 @@ export function migratePersistedState(
   if (state.xp && typeof state.xp === 'object') {
     next.xp = { ...getInitialXpState(), ...state.xp };
   }
+
+  // §35 (Phase 4.6): the stored theme preference becomes one
+  // themeMode. Legacy blobs carry (theme, hasCustomTheme): an
+  // explicit choice migrates to that mode; anything else was
+  // system-following and migrates to 'system' (its stored theme
+  // was only a snapshot of the OS value). A valid stored
+  // themeMode always wins. The legacy boolean is dropped.
+  if (
+    state.themeMode !== 'light' &&
+    state.themeMode !== 'dark' &&
+    state.themeMode !== 'system'
+  ) {
+    next.themeMode = themeModeFromLegacy(state.theme, state.hasCustomTheme);
+  }
+  if ('hasCustomTheme' in next) delete next.hasCustomTheme;
 
   // §23 (Phase 3.1): baselines become ONE field. Every pre-3.1
   // record encoded baseline only in its notes text (the flag was
@@ -1264,6 +1288,43 @@ export function findLiveTombstoneOverlaps(state: {
   return overlaps;
 }
 
+/** §35 helpers: the OS theme right now ('dark' when unknown). */
+function systemThemeNow(): Theme {
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  return 'dark';
+}
+
+/** §35: paint the resolved theme onto the document. */
+function applyThemeToDocument(theme: Theme): void {
+  if (typeof document === 'undefined') return;
+  if (theme === 'dark') {
+    document.documentElement.classList.add('dark');
+    document.documentElement.classList.remove('light');
+    document.documentElement.setAttribute('data-theme', 'dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+    document.documentElement.classList.add('light');
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
+}
+
+/**
+ * §35: the pre-paint boot keys theme-init.js reads. ascend_theme
+ * holds the RESOLVED theme (a paint cache), ascend_theme_mode the
+ * stored preference; the legacy custom flag is still written so
+ * a cached older boot script keeps working for one release.
+ */
+function writeThemeBootKeys(mode: ThemeMode, resolved: Theme): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem('ascend_theme', resolved);
+    localStorage.setItem('ascend_theme_mode', mode);
+    localStorage.setItem('ascend_has_custom_theme', mode === 'system' ? 'false' : 'true');
+  } catch {}
+}
+
 export function partializeAppState(state: AppState): Record<string, unknown> {
   return {
   profile: state.profile,
@@ -1271,8 +1332,10 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   workouts: state.workouts,
   meals: state.meals,
   bodyMetrics: state.bodyMetrics,
-  theme: state.theme,
-  hasCustomTheme: state.hasCustomTheme,
+  // §35: only the MODE persists. The resolved theme is runtime
+  // state, re-derived on load (theme-init.js paints pre-hydration;
+  // the page effect + onRehydrate reconcile the store).
+  themeMode: state.themeMode,
   prTargets: state.prTargets,
   macroGoals: state.macroGoals,
   plannedWorkouts: state.plannedWorkouts,
@@ -1493,7 +1556,7 @@ export const useAppStore = create<AppState>()(
       // the persisted state never overwrites them).
       progressPhotos: typeof localStorage !== 'undefined' ? loadProgressPhotosFromDisk() : [],
       theme: 'dark',
-      hasCustomTheme: false,
+      themeMode: 'system',
       prTargets: {},
       macroGoals: null,
       plannedWorkouts: [],
@@ -1676,9 +1739,20 @@ export const useAppStore = create<AppState>()(
 
       // UI Customization
       uiPreferences: { ...DEFAULT_UI_PREFERENCES },
-      setUiPreferences: (patch) => set((state) => ({
-        uiPreferences: { ...state.uiPreferences, ...patch },
-      })),
+      setUiPreferences: (patch) => set((state) => {
+        const merged = { ...state.uiPreferences, ...patch };
+        // §35: accent writes are validated at this boundary with
+        // the same rule the blob sanitizer uses — an invalid
+        // custom hex is never stored as 'custom' (it falls back
+        // to vermilion, visibly, instead of resolveAccentVariant
+        // silently rendering vermilion under a 'custom' label).
+        if ('accentTheme' in patch || 'customAccentHex' in patch) {
+          const accent = resolveAccentWrite(merged.accentTheme, merged.customAccentHex);
+          merged.accentTheme = accent.accentTheme as typeof merged.accentTheme;
+          merged.customAccentHex = accent.customAccentHex;
+        }
+        return { uiPreferences: merged };
+      }),
 
       // Navigation persistence (refresh/relaunch restores the last tab)
       lastActiveTab: 'home',
@@ -1972,72 +2046,30 @@ export const useAppStore = create<AppState>()(
         };
       }),
       
-      setTheme: (theme, isCustom = true) => {
-        if (typeof document !== 'undefined') {
-          if (theme === 'dark') {
-            document.documentElement.classList.add('dark');
-            document.documentElement.classList.remove('light');
-            document.documentElement.setAttribute('data-theme', 'dark');
-          } else {
-            document.documentElement.classList.remove('dark');
-            document.documentElement.classList.add('light');
-            document.documentElement.setAttribute('data-theme', 'light');
-          }
-        }
-        if (typeof localStorage !== 'undefined') {
-          try {
-            localStorage.setItem('ascend_theme', theme);
-            localStorage.setItem('ascend_has_custom_theme', isCustom ? 'true' : 'false');
-          } catch {}
-        }
-        set({ theme, hasCustomTheme: isCustom });
+      // §35: one stored preference (themeMode), one resolved
+      // runtime theme. setThemeMode is the only preference write;
+      // applySystemTheme is the system-following write and never
+      // touches the stored mode.
+      setThemeMode: (mode) => {
+        const resolved = resolveTheme(mode, systemThemeNow());
+        applyThemeToDocument(resolved);
+        writeThemeBootKeys(mode, resolved);
+        set({ theme: resolved, themeMode: mode });
       },
 
-      toggleTheme: () => set((state) => {
-        const nextTheme = state.theme === 'dark' ? 'light' : 'dark';
-        if (typeof document !== 'undefined') {
-          if (nextTheme === 'dark') {
-            document.documentElement.classList.add('dark');
-            document.documentElement.classList.remove('light');
-            document.documentElement.setAttribute('data-theme', 'dark');
-          } else {
-            document.documentElement.classList.remove('dark');
-            document.documentElement.classList.add('light');
-            document.documentElement.setAttribute('data-theme', 'light');
-          }
-        }
-        if (typeof localStorage !== 'undefined') {
-          try {
-            localStorage.setItem('ascend_theme', nextTheme);
-            localStorage.setItem('ascend_has_custom_theme', 'true');
-          } catch {}
-        }
-        return { theme: nextTheme, hasCustomTheme: true };
-      }),
+      applySystemTheme: (theme) => {
+        applyThemeToDocument(theme);
+        writeThemeBootKeys('system', theme);
+        set({ theme });
+      },
+
+      toggleTheme: () => {
+        const next: ThemeMode = get().theme === 'dark' ? 'light' : 'dark';
+        get().setThemeMode(next);
+      },
 
       resetThemeToSystem: () => {
-        let systemTheme: Theme = 'dark';
-        if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
-          systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        }
-        if (typeof document !== 'undefined') {
-          if (systemTheme === 'dark') {
-            document.documentElement.classList.add('dark');
-            document.documentElement.classList.remove('light');
-            document.documentElement.setAttribute('data-theme', 'dark');
-          } else {
-            document.documentElement.classList.remove('dark');
-            document.documentElement.classList.add('light');
-            document.documentElement.setAttribute('data-theme', 'light');
-          }
-        }
-        if (typeof localStorage !== 'undefined') {
-          try {
-            localStorage.setItem('ascend_theme', systemTheme);
-            localStorage.setItem('ascend_has_custom_theme', 'false');
-          } catch {}
-        }
-        set({ theme: systemTheme, hasCustomTheme: false });
+        get().setThemeMode('system');
       },
       
       addPR: (pr) => {
@@ -4433,6 +4465,16 @@ export const useAppStore = create<AppState>()(
           const normalizedPrs = normCollection(data.prs);
           const normalizedWorkouts = normCollection(data.workouts);
           const normalizedMeals = normCollection(data.meals);
+          // §35: theme restore — a new backup's themeMode wins; an
+          // OLD backup's (theme, hasCustomTheme) pair derives the
+          // mode via the same legacy rule as the blob migration;
+          // a backup with neither leaves the current mode alone.
+          const restoredThemeMode: ThemeMode | null =
+            data.themeMode === 'light' || data.themeMode === 'dark' || data.themeMode === 'system'
+              ? data.themeMode
+              : data.theme !== undefined || data.hasCustomTheme !== undefined
+                ? themeModeFromLegacy(data.theme, data.hasCustomTheme)
+                : null;
           let normalizedBodyMetrics: ReturnType<typeof normalizeRowDates>['rows'] | null = null;
           if (Array.isArray(data.bodyMetrics)) {
             const deduped = normalizeAndDedupeBodyMetricDates(data.bodyMetrics);
@@ -4601,8 +4643,10 @@ export const useAppStore = create<AppState>()(
               : state.bodyMetrics,
             prTargets: data.prTargets || state.prTargets,
             macroGoals: data.macroGoals !== undefined ? data.macroGoals : state.macroGoals,
-            theme: data.theme || state.theme,
-            hasCustomTheme: data.hasCustomTheme !== undefined ? data.hasCustomTheme : state.hasCustomTheme,
+            theme: restoredThemeMode
+              ? resolveTheme(restoredThemeMode, systemThemeNow())
+              : state.theme,
+            themeMode: restoredThemeMode ?? state.themeMode,
             hasCompletedOnboarding:
               data.hasCompletedOnboarding !== undefined
                 ? data.hasCompletedOnboarding
@@ -5153,23 +5197,22 @@ export const useAppStore = create<AppState>()(
             });
           }
 
-          // Auto-sync with device theme if not manually customized by athlete
+          // §35: resolve the stored MODE on load. 'system'
+          // resolves from the OS right now (and keeps following
+          // via the page effect); an explicit mode resolves to
+          // itself. The stored mode is never rewritten here.
           if (typeof window !== 'undefined') {
-            const hasCustom = state.hasCustomTheme ?? (localStorage.getItem('ascend_has_custom_theme') === 'true');
-            if (!hasCustom && typeof window.matchMedia === 'function') {
-              const deviceTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-              state.setTheme(deviceTheme, false);
+            const mode: ThemeMode =
+              state.themeMode === 'light' || state.themeMode === 'dark' || state.themeMode === 'system'
+                ? state.themeMode
+                : 'system';
+            const resolved = resolveTheme(mode, systemThemeNow());
+            if (mode === 'system') {
+              state.applySystemTheme(resolved);
+            } else if (state.theme !== resolved) {
+              state.setThemeMode(mode);
             } else {
-              const currentTheme = state.theme || 'dark';
-              if (currentTheme === 'dark') {
-                document.documentElement.classList.add('dark');
-                document.documentElement.classList.remove('light');
-                document.documentElement.setAttribute('data-theme', 'dark');
-              } else {
-                document.documentElement.classList.remove('dark');
-                document.documentElement.classList.add('light');
-                document.documentElement.setAttribute('data-theme', 'light');
-              }
+              applyThemeToDocument(resolved);
             }
           }
         }
@@ -5409,7 +5452,7 @@ if (typeof window !== 'undefined') {
             goals: state.goals,
             userMode: state.userMode,
             theme: state.theme,
-            hasCustomTheme: state.hasCustomTheme,
+            themeMode: state.themeMode,
             hasCompletedOnboarding: state.hasCompletedOnboarding,
             savedAt: new Date().toISOString(),
           };

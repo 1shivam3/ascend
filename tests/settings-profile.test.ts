@@ -96,7 +96,7 @@ describe('Phase 6 — Settings, Profile & Navigation Verification', () => {
       meals: [],
       bodyMetrics: [],
       theme: 'dark',
-      hasCustomTheme: true,
+      themeMode: 'dark', // §35: was hasCustomTheme: true — the explicit-dark pair
       userMode: 'intermediate',
       hasCompletedOnboarding: true,
       _hasHydrated: true,

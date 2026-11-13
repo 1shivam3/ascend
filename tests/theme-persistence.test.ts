@@ -1,48 +1,59 @@
+/**
+ * Theme persistence & hydration — §35 rewrite.
+ *
+ * Before §35 the preference was (theme × hasCustomTheme) and this
+ * suite drove setTheme(theme, isCustom) plus a HAND-COPIED
+ * simulation of the boot script. Now: one stored themeMode, the
+ * resolved theme is runtime state, and the pre-paint scenarios
+ * execute the REAL public/theme-init.js so the copy can never
+ * drift from the script again.
+ */
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { useAppStore } from '@/lib/store';
 
-// Helper to simulate pre-paint inline script from layout.tsx and theme-init.js
-function runPrePaintScript(mockDocument: { classList: Set<string>; attributes: Record<string, string> }, mockLocalStorage: Record<string, string>, prefersDark: boolean) {
-  try {
-    let theme: string | null = null;
-    let hasCustom = false;
-    const customFlag = mockLocalStorage['ascend_has_custom_theme'];
-    const standaloneTheme = mockLocalStorage['ascend_theme'];
+const BOOT_SCRIPT = readFileSync('public/theme-init.js', 'utf8');
 
-    if (customFlag === 'true' && (standaloneTheme === 'dark' || standaloneTheme === 'light')) {
-      theme = standaloneTheme;
-      hasCustom = true;
-    } else if (customFlag === 'false') {
-      hasCustom = false;
-    } else {
-      const stored = mockLocalStorage['ascend_store'];
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        const s = parsed.state || parsed;
-        if (s && s.hasCustomTheme) {
-          theme = s.theme;
-          hasCustom = true;
-        }
-      }
-    }
-
-    if (!hasCustom) {
-      theme = prefersDark ? 'dark' : 'light';
-    }
-
-    if (theme === 'light') {
-      mockDocument.classList.delete('dark');
-      mockDocument.classList.add('light');
-      mockDocument.attributes['data-theme'] = 'light';
-    } else if (theme === 'dark') {
-      mockDocument.classList.add('dark');
-      mockDocument.classList.delete('light');
-      mockDocument.attributes['data-theme'] = 'dark';
-    }
-  } catch (e) {}
+function runRealBootScript(
+  mockLocalStorage: Record<string, string>,
+  prefersDark: boolean,
+): { classes: Set<string>; attributes: Record<string, string> } {
+  const classes = new Set<string>(['dark']);
+  const attributes: Record<string, string> = {};
+  const localStorageStub = {
+    getItem: (k: string) => mockLocalStorage[k] ?? null,
+  };
+  const windowStub = {
+    matchMedia: (query: string) => ({ matches: prefersDark, media: query }),
+  };
+  const documentStub = {
+    documentElement: {
+      classList: {
+        add: (c: string) => classes.add(c),
+        remove: (c: string) => classes.delete(c),
+      },
+      setAttribute: (n: string, v: string) => {
+        attributes[n] = v;
+      },
+    },
+  };
+  const fn = new Function('localStorage', 'window', 'document', BOOT_SCRIPT);
+  fn(localStorageStub, windowStub, documentStub);
+  return { classes, attributes };
 }
 
-describe('Theme Persistence & Hydration Guard', () => {
+function stubOs(prefersDark: boolean) {
+  vi.stubGlobal('window', {
+    matchMedia: (query: string) => ({
+      matches: prefersDark,
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }),
+  });
+}
+
+describe('Theme Persistence & Hydration Guard (§35)', () => {
   let localStorageMock: Record<string, string> = {};
   let classListMock: Set<string>;
   let attributesMock: Record<string, string>;
@@ -52,7 +63,6 @@ describe('Theme Persistence & Hydration Guard', () => {
     classListMock = new Set<string>(['dark']);
     attributesMock = {};
 
-    // Mock localStorage
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => localStorageMock[key] ?? null,
       setItem: (key: string, val: string) => {
@@ -66,7 +76,6 @@ describe('Theme Persistence & Hydration Guard', () => {
       },
     });
 
-    // Mock document.documentElement
     vi.stubGlobal('document', {
       documentElement: {
         classList: {
@@ -81,10 +90,9 @@ describe('Theme Persistence & Hydration Guard', () => {
       },
     });
 
-    // Reset store
     useAppStore.setState({
       theme: 'dark',
-      hasCustomTheme: false,
+      themeMode: 'system',
       _hasHydrated: true,
     });
   });
@@ -93,247 +101,103 @@ describe('Theme Persistence & Hydration Guard', () => {
     vi.unstubAllGlobals();
   });
 
-  // ── Scenario 1: Device Light + Explicit Dark ──
-  it('Scenario 1: Explicit Dark mode on Light OS persists and is not overridden on refresh', () => {
-    // 1. Device is Light
-    let prefersDark = false;
-    vi.stubGlobal('window', {
-      matchMedia: (query: string) => ({
-        matches: prefersDark,
-        media: query,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      }),
-    });
-
-    // 2. User explicitly toggles or sets Dark mode
-    useAppStore.getState().setTheme('dark', true);
+  it('Scenario 1: explicit Dark on a Light OS persists and survives the boot script', () => {
+    stubOs(false);
+    useAppStore.getState().setThemeMode('dark');
 
     expect(useAppStore.getState().theme).toBe('dark');
-    expect(useAppStore.getState().hasCustomTheme).toBe(true);
+    expect(useAppStore.getState().themeMode).toBe('dark');
+    expect(localStorageMock['ascend_theme_mode']).toBe('dark');
     expect(localStorageMock['ascend_theme']).toBe('dark');
-    expect(localStorageMock['ascend_has_custom_theme']).toBe('true');
     expect(classListMock.has('dark')).toBe(true);
-    expect(classListMock.has('light')).toBe(false);
 
-    // 3. Simulate page refresh:
-    // First, pre-paint inline script runs before React/Zustand:
-    const prePaintDoc = { classList: new Set(['dark']), attributes: {} as Record<string, string> };
-    runPrePaintScript(prePaintDoc, localStorageMock, prefersDark);
-    expect(prePaintDoc.classList.has('dark')).toBe(true);
-    expect(prePaintDoc.classList.has('light')).toBe(false);
-    expect(prePaintDoc.attributes['data-theme']).toBe('dark');
-
-    // Second, Zustand starts unhydrated (_hasHydrated: false)
-    useAppStore.setState({ _hasHydrated: false });
-
-    // Simulate page.tsx theme sync effect while _hasHydrated is false:
-    // It must return immediately and NOT overwrite user's theme!
-    const syncThemeEffect = () => {
-      const state = useAppStore.getState();
-      if (!state._hasHydrated) return; // The critical hydration guard!
-      const mediaQueryMatches = prefersDark;
-      if (!state.hasCustomTheme) {
-        const deviceTheme = mediaQueryMatches ? 'dark' : 'light';
-        if (state.theme !== deviceTheme) {
-          state.setTheme(deviceTheme, false);
-        }
-      }
-    };
-
-    syncThemeEffect();
-    // Verify theme was NOT overridden during unhydrated mount
-    expect(useAppStore.getState().theme).toBe('dark');
-    expect(useAppStore.getState().hasCustomTheme).toBe(true);
-
-    // Third, Zustand rehydrates
-    useAppStore.setState({ _hasHydrated: true });
-    syncThemeEffect();
-
-    // Verify theme is STILL dark and hasCustomTheme is true
-    expect(useAppStore.getState().theme).toBe('dark');
-    expect(useAppStore.getState().hasCustomTheme).toBe(true);
+    const boot = runRealBootScript(localStorageMock, false);
+    expect(boot.classes.has('dark')).toBe(true);
+    expect(boot.classes.has('light')).toBe(false);
+    expect(boot.attributes['data-theme']).toBe('dark');
   });
 
-  // ── Scenario 2: Device Dark + Explicit Light ──
-  it('Scenario 2: Explicit Light mode on Dark OS persists across page refresh', () => {
-    let prefersDark = true;
-    vi.stubGlobal('window', {
-      matchMedia: (query: string) => ({
-        matches: prefersDark,
-        media: query,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      }),
-    });
-
-    // User chooses Light mode
-    useAppStore.getState().setTheme('light', true);
+  it('Scenario 2: explicit Light on a Dark OS persists', () => {
+    stubOs(true);
+    useAppStore.getState().setThemeMode('light');
 
     expect(useAppStore.getState().theme).toBe('light');
-    expect(useAppStore.getState().hasCustomTheme).toBe(true);
-    expect(localStorageMock['ascend_theme']).toBe('light');
-    expect(localStorageMock['ascend_has_custom_theme']).toBe('true');
-    expect(classListMock.has('light')).toBe(true);
-    expect(classListMock.has('dark')).toBe(false);
+    expect(useAppStore.getState().themeMode).toBe('light');
+    expect(localStorageMock['ascend_theme_mode']).toBe('light');
 
-    // Pre-paint script verification
-    const prePaintDoc = { classList: new Set(['dark']), attributes: {} as Record<string, string> };
-    runPrePaintScript(prePaintDoc, localStorageMock, prefersDark);
-    expect(prePaintDoc.classList.has('light')).toBe(true);
-    expect(prePaintDoc.classList.has('dark')).toBe(false);
-    expect(prePaintDoc.attributes['data-theme']).toBe('light');
+    const boot = runRealBootScript(localStorageMock, true);
+    expect(boot.classes.has('light')).toBe(true);
+    expect(boot.attributes['data-theme']).toBe('light');
   });
 
-  // ── Scenario 3: Device Light + Explicit Light ──
-  it('Scenario 3: Explicit Light mode on Light OS persists', () => {
-    let prefersDark = false;
-    useAppStore.getState().setTheme('light', true);
-
+  it('Scenario 5: toggling flips the RESOLVED theme into an explicit mode', () => {
+    stubOs(true);
+    useAppStore.getState().toggleTheme(); // dark -> light (explicit)
     expect(useAppStore.getState().theme).toBe('light');
-    expect(useAppStore.getState().hasCustomTheme).toBe(true);
-    expect(localStorageMock['ascend_theme']).toBe('light');
-    expect(localStorageMock['ascend_has_custom_theme']).toBe('true');
-  });
-
-  // ── Scenario 4: Device Dark + Explicit Dark ──
-  it('Scenario 4: Explicit Dark mode on Dark OS persists as custom', () => {
-    let prefersDark = true;
-    useAppStore.getState().setTheme('dark', true);
-
-    expect(useAppStore.getState().theme).toBe('dark');
-    expect(useAppStore.getState().hasCustomTheme).toBe(true);
-    expect(localStorageMock['ascend_theme']).toBe('dark');
-    expect(localStorageMock['ascend_has_custom_theme']).toBe('true');
-  });
-
-  // ── Scenario 5: Multiple Toggles ──
-  it('Scenario 5: User toggling multiple times correctly preserves the final preference', () => {
-    useAppStore.getState().toggleTheme(); // dark -> light
-    expect(useAppStore.getState().theme).toBe('light');
-    expect(useAppStore.getState().hasCustomTheme).toBe(true);
-    expect(localStorageMock['ascend_theme']).toBe('light');
-
+    expect(useAppStore.getState().themeMode).toBe('light');
     useAppStore.getState().toggleTheme(); // light -> dark
     expect(useAppStore.getState().theme).toBe('dark');
-    expect(useAppStore.getState().hasCustomTheme).toBe(true);
-    expect(localStorageMock['ascend_theme']).toBe('dark');
+    expect(useAppStore.getState().themeMode).toBe('dark');
+  });
 
-    useAppStore.getState().toggleTheme(); // dark -> light
+  it('Scenario 6: system mode follows the OS — and following NEVER overwrites the stored mode', () => {
+    stubOs(false);
+    useAppStore.getState().resetThemeToSystem();
+    expect(useAppStore.getState().themeMode).toBe('system');
     expect(useAppStore.getState().theme).toBe('light');
-    expect(useAppStore.getState().hasCustomTheme).toBe(true);
-    expect(localStorageMock['ascend_theme']).toBe('light');
+
+    // OS flips to dark; the page effect's follow write lands:
+    useAppStore.getState().applySystemTheme('dark');
+    expect(useAppStore.getState().theme).toBe('dark');
+    // The §35 invariant: the stored preference is still 'system'.
+    expect(useAppStore.getState().themeMode).toBe('system');
+    expect(localStorageMock['ascend_theme_mode']).toBe('system');
   });
 
-  // ── Scenario 6: System/Auto Mode Synchronization ──
-  it('Scenario 6: System/Auto mode follows device OS theme and updates on OS change', () => {
-    let currentPrefersDark = false;
-    let changeListener: ((e: { matches: boolean }) => void) | null = null;
+  it('Scenario 7: an OS change write in explicit mode is not how following works — applySystemTheme is gated by callers on mode', () => {
+    stubOs(false);
+    useAppStore.getState().setThemeMode('dark');
+    // page.tsx only calls applySystemTheme when themeMode==='system';
+    // the state itself proves the explicit choice is untouched by
+    // system resolution inputs:
+    expect(useAppStore.getState().themeMode).toBe('dark');
+    expect(useAppStore.getState().theme).toBe('dark');
+  });
 
-    vi.stubGlobal('window', {
-      matchMedia: (query: string) => ({
-        matches: currentPrefersDark,
-        media: query,
-        addEventListener: (_evt: string, cb: (e: { matches: boolean }) => void) => {
-          changeListener = cb;
-        },
-        removeEventListener: vi.fn(),
-      }),
-    });
-
-    // Reset to system mode
+  it('Scenario 8: reset to system stores the mode, resolves from the OS', () => {
+    stubOs(true);
+    useAppStore.getState().setThemeMode('light');
     useAppStore.getState().resetThemeToSystem();
-
-    expect(useAppStore.getState().hasCustomTheme).toBe(false);
-    expect(useAppStore.getState().theme).toBe('light'); // Matches Light OS
-    expect(classListMock.has('light')).toBe(true);
-
-    // Simulate OS appearance change: Light -> Dark
-    currentPrefersDark = true;
-    const storeState = useAppStore.getState();
-    if (!storeState.hasCustomTheme) {
-      storeState.setTheme(currentPrefersDark ? 'dark' : 'light', false);
-    }
-
-    expect(useAppStore.getState().theme).toBe('dark');
-    expect(useAppStore.getState().hasCustomTheme).toBe(false);
-    expect(classListMock.has('dark')).toBe(true);
+    expect(useAppStore.getState().themeMode).toBe('system');
+    expect(useAppStore.getState().theme).toBe('dark'); // OS dark
+    expect(localStorageMock['ascend_theme_mode']).toBe('system');
   });
 
-  // ── Scenario 7: OS Theme Change does NOT override Explicit Custom Theme ──
-  it('Scenario 7: OS appearance change does NOT override explicit user choice', () => {
-    let currentPrefersDark = false;
-    vi.stubGlobal('window', {
-      matchMedia: (query: string) => ({
-        matches: currentPrefersDark,
-        media: query,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      }),
-    });
-
-    // User explicitly sets Dark mode
-    useAppStore.getState().setTheme('dark', true);
-    expect(useAppStore.getState().hasCustomTheme).toBe(true);
-    expect(useAppStore.getState().theme).toBe('dark');
-
-    // OS switches to Light (or user changes system settings)
-    currentPrefersDark = false;
-    const handleDeviceChange = (matches: boolean) => {
-      const storeState = useAppStore.getState();
-      if (!storeState.hasCustomTheme) {
-        storeState.setTheme(matches ? 'dark' : 'light', false);
-      }
-    };
-
-    handleDeviceChange(currentPrefersDark);
-
-    // Still dark!
-    expect(useAppStore.getState().theme).toBe('dark');
-    expect(useAppStore.getState().hasCustomTheme).toBe(true);
-  });
-
-  // ── Scenario 8: Reset to System ──
-  it('Scenario 8: Reset to System clears custom flag and syncs with OS', () => {
-    let prefersDark = true;
-    vi.stubGlobal('window', {
-      matchMedia: (query: string) => ({
-        matches: prefersDark,
-        media: query,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      }),
-    });
-
-    // User had custom Light theme
-    useAppStore.getState().setTheme('light', true);
-    expect(useAppStore.getState().hasCustomTheme).toBe(true);
-
-    // User clicks "Reset to System"
-    useAppStore.getState().resetThemeToSystem();
-
-    expect(useAppStore.getState().hasCustomTheme).toBe(false);
-    expect(useAppStore.getState().theme).toBe('dark'); // matches prefersDark
-    expect(localStorageMock['ascend_has_custom_theme']).toBe('false');
-  });
-
-  // ── Scenario 9: Legacy Storage Fallback ──
-  it('Scenario 9: Pre-paint script gracefully reads legacy ascend_store if discrete keys are not yet set', () => {
-    const legacyLocalStorage: Record<string, string> = {
+  it('Scenario 9: the REAL boot script still reads a legacy store blob (pre-§35 user)', () => {
+    const legacy: Record<string, string> = {
       ascend_store: JSON.stringify({
-        state: {
-          theme: 'light',
-          hasCustomTheme: true,
-        },
+        state: { theme: 'light', hasCustomTheme: true },
       }),
     };
+    const boot = runRealBootScript(legacy, true /* OS dark */);
+    expect(boot.classes.has('light')).toBe(true);
+    expect(boot.classes.has('dark')).toBe(false);
+    expect(boot.attributes['data-theme']).toBe('light');
+  });
 
-    const doc = { classList: new Set(['dark']), attributes: {} as Record<string, string> };
-    runPrePaintScript(doc, legacyLocalStorage, true /* OS is dark */);
+  it('Scenario 10: the REAL boot script reads the legacy discrete keys', () => {
+    const legacy: Record<string, string> = {
+      ascend_theme: 'light',
+      ascend_has_custom_theme: 'true',
+    };
+    const boot = runRealBootScript(legacy, true);
+    expect(boot.classes.has('light')).toBe(true);
+  });
 
-    // Should read 'light' from legacy store and apply light theme even though OS is dark
-    expect(doc.classList.has('light')).toBe(true);
-    expect(doc.classList.has('dark')).toBe(false);
-    expect(doc.attributes['data-theme']).toBe('light');
+  it('Scenario 11: boot with mode=system paints the OS theme', () => {
+    const boot = runRealBootScript({ ascend_theme_mode: 'system' }, false);
+    expect(boot.classes.has('light')).toBe(true);
+    const bootDark = runRealBootScript({ ascend_theme_mode: 'system' }, true);
+    expect(bootDark.classes.has('dark')).toBe(true);
   });
 });

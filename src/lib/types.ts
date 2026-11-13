@@ -1,6 +1,33 @@
 export type Gender = 'male' | 'female' | 'other';
 export type Unit = 'kg' | 'lbs';
 export type Theme = 'dark' | 'light';
+
+/**
+ * §35: the STORED theme preference is one value — the mode.
+ * 'light'/'dark' are explicit choices; 'system' means "follow the
+ * OS". The resolved Theme is derived (resolveTheme below) and is
+ * runtime state only: following the system never overwrites the
+ * stored mode. (Before §35 the mode was encoded as Theme × a
+ * hasCustomTheme boolean, and system-following kept overwriting
+ * the stored theme with a snapshot of the OS value.)
+ */
+export type ThemeMode = 'light' | 'dark' | 'system';
+
+/** Legacy pair → mode (the §35 migration + old-backup reads). */
+export function themeModeFromLegacy(
+  theme: unknown,
+  hasCustomTheme: unknown,
+): ThemeMode {
+  if (hasCustomTheme === true && (theme === 'light' || theme === 'dark')) {
+    return theme;
+  }
+  return 'system';
+}
+
+/** The Theme a mode renders as, given the OS preference. */
+export function resolveTheme(mode: ThemeMode, systemTheme: Theme): Theme {
+  return mode === 'system' ? systemTheme : mode;
+}
 export type UserMode = 'beginner' | 'intermediate' | 'advanced';
 export type DietPreference = 'vegetarian' | 'eggitarian' | 'non_vegetarian' | 'vegan';
 

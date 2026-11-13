@@ -17,6 +17,7 @@ export const PRESERVED_LOCAL_KEYS: ReadonlySet<string> = new Set([
   'ascend_supabase_url',
   'ascend_supabase_anon_key',
   'ascend_theme',
+  'ascend_theme_mode',
   'ascend_has_custom_theme',
   LOGGED_OUT_LATCH_KEY,
 ]);
@@ -258,6 +259,7 @@ const BACKUP_STATE_FIELDS = [
   'prTargets',
   'macroGoals',
   'theme',
+  'themeMode',
   'hasCustomTheme',
   'hasCompletedOnboarding',
   'weeklySchedule',

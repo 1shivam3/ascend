@@ -88,7 +88,7 @@ export default function AppPage() {
   const [sharedProgram, setSharedProgram] = useState<DecodedProgram | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [pendingStartPlan, setPendingStartPlan] = useState<PlannedWorkout | null>(null);
-  const { profile, theme, hasCustomTheme, setTheme, _hasHydrated, activeWorkoutDraft, uiPreferences, workouts, meals, plannedWorkouts, prs, bodyMetrics, prTargets, macroGoals } = useStore();
+  const { profile, theme, themeMode, applySystemTheme, _hasHydrated, activeWorkoutDraft, uiPreferences, workouts, meals, plannedWorkouts, prs, bodyMetrics, prTargets, macroGoals } = useStore();
   // FND-06: the fork decision lives only for this session — closing
   // the app undecided re-shows the fork, which is the safe default.
   const [forkResolved, setForkResolved] = useState(false);
@@ -136,30 +136,31 @@ export default function AppPage() {
     }
   }, [_hasHydrated, persistHydrated, profile?.dateOfBirth]);
 
-  // Dynamic device theme synchronization (when not manually overridden in Settings)
+  // §35: device-theme following happens ONLY in 'system' mode, and
+  // the follow write (applySystemTheme) updates the resolved
+  // runtime theme — the stored themeMode is never overwritten.
   useEffect(() => {
     if (typeof window === 'undefined' || !_hasHydrated || !persistHydrated) return;
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
-    // Initial check if user has not set a custom theme
-    if (!hasCustomTheme) {
+    if (themeMode === 'system') {
       const deviceTheme = mediaQuery.matches ? 'dark' : 'light';
       if (theme !== deviceTheme) {
-        setTheme(deviceTheme, false);
+        applySystemTheme(deviceTheme);
       }
     }
 
     const handleDeviceChange = (e: MediaQueryListEvent) => {
       const storeState = useStore.getState();
-      if (!storeState.hasCustomTheme) {
-        storeState.setTheme(e.matches ? 'dark' : 'light', false);
+      if (storeState.themeMode === 'system') {
+        storeState.applySystemTheme(e.matches ? 'dark' : 'light');
       }
     };
 
     mediaQuery.addEventListener('change', handleDeviceChange);
     return () => mediaQuery.removeEventListener('change', handleDeviceChange);
-  }, [_hasHydrated, persistHydrated, hasCustomTheme, theme, setTheme]);
+  }, [_hasHydrated, persistHydrated, themeMode, theme, applySystemTheme]);
 
   // Listen for shared program links (#plan=...) in URL
   useEffect(() => {
@@ -218,7 +219,7 @@ export default function AppPage() {
 
   // UX redesign Stage 6 — apply the selected accent theme (preset or custom)
   // as CSS vars on <html>. This is NOT a theme-mode pick: it never touches
-  // hasCustomTheme or the light/dark class above. Re-applied when the accent
+  // themeMode or the light/dark class above. Re-applied when the accent
   // selection or the mode changes (every preset has light + dark variants).
   useEffect(() => {
     if (typeof document === 'undefined' || !_hasHydrated || !persistHydrated) return;
