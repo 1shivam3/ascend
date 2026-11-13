@@ -11,7 +11,7 @@
 import { CycleAnalyzerBase, FrameMeasurements, RepBag } from './CycleAnalyzerBase';
 import { PoseLandmarkIndex } from '../models/pose.types';
 import { FormObservation } from '../models/form-feedback.types';
-import { FormRep } from '../models/form-session.types';
+import { FormRep , getRepStatus } from '../models/form-session.types';
 import { FeedbackRule } from '../services/analysis/FormFeedbackEngine';
 
 export const BICEP_CURL_ANALYZER_VERSION = '1.0.0';
@@ -112,7 +112,7 @@ export class BicepCurlAnalyzer extends CycleAnalyzerBase {
         limitation: 'Estimated from 2D landmarks — a cue to check against the video, not a force measurement.',
       });
     }
-    const incomplete = reps.filter((r) => !r.isValid);
+    const incomplete = reps.filter((r) => getRepStatus(r) === 'failed');
     if (incomplete.length > 0) {
       out.push({
         id: 'rule-curl-incomplete',

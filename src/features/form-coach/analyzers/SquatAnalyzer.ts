@@ -8,7 +8,7 @@
 import { ExerciseAnalyzer, AnalyzerFrameResult, MovementAssessment } from './ExerciseAnalyzer';
 import { NormalizedLandmark, PoseLandmarkIndex, DetectedSide } from '../models/pose.types';
 import { FormCue, FormObservation, MovementPhase } from '../models/form-feedback.types';
-import { FormRep, FormSessionSummary, getRepStatus } from '../models/form-session.types';
+import { FormRep, FormSessionSummary, getRepStatus, isValidRep } from '../models/form-session.types';
 import {
   calculateJointAngle,
   calculateSegmentInclination,
@@ -555,7 +555,7 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
   ): FormSessionSummary {
     const now = Date.now();
     const durationSeconds = Math.max(1, Math.round((now - this.sessionStartTimeMs) / 1000));
-    const validReps = this.completedReps.filter((r) => r.isValid);
+    const validReps = this.completedReps.filter((r) => isValidRep(r));
 
     const avgConfidence =
       this.trackingConfidences.length > 0

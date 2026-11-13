@@ -11,7 +11,7 @@
 import { ExerciseAnalyzer, AnalyzerFrameResult } from './ExerciseAnalyzer';
 import { NormalizedLandmark, PoseLandmarkIndex, DetectedSide } from '../models/pose.types';
 import { FormObservation, MovementPhase } from '../models/form-feedback.types';
-import { FormRep, FormSessionSummary, getRepStatus } from '../models/form-session.types';
+import { FormRep, FormSessionSummary, getRepStatus, isValidRep } from '../models/form-session.types';
 import { computeTempoSeconds } from '../services/analysis/tempo';
 import { sustainedVisibilityOut, type VisibilitySample } from '../services/analysis/visibility';
 import {
@@ -257,7 +257,7 @@ export class DeadliftAnalyzer implements ExerciseAnalyzer {
         anklesSustainedOut: false,
         sideViewDetected: !this.currentRepConfidentlyFront(),
         depthTargetDeg: 0,
-        currentRepNumber: this.completedReps.filter((r) => r.isValid).length,
+        currentRepNumber: this.completedReps.filter((r) => isValidRep(r)).length,
         timestampMs,
       });
 
@@ -417,7 +417,7 @@ export class DeadliftAnalyzer implements ExerciseAnalyzer {
       anklesSustainedOut,
       sideViewDetected: !this.currentRepConfidentlyFront(),
       depthTargetDeg: 0,
-      currentRepNumber: this.completedReps.filter((r) => r.isValid).length,
+      currentRepNumber: this.completedReps.filter((r) => isValidRep(r)).length,
       timestampMs,
     });
 
@@ -445,7 +445,7 @@ export class DeadliftAnalyzer implements ExerciseAnalyzer {
   ): FormSessionSummary {
     const now = Date.now();
     const durationSeconds = Math.max(1, Math.round((now - this.sessionStartTimeMs) / 1000));
-    const validReps = this.completedReps.filter((r) => r.isValid);
+    const validReps = this.completedReps.filter((r) => isValidRep(r));
     // P0-3: "incomplete lockout" is claimed only for attempts whose
     // lockout was judged on visible landmarks and not reached.
     // Attempts whose lockout could not be judged are reported

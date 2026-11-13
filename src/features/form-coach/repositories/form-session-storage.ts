@@ -8,7 +8,7 @@
  * delegates here; this module imports nothing but the types.
  */
 
-import { FormSessionSummary } from '../models/form-session.types';
+import { FormSessionSummary, normalizeFormRep } from '../models/form-session.types';
 
 export const FORM_SESSIONS_STORAGE_KEY = 'ascend_form_coach_sessions';
 export const MAX_STORED_SESSIONS = 50;
@@ -31,7 +31,16 @@ export function readFormSessions(): FormSessionSummary[] {
     const raw = storage.getItem(FORM_SESSIONS_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    // §32 migration seam: every stored rep is normalized on the
+    // way in (status derived from the legacy isValid boolean when
+    // absent, the boolean dropped) — readers never see the old
+    // dual representation. The next write persists the new shape.
+    return parsed.map((session: FormSessionSummary) =>
+      Array.isArray(session?.reps)
+        ? { ...session, reps: session.reps.map((r) => normalizeFormRep(r)) }
+        : session
+    );
   } catch (err) {
     console.error('[FormSessionRepository] Failed to read sessions:', err);
     return [];

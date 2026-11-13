@@ -13,7 +13,7 @@
 import { CycleAnalyzerBase, FrameMeasurements, RepBag } from './CycleAnalyzerBase';
 import { PoseLandmarkIndex } from '../models/pose.types';
 import { FormObservation } from '../models/form-feedback.types';
-import { FormRep } from '../models/form-session.types';
+import { FormRep , getRepStatus } from '../models/form-session.types';
 import { FeedbackRule } from '../services/analysis/FormFeedbackEngine';
 
 export const BENT_OVER_ROW_ANALYZER_VERSION = '1.0.0';
@@ -100,7 +100,7 @@ export class BentOverRowAnalyzer extends CycleAnalyzerBase {
   }
 
   protected aggregateObservations(reps: FormRep[]): FormObservation[] {
-    const incomplete = reps.filter((r) => !r.isValid);
+    const incomplete = reps.filter((r) => getRepStatus(r) === 'failed');
     if (incomplete.length === 0) return [];
     return [
       {

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { DeadliftAnalyzer } from '@/features/form-coach/analyzers/DeadliftAnalyzer';
 import { SquatAnalyzer } from '@/features/form-coach/analyzers/SquatAnalyzer';
 import { computeTempoSeconds } from '@/features/form-coach/services/analysis/tempo';
-import { FormRep } from '@/features/form-coach/models/form-session.types';
+import { FormRep, isValidRep } from '@/features/form-coach/models/form-session.types';
 import { NormalizedLandmark, PoseLandmarkIndex } from '@/features/form-coach/models/pose.types';
 
 /**
@@ -133,7 +133,10 @@ describe('P0-3 rep statuses — deadlift lockout verification', () => {
     expect(summary.totalUnverifiedReps).toBe(2);
     for (const rep of summary.reps) {
       expect(rep.status).toBe('unverified');
-      expect(rep.isValid).toBe(false);
+      // §32: the old assertion here read rep.isValid === false —
+      // the boolean collapsed unverified into false; the derived
+      // reader keeps the distinction (unverified is NOT valid).
+      expect(isValidRep(rep)).toBe(false);
       expect(rep.invalidReason).toBe('Lockout could not be verified (feet out of frame)');
     }
     const titles = summary.observations.map((o) => o.title);

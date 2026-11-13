@@ -26,7 +26,7 @@
  */
 
 import { MovementPhase } from '../../models/form-feedback.types';
-import { FormRep } from '../../models/form-session.types';
+import { FormRep, repVerdict } from '../../models/form-session.types';
 
 export interface CycleRepStateMachineConfig {
   /** Signal at/below which the movement is in its flexed (working) zone. */
@@ -143,13 +143,12 @@ export class CycleRepStateMachine {
       maxTorsoInclinationDeg: 0,
       trackingConfidence: Math.round(avgConfidence * 100) / 100,
       observations: [],
-      isValid,
-      invalidReason: isValid ? undefined : this.config.incompleteReason,
-      // P0-3 verdict: a cycle record exists only when the driving
-      // signal was measurable through the cycle (a signal gap
-      // abandons the cycle with no record), so an invalid cycle rep
-      // is a measured failure, never 'unverified'.
-      status: isValid ? 'valid' : 'failed',
+      // §32: the shared verdict rule. A cycle record exists only
+      // when the driving signal was measurable through the cycle
+      // (a signal gap abandons the cycle with no record), so an
+      // invalid cycle rep is a measured failure, never
+      // 'unverified' from the machine.
+      ...repVerdict(isValid, this.config.incompleteReason),
       // "Lockout" for a cycle lift = the cycle genuinely completed
       // (with its top gate, when one is required), independent of the
       // duration validity check. Press/bench read this field; the

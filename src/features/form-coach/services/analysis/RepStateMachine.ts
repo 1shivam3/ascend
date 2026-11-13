@@ -6,7 +6,7 @@
  */
 
 import { MovementPhase } from '../../models/form-feedback.types';
-import { FormRep, SquatDepthClassification } from '../../models/form-session.types';
+import { FormRep, SquatDepthClassification, repVerdict } from '../../models/form-session.types';
 
 export interface RepStateMachineConfig {
   standingKneeAngleDeg: number; // e.g. 155°
@@ -99,7 +99,8 @@ export class RepStateMachine {
 
   /**
    * Evaluates current frame joint measurements and advances state machine.
-   * Returns a completed FormRep if a repetition successfully completed on this frame, else null.
+   * Returns the FormRep when an attempt CLOSES on this frame (valid
+   * or failed — §32: a closed attempt always emits its record), else null.
    */
   update(
     kneeAngleDeg: number | null,
@@ -216,26 +217,38 @@ export class RepStateMachine {
                 this.trackingConfidenceAccum.length
               : trackingConfidence;
 
-          if (isValid) {
-            this.repNumber += 1;
+          // §32: a closed attempt ALWAYS emits its record — the
+          // shared verdict rule stamps it 'valid' or 'failed'
+          // with the first unmet criterion as the reason. This
+          // machine used to emit only valid reps: a too-fast,
+          // too-slow or too-shallow squat vanished silently,
+          // unlike the deadlift/cycle machines' failed records.
+          // repNumber is the ATTEMPT ordinal, as in both other
+          // machines (it previously counted valid reps only).
+          const invalidReason = !isValid
+            ? totalDurationMs < this.config.minRepDurationMs
+              ? 'Rep too fast'
+              : totalDurationMs > this.config.maxRepDurationMs
+                ? 'Rep too slow'
+                : 'Depth not reached'
+            : undefined;
+          this.repNumber += 1;
 
-            completedRep = {
-              repNumber: this.repNumber,
-              startTime: repStart,
-              endTime: timestampMs,
-              durationSeconds: Math.round((totalDurationMs / 1000) * 10) / 10,
-              descentDurationSeconds: Math.max(0.2, Math.round((descentDurationMs / 1000) * 10) / 10),
-              ascentDurationSeconds: Math.max(0.2, Math.round((ascentDurationMs / 1000) * 10) / 10),
-              bottomHoldDurationSeconds: Math.round((bottomHoldMs / 1000) * 10) / 10,
-              minKneeAngleDeg: Math.round(this.minKneeAngle),
-              estimatedDepth: depth,
-              maxTorsoInclinationDeg: Math.round(this.maxTorsoInclination),
-              trackingConfidence: Math.round(avgConfidence * 100) / 100,
-              observations: Array.from(this.repObservations),
-              isValid: true,
-              status: 'valid',
-            };
-          }
+          completedRep = {
+            repNumber: this.repNumber,
+            startTime: repStart,
+            endTime: timestampMs,
+            durationSeconds: Math.round((totalDurationMs / 1000) * 10) / 10,
+            descentDurationSeconds: Math.max(0.2, Math.round((descentDurationMs / 1000) * 10) / 10),
+            ascentDurationSeconds: Math.max(0.2, Math.round((ascentDurationMs / 1000) * 10) / 10),
+            bottomHoldDurationSeconds: Math.round((bottomHoldMs / 1000) * 10) / 10,
+            minKneeAngleDeg: Math.round(this.minKneeAngle),
+            estimatedDepth: depth,
+            maxTorsoInclinationDeg: Math.round(this.maxTorsoInclination),
+            trackingConfidence: Math.round(avgConfidence * 100) / 100,
+            observations: Array.from(this.repObservations),
+            ...repVerdict(isValid, invalidReason),
+          };
 
           // Return to standing ready for next rep
           this.setPhase('standing', timestampMs);

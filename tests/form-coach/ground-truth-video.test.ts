@@ -21,6 +21,7 @@ import { describe, it, expect } from 'vitest';
 import { SquatAnalyzer } from '../../src/features/form-coach/analyzers/SquatAnalyzer';
 import { isLandmarkReliable } from '../../src/features/form-coach/services/analysis/LandmarkGeometry';
 import fixture from './fixtures/ground-truth-squat-landmarks.json';
+import { isValidRep } from '@/features/form-coach/models/form-session.types';
 
 describe('isLandmarkReliable presence semantics (D7)', () => {
   const base = { x: 0.5, y: 0.5, z: 0, visibility: 0.9 };
@@ -80,7 +81,7 @@ describe('ground-truth squat video replay', () => {
       'below_parallel',
       'below_parallel',
     ]);
-    expect(summary.reps.every((r) => r.isValid)).toBe(true);
+    expect(summary.reps.every((r) => isValidRep(r))).toBe(true);
 
     expect(analyzer.getMovementAssessment().signature).toBe('squat');
     expect(analyzer.getMovementAssessment().hingeFrames).toBe(0);

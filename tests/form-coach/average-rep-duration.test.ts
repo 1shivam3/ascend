@@ -3,6 +3,7 @@ import { DeadliftAnalyzer } from '@/features/form-coach/analyzers/DeadliftAnalyz
 import { SquatAnalyzer } from '@/features/form-coach/analyzers/SquatAnalyzer';
 import { BicepCurlAnalyzer } from '@/features/form-coach/analyzers/BicepCurlAnalyzer';
 import { NormalizedLandmark, PoseLandmarkIndex } from '@/features/form-coach/models/pose.types';
+import { isValidRep } from '@/features/form-coach/models/form-session.types';
 import { curlStream } from './batch-builders';
 
 /**
@@ -122,7 +123,7 @@ describe('averageRepDurationSeconds — set time per valid rep', () => {
     expect(summary.totalValidReps).toBe(1);
     // The old computation would have reported the single valid rep's
     // machine window (a few seconds at most) — pin the truthful figure.
-    const validRep = summary.reps.find((r) => r.isValid);
+    const validRep = summary.reps.find((r) => isValidRep(r));
     expect(validRep).toBeDefined();
     expect(validRep!.durationSeconds).toBeLessThan(27);
     expect(summary.averageRepDurationSeconds).toBe(27);

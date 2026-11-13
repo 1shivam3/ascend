@@ -15,7 +15,7 @@
  */
 
 import { MovementPhase } from '../../models/form-feedback.types';
-import { FormRep } from '../../models/form-session.types';
+import { FormRep, repVerdict } from '../../models/form-session.types';
 
 export interface DeadliftRepStateMachineConfig {
   /** Hip angle at/above which the lifter counts as standing tall. */
@@ -159,14 +159,11 @@ export class DeadliftRepStateMachine {
       maxTorsoInclinationDeg: Math.round(this.maxTorsoInclination),
       trackingConfidence: Math.round(avgConfidence * 100) / 100,
       observations: this.hipsRoseFirst ? ['hips_rose_first'] : [],
-      isValid,
-      invalidReason: isValid
-        ? undefined
-        : (invalidReason ?? 'Lockout not reached'),
-      // Provisional P0-3 verdict from the measured criteria; the
-      // analyzer upgrades a no-lockout 'failed' to 'unverified' when
-      // the ankle/foot landmarks were too invisible to judge lockout.
-      status: isValid ? 'valid' : 'failed',
+      // §32: the shared verdict rule. Provisional P0-3 verdict
+      // from the measured criteria; the analyzer upgrades a
+      // no-lockout 'failed' to 'unverified' when the ankle/foot
+      // landmarks were too invisible to judge lockout.
+      ...repVerdict(isValid, invalidReason ?? 'Lockout not reached'),
       minHipAngleDeg: Math.round(this.minHipAngle),
       lockoutAchieved,
       hipsRoseFirst: this.hipsRoseFirst,
