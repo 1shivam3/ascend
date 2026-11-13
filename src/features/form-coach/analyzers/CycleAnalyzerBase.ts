@@ -21,7 +21,7 @@ import {
 } from '../analyzers/ExerciseAnalyzer';
 import { NormalizedLandmark, PoseLandmarkIndex, DetectedSide } from '../models/pose.types';
 import { FormObservation } from '../models/form-feedback.types';
-import { FormRep, FormSessionSummary, getRepStatus } from '../models/form-session.types';
+import { FormRep, FormSessionSummary, getRepStatus, isValidRep } from '../models/form-session.types';
 import {
   calculateDistance,
   calculateJointAngle,
@@ -305,7 +305,7 @@ export abstract class CycleAnalyzerBase implements ExerciseAnalyzer {
         anklesVisible: false,
         sideViewDetected: !this.currentRepConfidentlyFront(),
         depthTargetDeg: 0,
-        currentRepNumber: this.completedReps.filter((r) => r.isValid).length,
+        currentRepNumber: this.completedReps.filter((r) => isValidRep(r)).length,
         timestampMs,
       });
       return {
@@ -466,7 +466,7 @@ export abstract class CycleAnalyzerBase implements ExerciseAnalyzer {
       anklesVisible: isLandmarkReliable(ankle),
       sideViewDetected: !this.currentRepConfidentlyFront(),
       depthTargetDeg: 0,
-      currentRepNumber: this.completedReps.filter((r) => r.isValid).length,
+      currentRepNumber: this.completedReps.filter((r) => isValidRep(r)).length,
       timestampMs,
     });
 
@@ -489,7 +489,7 @@ export abstract class CycleAnalyzerBase implements ExerciseAnalyzer {
   finishSet(workoutId?: string, setIndex?: number): FormSessionSummary {
     const now = Date.now();
     const durationSeconds = Math.max(1, Math.round((now - this.sessionStartTimeMs) / 1000));
-    const validReps = this.completedReps.filter((r) => r.isValid);
+    const validReps = this.completedReps.filter((r) => isValidRep(r));
 
     const avgConfidence =
       this.trackingConfidences.length > 0

@@ -41,13 +41,15 @@ export function assistantMessageFromResponse(
     action?: unknown;
   };
   const action = validateCoachAction(rec.action);
-  return {
-    role: 'assistant',
+  const base = {
+    role: 'assistant' as const,
     content: typeof rec.reply === 'string' ? rec.reply : fallbackText,
     evidence: Array.isArray(rec.evidence) ? rec.evidence : [],
     ts: now,
-    ...(action ? { action, actionState: 'pending' as const } : {}),
   };
+  // §28: the two message variants are built explicitly — an action
+  // always lands beside its 'pending' state, never optionally.
+  return action ? { ...base, action, actionState: 'pending' as const } : base;
 }
 
 /** Empty-state suggestion chips (Slice B): fixed, allowlisted
@@ -130,7 +132,7 @@ export default function CoachChatSection() {
   // superseded duplicates resolve even if the user never sends again.
   useEffect(() => {
     const cur = useCoachChatStore.getState().messages;
-    const settled = settlePendingActions(cur, Date.now());
+    const settled = settlePendingActions(cur, Date.now(), useStore.getState().macroGoals);
     if (settled !== cur) setMessages(settled);
   }, [setMessages]);
 
@@ -144,7 +146,9 @@ export default function CoachChatSection() {
     (index: number, patch: Partial<CoachChatMessage>) => {
       const cur = useCoachChatStore.getState().messages;
       if (!cur[index]) return;
-      setMessages(cur.map((m, i) => (i === index ? { ...m, ...patch } : m)));
+      // The patch producers (CoachActionCard helpers) only ever
+      // produce valid action-field combinations (§28 union).
+      setMessages(cur.map((m, i) => (i === index ? ({ ...m, ...patch } as CoachChatMessage) : m)));
     },
     [setMessages]
   );
@@ -383,7 +387,8 @@ export default function CoachChatSection() {
       setMessages(
         settlePendingActions(
           [...nextMessages, assistantMessageFromResponse(data, epochNow(), t('coachChat.errorGeneric'))],
-          epochNow()
+          epochNow(),
+          useStore.getState().macroGoals
         )
       );
     } catch {

@@ -238,7 +238,6 @@ export const hi: Partial<Record<StringKey, string>> = {
   'formCoach.phaseBottom': 'सबसे नीचे की स्थिति',
   'formCoach.phaseAscending': 'ऊपर आ रहे हैं',
   'formCoach.phaseLockout': 'लॉकआउट',
-  'formCoach.phaseRepCompleted': 'रेप पूरा हुआ',
   'formCoach.phaseTrackingLost': 'ट्रैकिंग रुकी',
   'formCoach.minKneeAngle': 'न्यूनतम घुटने का कोण',
   'formCoach.jointAngle': 'जोड़ का कोण',
@@ -417,6 +416,10 @@ export const hi: Partial<Record<StringKey, string>> = {
   'health.neverSynced': 'अभी तक सिंक नहीं हुआ',
   'health.stepsToday': 'आज के स्टेप्स',
   'health.unavailable': 'इस डिवाइस पर Health Connect उपलब्ध नहीं है।',
+  'health.partialMissing': 'अभी चाहिए: {types}। Health सिंक के लिए तीनों ज़रूरी हैं — Health Connect सेटिंग्स में अनुमति दें।',
+  'health.typeSteps': 'कदम',
+  'health.typeSleep': 'नींद',
+  'health.typeWeight': 'वज़न',
 
   // ── Progress: muscle volume & recovery ──────────────────────────────
   'progress.muscleVolume': 'मसल वॉल्यूम',
@@ -693,6 +696,9 @@ export const hi: Partial<Record<StringKey, string>> = {
   'scan.lowMemory': 'डिवाइस मेमोरी कम होने से फ़ोटो प्रोसेस नहीं हो सकी। बैकग्राउंड ऐप बंद करके देखें, या नीचे ऑफ़लाइन डेटाबेस से अनुमान लगाएं।',
   'scan.processFailed': 'कैमरा फ़ोटो प्रोसेस नहीं हो सकी। कृपया फिर कोशिश करें।',
   'scan.offlineEstimateTitle': 'ऑफ़लाइन अनुमान',
+  'scan.sourceCloud': 'AI द्वारा विश्लेषण',
+  'scan.sourceOffline': 'ऑफ़लाइन अनुमान',
+  'scan.sourceRefined': 'AI ने सुधारा',
   'scan.offlineEstimateMsg': 'ऑफ़लाइन फ़ूड डेटाबेस से अनुमानित पोषण।',
   'scan.estimateErrorTitle': 'अनुमान त्रुटि',
   'scan.estimateErrorMsg': 'ऑफ़लाइन अनुमान नहीं बन सका।',

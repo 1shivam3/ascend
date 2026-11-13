@@ -17,6 +17,7 @@ export const PRESERVED_LOCAL_KEYS: ReadonlySet<string> = new Set([
   'ascend_supabase_url',
   'ascend_supabase_anon_key',
   'ascend_theme',
+  'ascend_theme_mode',
   'ascend_has_custom_theme',
   LOGGED_OUT_LATCH_KEY,
 ]);
@@ -258,6 +259,7 @@ const BACKUP_STATE_FIELDS = [
   'prTargets',
   'macroGoals',
   'theme',
+  'themeMode',
   'hasCustomTheme',
   'hasCompletedOnboarding',
   'weeklySchedule',
@@ -536,7 +538,8 @@ export function importFullBackupJSON(jsonString: string): boolean {
     const nextState: Record<string, any> = {
       ...currentState,
       ...data,
-      hasCompletedOnboarding: true,
+      // §26: no completion flag to force — completion derives
+      // from the restored profile's presence.
       _hasHydrated: true,
     };
     // F12 (preview-fix) + gauntlet DI-07: same entry-date rule as

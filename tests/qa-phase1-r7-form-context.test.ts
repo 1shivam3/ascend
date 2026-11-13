@@ -35,7 +35,6 @@ function rep(over: Partial<FormRep> = {}): FormRep {
     maxTorsoInclinationDeg: 15,
     trackingConfidence: 1,
     observations: [],
-    isValid: true,
     status: 'valid',
     ...over,
   };
@@ -90,12 +89,12 @@ describe('R7: unverified reps are excluded and labelled (deadlift)', () => {
     totalUnverifiedReps: 2,
     analysedRepCount: 4,
     reps: [
-      rep({ repNumber: 1, status: 'valid', isValid: true, lockoutAchieved: true, minHipAngleDeg: 170 }),
-      rep({ repNumber: 2, status: 'failed', isValid: false, lockoutAchieved: false, minHipAngleDeg: 175 }),
+      rep({ repNumber: 1, status: 'valid', lockoutAchieved: true, minHipAngleDeg: 170 }),
+      rep({ repNumber: 2, status: 'failed', lockoutAchieved: false, minHipAngleDeg: 175 }),
       // Unverified: placeholders that would poison the hip range and
       // the lockout count if they were treated as measurements.
-      rep({ repNumber: 3, status: 'unverified', isValid: false, lockoutAchieved: false, minHipAngleDeg: 5, maxTorsoInclinationDeg: 89 }),
-      rep({ repNumber: 4, status: 'unverified', isValid: false, lockoutAchieved: true, minHipAngleDeg: 179, maxTorsoInclinationDeg: 88 }),
+      rep({ repNumber: 3, status: 'unverified', lockoutAchieved: false, minHipAngleDeg: 5, maxTorsoInclinationDeg: 89 }),
+      rep({ repNumber: 4, status: 'unverified', lockoutAchieved: true, minHipAngleDeg: 179, maxTorsoInclinationDeg: 88 }),
     ],
   });
 
@@ -125,8 +124,8 @@ describe('R7: an unverified-only session yields no citable measurements', () => 
       totalUnverifiedReps: 2,
       analysedRepCount: 2,
       reps: [
-        rep({ repNumber: 1, status: 'unverified', isValid: false, minHipAngleDeg: 40 }),
-        rep({ repNumber: 2, status: 'unverified', isValid: false, minHipAngleDeg: 42 }),
+        rep({ repNumber: 1, status: 'unverified', minHipAngleDeg: 40 }),
+        rep({ repNumber: 2, status: 'unverified', minHipAngleDeg: 42 }),
       ],
     });
     const { lines, evidenceLine } = serializeFormChecks([s]);
@@ -150,7 +149,7 @@ describe('R7: the built coach context + system prompt carry the rule', () => {
       analysedRepCount: 2,
       reps: [
         rep({ repNumber: 1, status: 'valid', lockoutAchieved: true, minHipAngleDeg: 172 }),
-        rep({ repNumber: 2, status: 'unverified', isValid: false, lockoutAchieved: false, minHipAngleDeg: 3 }),
+        rep({ repNumber: 2, status: 'unverified', lockoutAchieved: false, minHipAngleDeg: 3 }),
       ],
     });
     const ctx = buildCoachChatContext(
@@ -213,7 +212,7 @@ describe('R7: weekly review form line excludes unverified reps', () => {
       reps: [
         rep({ repNumber: 1, status: 'valid', estimatedDepth: 'below_parallel' }),
         rep({ repNumber: 2, status: 'valid', estimatedDepth: 'parallel' }),
-        rep({ repNumber: 3, status: 'unverified', isValid: false, estimatedDepth: 'below_parallel' }),
+        rep({ repNumber: 3, status: 'unverified', estimatedDepth: 'below_parallel' }),
       ],
     });
     // Add a batch exercise so the per-exercise composition runs.

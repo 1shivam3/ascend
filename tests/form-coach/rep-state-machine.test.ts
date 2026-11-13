@@ -49,7 +49,7 @@ describe('RepStateMachine', () => {
     // Rep completed!
     expect(rep).not.toBeNull();
     expect(rep?.repNumber).toBe(1);
-    expect(rep?.isValid).toBe(true);
+    expect(rep?.status).toBe('valid'); // §32
     expect(rep?.minKneeAngleDeg).toBe(85);
     expect(rep?.estimatedDepth).toBe('below_parallel'); // 85 deg < 90 target
     expect(sm.getCompletedRepCount()).toBe(1);
@@ -134,7 +134,7 @@ describe('RepStateMachine', () => {
     }
 
     expect(rep).not.toBeNull();
-    expect(rep?.isValid).toBe(true);
+    expect(rep?.status).toBe('valid'); // §32
     // Descent ≈ from the last locked-out frame to the inflection (~1.4 s),
     // not the ~0.3 s trigger-to-threshold slice.
     expect(rep?.descentDurationSeconds).toBeGreaterThanOrEqual(1.2);

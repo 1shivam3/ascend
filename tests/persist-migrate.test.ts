@@ -75,12 +75,19 @@ describe('persist migrate (QA4-012)', () => {
     const out = migratePersistedState(legacy, 0) as any;
     expect(out.workouts).toBe(workouts);
     expect(out.theme).toBe('light');
-    expect(out.hasCompletedOnboarding).toBe(true);
+    // §26 + §35: the two deliberate exceptions to passthrough —
+    // the completion boolean is DELETED (completion is derived
+    // from profile presence now), and themeMode is derived from
+    // the legacy pair (no custom flag here → 'system').
+    expect('hasCompletedOnboarding' in out).toBe(false);
+    expect(out.themeMode).toBe('system');
   });
 
   it('tolerates empty / malformed persisted state', () => {
-    expect(migratePersistedState(undefined, 0)).toEqual({});
-    expect(migratePersistedState(null, 0)).toEqual({});
+    // §35: even an empty blob gains the derived themeMode default
+    // ('system' — it followed the OS, or never chose).
+    expect(migratePersistedState(undefined, 0)).toEqual({ themeMode: 'system' });
+    expect(migratePersistedState(null, 0)).toEqual({ themeMode: 'system' });
     const out = migratePersistedState({ uiPreferences: 'junk' }, 0) as any;
     expect(out.uiPreferences).toBe('junk'); // not an object — left for normal validation paths
   });

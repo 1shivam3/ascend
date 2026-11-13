@@ -15,14 +15,14 @@ export default function TelemetryConsentBanner() {
     if (!hasConfiguredTelemetry()) return;
 
     const current = getTelemetryConsent();
-    if (current === null) {
+    if (current === 'unasked') {
       // Small timeout so it doesn't flash during initial hydration
       const timer = setTimeout(() => setVisible(true), 1200);
       return () => clearTimeout(timer);
     }
 
     const handler = () => {
-      setVisible(getTelemetryConsent() === null);
+      setVisible(getTelemetryConsent() === 'unasked');
     };
     window.addEventListener(TELEMETRY_CONSENT_EVENT, handler);
     return () => window.removeEventListener(TELEMETRY_CONSENT_EVENT, handler);

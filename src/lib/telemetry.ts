@@ -3,7 +3,15 @@
  * Manages environment-driven telemetry configuration and user consent gating.
  */
 
-export type TelemetryConsent = 'accepted' | 'declined' | null;
+/**
+ * §37: consent is an explicit tri-state — 'unasked' is a real
+ * value, not a smuggled null. Stored representation (migration):
+ * the localStorage key holds 'accepted' or 'declined' once the
+ * user chooses; ABSENCE of the key is 'unasked'. Nothing on disk
+ * changes for existing users — the reader maps absence/garbage
+ * to 'unasked', so old stored values keep their meaning.
+ */
+export type TelemetryConsent = 'unasked' | 'accepted' | 'declined';
 
 export const TELEMETRY_CONSENT_KEY = 'ascend_telemetry_consent';
 export const TELEMETRY_CONSENT_EVENT = 'ascend_telemetry_consent_changed';
@@ -60,15 +68,18 @@ export function hasConfiguredTelemetry(): boolean {
  * Returns the athlete's current telemetry consent status from localStorage.
  */
 export function getTelemetryConsent(): TelemetryConsent {
-  if (typeof window === 'undefined') return null;
+  // Server / no storage: no choice has been recorded — 'unasked'.
+  // Every consumer gates on 'accepted', so this can never enable
+  // telemetry by accident.
+  if (typeof window === 'undefined') return 'unasked';
   try {
     const val = window.localStorage.getItem(TELEMETRY_CONSENT_KEY);
     if (val === 'accepted' || val === 'declined') {
       return val;
     }
-    return null;
+    return 'unasked';
   } catch {
-    return null;
+    return 'unasked';
   }
 }
 

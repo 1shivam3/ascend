@@ -13,6 +13,7 @@ import { useStore } from './store';
 import {
   checkHealthAuthorization,
   fetchHealthData,
+  invalidateHealthGrants,
   isHealthConnectSupported,
 } from './health-connect';
 
@@ -27,7 +28,10 @@ export async function syncHealthConnectIfEnabled(): Promise<HealthSyncOutcome> {
   inFlight = true;
   try {
     const auth = await checkHealthAuthorization();
-    if (auth !== 'granted') return 'denied';
+    // §36: sync requires the full grant set ('all'); a partial
+    // grant is reported as denied here, and Settings names the
+    // missing types when the user connects.
+    if (auth.state !== 'all') return 'denied';
     const result = await fetchHealthData();
     useStore.getState().applyHealthSync(result);
     return 'synced';
@@ -51,9 +55,16 @@ export function initHealthConnectSync(): void {
   import('@capacitor/app')
     .then(({ App }) => {
       App.addListener('appStateChange', ({ isActive }) => {
-        if (isActive) void syncHealthConnectIfEnabled();
+        if (isActive) {
+          // §36: returning to the app can follow a permission
+          // change in Health Connect's own settings — the grant
+          // cache must not survive the resume.
+          invalidateHealthGrants();
+          void syncHealthConnectIfEnabled();
+        }
       });
       App.addListener('resume', () => {
+        invalidateHealthGrants();
         void syncHealthConnectIfEnabled();
       });
     })

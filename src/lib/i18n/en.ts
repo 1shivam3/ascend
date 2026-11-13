@@ -231,7 +231,6 @@ export const en = {
   'formCoach.phaseBottom': 'Bottom',
   'formCoach.phaseAscending': 'Ascending',
   'formCoach.phaseLockout': 'Lockout',
-  'formCoach.phaseRepCompleted': 'Rep completed',
   'formCoach.phaseTrackingLost': 'Tracking lost',
   'formCoach.minKneeAngle': 'Min Knee Angle',
   'formCoach.jointAngle': 'Joint angle',
@@ -408,6 +407,10 @@ export const en = {
   'health.neverSynced': 'Not synced yet',
   'health.stepsToday': 'Steps today',
   'health.unavailable': 'Health Connect is not available on this device.',
+  'health.partialMissing': 'Still needed: {types}. Health sync needs all three — grant them in Health Connect settings.',
+  'health.typeSteps': 'Steps',
+  'health.typeSleep': 'Sleep',
+  'health.typeWeight': 'Weight',
 
   // ── Progress: muscle volume & recovery ──────────────────────────────
   'progress.muscleVolume': 'Muscle Volume',
@@ -686,6 +689,9 @@ export const en = {
   'scan.lowMemory': 'Unable to process photo due to low device memory. Try closing background apps, or estimate with the offline database below.',
   'scan.processFailed': 'Failed to process camera image. Please try again.',
   'scan.offlineEstimateTitle': 'Offline Estimate',
+  'scan.sourceCloud': 'Analyzed by AI',
+  'scan.sourceOffline': 'Offline estimate',
+  'scan.sourceRefined': 'AI refined',
   'scan.offlineEstimateMsg': 'Estimated nutrition from offline food database.',
   'scan.estimateErrorTitle': 'Estimate Error',
   'scan.estimateErrorMsg': 'Could not generate offline estimate.',

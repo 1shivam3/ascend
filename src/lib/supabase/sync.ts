@@ -2549,7 +2549,6 @@ class SupabaseSyncEngine {
                   ? undefined
                   : resolveAvatar(localState.profile?.avatar),
           };
-          updates.hasCompletedOnboarding = true;
           needsLocalUpdate = true;
         }
       } else if (localState.profile && !isCrossAccountSwitch) {
@@ -2588,7 +2587,6 @@ class SupabaseSyncEngine {
           dietPreference: 'non_vegetarian',
           createdAt: new Date().toISOString(),
         };
-        updates.hasCompletedOnboarding = true;
         needsLocalUpdate = true;
       }
 

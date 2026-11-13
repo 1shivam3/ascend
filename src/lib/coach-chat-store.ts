@@ -22,7 +22,18 @@ import { persist } from 'zustand/middleware';
 import type { CoachAction } from './coach-actions';
 import type { MacroGoals } from './types';
 
-export type CoachActionState = 'pending' | 'applied' | 'dismissed' | 'stale' | 'superseded';
+export type CoachActionState =
+  | 'pending'
+  | 'applied'
+  | 'dismissed'
+  | 'stale'
+  | 'superseded'
+  /** §28: an applied macro-goals receipt that was reversed via
+   * Undo. A state of its own (it used to be a separate boolean
+   * flag beside an 'applied' state — a hidden sixth state). The
+   * receipt is retained so the card keeps showing what was
+   * applied and that it was reversed. */
+  | 'undone';
 
 /** Receipt for an applied set_macro_goals action: what the goals were
  * and what they became — renders the card's old → new line and powers
@@ -32,33 +43,59 @@ export interface CoachActionReceipt {
   applied: MacroGoals;
 }
 
-export interface CoachChatMessage {
+/**
+ * §28: the captured proposal-time macro goals, with the capture
+ * fact explicit. The tri-state this replaces was carried by
+ * `undefined | null | MacroGoals` and read differently at
+ * different sites. Now:
+ *  - field ABSENT (`actionBase === undefined`) = NOT CAPTURED YET
+ *  - `{ status: 'captured', goals: null }` = captured, no goals
+ *    existed at proposal time
+ *  - `{ status: 'captured', goals }` = captured snapshot
+ * Legacy persisted messages hold the raw `MacroGoals | null` in
+ * this field; `readActionBase` (coach-action-executor) is the one
+ * normalizing reader for both shapes.
+ */
+export interface ActionBaseCapture {
+  status: 'captured';
+  goals: MacroGoals | null;
+}
+
+interface CoachChatMessageBase {
   role: 'user' | 'assistant';
   content: string;
   evidence?: string[];
-  /** Coach AI Actions (Slice A): at most one validated action per
-   * assistant reply. Absent on every pre-existing persisted message —
-   * all fields below are optional for exactly that reason. */
-  action?: CoachAction;
-  /** Lifecycle of `action`; meaningful only when `action` is set. */
-  actionState?: CoachActionState;
   /** Epoch ms the message was appended (drives the 30-min card
    * expiry). Absent on threads persisted before Slice A. */
   ts?: number;
+}
+
+/** A message with no action. §28: the action fields are `never`
+ * here, so an actionState (or base, or receipt) without an action
+ * is a COMPILE error, not a runtime surprise. */
+export interface PlainCoachChatMessage extends CoachChatMessageBase {
+  action?: never;
+  actionState?: never;
+  appliedSnapshot?: never;
+  actionBase?: never;
+}
+
+/** A message carrying its one validated coach action (Slice A). */
+export interface ActionCoachChatMessage extends CoachChatMessageBase {
+  action: CoachAction;
+  /** Lifecycle of `action` — always present beside it. */
+  actionState: CoachActionState;
   /** Set when a set_macro_goals action is applied. */
   appliedSnapshot?: CoachActionReceipt;
   /** Slice B: the macro goals as they stood when the card first
-   * rendered (null = no goals existed then). Captured ONCE, on first
-   * render, and persisted with the message — so an apply after a
-   * reload still version-checks against proposal-time values, not
-   * whatever the goals happen to be when the reloaded card paints.
-   * `undefined` means "not captured yet". set_macro_goals only. */
-  actionBase?: MacroGoals | null;
-  /** Slice B: true once an applied set_macro_goals receipt has been
-   * undone. The receipt is retained so the card can keep showing
-   * what was applied and that it was reversed. */
-  undone?: boolean;
+   * rendered. Captured ONCE, on first render, and persisted with
+   * the message — so an apply after a reload still version-checks
+   * against proposal-time values, not whatever the goals happen
+   * to be when the reloaded card paints. set_macro_goals only. */
+  actionBase?: ActionBaseCapture;
 }
+
+export type CoachChatMessage = PlainCoachChatMessage | ActionCoachChatMessage;
 
 interface CoachChatState {
   messages: CoachChatMessage[];

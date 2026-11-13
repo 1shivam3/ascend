@@ -326,14 +326,35 @@ export async function checkLocalNotificationPermission(): Promise<LocalNotificat
   }
 }
 
-export async function requestLocalNotificationPermission(): Promise<boolean> {
-  if (!isNativeApp()) return false;
+/**
+ * §36: the request result is the FULL state, not a boolean —
+ * a denial, a dismissed sheet, an unsupported web context and
+ * a bridge failure used to collapse into the same `false`, and
+ * callers showed "still off" for all four.
+ * - granted: the user allowed notifications.
+ * - denied: the user (or OS policy) refused.
+ * - dismissed: the sheet closed without a decision (the plugin
+ *   still reports 'prompt').
+ * - unsupported-web: notifications can't be requested here.
+ * - bridge-error: the native plugin failed to answer.
+ */
+export type LocalNotificationRequestResult =
+  | 'granted'
+  | 'denied'
+  | 'dismissed'
+  | 'unsupported-web'
+  | 'bridge-error';
+
+export async function requestLocalNotificationPermission(): Promise<LocalNotificationRequestResult> {
+  if (!isNativeApp()) return 'unsupported-web';
   try {
     const plugin = await loadPlugin();
     const status = await plugin.requestPermissions();
-    return status.display === 'granted';
+    if (status.display === 'granted') return 'granted';
+    if (status.display === 'denied') return 'denied';
+    return 'dismissed';
   } catch {
-    return false;
+    return 'bridge-error';
   }
 }
 

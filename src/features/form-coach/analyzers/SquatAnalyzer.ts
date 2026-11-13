@@ -8,7 +8,7 @@
 import { ExerciseAnalyzer, AnalyzerFrameResult, MovementAssessment } from './ExerciseAnalyzer';
 import { NormalizedLandmark, PoseLandmarkIndex, DetectedSide } from '../models/pose.types';
 import { FormCue, FormObservation, MovementPhase } from '../models/form-feedback.types';
-import { FormRep, FormSessionSummary, getRepStatus } from '../models/form-session.types';
+import { FormRep, FormSessionSummary, getRepStatus, isValidRep } from '../models/form-session.types';
 import {
   calculateJointAngle,
   calculateSegmentInclination,
@@ -18,6 +18,7 @@ import {
 import { RepStateMachine, RepStateMachineConfig, DEFAULT_SQUAT_CONFIG } from '../services/analysis/RepStateMachine';
 import { FormFeedbackEngine, FeedbackRule, RuleEvaluationContext } from '../services/analysis/FormFeedbackEngine';
 import { computeTempoSeconds } from '../services/analysis/tempo';
+import { sustainedVisibilityOut, type VisibilitySample } from '../services/analysis/visibility';
 import { safeRandomId } from '@/lib/formatters';
 
 export const SQUAT_ANALYZER_VERSION = '1.0.0';
@@ -28,9 +29,6 @@ export const SQUAT_ANALYZER_VERSION = '1.0.0';
  * the trailing window, and the window must span at least the minimum
  * duration, before the absence counts as real.
  */
-const VISIBILITY_WINDOW_MS = 1200;
-const VISIBILITY_MIN_SPAN_MS = 700;
-const VISIBILITY_BAD_SHARE = 0.6;
 
 /**
  * D1: a rep counts as confidently FRONT only when front classifications
@@ -78,11 +76,6 @@ function majorityView(votes: DetectedSide[]): DetectedSide {
   if (sideCount > 0) return sideBest as DetectedSide;
   if (counts.front > 0) return 'front';
   return 'unknown';
-}
-
-interface VisibilitySample {
-  t: number;
-  ok: boolean;
 }
 
 export class SquatAnalyzer implements ExerciseAnalyzer {
@@ -299,24 +292,10 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
     };
   }
 
-  /**
-   * D2: push one visibility sample into a trailing window and report
-   * whether the absence is SUSTAINED — window spans at least
-   * VISIBILITY_MIN_SPAN_MS and at least VISIBILITY_BAD_SHARE of its
-   * samples are not-ok. A brief dip inside an otherwise visible window
-   * returns false.
-   */
+  /** §33: the shared trailing-window rule (services/analysis/
+   * visibility.ts) — this analyzer used to carry a private copy. */
   private sustainedOut(window: VisibilitySample[], ok: boolean, timestampMs: number): boolean {
-    window.push({ t: timestampMs, ok });
-    const cutoff = timestampMs - VISIBILITY_WINDOW_MS;
-    while (window.length > 1 && window[0].t < cutoff) {
-      window.shift();
-    }
-    if (window.length === 0) return false;
-    const span = timestampMs - window[0].t;
-    if (span < VISIBILITY_MIN_SPAN_MS) return false;
-    const bad = window.reduce((acc, s) => acc + (s.ok ? 0 : 1), 0);
-    return bad / window.length >= VISIBILITY_BAD_SHARE;
+    return sustainedVisibilityOut(window, ok, timestampMs);
   }
 
   /** D1: is the CURRENT rep confidently front-view across its frames so far? */
@@ -576,7 +555,7 @@ export class SquatAnalyzer implements ExerciseAnalyzer {
   ): FormSessionSummary {
     const now = Date.now();
     const durationSeconds = Math.max(1, Math.round((now - this.sessionStartTimeMs) / 1000));
-    const validReps = this.completedReps.filter((r) => r.isValid);
+    const validReps = this.completedReps.filter((r) => isValidRep(r));
 
     const avgConfidence =
       this.trackingConfidences.length > 0

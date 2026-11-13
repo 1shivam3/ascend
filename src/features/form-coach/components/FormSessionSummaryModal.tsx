@@ -7,7 +7,7 @@
  */
 
 import React, { useState } from 'react';
-import { FormSessionSummary, SquatDepthClassification, getRepStatus } from '../models/form-session.types';
+import { FormSessionSummary, SquatDepthClassification, getRepStatus, isValidRep } from '../models/form-session.types';
 import { useTranslation } from '@/lib/i18n';
 import type { StringKey } from '@/lib/i18n/en';
 import {
@@ -375,7 +375,7 @@ export default function FormSessionSummaryModal({
                                 : 'below shoulder'}
                           </span>
                           <span className="text-2xs text-text-muted block">
-                            {rep.isValid ? 'Complete' : (rep.invalidReason ?? 'Incomplete')}
+                            {isValidRep(rep) ? 'Complete' : (rep.invalidReason ?? 'Incomplete')}
                           </span>
                         </div>
                       ) : (
@@ -386,7 +386,7 @@ export default function FormSessionSummaryModal({
                           <span className="text-2xs text-text-muted block">
                             {rep.lockoutAchieved !== undefined
                               ? `Lockout: ${rep.lockoutAchieved ? 'Full' : 'Not reached'}`
-                              : rep.isValid
+                              : isValidRep(rep)
                                 ? 'Complete'
                                 : (rep.invalidReason ?? 'Incomplete')}
                           </span>

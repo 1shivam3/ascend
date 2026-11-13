@@ -29,7 +29,7 @@ function rep(over: Partial<FormRep> = {}): FormRep {
     maxTorsoInclinationDeg: 36,
     trackingConfidence: 1,
     observations: [],
-    isValid: true,
+    status: 'valid', // §32: the one verdict field (was isValid: true)
     ...over,
   };
 }
@@ -165,7 +165,7 @@ function deadliftSession(over: Partial<FormSessionSummary> = {}): FormSessionSum
       deadliftRep({ repNumber: 1, minHipAngleDeg: 62 }),
       deadliftRep({ repNumber: 2, minHipAngleDeg: 66 }),
       deadliftRep({ repNumber: 3, minHipAngleDeg: 70 }),
-      deadliftRep({ repNumber: 4, minHipAngleDeg: 68, lockoutAchieved: false, isValid: false, invalidReason: 'Lockout not reached' }),
+      deadliftRep({ repNumber: 4, minHipAngleDeg: 68, lockoutAchieved: false, status: 'failed', invalidReason: 'Lockout not reached' }),
     ],
     observations: [
       {

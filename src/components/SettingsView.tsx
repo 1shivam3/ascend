@@ -78,6 +78,7 @@ import {
   isHealthConnectSupported,
   openHealthConnectSettings,
   requestHealthAuthorization,
+  type HealthReadType,
 } from '@/lib/health-connect';
 import { syncHealthConnectIfEnabled } from '@/lib/health-sync';
 
@@ -122,9 +123,9 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   const profile = storeProfile ?? useStore.getState().profile;
   const setProfile = useStore((state) => state.setProfile);
   const theme = useStore((state) => state.theme);
-  const setTheme = useStore((state) => state.setTheme);
+  const setThemeMode = useStore((state) => state.setThemeMode);
   const resetThemeToSystem = useStore((state) => state.resetThemeToSystem);
-  const hasCustomTheme = useStore((state) => state.hasCustomTheme);
+  const themeMode = useStore((state) => state.themeMode);
   const importAllData = useStore((state) => state.importAllData);
   const uiPreferences = useStore((state) => state.uiPreferences);
   const setUiPreferences = useStore((state) => state.setUiPreferences);
@@ -215,7 +216,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   }, []);
   // ── UX redesign Stage 6 — accent + dashboard personalization ──────────
   // Accent selection is NOT a theme-mode pick: it never touches
-  // hasCustomTheme. The page.tsx effect restyles the app from these keys.
+  // themeMode. The page.tsx effect restyles the app from these keys.
   const isDarkMode = theme === 'dark';
   const accentSwatches = ACCENT_PRESETS.map((p) => ({
     id: p.id,
@@ -358,11 +359,15 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   const healthSupported = isHealthConnectSupported();
   const healthConnectLastSyncedAt = useStore((state) => state.healthConnectLastSyncedAt);
   const [healthStatus, setHealthStatus] = useState<'idle' | 'connecting' | 'denied' | 'unavailable'>('idle');
+  // §36: when a grant comes back partial/none, exactly which
+  // data types are missing — shown under the permission help.
+  const [healthMissing, setHealthMissing] = useState<HealthReadType[]>([]);
 
   const handleHealthConnectToggle = async () => {
     if (uiPreferences.healthConnectEnabled === true) {
       setUiPreferences({ healthConnectEnabled: false });
       setHealthStatus('idle');
+      setHealthMissing([]);
       toast.info(t('settings.healthOffMsg'), t('health.title'));
       return;
     }
@@ -373,7 +378,8 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       return;
     }
     const auth = await requestHealthAuthorization();
-    if (auth === 'granted') {
+    if (auth.state === 'all') {
+      setHealthMissing([]);
       setUiPreferences({ healthConnectEnabled: true });
       setHealthStatus('idle');
       const outcome = await syncHealthConnectIfEnabled();
@@ -383,16 +389,19 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
           : t('settings.healthConnectedMsg'),
         t('health.title')
       );
-    } else if (auth === 'denied') {
+    } else if (auth.state === 'partial' || auth.state === 'none') {
       // Same denied-permission pattern as everywhere else (Item 0):
       // purpose line + button into Health Connect's own settings.
+      // §36: a partial grant is no longer a blanket denial — the
+      // missing types are named under the help block.
+      setHealthMissing(auth.missing);
       setHealthStatus('denied');
     } else {
       setHealthStatus('idle');
       toast.error(t('settings.healthFailedMsg'), t('health.title'));
     }
   };
-  const [telemetryConsent, setTelemetryConsentState] = useState<TelemetryConsent>(null);
+  const [telemetryConsent, setTelemetryConsentState] = useState<TelemetryConsent>('unasked');
 
   useEffect(() => {
     setTelemetryConsentState(getTelemetryConsent());
@@ -790,15 +799,15 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.appearance')}</span>
               <span className="text-2xs font-mono text-text-muted capitalize">
-                {hasCustomTheme ? (theme === 'dark' ? t('settings.themeDark') : t('settings.themeLight')) : t('settings.systemDefault')}
+                {themeMode !== 'system' ? (themeMode === 'dark' ? t('settings.themeDark') : t('settings.themeLight')) : t('settings.systemDefault')}
               </span>
             </div>
             <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-bg-secondary border border-border">
               <button
                 type="button"
-                onClick={() => setTheme('light')}
+                onClick={() => setThemeMode('light')}
                 className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                  hasCustomTheme && theme === 'light'
+                  themeMode === 'light'
                     ? 'bg-bg-card text-text-primary shadow-xs border border-border'
                     : 'text-text-muted hover:text-text-primary'
                 }`}
@@ -808,9 +817,9 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               </button>
               <button
                 type="button"
-                onClick={() => setTheme('dark')}
+                onClick={() => setThemeMode('dark')}
                 className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                  hasCustomTheme && theme === 'dark'
+                  themeMode === 'dark'
                     ? 'bg-bg-card text-text-primary shadow-xs border border-border'
                     : 'text-text-muted hover:text-text-primary'
                 }`}
@@ -822,7 +831,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 type="button"
                 onClick={() => resetThemeToSystem()}
                 className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                  !hasCustomTheme
+                  themeMode === 'system'
                     ? 'bg-bg-card text-text-primary shadow-xs border border-border'
                     : 'text-text-muted hover:text-text-primary'
                 }`}
@@ -1193,6 +1202,23 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               )}
               {healthStatus === 'unavailable' && (
                 <p className="text-2xs text-amber-300 leading-relaxed">{t('health.unavailable')}</p>
+              )}
+              {healthStatus === 'denied' && healthMissing.length > 0 && (
+                <p className="text-2xs text-amber-300 leading-relaxed">
+                  {t('health.partialMissing', {
+                    types: healthMissing
+                      .map((ty) =>
+                        t(
+                          ty === 'steps'
+                            ? 'health.typeSteps'
+                            : ty === 'sleep'
+                              ? 'health.typeSleep'
+                              : 'health.typeWeight',
+                        ),
+                      )
+                      .join(', '),
+                  })}
+                </p>
               )}
               {healthStatus === 'denied' && (
                 <PermissionHelp

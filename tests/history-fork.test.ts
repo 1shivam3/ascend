@@ -5,7 +5,7 @@ import {
   readArchivedHistory,
   retainedHistoryCounts,
 } from '../src/lib/history-fork';
-import { useStore } from '@/lib/store';
+import { useStore, selectHasCompletedOnboarding } from '@/lib/store';
 import { dayPlanRef } from '@/lib/types';
 
 // FND-06: a fresh profile must never silently inherit retained history.
@@ -76,7 +76,7 @@ describe('startFreshFromRetainedHistory / restoreArchivedHistory', () => {
     storage.setItem('ascend_emergency_snapshot', JSON.stringify({ workouts: [{ id: 'w1' }] }));
     useStore.setState({
       profile: null,
-      hasCompletedOnboarding: false,
+      // §26: no completion flag — the seed's profile state carries it.
       workouts: [{ id: 'w1', date: '2026-10-20', exercises: [] }],
       meals: [{ id: 'm1', date: '2026-10-20', name: 'Lunch', foods: [] }],
       plannedWorkouts: [{ id: 'p1', name: 'Plan', exercises: [], createdAt: '2026-01-01' }],
@@ -108,7 +108,7 @@ describe('startFreshFromRetainedHistory / restoreArchivedHistory', () => {
     // default profile untouched onboarding produces — no DOB, no
     // plans — and marks onboarding complete, so the app opens on
     // Today instead of the onboarding start screen.
-    expect(after.hasCompletedOnboarding).toBe(true);
+    expect(selectHasCompletedOnboarding(after)).toBe(true); // §26: the fresh default profile IS completion
     expect(after.profile).toBeTruthy();
     expect(after.profile!.id.startsWith('guest_')).toBe(true);
     // FE-21 (audit 3): no placeholder name is seeded — the profile name
@@ -166,7 +166,7 @@ describe('startFreshFromRetainedHistory / restoreArchivedHistory', () => {
     // The fork gate in page.tsx requires NO profile, so a present
     // profile skips the fork.
     expect(after.profile).not.toBeNull();
-    expect(after.hasCompletedOnboarding).toBe(true);
+    expect(selectHasCompletedOnboarding(after)).toBe(true); // §26 derived
   });
 
   it('a failed archive write clears nothing', () => {
@@ -180,21 +180,21 @@ describe('startFreshFromRetainedHistory / restoreArchivedHistory', () => {
     expect(useStore.getState().workouts).toHaveLength(1);
     // No default profile is created on failure — the fork stays.
     expect(useStore.getState().profile).toBeNull();
-    expect(useStore.getState().hasCompletedOnboarding).toBe(false);
+    expect(selectHasCompletedOnboarding(useStore.getState())).toBe(false); // §26 derived
   });
 
   it('restore brings the archived history back and keeps onboarding complete', () => {
     useStore.getState().startFreshFromRetainedHistory();
     expect(useStore.getState().workouts).toEqual([]);
     // Simulate the fresh profile the user set up after Start fresh.
-    useStore.setState({ profile: { id: 'new', name: 'New' }, hasCompletedOnboarding: true } as never);
+    useStore.setState({ profile: { id: 'new', name: 'New' } } as never); // §26: profile presence carries completion
     const ok = useStore.getState().restoreArchivedHistory();
     expect(ok).toBe(true);
     const after = useStore.getState();
     expect(after.workouts).toHaveLength(1);
     expect(after.plannedWorkouts).toHaveLength(1);
     expect(after.profile?.name).toBe('New');
-    expect(after.hasCompletedOnboarding).toBe(true);
+    expect(selectHasCompletedOnboarding(after)).toBe(true); // §26 derived
     // The archive is kept, so a restore is repeatable.
     expect(storage.getItem(ARCHIVED_HISTORY_KEY)).not.toBeNull();
   });

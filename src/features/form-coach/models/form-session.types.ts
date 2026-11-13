@@ -21,13 +21,60 @@ export type SquatDepthClassification = 'above_parallel' | 'parallel' | 'below_pa
  * machines emit a rep record only when the very signal that judges
  * the rep was measurable throughout, so their reps are never
  * 'unverified'.
+ *
+ * §32 (Phase 4): the verdict is ONE field — `status`, required.
+ * The parallel `isValid` boolean that used to duplicate it is
+ * gone (derive validity with isValidRep); records saved before
+ * `status` existed are normalized at the storage read seam
+ * (normalizeFormRep), so no reader needs a legacy fallback.
  */
 export type FormRepStatus = 'valid' | 'failed' | 'unverified';
 
-/** Status of a rep, tolerating legacy records saved before the
- * status field existed (they fall back to the isValid verdict). */
+/** The rep's verdict — the field itself; reads are normalized at
+ * the storage seam, so there is no fallback to consult. */
 export function getRepStatus(rep: FormRep): FormRepStatus {
-  return rep.status ?? (rep.isValid ? 'valid' : 'failed');
+  return rep.status;
+}
+
+/** Derived validity — the ONLY way validity is read now. */
+export function isValidRep(rep: FormRep): boolean {
+  return rep.status === 'valid';
+}
+
+/**
+ * §32: THE shared verdict rule, used by all three rep machines:
+ * criteria met on measured evidence → 'valid'; criteria
+ * measurable and not met → 'failed' (with the reason). A machine
+ * never emits a record without this verdict, and a closed
+ * attempt always emits a record — silence is not a verdict.
+ * ('unverified' is stamped afterwards by an analyzer, never by
+ * a machine: only the analyzer knows whether the landmarks a
+ * criterion needs were visible — see visibility.ts.)
+ */
+export function repVerdict(
+  criteriaMet: boolean,
+  invalidReason?: string
+): { status: FormRepStatus; invalidReason?: string } {
+  return criteriaMet
+    ? { status: 'valid' }
+    : { status: 'failed', invalidReason };
+}
+
+/**
+ * Normalize a possibly-legacy persisted rep to the canonical
+ * shape: `status` present (derived from the pre-§32 `isValid`
+ * boolean when absent) and the boolean removed. Returns the
+ * same reference when the rep is already canonical.
+ */
+export function normalizeFormRep(
+  rep: FormRep & { isValid?: boolean }
+): FormRep {
+  if (rep.status !== undefined && !('isValid' in rep)) return rep;
+  const { isValid, ...rest } = rep as FormRep & { isValid?: boolean };
+  return {
+    ...rest,
+    status: rep.status ?? (isValid ? 'valid' : 'failed'),
+  };
 }
 
 export interface FormRep {
@@ -43,13 +90,13 @@ export interface FormRep {
   maxTorsoInclinationDeg: number;
   trackingConfidence: number;
   observations: string[];
-  isValid: boolean;
   invalidReason?: string;
-  /** P0-3 verdict: see FormRepStatus. Stamped by every state machine
-   * ('valid'/'failed' from the measured criteria); the deadlift
-   * analyzer may upgrade a 'failed' to 'unverified' when the lockout
-   * landmarks were not visible enough to judge. */
-  status?: FormRepStatus;
+  /** The ONE verdict field (§32): see FormRepStatus. Stamped by
+   * every state machine via repVerdict ('valid'/'failed' from the
+   * measured criteria); an analyzer may upgrade a 'failed' to
+   * 'unverified' when the landmarks a criterion needs were not
+   * visible enough to judge. Validity is derived: isValidRep. */
+  status: FormRepStatus;
   /**
    * Deadlift measurements (stamped by the deadlift analyzer only; squat
    * reps leave these undefined). minHipAngleDeg is the deepest hip fold

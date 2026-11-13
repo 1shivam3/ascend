@@ -91,7 +91,7 @@ describe('DeadliftAnalyzer — full sets', () => {
     expect(summary.totalDetectedReps).toBe(3);
     expect(summary.reps).toHaveLength(3);
     for (const rep of summary.reps) {
-      expect(rep.isValid).toBe(true);
+      expect(rep.status).toBe('valid'); // §32
       expect(rep.lockoutAchieved).toBe(true);
       expect(rep.minHipAngleDeg).toBeGreaterThanOrEqual(58);
       expect(rep.minHipAngleDeg).toBeLessThanOrEqual(72);
@@ -128,7 +128,7 @@ describe('DeadliftAnalyzer — incomplete pulls are not reps', () => {
     expect(summary.totalDetectedReps).toBe(2);
     expect(summary.reps).toHaveLength(2);
     for (const rep of summary.reps) {
-      expect(rep.isValid).toBe(false);
+      expect(rep.status).toBe('failed'); // §32
       expect(rep.lockoutAchieved).toBe(false);
       expect(rep.invalidReason).toBe('Lockout not reached');
     }

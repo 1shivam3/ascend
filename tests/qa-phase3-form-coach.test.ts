@@ -286,7 +286,7 @@ describe('Phase 3 check 2: summary strings leak no enums, in either language', (
     'formCoach.phaseBottom',
     'formCoach.phaseAscending',
     'formCoach.phaseLockout',
-    'formCoach.phaseRepCompleted',
+    // §31: 'formCoach.phaseRepCompleted' deleted with the phase.
     'formCoach.phaseTrackingLost',
   ] as const;
 

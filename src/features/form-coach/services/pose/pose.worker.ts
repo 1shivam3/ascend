@@ -16,6 +16,10 @@ let lastProcessedTimestamp = 0;
 let cachedVision: any = null;
 let cachedOptions: PoseLandmarkerOptions | null = null;
 
+// §33: the delegate that actually initialized — reported to the
+// service in INIT_SUCCESS so its state union can carry it.
+let currentDelegate: 'GPU' | 'CPU' = 'GPU';
+
 async function createLandmarkerInstance(vision: any, wasmPath: string, modelPath: string): Promise<PoseLandmarker> {
   const baseOptionsGPU: PoseLandmarkerOptions = {
     baseOptions: {
@@ -44,6 +48,7 @@ async function createLandmarkerInstance(vision: any, wasmPath: string, modelPath
   try {
     const instance = await PoseLandmarker.createFromOptions(vision, baseOptionsGPU);
     cachedOptions = baseOptionsGPU;
+    currentDelegate = 'GPU';
     return instance;
   } catch (gpuErr: any) {
     console.warn(
@@ -52,6 +57,7 @@ async function createLandmarkerInstance(vision: any, wasmPath: string, modelPath
     );
     const instance = await PoseLandmarker.createFromOptions(vision, baseOptionsCPU);
     cachedOptions = baseOptionsCPU;
+    currentDelegate = 'CPU';
     return instance;
   }
 }
@@ -61,7 +67,7 @@ self.onmessage = async (event: MessageEvent) => {
 
   if (type === 'INIT') {
     if (landmarker) {
-      self.postMessage({ type: 'INIT_SUCCESS' });
+      self.postMessage({ type: 'INIT_SUCCESS', delegate: currentDelegate });
       return;
     }
     if (isInitializing) return;
@@ -75,7 +81,7 @@ self.onmessage = async (event: MessageEvent) => {
       lastProcessedTimestamp = 0;
 
       isInitializing = false;
-      self.postMessage({ type: 'INIT_SUCCESS' });
+      self.postMessage({ type: 'INIT_SUCCESS', delegate: currentDelegate });
     } catch (err: any) {
       isInitializing = false;
       self.postMessage({

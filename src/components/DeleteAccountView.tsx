@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useReducer } from 'react';
 import Link from 'next/link';
 import {
   Dumbbell,
@@ -24,15 +24,14 @@ import { SUPPORT_EMAIL } from '@/lib/legal';
 import { localizedUserMessage } from '@/lib/user-error';
 import { useTranslation } from '@/lib/i18n';
 
-export type DeletionStatus =
-  | 'idle'
-  | 'requesting_token'
-  | 'token_requested'
-  | 'deleting'
-  | 'complete'
-  | 'partial'
-  | 'skipped'
-  | 'error';
+import {
+  deletionFlowReducer,
+  initialDeletionFlow,
+  isTerminalStatus,
+  type DeletionStatus,
+} from '@/lib/deletion-flow';
+
+export type { DeletionStatus } from '@/lib/deletion-flow';
 
 export interface DeleteAccountViewProps {
   initialStatus?: DeletionStatus;
@@ -48,16 +47,25 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
   const [email, setEmail] = useState<string>(props.initialEmail || '');
   const [verificationToken, setVerificationToken] = useState<string>(props.initialVerificationToken || '');
   const [confirmText, setConfirmText] = useState<string>('');
-  const [status, setStatus] = useState<DeletionStatus>(props.initialStatus || 'idle');
-  const [errorMessage, setErrorMessage] = useState<string | null>(props.initialErrorMessage || null);
-  const [statusDetails, setStatusDetails] = useState<string | null>(props.initialStatusDetails || null);
-
-  // Authentication state for signed-in users
-  const [sessionUser, setSessionUser] = useState<{
-    email: string;
-    accessToken: string;
-  } | null>(props.initialSessionUser !== undefined ? props.initialSessionUser : null);
-  const [isCheckingSession, setIsCheckingSession] = useState<boolean>(props.initialSessionUser === undefined);
+  // §34: status + session + messages are ONE machine
+  // (lib/deletion-flow). The session check is an arm of the
+  // state, not a parallel pair of session variables.
+  const [flow, dispatch] = useReducer(
+    deletionFlowReducer,
+    undefined as void,
+    () =>
+      initialDeletionFlow({
+        status: props.initialStatus,
+        errorMessage: props.initialErrorMessage,
+        statusDetails: props.initialStatusDetails,
+        sessionUser: props.initialSessionUser,
+      }),
+  );
+  const status = flow.status;
+  const errorMessage = flow.errorMessage;
+  const statusDetails = flow.statusDetails;
+  const sessionUser =
+    flow.session.kind === 'signed-in' ? flow.session : null;
 
   // 1. Detect existing Supabase session & URL query parameters on mount
   useEffect(() => {
@@ -88,25 +96,26 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
       }
 
       // Check for active Supabase session
+      let resolvedUser: { email: string; accessToken: string } | null = null;
       try {
         const supabase = getSupabase();
         if (supabase) {
           const { data: { session } } = await supabase.auth.getSession();
-          if (mounted && session?.user && session.access_token) {
-            setSessionUser({
+          if (session?.user && session.access_token) {
+            resolvedUser = {
               email: session.user.email || '',
               accessToken: session.access_token,
-            });
-            if (session.user.email) {
-              setEmail(session.user.email);
-            }
+            };
           }
         }
       } catch {
-        // Non-blocking
+        // Non-blocking — resolves as signed-out below.
       } finally {
         if (mounted) {
-          setIsCheckingSession(false);
+          dispatch({ type: 'session-resolved', user: resolvedUser });
+          if (resolvedUser?.email) {
+            setEmail(resolvedUser.email);
+          }
         }
       }
     }
@@ -121,12 +130,14 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
   const handleRequestToken = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
-      setErrorMessage(t('del.emailRequired'));
+      // §34: validation goes through the machine now, so the
+      // message actually renders (before, it was set on a state
+      // the error panel never read without status 'error').
+      dispatch({ type: 'invalid', message: t('del.emailRequired') });
       return;
     }
 
-    setStatus('requesting_token');
-    setErrorMessage(null);
+    dispatch({ type: 'request-token' });
 
     try {
       const res = await fetch('/api/auth/delete-account', {
@@ -141,22 +152,25 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
       const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
-        setStatus('token_requested');
-        setStatusDetails(
-          data?.message ||
-            t('del.linkSent')
-        );
+        dispatch({
+          type: 'token-sent',
+          details: data?.message || t('del.linkSent'),
+        });
         if (data.debugToken) {
           setVerificationToken(data.debugToken);
         }
       } else {
-        setStatus('error');
-        setErrorMessage(data?.message || t('del.linkFail'));
+        dispatch({
+          type: 'request-failed',
+          message: data?.message || t('del.linkFail'),
+        });
       }
     } catch (err: any) {
-      setStatus('error');
       // QA4-016: sanitize — raw fetch errors don't belong in the UI.
-      setErrorMessage(localizedUserMessage(t, language, err, 'generic'));
+      dispatch({
+        type: 'request-failed',
+        message: localizedUserMessage(t, language, err, 'generic'),
+      });
     }
   };
 
@@ -164,27 +178,22 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
   const handleDeleteAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
-      setErrorMessage(t('del.emailReq2'));
+      dispatch({ type: 'invalid', message: t('del.emailReq2') });
       return;
     }
 
     if (confirmText.trim().toUpperCase() !== 'DELETE') {
-      setStatus('error');
-      setErrorMessage(t('del.typeDeleteError'));
+      dispatch({ type: 'invalid', message: t('del.typeDeleteError') });
       return;
     }
 
     // Require either a signed-in session OR a verification token
     if (!sessionUser && !verificationToken.trim()) {
-      setStatus('error');
-      setErrorMessage(
-        t('del.tokenRequired')
-      );
+      dispatch({ type: 'invalid', message: t('del.tokenRequired') });
       return;
     }
 
-    setStatus('deleting');
-    setErrorMessage(null);
+    dispatch({ type: 'delete' });
 
     try {
       const headers: Record<string, string> = {
@@ -208,43 +217,41 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
 
       // Requirement 5: Accurately report complete, partial, and failed deletion
       if (res.status === 200 && data.cloudDeleted === true) {
-        setStatus('complete');
-        setStatusDetails(
-          data?.message ||
-            t('del.purgedMsg')
-        );
+        dispatch({
+          type: 'delete-complete',
+          details: data?.message || t('del.purgedMsg'),
+        });
         wipeLocalData();
       } else if (
         res.status === 200 &&
         data.cloudDeleted === false &&
         data.message?.includes('Cloud deletion skipped')
       ) {
-        setStatus('skipped');
-        setStatusDetails(
-          data.message ||
-            t('del.skippedMsg')
-        );
+        dispatch({
+          type: 'delete-skipped',
+          details: data.message || t('del.skippedMsg'),
+        });
         wipeLocalData();
       } else if (res.status === 207 || (data.cloudDeleted === false && data.authPurged)) {
-        setStatus('partial');
-        setStatusDetails(
-          data?.message ||
-            `Partial deletion: Your login credentials and authentication account were purged, but some database records could not be fully cleared. Please contact ${SUPPORT_EMAIL} for manual verification.`
-        );
+        dispatch({
+          type: 'delete-partial',
+          details:
+            data?.message ||
+            `Partial deletion: Your login credentials and authentication account were purged, but some database records could not be fully cleared. Please contact ${SUPPORT_EMAIL} for manual verification.`,
+        });
         wipeLocalData();
       } else {
-        setStatus('error');
-        setErrorMessage(
-          data?.message ||
-            t('del.failMsg')
-        );
+        dispatch({
+          type: 'delete-failed',
+          message: data?.message || t('del.failMsg'),
+        });
       }
     } catch (err: any) {
-      setStatus('error');
       // QA4-016: sanitize raw errors; keep the support path in the copy.
-      setErrorMessage(
-        `${localizedUserMessage(t, language, err, 'generic')} If it keeps happening, contact ${SUPPORT_EMAIL} for manual processing.`
-      );
+      dispatch({
+        type: 'delete-failed',
+        message: `${localizedUserMessage(t, language, err, 'generic')} If it keeps happening, contact ${SUPPORT_EMAIL} for manual processing.`,
+      });
     }
   };
 
@@ -400,7 +407,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
           </p>
 
           {/* ACTIVE SESSION BADGE */}
-          {!isCheckingSession && sessionUser && (
+          {flow.session.kind === 'signed-in' && sessionUser && (
             <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-2xs flex items-center gap-2">
               <UserCheck className="size-4 shrink-0" />
               <span>
@@ -475,7 +482,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
             </div>
           )}
 
-          {status !== 'complete' && status !== 'partial' && status !== 'skipped' && (
+          {!isTerminalStatus(status) && (
             <>
               {/* STEP 1: Request Verification Link (if not signed in and no token) */}
               {!sessionUser && !verificationToken && (
@@ -601,7 +608,17 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
                     className="p-2.5 rounded-lg bg-danger/10 border border-danger/30 text-danger text-2xs flex items-start gap-2"
                   >
                     <AlertTriangle className="size-4 shrink-0 mt-0.5" />
-                    <span>{errorMessage}</span>
+                    <span className="flex-1">{errorMessage}</span>
+                    {/* §34: the explicit reset transition out of
+                        'error' — back to the form, message cleared. */}
+                    <button
+                      type="button"
+                      data-testid="deletion-error-reset"
+                      onClick={() => dispatch({ type: 'reset' })}
+                      className="shrink-0 font-bold underline underline-offset-2 cursor-pointer"
+                    >
+                      {t('perm.tryAgain')}
+                    </button>
                   </div>
                 )}
 

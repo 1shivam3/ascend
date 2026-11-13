@@ -25,23 +25,76 @@ import SummaryScreen from './onboarding/SummaryScreen';
 import StepProgressBar from './onboarding/StepProgressBar';
 import { kgToLbs, lbsToKg } from '@/lib/units';
 
+/**
+ * §25: the screen union holds only screens that exist.
+ * 'experience' and 'schedule' were removed from the flow by the
+ * simplified onboarding; they survive ONLY as legacy deep-link
+ * values, remapped to 'details' at parse time below (old links
+ * keep working, the dead states are unrepresentable here).
+ */
 type OnboardingScreenId =
   | 'splash'
   | 'welcome'
   | 'create_account'
   | 'login'
   | 'goals'
-  | 'experience'
-  | 'schedule'
   | 'details'
   | 'plan_offer'
   | 'summary';
+
+const ONBOARDING_SCREENS: readonly OnboardingScreenId[] = [
+  'splash',
+  'welcome',
+  'create_account',
+  'login',
+  'goals',
+  'details',
+  'plan_offer',
+  'summary',
+];
+
+/**
+ * §25 progress persistence — SCOPE (decided, documented): only
+ * the furthest pre-input screen is saved (welcome / create_
+ * account / login / goals), under a non-sensitive key holding
+ * nothing but the screen id. A reload resumes there instead of
+ * restarting at splash. Screens past 'goals' stage their inputs
+ * in memory by design (the profile commits only at completion),
+ * so their resume point is 'goals'. Name/DOB/email/goals answers
+ * are NEVER persisted by this mechanism. The key is cleared when
+ * onboarding completes.
+ */
+const ONBOARDING_PROGRESS_KEY = 'ascend_onboarding_screen';
+const RESUME_POINTS: readonly OnboardingScreenId[] = [
+  'welcome',
+  'create_account',
+  'login',
+  'goals',
+];
+
+function resumePointFor(screen: OnboardingScreenId): OnboardingScreenId | null {
+  if (RESUME_POINTS.includes(screen)) return screen;
+  if (screen === 'details' || screen === 'plan_offer' || screen === 'summary') {
+    return 'goals';
+  }
+  return null; // splash — nothing to resume yet
+}
 
 export default function Onboarding() {
   const { t } = useTranslation();
   const toast = useToast();
   const { navigate } = useAppNavigation();
   const [currentScreen, setCurrentScreen] = useState<OnboardingScreenId>('splash');
+
+  // §25: persist the resume point as the flow advances (scope
+  // documented at ONBOARDING_PROGRESS_KEY — screen id only).
+  useEffect(() => {
+    const point = resumePointFor(currentScreen);
+    if (!point) return;
+    try {
+      window.localStorage.setItem(ONBOARDING_PROGRESS_KEY, point);
+    } catch {}
+  }, [currentScreen]);
   const [authOrigin, setAuthOrigin] = useState<'welcome' | 'create_account'>('welcome');
 
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
@@ -145,18 +198,15 @@ export default function Onboarding() {
 
     // Check for direct screen navigation or OAuth error in URL hash or search params
     const searchParams = new URLSearchParams(window.location.search);
-    const screenParam = searchParams.get('screen') as OnboardingScreenId;
-    if (
-      screenParam &&
-      ['splash', 'welcome', 'create_account', 'login', 'goals', 'experience', 'schedule', 'details', 'plan_offer', 'summary'].includes(
-        screenParam
-      )
-    ) {
-      // Simplified onboarding removed the experience/schedule steps; old
-      // deep links to them land on details-lite instead of a dead screen.
-      setCurrentScreen(
-        screenParam === 'experience' || screenParam === 'schedule' ? 'details' : screenParam
-      );
+    const screenParam = searchParams.get('screen');
+    if (screenParam) {
+      // §25: legacy deep links to the removed experience/schedule
+      // steps land on details-lite instead of a dead screen.
+      if (screenParam === 'experience' || screenParam === 'schedule') {
+        setCurrentScreen('details');
+      } else if ((ONBOARDING_SCREENS as readonly string[]).includes(screenParam)) {
+        setCurrentScreen(screenParam as OnboardingScreenId);
+      }
     }
     const hashClean = (window.location.hash || '').replace(/^#/, '');
     const hashParams = new URLSearchParams(hashClean);
@@ -186,6 +236,17 @@ export default function Onboarding() {
         )
     );
 
+    // §25: resume the saved pre-input screen when nothing else
+    // (deep link, OAuth outcome, session restore) steers the flow.
+    if (!screenParam && !oauthError && !hasAuthCallback && !hasExistingSession) {
+      try {
+        const saved = window.localStorage.getItem(ONBOARDING_PROGRESS_KEY);
+        if (saved && (RESUME_POINTS as readonly string[]).includes(saved)) {
+          setCurrentScreen(saved as OnboardingScreenId);
+        }
+      } catch {}
+    }
+
     if (hasAuthCallback || hasExistingSession) {
       setIsRestoringAccount(true);
       import('@/lib/supabase/sync').then(({ syncEngine }) => {
@@ -200,8 +261,7 @@ export default function Onboarding() {
             setAthleteEmail((prev) => prev || currentUser.email || '');
           }
           if (
-            useStore.getState().profile ||
-            useStore.getState().hasCompletedOnboarding
+            useStore.getState().profile
           ) {
             setIsRestoringAccount(false);
             return;
@@ -220,8 +280,7 @@ export default function Onboarding() {
           }
 
           if (
-            useStore.getState().profile ||
-            useStore.getState().hasCompletedOnboarding
+            useStore.getState().profile
           ) {
             setIsRestoringAccount(false);
             return;
@@ -526,6 +585,11 @@ export default function Onboarding() {
     // could render (applying it earlier unmounts Onboarding via the
     // page.tsx gate). Apply it here, on the summary's Continue.
     applyPendingProfile();
+    // §25: the flow is done — the resume point must not greet the
+    // next fresh start (e.g. after a logout) mid-flow.
+    try {
+      window.localStorage.removeItem(ONBOARDING_PROGRESS_KEY);
+    } catch {}
     // pendingPlans was nulled at Accept/Decline, so judge the toast by
     // what actually landed in the store: plans added → Training Ready.
     const plansAdded = (useStore.getState().plannedWorkouts?.length ?? 0) > 0;

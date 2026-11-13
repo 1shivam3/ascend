@@ -28,7 +28,7 @@ function rep(over: Partial<FormRep> = {}): FormRep {
     maxTorsoInclinationDeg: 10,
     trackingConfidence: 1,
     observations: [],
-    isValid: true,
+    status: 'valid', // §32: the one verdict field (was isValid: true)
     ...over,
   };
 }

@@ -15,7 +15,7 @@
  */
 
 import { MovementPhase } from '../../models/form-feedback.types';
-import { FormRep } from '../../models/form-session.types';
+import { FormRep, repVerdict } from '../../models/form-session.types';
 
 export interface DeadliftRepStateMachineConfig {
   /** Hip angle at/above which the lifter counts as standing tall. */
@@ -159,14 +159,11 @@ export class DeadliftRepStateMachine {
       maxTorsoInclinationDeg: Math.round(this.maxTorsoInclination),
       trackingConfidence: Math.round(avgConfidence * 100) / 100,
       observations: this.hipsRoseFirst ? ['hips_rose_first'] : [],
-      isValid,
-      invalidReason: isValid
-        ? undefined
-        : (invalidReason ?? 'Lockout not reached'),
-      // Provisional P0-3 verdict from the measured criteria; the
-      // analyzer upgrades a no-lockout 'failed' to 'unverified' when
-      // the ankle/foot landmarks were too invisible to judge lockout.
-      status: isValid ? 'valid' : 'failed',
+      // §32: the shared verdict rule. Provisional P0-3 verdict
+      // from the measured criteria; the analyzer upgrades a
+      // no-lockout 'failed' to 'unverified' when the ankle/foot
+      // landmarks were too invisible to judge lockout.
+      ...repVerdict(isValid, invalidReason ?? 'Lockout not reached'),
       minHipAngleDeg: Math.round(this.minHipAngle),
       lockoutAchieved,
       hipsRoseFirst: this.hipsRoseFirst,
@@ -214,7 +211,13 @@ export class DeadliftRepStateMachine {
         return null;
       }
 
-      case 'standing': {
+      // §31: 'lockout' is the standing position a completed rep
+      // ends in — entered on the frame the pull reaches full
+      // extension (see 'ascending'), held until the next hinge.
+      // Its exits are exactly standing's exits: the next descent
+      // begins from here, timed from lastLockoutTimeMs as before.
+      case 'standing':
+      case 'lockout': {
         if (hipAngleDeg <= this.config.hingeZoneHipAngleDeg) {
           // Stream (or set) starts already hinged — e.g. the lifter is
           // in setup when the video begins. That is the bottom.
@@ -284,7 +287,10 @@ export class DeadliftRepStateMachine {
           kneeAngleDeg >= this.config.lockoutKneeAngleDeg
         ) {
           const rep = this.buildRep(timestampMs, true);
-          this.phase = 'standing';
+          // §31: the rep ends IN lockout, not in an undifferentiated
+          // 'standing' — the phase now names the position the
+          // lifter is holding (the modal already had its label).
+          this.phase = 'lockout';
           this.repStartTimeMs = null;
           return rep;
         }

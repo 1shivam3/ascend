@@ -12,7 +12,8 @@ import {
   buildBlockIntakeFromAction,
   buildProgramProposalFromAction,
   COACH_ACTION_EXPIRY_MS,
-  effectiveActionState,
+  deriveActionState,
+  readActionBase,
   macroGoalsBaseMatches,
   settlePendingActions,
   undoMacroGoals,
@@ -335,7 +336,9 @@ describe('executor: program proposal via proposeCoachBlock / approveBlockProposa
 const NOW = 1_760_000_000_000;
 
 function msg(partial: Partial<CoachChatMessage>): CoachChatMessage {
-  return { role: 'assistant', content: '…', ...partial };
+  // Test builder seam: callers pass complete action-field sets
+  // (the §28 union is enforced at the app's own construction sites).
+  return { role: 'assistant', content: '…', ...partial } as CoachChatMessage;
 }
 
 const macroAction = { type: 'set_macro_goals' as const, proteinG: 160 };
@@ -370,11 +373,43 @@ describe('executor: pending-card lifecycle', () => {
     expect(fresh).toBe(messages); // untouched → same reference
   });
 
-  it('effectiveActionState reports expiry without mutating', () => {
+  it('deriveActionState reports expiry without mutating (§28: the one derivation)', () => {
     const m = msg({ action: macroAction, actionState: 'pending', ts: NOW });
-    expect(effectiveActionState(m, NOW + COACH_ACTION_EXPIRY_MS + 1)).toBe('stale');
-    expect(effectiveActionState(m, NOW + 1000)).toBe('pending');
+    expect(deriveActionState(m, { now: NOW + COACH_ACTION_EXPIRY_MS + 1 })).toBe('stale');
+    expect(deriveActionState(m, { now: NOW + 1000 })).toBe('pending');
     expect(m.actionState).toBe('pending');
+  });
+
+  it('§28: derive folds base-moved into stale, and readActionBase reads both capture shapes', () => {
+    const goals = { calories: 2000, proteinG: 150, carbsG: 200, fatG: 70 };
+    const tagged = msg({
+      action: macroAction, actionState: 'pending', ts: NOW,
+      actionBase: { status: 'captured', goals: { ...goals } },
+    } as any);
+    expect(readActionBase(tagged)).toEqual(goals);
+    expect(deriveActionState(tagged, { now: NOW + 1000, liveGoals: goals })).toBe('pending');
+    expect(
+      deriveActionState(tagged, { now: NOW + 1000, liveGoals: { ...goals, calories: 2200 } })
+    ).toBe('stale');
+    // Legacy raw shapes: the goals object itself, and null.
+    const legacy = msg({
+      action: macroAction, actionState: 'pending', ts: NOW,
+      actionBase: { ...goals },
+    } as any);
+    expect(readActionBase(legacy)).toEqual(goals);
+    const legacyNull = msg({
+      action: macroAction, actionState: 'pending', ts: NOW, actionBase: null,
+    } as any);
+    expect(readActionBase(legacyNull)).toBeNull();
+    const uncaptured = msg({ action: macroAction, actionState: 'pending', ts: NOW });
+    expect(readActionBase(uncaptured)).toBeUndefined();
+  });
+
+  it("§28: the legacy undone flag derives (and settles) to the 'undone' state", () => {
+    const legacy = msg({ action: macroAction, actionState: 'applied', ts: NOW, undone: true } as any);
+    expect(deriveActionState(legacy, { now: NOW })).toBe('undone');
+    const settled = settlePendingActions([legacy], NOW);
+    expect(settled[0].actionState).toBe('undone');
   });
 
   it('applied and dismissed actions are never settled', () => {

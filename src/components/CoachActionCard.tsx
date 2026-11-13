@@ -12,7 +12,8 @@ import {
   buildBlockIntakeFromAction,
   buildProgramProposalFromAction,
   COACH_ACTION_EXPIRY_MS,
-  effectiveActionState,
+  deriveActionState,
+  readActionBase,
   undoMacroGoals,
 } from '@/lib/coach-action-executor';
 import { buildIntakePrefill } from '@/lib/block-intake';
@@ -24,6 +25,7 @@ import {
 } from '@/lib/minor-targets';
 import type { BlockProposal } from '@/lib/block-engine';
 import type {
+  ActionCoachChatMessage,
   CoachActionReceipt,
   CoachChatMessage,
 } from '@/lib/coach-chat-store';
@@ -68,19 +70,6 @@ export interface MacroRow {
   to: number;
 }
 
-/** The four user-facing fields equal? Mirrors the executor's base
- * check, but against the goals THIS card rendered with (the executor
- * re-checks against the live store at apply time regardless). */
-function sameMacroFields(a: MacroGoals | null, b: MacroGoals | null): boolean {
-  if (a === null || b === null) return a === b;
-  return (
-    a.calories === b.calories &&
-    a.proteinG === b.proteinG &&
-    a.carbsG === b.carbsG &&
-    a.fatG === b.fatG
-  );
-}
-
 /**
  * The base-capture rule: the FIRST time a pending set_macro_goals
  * card renders, snapshot the current goals onto the message. Returns
@@ -89,11 +78,14 @@ function sameMacroFields(a: MacroGoals | null, b: MacroGoals | null): boolean {
 export function captureActionBasePatch(
   message: CoachChatMessage,
   liveGoals: MacroGoals | null
-): Partial<CoachChatMessage> | null {
+): Partial<ActionCoachChatMessage> | null {
   if (message.action?.type !== 'set_macro_goals') return null;
   if (message.actionState !== 'pending') return null;
-  if (message.actionBase !== undefined) return null;
-  return { actionBase: liveGoals ? { ...liveGoals } : null };
+  // §28: a legacy raw capture counts as captured — never recapture.
+  if (readActionBase(message) !== undefined) return null;
+  return {
+    actionBase: { status: 'captured', goals: liveGoals ? { ...liveGoals } : null },
+  };
 }
 
 /** Diff rows for a pending/stale macro card: one per field the
@@ -130,27 +122,28 @@ export function macroReceiptRows(
 export function applyMacroFromCard(
   message: CoachChatMessage,
   liveGoals: MacroGoals | null
-): Partial<CoachChatMessage> {
+): Partial<ActionCoachChatMessage> {
   const action = message.action;
   if (!action || action.type !== 'set_macro_goals') return {};
+  const captured = readActionBase(message);
   const base =
-    message.actionBase !== undefined
-      ? message.actionBase
+    captured !== undefined
+      ? captured
       : liveGoals
         ? { ...liveGoals }
         : null;
+  const baseCapture = { status: 'captured' as const, goals: base };
   const result = applyMacroGoalsAction(action, base);
   if (!result.ok) {
     // Blocked (needs real body stats): no patch — the component
     // renders the honest blocked state and offers no Apply.
     if ('blocked' in result) return {};
-    return { actionBase: base, actionState: 'stale' };
+    return { actionBase: baseCapture, actionState: 'stale' };
   }
   return {
-    actionBase: base,
+    actionBase: baseCapture,
     actionState: 'applied',
     appliedSnapshot: result.receipt,
-    undone: false,
   };
 }
 
@@ -161,34 +154,35 @@ export function rebaseMacroFromCard(
   message: CoachChatMessage,
   liveGoals: MacroGoals | null,
   now: number
-): Partial<CoachChatMessage> {
+): Partial<ActionCoachChatMessage> {
   const action = message.action;
   if (!action || action.type !== 'set_macro_goals') return {};
   const base = liveGoals ? { ...liveGoals } : null;
+  const baseCapture = { status: 'captured' as const, goals: base };
   const result = applyMacroGoalsAction(action, base);
   if (!result.ok) {
     if ('blocked' in result) return {};
-    return { actionBase: base, ts: now, actionState: 'stale' };
+    return { actionBase: baseCapture, ts: now, actionState: 'stale' };
   }
   return {
-    actionBase: base,
+    actionBase: baseCapture,
     ts: now,
     actionState: 'applied',
     appliedSnapshot: result.receipt,
-    undone: false,
   };
 }
 
 /** Undo an applied macro card. A stale undo (goals changed again
  * since the apply) patches nothing — the card shows honest copy. */
 export function undoMacroFromCard(message: CoachChatMessage): {
-  patch: Partial<CoachChatMessage> | null;
+  patch: Partial<ActionCoachChatMessage> | null;
   stale: boolean;
 } {
   if (!message.appliedSnapshot) return { patch: null, stale: false };
   const result = undoMacroGoals(message.appliedSnapshot);
   if (!result.ok) return { patch: null, stale: true };
-  return { patch: { undone: true }, stale: false };
+  // §28: undone is a STATE now, not a flag beside 'applied'.
+  return { patch: { actionState: 'undone' }, stale: false };
 }
 
 /** True when the action's intake is exactly what the profile prefill
@@ -231,7 +225,7 @@ export function applyProgramFromCard(proposal: BlockProposal): boolean {
 
 export interface CoachActionCardProps {
   message: CoachChatMessage;
-  onPatch: (patch: Partial<CoachChatMessage>) => void;
+  onPatch: (patch: Partial<ActionCoachChatMessage>) => void;
   /** Test seam: fixed "now" for expiry (defaults to Date.now()). */
   nowMs?: number;
   /** Test seam: live goals to render against (defaults to the store's). */
@@ -273,7 +267,8 @@ export default function CoachActionCard({
   // tab switches remount the section and re-evaluate.
   const [mountNow] = useState(() => Date.now());
   const now = nowMs ?? mountNow;
-  const eff = effectiveActionState(message, now);
+  // §28: the one derivation — render and settle share it.
+  const eff = deriveActionState(message, { now, liveGoals });
   const expired =
     message.ts !== undefined &&
     now - message.ts > COACH_ACTION_EXPIRY_MS &&
@@ -335,13 +330,13 @@ export default function CoachActionCard({
 
   // ── set_macro_goals ──────────────────────────────────────────────
   if (action.type === 'set_macro_goals') {
-    if (state === 'applied' && message.appliedSnapshot) {
+    if ((state === 'applied' || eff === 'undone') && message.appliedSnapshot) {
       const rows = macroReceiptRows(action, message.appliedSnapshot);
       return (
         <div className="rounded-xl border border-border bg-bg-secondary/60 p-3 space-y-2">
           <p className="text-xs font-bold text-text-primary">{t('coachChat.actionAppliedMacroTitle')}</p>
           <MacroRows rows={rows} />
-          {message.undone ? (
+          {eff === 'undone' ? (
             <p className="text-xs text-text-secondary">{t('coachChat.actionUndone')}</p>
           ) : (
             <>
@@ -365,9 +360,11 @@ export default function CoachActionCard({
       );
     }
 
-    const base = message.actionBase;
-    const moved = base !== undefined && !sameMacroFields(liveGoals, base);
-    const stale = state === 'stale' || (state === 'pending' && moved);
+    // §28: the base read normalizes legacy captures; "moved off
+    // the base" is no longer a card-local rule — deriveActionState
+    // already folded it into eff === 'stale'.
+    const base = readActionBase(message);
+    const stale = eff === 'stale';
 
     // Phase 3 (Task 3.1): minor maintenance guard, rendered up front.
     // For a 13–17 user, an action whose calories would move the

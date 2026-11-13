@@ -40,7 +40,7 @@ describe('overhead press analyzer', () => {
     expect(summary.totalDetectedReps).toBe(3);
     expect(summary.totalValidReps).toBe(3);
     for (const rep of summary.reps) {
-      expect(rep.isValid).toBe(true);
+      expect(rep.status).toBe('valid'); // §32: verdict is the status field
       expect(rep.lockoutAchieved).toBe(true);
       expect(rep.minElbowAngleDeg).toBeLessThanOrEqual(100);
     }
@@ -133,7 +133,7 @@ describe('lunge analyzer', () => {
     expect(summary.totalValidReps).toBe(3);
     for (const rep of summary.reps) {
       expect(rep.minKneeAngleDeg).toBeLessThanOrEqual(95);
-      expect(rep.isValid).toBe(true);
+      expect(rep.status).toBe('valid'); // §32: verdict is the status field
     }
   });
 

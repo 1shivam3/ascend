@@ -35,7 +35,6 @@ import {
   FormExerciseId,
   FORM_EXERCISE_IDS,
   isFormExerciseId,
-  MovementSignature,
 } from '../analyzers/ExerciseAnalyzer';
 import {
   MovementClassifier,
@@ -47,40 +46,6 @@ import { FormSessionSummary, FormCoachConfig } from '../models/form-session.type
 import { FormSessionRepository } from '../repositories/FormSessionRepository';
 
 export type FormCoachState = 'select' | 'analyzing' | 'report' | 'no-tracking' | 'unsupported' | 'error';
-
-/**
- * D4: decides what the end of an analysis means. When pose tracking
- * never found the lifter — zero tracked frames, or tracking present on
- * a negligible share of a long stream — there is no honest summary to
- * show: the UI must say tracking failed and how to refilm, instead of
- * sitting in the analyzing state or rendering an empty report. When
- * tracking worked but no rep was valid, the summary (0 valid reps) IS
- * the honest result and renders as a report.
- *
- * D6: when tracking worked but the movement signature is positively
- * NOT the graded exercise (a hip hinge fed to the squat analyzer), the
- * honest outcome is 'not-squat' — no squat summary is built or saved.
- * Tracking failure takes precedence: a stream that was never tracked
- * cannot be judged as any movement.
- *
- * Retained as the D6 routing contract; the hook's end-of-analysis
- * routing now goes through resolveDetectionOutcome below, which
- * generalizes this to both supported exercises.
- */
-export function resolveAnalysisOutcome(
-  stats: {
-    framesProcessed: number;
-    framesTracked: number;
-  },
-  movementSignature?: MovementSignature
-): 'report' | 'no-tracking' | 'not-squat' {
-  if (stats.framesTracked === 0) return 'no-tracking';
-  if (stats.framesProcessed >= 30 && stats.framesTracked / stats.framesProcessed < 0.02) {
-    return 'no-tracking';
-  }
-  if (movementSignature === 'not_squat') return 'not-squat';
-  return 'report';
-}
 
 /** How the analyzer for a run is chosen. */
 export type AnalyzerMode =

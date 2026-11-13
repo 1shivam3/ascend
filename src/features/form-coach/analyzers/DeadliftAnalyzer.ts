@@ -11,8 +11,9 @@
 import { ExerciseAnalyzer, AnalyzerFrameResult } from './ExerciseAnalyzer';
 import { NormalizedLandmark, PoseLandmarkIndex, DetectedSide } from '../models/pose.types';
 import { FormObservation, MovementPhase } from '../models/form-feedback.types';
-import { FormRep, FormSessionSummary, getRepStatus } from '../models/form-session.types';
+import { FormRep, FormSessionSummary, getRepStatus, isValidRep } from '../models/form-session.types';
 import { computeTempoSeconds } from '../services/analysis/tempo';
+import { sustainedVisibilityOut, type VisibilitySample } from '../services/analysis/visibility';
 import {
   calculateJointAngle,
   calculateSegmentInclination,
@@ -30,9 +31,6 @@ export const DEADLIFT_ANALYZER_VERSION = '1.0.0';
 
 // Same sustained-dropout discipline as the squat analyzer (D2): the
 // feet-out-of-frame alert requires the absence to be sustained.
-const VISIBILITY_WINDOW_MS = 1200;
-const VISIBILITY_MIN_SPAN_MS = 700;
-const VISIBILITY_BAD_SHARE = 0.6;
 
 // Same per-rep view discipline as the squat analyzer (D1): a rep counts
 // as confidently FRONT only on a sustained front majority of its own
@@ -62,11 +60,6 @@ function majorityView(votes: DetectedSide[]): DetectedSide {
   if (sideCount > 0) return sideBest as DetectedSide;
   if (counts.front > 0) return 'front';
   return 'unknown';
-}
-
-interface VisibilitySample {
-  t: number;
-  ok: boolean;
 }
 
 export class DeadliftAnalyzer implements ExerciseAnalyzer {
@@ -198,17 +191,10 @@ export class DeadliftAnalyzer implements ExerciseAnalyzer {
     return { framesProcessed: this.framesProcessed, framesTracked: this.framesTracked };
   }
 
+  /** §33: the shared trailing-window rule (services/analysis/
+   * visibility.ts) — this analyzer used to carry a private copy. */
   private sustainedOut(window: VisibilitySample[], ok: boolean, timestampMs: number): boolean {
-    window.push({ t: timestampMs, ok });
-    const cutoff = timestampMs - VISIBILITY_WINDOW_MS;
-    while (window.length > 1 && window[0].t < cutoff) {
-      window.shift();
-    }
-    if (window.length === 0) return false;
-    const span = timestampMs - window[0].t;
-    if (span < VISIBILITY_MIN_SPAN_MS) return false;
-    const bad = window.reduce((acc, s) => acc + (s.ok ? 0 : 1), 0);
-    return bad / window.length >= VISIBILITY_BAD_SHARE;
+    return sustainedVisibilityOut(window, ok, timestampMs);
   }
 
   private currentRepConfidentlyFront(): boolean {
@@ -271,7 +257,7 @@ export class DeadliftAnalyzer implements ExerciseAnalyzer {
         anklesSustainedOut: false,
         sideViewDetected: !this.currentRepConfidentlyFront(),
         depthTargetDeg: 0,
-        currentRepNumber: this.completedReps.filter((r) => r.isValid).length,
+        currentRepNumber: this.completedReps.filter((r) => isValidRep(r)).length,
         timestampMs,
       });
 
@@ -431,7 +417,7 @@ export class DeadliftAnalyzer implements ExerciseAnalyzer {
       anklesSustainedOut,
       sideViewDetected: !this.currentRepConfidentlyFront(),
       depthTargetDeg: 0,
-      currentRepNumber: this.completedReps.filter((r) => r.isValid).length,
+      currentRepNumber: this.completedReps.filter((r) => isValidRep(r)).length,
       timestampMs,
     });
 
@@ -459,7 +445,7 @@ export class DeadliftAnalyzer implements ExerciseAnalyzer {
   ): FormSessionSummary {
     const now = Date.now();
     const durationSeconds = Math.max(1, Math.round((now - this.sessionStartTimeMs) / 1000));
-    const validReps = this.completedReps.filter((r) => r.isValid);
+    const validReps = this.completedReps.filter((r) => isValidRep(r));
     // P0-3: "incomplete lockout" is claimed only for attempts whose
     // lockout was judged on visible landmarks and not reached.
     // Attempts whose lockout could not be judged are reported
