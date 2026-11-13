@@ -1024,6 +1024,103 @@ export function clearTombstoneStamps(
   return next;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// The ONE deletion API (Phase 1.6, §10).
+//
+// Before: five deletedX arrays (+ legacy lists), each mutated inline
+// at every delete/restore site with the same dedupe-append / filter
+// pattern re-typed per action — free to drift, and free to leave a
+// live row and its tombstone coexisting (an illegal state the sync
+// engine then has to guess about). The persisted SHAPE is unchanged
+// (the same five arrays + the stamp map); what changed is that the
+// mutations route through the two transitions below, and the
+// invariant is a pure function anyone can assert:
+//
+//   INVARIANT: no id is ever in a live list and its tombstone list
+//   at the same time. findLiveTombstoneOverlaps must return [] for
+//   every reachable store state.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const DELETED_LIST_KEY_BY_COLLECTION = {
+  workouts: 'deletedWorkoutIds',
+  meals: 'deletedMealIds',
+  body_metrics: 'deletedBodyMetricIds',
+  planned_workouts: 'deletedPlanIds',
+  personal_records: 'deletedPrIds',
+} as const satisfies Record<TombstoneCollection, string>;
+
+export const LIVE_LIST_KEY_BY_COLLECTION = {
+  workouts: 'workouts',
+  meals: 'meals',
+  body_metrics: 'bodyMetrics',
+  planned_workouts: 'plannedWorkouts',
+  personal_records: 'prs',
+} as const satisfies Record<TombstoneCollection, string>;
+
+export type TombstoneListKey =
+  (typeof DELETED_LIST_KEY_BY_COLLECTION)[TombstoneCollection];
+
+/** The slice of state the deletion transitions read and produce. */
+export interface TombstoneListsState {
+  deletedWorkoutIds?: string[];
+  deletedMealIds?: string[];
+  deletedBodyMetricIds?: string[];
+  deletedPlanIds?: string[];
+  deletedPrIds?: string[];
+  tombstoneStamps?: Record<string, string>;
+}
+
+/** Record deletions: add the ids (deduped) + stamp them. Returns the partial to spread into set(). */
+export function applyDeletionToState(
+  state: TombstoneListsState,
+  collection: TombstoneCollection,
+  ids: string[],
+): Partial<Record<TombstoneListKey, string[]>> & { tombstoneStamps: Record<string, string> } {
+  const key = DELETED_LIST_KEY_BY_COLLECTION[collection];
+  const next = [...(state[key] || [])];
+  for (const id of ids) {
+    if (!next.includes(id)) next.push(id);
+  }
+  return {
+    [key]: next,
+    tombstoneStamps: stampTombstoneDeletes(state.tombstoneStamps, collection, ids),
+  } as Partial<Record<TombstoneListKey, string[]>> & { tombstoneStamps: Record<string, string> };
+}
+
+/** Undo deletions: remove the ids AND their stamps. Returns the partial to spread into set(). */
+export function applyRestoreToState(
+  state: TombstoneListsState,
+  collection: TombstoneCollection,
+  ids: string[],
+): Partial<Record<TombstoneListKey, string[]>> & { tombstoneStamps: Record<string, string> } {
+  const key = DELETED_LIST_KEY_BY_COLLECTION[collection];
+  const idSet = new Set(ids);
+  return {
+    [key]: (state[key] || []).filter((d) => !idSet.has(d)),
+    tombstoneStamps: clearTombstoneStamps(state.tombstoneStamps, collection, ids),
+  } as Partial<Record<TombstoneListKey, string[]>> & { tombstoneStamps: Record<string, string> };
+}
+
+/** The §10 invariant, pure: ids that are live AND tombstoned at once. Must always be []. */
+export function findLiveTombstoneOverlaps(state: {
+  workouts?: { id: string }[];
+  meals?: { id: string }[];
+  bodyMetrics?: { id: string }[];
+  plannedWorkouts?: { id: string }[];
+  prs?: { id: string }[];
+} & TombstoneListsState): { collection: TombstoneCollection; id: string }[] {
+  const overlaps: { collection: TombstoneCollection; id: string }[] = [];
+  for (const collection of Object.keys(DELETED_LIST_KEY_BY_COLLECTION) as TombstoneCollection[]) {
+    const live = new Set(
+      (state[LIVE_LIST_KEY_BY_COLLECTION[collection]] || []).map((r) => r.id),
+    );
+    for (const id of state[DELETED_LIST_KEY_BY_COLLECTION[collection]] || []) {
+      if (live.has(id)) overlaps.push({ collection, id });
+    }
+  }
+  return overlaps;
+}
+
 export function partializeAppState(state: AppState): Record<string, unknown> {
   return {
   profile: state.profile,
@@ -1833,13 +1930,9 @@ export const useAppStore = create<AppState>()(
       })),
       deletePR: (id) => set((state) => ({
         prs: state.prs.filter(pr => pr.id !== id),
-        // Tombstone so a stale server copy can't resurrect this PR (QA4-001).
-        deletedPrIds: (state.deletedPrIds || []).includes(id)
-          ? state.deletedPrIds
-          : [...(state.deletedPrIds || []), id],
-        // S1/S2: stamp the deletion so sync can order it against
-        // another device's edit of the same PR.
-        tombstoneStamps: stampTombstoneDeletes(state.tombstoneStamps, 'personal_records', [id]),
+        // Tombstone so a stale server copy can't resurrect this PR (QA4-001);
+        // the S1/S2 deletion stamp rides along via the §10 deletion API.
+        ...applyDeletionToState(state, 'personal_records', [id]),
       })),
       
       setPRTarget: (exercise, targetKg) => set((state) => ({
@@ -2233,12 +2326,9 @@ export const useAppStore = create<AppState>()(
           return {
             workouts: nextWorkouts,
             lifterProfile: nextProfile,
-            // Tombstone so a stale server copy can't resurrect it (QA4-001).
-            deletedWorkoutIds: (state.deletedWorkoutIds || []).includes(id)
-              ? state.deletedWorkoutIds
-              : [...(state.deletedWorkoutIds || []), id],
-            // S1/S2: stamp the deletion for delete-vs-edit ordering.
-            tombstoneStamps: stampTombstoneDeletes(state.tombstoneStamps, 'workouts', [id]),
+            // Tombstone so a stale server copy can't resurrect it (QA4-001);
+            // the S1/S2 deletion stamp rides along via the §10 deletion API.
+            ...applyDeletionToState(state, 'workouts', [id]),
           };
         });
         // QA-hardening R1: the deleted session may have minted PRs —
@@ -2289,13 +2379,19 @@ export const useAppStore = create<AppState>()(
         if (get().workouts.some((w) => w.id === workout.id)) return;
         set((state) => {
           const nextWorkouts = [...state.workouts];
-          nextWorkouts.splice(Math.max(0, Math.min(index, nextWorkouts.length)), 0, workout);
+          // §10 race fix: a restore is an EDIT — re-stamp it. The
+          // server tombstone is stamped at delete time, NEWER than
+          // the restored row's original stamp; without the re-stamp
+          // the next pull's newest-wins check deletes the restored
+          // row again (and push filters it out) — Undo of an
+          // already-synced deletion was silently undone by sync.
+          nextWorkouts.splice(Math.max(0, Math.min(index, nextWorkouts.length)), 0, stampEditedRow(workout));
           return {
             workouts: nextWorkouts,
             lifterProfile: generateLifterTwinProfile(nextWorkouts, state.profile?.unit || 'kg'),
             // Undoing a deletion must also clear its tombstone (QA4-001),
             // or the next sync would delete the restored workout again.
-            deletedWorkoutIds: (state.deletedWorkoutIds || []).filter((d) => d !== workout.id),
+            ...applyRestoreToState(state, 'workouts', [workout.id]),
           };
         });
         // QA-hardening R1: restore the PRs the deletion recomputed away.
@@ -2327,22 +2423,20 @@ export const useAppStore = create<AppState>()(
       },
       deleteMeal: (id) => set((state) => ({
         meals: state.meals.filter(meal => meal.id !== id),
-        // Tombstone so a stale server copy can't resurrect it (QA4-001).
-        deletedMealIds: (state.deletedMealIds || []).includes(id)
-          ? state.deletedMealIds
-          : [...(state.deletedMealIds || []), id],
-        // S1/S2: stamp the deletion for delete-vs-edit ordering.
-        tombstoneStamps: stampTombstoneDeletes(state.tombstoneStamps, 'meals', [id]),
+        // Tombstone so a stale server copy can't resurrect it (QA4-001);
+        // the S1/S2 deletion stamp rides along via the §10 deletion API.
+        ...applyDeletionToState(state, 'meals', [id]),
       })),
       insertMealAt: (meal, index) => set((state) => {
         if (state.meals.some((m) => m.id === meal.id)) return state;
         const nextMeals = [...state.meals];
-        nextMeals.splice(Math.max(0, Math.min(index, nextMeals.length)), 0, meal);
+        // §10 race fix: re-stamp the restore (see insertWorkoutAt).
+        nextMeals.splice(Math.max(0, Math.min(index, nextMeals.length)), 0, stampEditedRow(meal));
         // Undoing a deletion must also clear its tombstone (QA4-001),
         // or the next sync would delete the restored meal again.
         return {
           meals: nextMeals,
-          deletedMealIds: (state.deletedMealIds || []).filter((d) => d !== meal.id),
+          ...applyRestoreToState(state, 'meals', [meal.id]),
         };
       }),
       restoreFoodToMeal: (mealSnapshot, mealIndex, foodIndex) => set((state) => {
@@ -2354,20 +2448,22 @@ export const useAppStore = create<AppState>()(
             if (i !== existingIdx) return meal;
             const foods = [...meal.foods];
             foods.splice(Math.min(foodIndex, foods.length), 0, food);
-            return { ...meal, foods };
+            // Stamp the edit, mirroring deleteFoodFromMeal.
+            return stampEditedRow({ ...meal, foods });
           });
           return {
             meals: nextMeals,
-            deletedMealIds: (state.deletedMealIds || []).filter((d) => d !== mealSnapshot.id),
+            ...applyRestoreToState(state, 'meals', [mealSnapshot.id]),
           };
         }
         // The removed food was the meal's last item, so deleteFoodFromMeal
         // removed the whole meal — restore the snapshot in place.
+        // §10 race fix: re-stamp the resurrection (see insertWorkoutAt).
         const nextMeals = [...state.meals];
-        nextMeals.splice(Math.max(0, Math.min(mealIndex, nextMeals.length)), 0, mealSnapshot);
+        nextMeals.splice(Math.max(0, Math.min(mealIndex, nextMeals.length)), 0, stampEditedRow(mealSnapshot));
         return {
           meals: nextMeals,
-          deletedMealIds: (state.deletedMealIds || []).filter((d) => d !== mealSnapshot.id),
+          ...applyRestoreToState(state, 'meals', [mealSnapshot.id]),
         };
       }),
       updateMeal: (id, updated) => set((state) => ({
@@ -2392,15 +2488,11 @@ export const useAppStore = create<AppState>()(
           .map((meal) => meal.id);
         return {
           meals: nextMeals,
-          deletedMealIds:
-            removedIds.length > 0
-              ? [...new Set([...(state.deletedMealIds || []), ...removedIds])]
-              : state.deletedMealIds,
-          // S1/S2: stamp the deletion for delete-vs-edit ordering.
-          tombstoneStamps:
-            removedIds.length > 0
-              ? stampTombstoneDeletes(state.tombstoneStamps, 'meals', removedIds)
-              : state.tombstoneStamps,
+          // §10 deletion API (the S1/S2 stamp rides along); an empty
+          // removedIds leaves both fields untouched, as before.
+          ...(removedIds.length > 0
+            ? applyDeletionToState(state, 'meals', removedIds)
+            : {}),
         };
       }),
 
@@ -2460,26 +2552,22 @@ export const useAppStore = create<AppState>()(
         const replacedIds = state.bodyMetrics
           .filter(m => m.date === entryDate && m.id !== entry.id)
           .map(m => m.id);
+        // §10 deletion API: un-tombstone the incoming id, then
+        // tombstone (+ S1/S2 stamp) the same-date replacements.
+        const afterUndelete: TombstoneListsState = {
+          ...state,
+          ...applyRestoreToState(state, 'body_metrics', [entry.id]),
+        };
         return {
           bodyMetrics: [stampNewRow(normalizedEntry), ...state.bodyMetrics.filter(m => m.date !== entryDate)],
-          deletedBodyMetricIds: [
-            ...new Set([
-              ...(state.deletedBodyMetricIds || []).filter((d) => d !== entry.id),
-              ...replacedIds,
-            ]),
-          ],
-          // S1/S2: stamp the same-date replacements' deletions.
-          tombstoneStamps: stampTombstoneDeletes(state.tombstoneStamps, 'body_metrics', replacedIds),
+          ...applyDeletionToState(afterUndelete, 'body_metrics', replacedIds),
         };
       }),
       deleteBodyMetric: (id) => set((state) => ({
         bodyMetrics: state.bodyMetrics.filter(m => m.id !== id),
         // Tombstone so a stale server copy can't resurrect it (QA4-001).
-        deletedBodyMetricIds: (state.deletedBodyMetricIds || []).includes(id)
-          ? state.deletedBodyMetricIds
-          : [...(state.deletedBodyMetricIds || []), id],
-        // S1/S2: stamp the deletion for delete-vs-edit ordering.
-        tombstoneStamps: stampTombstoneDeletes(state.tombstoneStamps, 'body_metrics', [id]),
+        // The S1/S2 deletion stamp rides along via the §10 deletion API.
+        ...applyDeletionToState(state, 'body_metrics', [id]),
       })),
       // Progress photos are downscaled (~800px JPEG) before storage; cap the
       // count so localStorage stays healthy. Persisted to their own key
@@ -2671,11 +2759,8 @@ export const useAppStore = create<AppState>()(
           weeklySchedule: nextSchedule,
           // Tombstone the deletion so a stale server copy can never
           // resurrect this plan on the next sync pull.
-          deletedPlanIds: state.deletedPlanIds.includes(id)
-            ? state.deletedPlanIds
-            : [...state.deletedPlanIds, id],
-          // S1/S2: stamp the deletion for delete-vs-edit ordering.
-          tombstoneStamps: stampTombstoneDeletes(state.tombstoneStamps, 'planned_workouts', [id]),
+          // The S1/S2 deletion stamp rides along via the §10 deletion API.
+          ...applyDeletionToState(state, 'planned_workouts', [id]),
         };
       }),
 
