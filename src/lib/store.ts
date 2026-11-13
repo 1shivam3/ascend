@@ -52,7 +52,7 @@ import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
 import { sanitizeTodayLayout, DEFAULT_TODAY_LAYOUT } from './today-layout';
 import { normalizeHex } from './accent-themes';
 import { purgeLocalAppData, purgeAppCaches, isRecognizedBackupData, buildFullBackup, getCustomBarcodes, getOrCreateGuestId } from './storage';
-import { ARCHIVED_HISTORY_KEY, ARCHIVED_HISTORY_PREV_KEY, hasRetainedHistory } from './history-fork';
+import { appendArchive, readArchiveResult, hasRetainedHistory } from './history-fork';
 import { calculateHydrationTarget } from './habits';
 import { getTabLeaderGuard } from './tab-leader';
 import { dropTombstonedRows } from './tombstone-heal';
@@ -3992,15 +3992,14 @@ export const useAppStore = create<AppState>()(
       // 'true' so disaster recovery stays gated off and cannot
       // resurrect the cleared history into the fresh profile. The
       // archive survives until a later Start fresh rotates it into
-      // the previous slot (DI-13) or an explicit Delete WebApp Data &
-      // Reset purges it.
+      // the previous generation (DI-13) or an explicit Delete WebApp
+      // Data & Reset purges it.
       // Logout-to-onboarding + Start fresh share this write: a full
-      // backup (storage.ts shape) under the archive key. Gauntlet
-      // DI-13: before overwriting, the previous archive rotates into
-      // the PREV slot, so a second Start fresh keeps one generation
-      // of the older history recoverable instead of destroying it.
-      // A failed write returns false and the caller must NOT clear
-      // live state — the archive is the only copy.
+      // backup (storage.ts shape) appended via history-fork's §12
+      // list write, which keeps one older generation recoverable
+      // instead of destroying it. A failed write returns false and
+      // the caller must NOT clear live state — the archive is the
+      // only copy.
       archiveRetainedHistory: () => {
         if (typeof window === 'undefined') return false;
         const state = get();
@@ -4012,14 +4011,10 @@ export const useAppStore = create<AppState>()(
             }),
             archivedAt: new Date().toISOString(),
           };
-          const previous = localStorage.getItem(ARCHIVED_HISTORY_KEY);
-          if (previous) {
-            try {
-              localStorage.setItem(ARCHIVED_HISTORY_PREV_KEY, previous);
-            } catch {}
-          }
-          localStorage.setItem(ARCHIVED_HISTORY_KEY, JSON.stringify(archive));
-          return true;
+          // §12: the rotation is history-fork's single-key list
+          // write — one setItem carries both generations, so the
+          // older copy can no longer be lost to a silent half-write.
+          return appendArchive(archive as Record<string, unknown>);
         } catch {
           return false;
         }
@@ -4114,9 +4109,12 @@ export const useAppStore = create<AppState>()(
       restoreArchivedHistory: () => {
         if (typeof window === 'undefined') return false;
         try {
-          const raw = localStorage.getItem(ARCHIVED_HISTORY_KEY);
-          if (!raw) return false;
-          const parsed = JSON.parse(raw);
+          // §12: the shared discriminated read — newest READABLE
+          // generation (a corrupt newest slot falls back to the
+          // previous generation instead of failing the restore).
+          const archiveResult = readArchiveResult();
+          if (archiveResult.kind !== 'found') return false;
+          const parsed = archiveResult.archive as Record<string, any>;
           // Gauntlet R4: restoring the archive must NOT re-archive the
           // current state over it — the archive stays repeatable.
           const ok = get().importAllData(parsed, { archiveFirst: false });

@@ -38,9 +38,163 @@ import { isRecognizedBackupData } from './storage';
  * archive lives under ARCHIVED_HISTORY_KEY; archiving again first
  * rotates the current archive into ARCHIVED_HISTORY_PREV_KEY, so one
  * accidental second Start-fresh can no longer destroy the only copy
- * of the older history. Restore reads the main slot (unchanged). */
+ * of the older history. Restore reads the main slot (unchanged).
+ *
+ * Phase 1.8 (§12): the two-key rotation was not atomic — the PREV
+ * write was silently best-effort, so its failure lost the older
+ * generation without a signal — and the readers disagreed (restore
+ * and the summary read only the current slot; sync's macro-goal
+ * restore fell back to PREV; absent/corrupt/foreign all read as the
+ * same null). The archive now lives as ONE versioned list under
+ * ARCHIVED_HISTORY_KEY ({version: 2, archives: [newest, previous]}):
+ * rotation is a single setItem. The helpers below are the only
+ * readers/writers; they accept the legacy two-key shape
+ * (backward-compatible reads) and migrate it into the list on the
+ * next write. ARCHIVED_HISTORY_PREV_KEY remains only as the legacy
+ * read/migration source — nothing writes it anymore. */
 export const ARCHIVED_HISTORY_KEY = 'ascend_archived_history';
 export const ARCHIVED_HISTORY_PREV_KEY = 'ascend_archived_history_prev';
+
+/** The list format version stored under ARCHIVED_HISTORY_KEY. */
+export const ARCHIVE_LIST_VERSION = 2;
+/** Generations kept — the same two the two-key rotation kept. */
+const MAX_ARCHIVE_GENERATIONS = 2;
+
+export type ArchiveReadResult =
+  | {
+      kind: 'found';
+      archive: Record<string, unknown>;
+      slot: 'current' | 'previous';
+      format: 'list' | 'legacy';
+    }
+  | { kind: 'absent' }
+  | { kind: 'corrupt' };
+
+function storageAvailable(): boolean {
+  return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+}
+
+/**
+ * One STORED generation slot: `archive` is null when something is
+ * stored in that slot but it is not a readable ASCEND backup — the
+ * distinction the discriminated read is built on.
+ */
+interface StoredArchiveEntry {
+  archive: Record<string, unknown> | null;
+  format: 'list' | 'legacy';
+}
+
+function toStoredEntry(value: unknown, format: 'list' | 'legacy'): StoredArchiveEntry {
+  return {
+    archive: isRecognizedBackupData(value) ? (value as Record<string, unknown>) : null,
+    format,
+  };
+}
+
+/**
+ * The stored generation slots, newest first, across the list format
+ * and the legacy two-key shape. At most MAX_ARCHIVE_GENERATIONS
+ * slots: the list's entries, or a legacy bare backup (one slot),
+ * with the legacy PREV key filling any remaining slot.
+ */
+function readStoredArchiveEntries(): StoredArchiveEntry[] {
+  const entries: StoredArchiveEntry[] = [];
+  if (!storageAvailable()) return entries;
+  try {
+    const mainRaw = localStorage.getItem(ARCHIVED_HISTORY_KEY);
+    if (mainRaw !== null) {
+      let parsed: unknown = null;
+      let parseOk = true;
+      try {
+        parsed = JSON.parse(mainRaw);
+      } catch {
+        parseOk = false;
+      }
+      if (
+        parseOk &&
+        parsed &&
+        typeof parsed === 'object' &&
+        Array.isArray((parsed as { archives?: unknown }).archives)
+      ) {
+        for (const entry of (parsed as { archives: unknown[] }).archives) {
+          entries.push(toStoredEntry(entry, 'list'));
+        }
+      } else {
+        entries.push(
+          parseOk ? toStoredEntry(parsed, 'legacy') : { archive: null, format: 'legacy' },
+        );
+      }
+    }
+    if (entries.length < MAX_ARCHIVE_GENERATIONS) {
+      const prevRaw = localStorage.getItem(ARCHIVED_HISTORY_PREV_KEY);
+      if (prevRaw !== null) {
+        try {
+          entries.push(toStoredEntry(JSON.parse(prevRaw), 'legacy'));
+        } catch {
+          entries.push({ archive: null, format: 'legacy' });
+        }
+      }
+    }
+  } catch {
+    // Storage read failure: report the slots gathered so far.
+  }
+  return entries.slice(0, MAX_ARCHIVE_GENERATIONS);
+}
+
+/** Every readable archive generation, newest first (either format). */
+export function readArchiveGenerations(): Record<string, unknown>[] {
+  return readStoredArchiveEntries()
+    .filter((e): e is StoredArchiveEntry & { archive: Record<string, unknown> } => e.archive !== null)
+    .map((e) => e.archive);
+}
+
+/**
+ * The §12 discriminated read — the ONE read path for the archive.
+ * The unified fallback rule: the newest READABLE generation wins,
+ * whichever slot it occupies; 'absent' (nothing stored) and
+ * 'corrupt' (stored but nothing readable) are distinct outcomes,
+ * never conflated into a bare null.
+ */
+export function readArchiveResult(): ArchiveReadResult {
+  const entries = readStoredArchiveEntries();
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    if (entry.archive !== null) {
+      return {
+        kind: 'found',
+        archive: entry.archive,
+        slot: i === 0 ? 'current' : 'previous',
+        format: entry.format,
+      };
+    }
+  }
+  return entries.length > 0 ? { kind: 'corrupt' } : { kind: 'absent' };
+}
+
+/**
+ * Append one generation — the §12 single-key list write. Rotation
+ * is ONE setItem of the whole list, so it cannot half-happen the
+ * way the two-key rotation could. Legacy generations are carried
+ * into the list (migration) and the legacy PREV key is removed.
+ * Returns false when the write fails; the caller must then NOT
+ * clear live state (the archive may be the only copy).
+ */
+export function appendArchive(archive: Record<string, unknown>): boolean {
+  if (!storageAvailable()) return false;
+  try {
+    const next = [archive, ...readArchiveGenerations()].slice(0, MAX_ARCHIVE_GENERATIONS);
+    localStorage.setItem(
+      ARCHIVED_HISTORY_KEY,
+      JSON.stringify({ version: ARCHIVE_LIST_VERSION, archives: next }),
+    );
+    try {
+      localStorage.removeItem(ARCHIVED_HISTORY_PREV_KEY);
+    } catch {}
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export interface RetainedHistoryInput {
   workouts?: unknown[] | null;
@@ -95,27 +249,27 @@ export interface ArchivedHistorySummary {
  * Read + validate the Start-fresh archive (null when absent or not
  * ASCEND data). The archive is a full backup (storage.ts shape), so
  * its fields count exactly like live state.
+ *
+ * §12: built on the shared discriminated read — the summary now
+ * follows the same unified fallback as every other reader (a
+ * corrupt newest generation no longer hides a healthy previous
+ * one). The outward shape is unchanged: null when nothing readable
+ * exists, whether the underlying result was 'absent' or 'corrupt'.
  */
 export function readArchivedHistory(): ArchivedHistorySummary | null {
-  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(ARCHIVED_HISTORY_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!isRecognizedBackupData(parsed)) return null;
-    return {
-      counts: retainedHistoryCounts({
-        workouts: parsed.workouts,
-        meals: parsed.meals,
-        plannedWorkouts: parsed.plannedWorkouts,
-        prs: parsed.prs,
-        bodyMetrics: parsed.bodyMetrics,
-        prTargets: parsed.prTargets,
-        macroGoals: parsed.macroGoals,
-      }),
-      archivedAt: typeof parsed.archivedAt === 'string' ? parsed.archivedAt : undefined,
-    };
-  } catch {
-    return null;
-  }
+  const result = readArchiveResult();
+  if (result.kind !== 'found') return null;
+  const parsed = result.archive;
+  return {
+    counts: retainedHistoryCounts({
+      workouts: parsed.workouts as unknown[] | undefined,
+      meals: parsed.meals as unknown[] | undefined,
+      plannedWorkouts: parsed.plannedWorkouts as unknown[] | undefined,
+      prs: parsed.prs as unknown[] | undefined,
+      bodyMetrics: parsed.bodyMetrics as unknown[] | undefined,
+      prTargets: parsed.prTargets as Record<string, unknown> | undefined,
+      macroGoals: parsed.macroGoals,
+    }),
+    archivedAt: typeof parsed.archivedAt === 'string' ? parsed.archivedAt : undefined,
+  };
 }

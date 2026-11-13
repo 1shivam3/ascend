@@ -141,9 +141,13 @@ describe('startFreshFromRetainedHistory / restoreArchivedHistory', () => {
     expect(after.bodyMetrics[0].weightKg).toBe(70);
     expect(after.bodyMetrics[0].heightCm).toBe(175);
     // Nothing deleted: the archive holds the original history.
+    // §12 format change (deliberate): the key now holds the
+    // versioned generation list; its newest entry is the archive
+    // this Start fresh just wrote. Legacy bare-backup archives stay
+    // readable — see tests/archive-rotation-phase1.test.ts.
     const raw = storage.getItem(ARCHIVED_HISTORY_KEY);
     expect(raw).not.toBeNull();
-    const archived = JSON.parse(raw!);
+    const archived = JSON.parse(raw!).archives[0];
     expect(archived.workouts).toHaveLength(1);
     expect(archived.plannedWorkouts).toHaveLength(1);
     expect(archived.archivedAt).toBeTruthy();

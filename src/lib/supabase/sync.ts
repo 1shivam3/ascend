@@ -27,7 +27,7 @@ import {
 } from './reconcile';
 import { decideStartFreshGate, isGuestProfileId } from '../start-fresh-guard';
 import { classifyIdentity, isCrossAccountProfile } from '../identity';
-import { hasRetainedHistory, ARCHIVED_HISTORY_KEY, ARCHIVED_HISTORY_PREV_KEY } from '../history-fork';
+import { hasRetainedHistory, readArchiveGenerations } from '../history-fork';
 import { clearLoggedOutLatch, isLoggedOutLatchSet, markLoggedOut } from '../logged-out-latch';
 import { DEFAULT_BODYWEIGHT_KG } from '../defaults';
 import { getInitialCoachBlocksState, type CoachBlocksState } from '../block-engine';
@@ -1043,15 +1043,7 @@ export function macroGoalsFromArchive(archive: unknown, userId: string): MacroGo
   return g as MacroGoals;
 }
 
-function readLocalArchive(key: string): unknown {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
+
 
 
 export interface AuthUser {
@@ -2859,9 +2851,14 @@ class SupabaseSyncEngine {
       // existing local value is never overwritten. (See the helper's
       // comment block for the full mechanism.)
       if (!updates.macroGoals && !freshState.macroGoals) {
-        const restored =
-          macroGoalsFromArchive(readLocalArchive(ARCHIVED_HISTORY_KEY), user.id) ??
-          macroGoalsFromArchive(readLocalArchive(ARCHIVED_HISTORY_PREV_KEY), user.id);
+        // §12: iterate the shared generation list (newest first) —
+        // the same current-then-previous order the old two-key ??
+        // chain had, now over one read path for every format.
+        let restored: MacroGoals | null = null;
+        for (const generation of readArchiveGenerations()) {
+          restored = macroGoalsFromArchive(generation, user.id);
+          if (restored) break;
+        }
         if (restored) updates.macroGoals = restored;
       }
       // The captured needsLocalUpdate reflects pre-round-trip state;
