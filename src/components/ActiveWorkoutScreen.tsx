@@ -30,6 +30,7 @@ import {
   Search,
 } from 'lucide-react';
 import { useStore, shouldAutosaveDraft } from '@/lib/store';
+import { useRestTimer } from '@/lib/use-rest-timer';
 import { computeSessionBest, gateSessionOutcome, outcomeNote } from '@/lib/pr-reevaluation';
 import { getDemoForExercise } from '@/lib/exercise-media';
 import FormCuesSheet from '@/components/FormCuesSheet';
@@ -540,11 +541,9 @@ export default function ActiveWorkoutScreen({
     }, 95);
   }, [registerBackHandler]);
 
-  // Rest Timer state (live-fix L4: the idle preset shown by the pill and
-  // the overlay is defaultRestDuration — one source, no stale copy).
-  const [restSecondsLeft, setRestSecondsLeft] = useState<number>(0);
-  const [isRestRunning, setIsRestRunning] = useState<boolean>(false);
-  const [isRestFinished, setIsRestFinished] = useState<boolean>(false);
+  // Rest Timer (§21, Phase 3.2): the timer is one state machine —
+  // see useRestTimer below (declared after defaultRestDuration,
+  // which it reads at start time). No flags or refs live here.
   const [isRestPopoverOpen, setIsRestPopoverOpen] = useState<boolean>(false);
 
   // Rest-timer sound fix — alert plumbing. The finish chime lives in
@@ -588,68 +587,9 @@ export default function ActiveWorkoutScreen({
   const [weightPrompt, setWeightPrompt] = useState<{ setIdx: number; mode: 'beginner' | 'toggle' } | null>(null);
   const weightPromptShownRef = useRef<Set<string>>(new Set());
 
-  // Live-fix L4: dismissing the Set Complete overlay pauses the rest
-  // timer (remaining time stays resumable from the pill) — it must never
-  // keep running invisibly after its UI is gone. Shared by the X button,
-  // the Escape handler, and the Android-back handler so every close path
-  // behaves identically. (Defined before the effects below: the back
-  // handler's deps array reads it during render.)
-  const dismissSetComplete = useCallback(() => {
-    setCompletedSetSummary(null);
-    if (isRestRunning) {
-      restTargetEndTimeRef.current = null;
-      setIsRestRunning(false);
-      cancelRestAlert();
-    }
-  }, [isRestRunning, cancelRestAlert]);
-
-  // Micro-fix L4 (round 2): the live path is the pill + popover, NOT the
-  // Set Complete overlay — the first round hid the pill only while the
-  // overlay was open, so pill + popover counted side by side and Escape
-  // did nothing on the popover. Dismissing the popover pauses the rest
-  // timer (remaining time stays resumable from the pill); collapsing the
-  // popover via its X button does NOT pause — Escape is the pause path.
-  const dismissRestPopover = useCallback(() => {
-    setIsRestPopoverOpen(false);
-    if (isRestRunning) {
-      restTargetEndTimeRef.current = null;
-      setIsRestRunning(false);
-      cancelRestAlert();
-    }
-  }, [isRestRunning, cancelRestAlert]);
-
-  useEffect(() => {
-    if (completedSetSummary) {
-      return registerBackHandler(() => {
-        dismissSetComplete();
-        return true;
-      }, 105);
-    }
-  }, [completedSetSummary, registerBackHandler, dismissSetComplete]);
-
-  // Escape closes the Set Complete overlay (it previously did nothing —
-  // the overlay is not a useModalA11y modal, so nothing handled the key).
-  useEffect(() => {
-    if (!completedSetSummary) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') dismissSetComplete();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [completedSetSummary, dismissSetComplete]);
-
-  // Micro-fix L4 (round 2): Escape closes the rest popover AND pauses
-  // (same dismiss+pause semantics as the overlay). Without this, Escape
-  // did nothing on the popover — the only close paths were Skip (which
-  // kills the timer) and re-tapping the pill (hidden once open).
-  useEffect(() => {
-    if (!isRestPopoverOpen || completedSetSummary) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') dismissRestPopover();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [isRestPopoverOpen, completedSetSummary, dismissRestPopover]);
+  // (The Set Complete / popover dismiss callbacks and their Escape
+  // + back-handler effects live below the rest-timer hook they
+  // pause — §21.)
 
   // Micro-fix L4 (round 2): single timer UI across transitions — when
   // the Set Complete overlay opens, the popover closes so pill + popover
@@ -1061,9 +1001,6 @@ export default function ActiveWorkoutScreen({
   // AudioContext at finish time, which Android starts suspended, so
   // the chime never sounded on real phones.
 
-  // Timestamp-based drift-free rest timer reference
-  const restTargetEndTimeRef = useRef<number | null>(null);
-
   // Elapsed workout timer — re-derived from the persisted start
   // timestamp on every tick (J2.3), so a throttled interval or a
   // remount can never leave a stale/reset value behind.
@@ -1075,43 +1012,35 @@ export default function ActiveWorkoutScreen({
     return () => clearInterval(timer);
   }, [sessionStartTime]);
 
-  // Countdown Rest Timer - timestamp based to eliminate mobile background/tab sleep drift
-  useEffect(() => {
-    if (!isRestRunning) return;
-    const updateTick = () => {
-      const endTime = restTargetEndTimeRef.current;
-      if (!endTime) return;
-      const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
-      if (remaining <= 0) {
-        setIsRestRunning(false);
-        setIsRestFinished(true);
-        setRestSecondsLeft(0);
-        restTargetEndTimeRef.current = null;
-        playRestDoneChime();
-        triggerHaptic('rest_done');
-        // The chime + haptic just fired in the foreground — the
-        // scheduled locked-screen alert must not fire a second later.
-        cancelRestAlert();
-      } else {
-        setRestSecondsLeft(remaining);
-      }
-    };
-
-    updateTick();
-    const interval = setInterval(updateTick, 500);
-
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        updateTick();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
-  }, [isRestRunning, cancelRestAlert]);
+  // §21 (Phase 3.2): the rest timer is ONE machine — useRestTimer
+  // (lib/use-rest-timer + lib/rest-timer). The countdown tick, the
+  // finish effects and the OS-alert scheduling all live in the
+  // hook; startTimer below is the single start path (the two
+  // hand-copied starts — set-toggle and voice-log — call it too;
+  // their copies never set the end time the countdown read, which
+  // froze the pill mid-"run"). Finish effects: chime + haptic in
+  // the foreground, and the scheduled locked-screen alert is
+  // cancelled so it cannot fire a second time.
+  const restTimer = useRestTimer({
+    defaultSeconds: defaultRestDuration,
+    onFinish: () => {
+      playRestDoneChime();
+      triggerHaptic('rest_done');
+      cancelRestAlert();
+    },
+    scheduleAlert: scheduleRestAlert,
+    cancelAlert: cancelRestAlert,
+    unlockAudio: unlockRestAudio,
+  });
+  const restSecondsLeft = restTimer.secondsLeft;
+  const isRestRunning = restTimer.status === 'running';
+  const isRestFinished = restTimer.status === 'finished';
+  const startTimer = restTimer.start;
+  // Wrapped: the hook's togglePause takes an optional start value,
+  // which must never receive a click event from direct onClick use.
+  const togglePauseTimer = () => restTimer.togglePause();
+  const adjustTimer = restTimer.adjust;
+  const skipTimer = restTimer.skip;
 
   // Rest-timer sound fix: leaving the workout (finish/discard/unmount)
   // must never leave a rest alert pending behind it.
@@ -1121,65 +1050,59 @@ export default function ActiveWorkoutScreen({
     };
   }, []);
 
-  // Start rest timer. Called only from user-gesture paths (set
-  // complete, pill, pause toggle), so it also unlocks the shared audio
-  // context while the gesture is on the stack, and schedules the
-  // locked-screen alert for the exact end time.
-  const startTimer = useCallback(
-    (seconds?: number) => {
-      const targetSec = seconds || defaultRestDuration;
-      const endTime = Date.now() + targetSec * 1000;
-      restTargetEndTimeRef.current = endTime;
-      setRestSecondsLeft(targetSec);
-      setIsRestRunning(true);
-      setIsRestFinished(false);
-      unlockRestAudio();
-      scheduleRestAlert(endTime);
-    },
-    [defaultRestDuration, scheduleRestAlert]
-  );
+  // Live-fix L4: dismissing the Set Complete overlay pauses the rest
+  // timer (remaining time stays resumable from the pill) — it must never
+  // keep running invisibly after its UI is gone. Shared by the X button,
+  // the Escape handler, and the Android-back handler so every close path
+  // behaves identically.
+  const dismissSetComplete = useCallback(() => {
+    setCompletedSetSummary(null);
+    if (restTimer.status === 'running') restTimer.pause();
+  }, [restTimer]);
 
-  const togglePauseTimer = () => {
-    if (restSecondsLeft === 0) {
-      startTimer();
-    } else if (isRestRunning) {
-      restTargetEndTimeRef.current = null;
-      setIsRestRunning(false);
-      cancelRestAlert();
-    } else {
-      const endTime = Date.now() + restSecondsLeft * 1000;
-      restTargetEndTimeRef.current = endTime;
-      setIsRestRunning(true);
-      unlockRestAudio();
-      scheduleRestAlert(endTime);
+  // Micro-fix L4 (round 2): the live path is the pill + popover, NOT the
+  // Set Complete overlay — the first round hid the pill only while the
+  // overlay was open, so pill + popover counted side by side and Escape
+  // did nothing on the popover. Dismissing the popover pauses the rest
+  // timer (remaining time stays resumable from the pill); collapsing the
+  // popover via its X button does NOT pause — Escape is the pause path.
+  const dismissRestPopover = useCallback(() => {
+    setIsRestPopoverOpen(false);
+    if (restTimer.status === 'running') restTimer.pause();
+  }, [restTimer]);
+
+  useEffect(() => {
+    if (completedSetSummary) {
+      return registerBackHandler(() => {
+        dismissSetComplete();
+        return true;
+      }, 105);
     }
-  };
+  }, [completedSetSummary, registerBackHandler, dismissSetComplete]);
 
-  const adjustTimer = (delta: number) => {
-    // The shifted end time is computed from the current ref BEFORE the
-    // state updater runs (updaters execute at render time) so the
-    // locked-screen alert can be moved to the same instant.
-    const endTime = restTargetEndTimeRef.current;
-    const shiftedEnd = endTime !== null ? endTime + delta * 1000 : null;
-    setRestSecondsLeft((prev) => {
-      const next = Math.max(0, prev + delta);
-      if (restTargetEndTimeRef.current) {
-        restTargetEndTimeRef.current += delta * 1000;
-      }
-      return next;
-    });
-    if (shiftedEnd !== null && isRestRunning) {
-      scheduleRestAlert(shiftedEnd);
-    }
-  };
+  // Escape closes the Set Complete overlay (it previously did nothing —
+  // the overlay is not a useModalA11y modal, so nothing handled the key).
+  useEffect(() => {
+    if (!completedSetSummary) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') dismissSetComplete();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [completedSetSummary, dismissSetComplete]);
 
-  const skipTimer = () => {
-    restTargetEndTimeRef.current = null;
-    setRestSecondsLeft(0);
-    setIsRestRunning(false);
-    setIsRestFinished(false);
-    cancelRestAlert();
-  };
+  // Micro-fix L4 (round 2): Escape closes the rest popover AND pauses
+  // (same dismiss+pause semantics as the overlay). Without this, Escape
+  // did nothing on the popover — the only close paths were Skip (which
+  // kills the timer) and re-tapping the pill (hidden once open).
+  useEffect(() => {
+    if (!isRestPopoverOpen || completedSetSummary) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') dismissRestPopover();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isRestPopoverOpen, completedSetSummary, dismissRestPopover]);
 
   const formatTime = (totalSec: number) => {
     const mins = Math.floor(totalSec / 60);
@@ -1588,14 +1511,11 @@ export default function ActiveWorkoutScreen({
     if (isNowCompleted) {
       triggerHaptic('set_complete');
       // Auto start rest timer immediately based on athlete goal & lift type
+      // (§21: through the single start path — this tap is the gesture
+      // that unlocks the chime audio, and the hook schedules the
+      // locked-screen alert for the same endsAt the countdown reads.)
       const restDuration = defaultRestDuration;
-      setRestSecondsLeft(restDuration);
-      setIsRestRunning(true);
-      setIsRestFinished(false);
-      // This tap is the gesture that unlocks the chime audio; the
-      // locked-screen alert tracks the same end time.
-      unlockRestAudio();
-      scheduleRestAlert(Date.now() + restDuration * 1000);
+      startTimer(restDuration);
       toast.info(
         t('workout.toastSetLogged', {
           n: setIdx + 1,
@@ -1912,13 +1832,8 @@ export default function ActiveWorkoutScreen({
       })
     );
 
-    // Auto-trigger rest interval timer
-    const restDuration = defaultRestDuration;
-    setRestSecondsLeft(restDuration);
-    setIsRestRunning(true);
-    setIsRestFinished(false);
-    unlockRestAudio();
-    scheduleRestAlert(Date.now() + restDuration * 1000);
+    // Auto-trigger rest interval timer (§21: the single start path)
+    startTimer(defaultRestDuration);
   };
 
   // Warm-up sets generator preview
@@ -3500,8 +3415,7 @@ export default function ActiveWorkoutScreen({
           type="button"
           onClick={() => {
             if (isRestFinished) {
-              setIsRestFinished(false);
-              setRestSecondsLeft(0);
+              skipTimer();
             } else if (!isRestRunning && restSecondsLeft === 0) {
               startTimer();
             } else {

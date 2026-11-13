@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { tabListKeyDown } from '@/lib/tab-keyboard';
 import { useStore, shouldAutosaveDraft, isStaleDraft } from '@/lib/store';
+import { useRestTimer } from '@/lib/use-rest-timer';
 import { resolveDefaultCoachSegment } from '@/lib/coach-session';
 import { renderLocalizedSentence } from '@/lib/coach-i18n';
 import { useTranslation } from '@/lib/i18n';
@@ -1292,11 +1293,23 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const [startedFromPlanId, setStartedFromPlanId] = useState<string | null>(null);
   const [sharingPlan, setSharingPlan] = useState<PlannedWorkout | null>(null);
 
-  // ── Rest Timer State ───────────────────────────────────────────────────────
-  const [restSecondsLeft, setRestSecondsLeft] = useState<number>(0);
+  // ── Rest Timer (§21, Phase 3.2) ────────────────────────────────────────────
+  // The same one machine the live session screen uses
+  // (lib/use-rest-timer): this page's old decrement timer drifted
+  // whenever the tab slept, because it counted interval firings
+  // instead of deriving from an end time. restTotalSeconds stays
+  // local — it is the bar's preset selection, not timer state.
   const [restTotalSeconds, setRestTotalSeconds] = useState<number>(defaultRestSeconds);
-  const [isRestRunning, setIsRestRunning] = useState<boolean>(false);
-  const [isTimerFinished, setIsTimerFinished] = useState<boolean>(false);
+  const restTimer = useRestTimer({
+    defaultSeconds: defaultRestSeconds,
+    onFinish: () => {
+      playBeep();
+      toast.info(t('toast.restReady'), t('toast.titleSetReady'));
+    },
+  });
+  const restSecondsLeft = restTimer.secondsLeft;
+  const isRestRunning = restTimer.status === 'running';
+  const isTimerFinished = restTimer.status === 'finished';
 
   useEffect(() => {
     setRestTotalSeconds(defaultRestSeconds);
@@ -1845,26 +1858,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     } catch {}
   };
 
-  // ─── Rest Timer Effect ───────────────────────────────────────────────────
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    if (isRestRunning && restSecondsLeft > 0) {
-      interval = setInterval(() => {
-        setRestSecondsLeft((prev) => {
-          if (prev <= 1) {
-            playBeep();
-            toast.info(t('toast.restReady'), t('toast.titleSetReady'));
-            setIsRestRunning(false);
-            setIsTimerFinished(true);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => { if (interval) clearInterval(interval); };
-  }, [isRestRunning, restSecondsLeft, toast]);
+  // ─── Rest Timer Handlers (§21: delegating to the one machine) ────────────
 
   const startTimer = (seconds: number) => {
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
@@ -1873,34 +1867,27 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       } catch {}
     }
     setRestTotalSeconds(seconds);
-    setRestSecondsLeft(seconds);
-    setIsRestRunning(true);
-    setIsTimerFinished(false);
+    restTimer.start(seconds);
   };
 
   const togglePauseTimer = () => {
     if (restSecondsLeft === 0) {
       startTimer(restTotalSeconds || 90);
     } else {
-      setIsRestRunning(r => !r);
+      restTimer.togglePause();
     }
   };
 
   const resetTimer = () => {
-    setIsRestRunning(false);
-    setIsTimerFinished(false);
-    setRestSecondsLeft(restTotalSeconds);
+    restTimer.reset(restTotalSeconds);
   };
 
   const skipTimer = () => {
-    setIsRestRunning(false);
-    setRestSecondsLeft(0);
-    setIsTimerFinished(false);
+    restTimer.skip();
   };
 
   const adjustTimer = (deltaSeconds: number) => {
-    setRestSecondsLeft(prev => Math.max(0, prev + deltaSeconds));
-    setIsTimerFinished(false);
+    restTimer.adjust(deltaSeconds);
   };
 
   const formatTimer = (secs: number) => {
