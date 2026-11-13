@@ -153,19 +153,3 @@ export interface WarmupSet {
   pct: string;
 }
 
-export function generateWarmupRamp(
-  targetWeight: number,
-  unit: 'kg' | 'lbs' = 'kg',
-  barWeight: number = 20
-): WarmupSet[] {
-  if (targetWeight <= barWeight) return [];
-  const step = unit === 'kg' ? 2.5 : 5;
-  const roundToStep = (wt: number) => Math.max(barWeight, Math.round(wt / step) * step);
-  return [
-    { label: 'Set 1 (Empty Bar)', weight: barWeight, reps: '10 reps', pct: 'Warmup' },
-    { label: 'Set 2 (50%)', weight: roundToStep(targetWeight * 0.5), reps: '5 reps', pct: '50%' },
-    { label: 'Set 3 (70%)', weight: roundToStep(targetWeight * 0.7), reps: '3 reps', pct: '70%' },
-    { label: 'Set 4 (85%)', weight: roundToStep(targetWeight * 0.85), reps: '1-2 reps', pct: '85%' },
-    { label: 'Work Set (100%)', weight: targetWeight, reps: 'Work reps', pct: '100%' },
-  ];
-}

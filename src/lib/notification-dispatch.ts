@@ -6,12 +6,6 @@
 
 import { redactSecrets } from './server-security';
 
-export interface DeliveryClaimParams {
-  idempotencyKey: string;
-  endpoint: string;
-  userId: string | null;
-  notificationType: string;
-}
 
 /**
  * Atomically claims one delivery, or returns false when another

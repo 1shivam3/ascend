@@ -50,8 +50,6 @@
  * English FOOD_DB key everywhere, exactly like EXERCISE_NAME_HI.
  */
 
-export const FOOD_HINDI_SOURCE =
-  "Repo-curated DEVANAGARI_WORD_MAP (src/lib/devanagari.ts, QA4-029), inverted; 65/617 FOOD_DB keys";
 
 /** Devanagari display name for a FOOD_DB key, or undefined when unmapped. */
 export const FOOD_NAME_HI: Record<string, string> = {

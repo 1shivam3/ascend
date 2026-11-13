@@ -103,20 +103,4 @@ export const POSE_CONNECTIONS: ReadonlyArray<readonly [PoseLandmarkIndex, PoseLa
 
 export type DetectedSide = 'left' | 'right' | 'front' | 'unknown';
 
-export interface PoseDetectionResult {
-  landmarks: PoseLandmarks | null;
-  worldLandmarks?: PoseLandmarks | null;
-  timestampMs: number;
-  trackingConfidence: number;
-  detectedSide: DetectedSide;
-}
 
-export interface CameraSetupGuidance {
-  exerciseId: string;
-  recommendedView: 'side' | 'front';
-  minDistanceMeters: number;
-  maxDistanceMeters: number;
-  instructions: string[];
-  keyLandmarks: PoseLandmarkIndex[];
-  minConfidence: number;
-}

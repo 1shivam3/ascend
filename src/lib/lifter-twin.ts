@@ -74,9 +74,6 @@ export function calculateSetEffortDrift(sets: WorkoutSet[]): {
   };
 }
 
-// Backward-compatible alias
-export const calculateSetFatigueSlope = calculateSetEffortDrift;
-
 /**
  * Normalized exercise-name equality (FE-03, audit-3): trim, case-fold,
  * collapse internal whitespace — and nothing looser. Variant lifts

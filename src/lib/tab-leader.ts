@@ -372,6 +372,3 @@ export function getTabLeaderGuard(): TabLeaderGuard | null {
 }
 
 /** Test hook: replace the singleton (unit tests only). */
-export function __setTabLeaderGuardForTests(guard: TabLeaderGuard | null): void {
-  singleton = guard;
-}

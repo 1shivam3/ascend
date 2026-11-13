@@ -458,17 +458,6 @@ export const sanitizeAthleteName = (raw: string, maxLength = 50): string => {
 };
 
 /** Email-safe slug from a display name (for the local guest email). */
-export const athleteNameToEmailSlug = (name: string): string => {
-  const slug = name
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[^\w\s.-]/g, '')
-    .trim()
-    .replace(/[\s_]+/g, '.')
-    .replace(/\.+/g, '.')
-    .replace(/^[.-]+|[.-]+$/g, '');
-  return slug || 'athlete';
-};
 
 /** Time-of-day greeting. Late night (22–5) gets "Good night," never "Good morning,". */
 export const getTimeGreeting = (date: Date = new Date()): string => {

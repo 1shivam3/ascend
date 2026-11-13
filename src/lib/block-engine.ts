@@ -70,7 +70,10 @@ import { kgToLbs } from './units';
 
 export type BlockFocus = 'strength' | 'hypertrophy' | 'fat_loss' | 'maintenance';
 export type BlockWeekType = 'build' | 'deload' | 'test';
-export type NutritionPhase = 'deficit' | 'surplus' | 'maintenance';
+// §D2: the type + its one derivation live in nutrition-phase.ts;
+// re-exported here so existing imports keep working.
+export type { NutritionPhase } from './nutrition-phase';
+import type { NutritionPhase } from './nutrition-phase';
 
 export interface ProgressionScheme {
   /** Evidence-layer canonical key (trim + lowercase). */
@@ -371,10 +374,11 @@ function resolveFocus(
         reason: 'Your goal is strength, so the block is built around heavy main lifts with a test week to prove the progress.',
       };
     case 'build_muscle':
-      // NOTE: a build_muscle+deficit branch used to live here, but the
-      // store only ever passes nutritionPhase for lose_fat — the branch
-      // was unreachable dead code. Deleted rather than kept "just in
-      // case": a branch that cannot fire is a branch nobody tests.
+      // NOTE: a build_muscle+deficit branch used to live here. It
+      // stays deleted: deriveNutritionPhase (nutrition-phase.ts)
+      // yields 'deficit' ONLY for lose_fat, so the combination is
+      // unrepresentable by construction now — a branch that cannot
+      // fire is a branch nobody tests.
       // The reason must be truthful at cold start: a brand-new lifter
       // has no logged progress for loads to "come from" (the sim's
       // first-ever hypertrophy blocks claimed exactly that), so the

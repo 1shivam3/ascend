@@ -1,4 +1,5 @@
 import { FoodItem, MacroTotals, MacroGoals, AthleteGoal, Gender } from './types';
+import { deriveNutritionPhase } from './nutrition-phase';
 import { INDIAN_FOOD_VALUES, getHouseholdUnitGrams } from './indian-foods';
 import { containsDevanagari, expandFoodQuery, transliterateDevanagari } from './devanagari';
 import { resolveFoodAlias } from './food-aliases';
@@ -1507,31 +1508,21 @@ export function calculateRecommendedMacroGoals(
       break;
   }
 
-  // Phase 3 (Task 3.1): minors are MAINTENANCE-ONLY — for every goal.
-  // The lose_fat branch used to be the only guarded one (no deficit
-  // under 18); the build_muscle / get_stronger surpluses above were
-  // still prescribed to 13–17-year-olds. Growth comes first: under
-  // 18 the calorie target IS maintenance, whatever the goal. Protein
-  // per kg stays goal-driven (it is not an energy target). The age
-  // range is (0, 18), wider than the 13–17 product band: under-13
-  // accounts are rejected at every entry point, but a legacy or
-  // restored record must still never be prescribed a deficit or a
-  // surplus. See lib/minor-targets.ts for the full enforcement map.
-  if (typeof ageYears === 'number' && ageYears > 0 && ageYears < 18) {
-    targetCalories = maintenance;
-  }
-
-  // QA-hardening R5: unknown age is a SEPARATE axis from the minor
-  // clamp above. When no usable age is on file (no DOB — the engine
-  // would otherwise cost the user as a 25-year-old), the user cannot
-  // be shown to be an adult, so no deficit — and no surplus — is
-  // prescribed either: the calorie target IS maintenance until a DOB
-  // is added. Protein per kg stays goal-driven, as in the minor
-  // clamp. "Known" mirrors a plausible recorded age (13–120); the
-  // BMR defaulting in calculateMaintenanceCalories is unchanged.
-  const hasKnownAge =
-    typeof ageYears === 'number' && Number.isFinite(ageYears) && ageYears >= 13 && ageYears <= 120;
-  if (!hasKnownAge) {
+  // §D2: BOTH safety clamps that used to live here — minors are
+  // maintenance-only for every goal (Phase 3 Task 3.1: growth
+  // comes first; the band is (0, 18), wider than the 13–17
+  // product band, so a legacy/restored under-13 record is never
+  // prescribed a deficit or surplus either), and unknown age is
+  // maintenance-only (QA-hardening R5: no DOB on file means the
+  // user cannot be shown to be an adult) — are exactly the
+  // cases where the ONE derivation in nutrition-phase.ts
+  // returns 'maintenance' for a goal whose raw direction is
+  // not. Expressing the clamps through deriveNutritionPhase
+  // keeps Fuel's targets and the coach block's nutritionPhase
+  // from ever disagreeing. Protein per kg stays goal-driven
+  // (it is not an energy target). See lib/minor-targets.ts for
+  // the full enforcement map.
+  if (deriveNutritionPhase(goal, ageYears) === 'maintenance') {
     targetCalories = maintenance;
   }
 

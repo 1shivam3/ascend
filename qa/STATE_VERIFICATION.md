@@ -90,3 +90,55 @@ had been lost with the home-quota exhaustion — see the Phase 0 report):
   the file header). Everything else is fair game per the brief.
 - One correction to the source inventory: §19's `'replaced'` is assigned
   (store.ts:3147) — the smell is lazy terminal labeling, not a dead state.
+
+## D. Program completion addendum (Phase 5, 2026-11-13)
+
+Every entry above now has a final disposition. Machine documentation:
+`STATE_MACHINES.md` (repo root). Invariant tests:
+`tests/state-invariants-phase5.test.ts`.
+
+| § | Disposition | Phase / PR | Commit(s) |
+|---|---|---|---|
+| 1, 2 | fixed — one sync state machine + one UI selector | 2 / #131 | d2d23e4 |
+| 3 | fixed — one latch owner module | 1 / #130 | bda4bf7 |
+| 4 | fixed — content signature, persisted pending, honest suppress; the ">500 ms heuristic" sub-claim was **false** (never existed) | 1 / #130 | e765680 |
+| 5, 6, 27 | fixed — one identity classifier + provenance | 1 / #130 | 88e5376 |
+| 7 | fixed — schema/row split, payload stamps, error classes only | 1 / #130 | e28265c |
+| 8 | fixed — user-scoped adoption baseline | 1 / #130 | 56ef915 |
+| 9 | fixed — one conflict rule + conflict log | 2 / #131 | 6cd89f0 |
+| 10 | fixed — one deletion API + invariant; TTL migration **needs owner action** (dashboard apply of 2026111301) | 1 / #130 | b41754f |
+| 11 | fixed — canonical signature, baseline clears on revert | 2 / #131 | 4c50f17 |
+| 12 | fixed — atomic generation-list archive, unified read | 1 / #130 | d90eb51, c34913c |
+| 13 | **intentional** — fail-open kept + documented; stop()/unload fixed | 2 / #131 | 4348748, fb792c6 |
+| 14 | fixed — terminal consumed, fail-closed reads | 1 / #130 | 3e365f8 |
+| 15 | fixed — one draft definition, stale-resume prompt; zero-exercise drafts persist (gate-caught regression reverted a1ee767) | 3 / #132 | 6b38d4e, a1ee767 |
+| 16, 18 | fixed — one Today resolver, kind-tagged schedule days | 3 / #132 | 6b38d4e |
+| 17 | fixed — one set-status precedence + canonical persisted shape | 3 / #132 | f249b9a |
+| 19 | fixed — settle pass, recorded dismissals, counted cap | 3 / #132 | 3ebec16, 5105363 |
+| 20 | fixed — one decision vocabulary; 'applied' derived (**stays derived by design**, validator pins stored 'accepted') | 3 / #132 | 3ebec16, 5105363 |
+| 21 | fixed — one rest-timer machine, single start path | 3 / #132 | 9604192 |
+| 22 | fixed — run-player reducer, 80% completion threshold, enrollment ids | 3 / #132 | 745b9f0 |
+| 23 | fixed — PRs one source (replay) + manual; isPR field removed | 3 / #132 | 1f24144 |
+| 24 | fixed — id-keyed steps, completedAt is "done" | 3 / #132 | 73aec8c |
+| 25, 26 | fixed — dead screens removed, completion derived from profile | 4 / #133 | caceb54 (+ gate fix 5e09c6c) |
+| 28 | fixed — 'undone' a state, one stale derivation, tightened types | 4 / #133 | 2938c52 |
+| 29 | fixed — one flow machine + camera-permission machine | 4 / #133 | 21a29b1 |
+| 30 | fixed — legacy outcome vocabulary deleted (zero callers) | 4 / #133 | 4eb3290 |
+| 31 | fixed — 'lockout' implemented (deadlift); 'rep_completed' deleted (zero assignments) | 4 / #133 | 3a8886b |
+| 32 | fixed — verdict is one field; squat emits failed reps | 4 / #133 | e7bf98c |
+| 33 | fixed — pose-service union; shared visibility helper | 4 / #133 | 2e3ff6d |
+| 34 | fixed — one deletion reducer, error reset | 4 / #133 | f96c3be |
+| 35 | fixed — one persisted themeMode; accent validated on write | 4 / #133 | 23d2dce |
+| 36 | fixed — per-type grants derived; full notification result | 4 / #133 | f4237ae |
+| 37 | fixed — explicit consent tri-state | 4 / #133 | 83232ab |
+| D1 | fixed — thresholds exist once; 'primed' w/o history **intentional** (documented) | 5 | f9be967 |
+| D2 | fixed — phase derived once (goal × age safety); block + Fuel share it | 5 | c11a825 |
+| D3 | **intentional** — 'fatigued' > 'recent' precedence documented + pinned | 5 | 58795a8 |
+| D4 | **by design** — pure classifiers, no lifecycle; recorded in STATE_MACHINES.md | 5 | — |
+| — | dead-code sweep: 32 grep-proven dead exports removed | 5 | 8de1a81 |
+| — | five cross-machine invariants under CI | 5 | 88ec008 |
+
+Recorded bugs: B1 (§23 set-edit gap) fixed 1f24144 · B2 (§23 Coach's Take)
+fixed 1f24144 · B3 (§1/§2 banner vs Settings) fixed d2d23e4 · B4 (§16/§18
+rest-day) fixed 6b38d4e · B5 (§16 button flip) fixed 6b38d4e — each with
+tests in its phase suite.

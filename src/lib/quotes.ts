@@ -88,9 +88,3 @@ export function getDailyQuote(
   return pool[slot % pool.length];
 }
 
-/**
- * Legacy compat — picks a neutral quote changing every 4 hours
- */
-export function getQuoteForNow(): Quote {
-  return getDailyQuote(null, 4);
-}
