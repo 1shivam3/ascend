@@ -2770,6 +2770,8 @@ export const en = {
   'decision.accept': 'Accept',
   'decision.editOverride': 'Edit Override',
   'decision.override': 'Override',
+  'decision.dismiss': 'Dismiss',
+  'decision.dismissedState': 'Dismissed',
   'pva.title': 'Plan vs Actual',
   'pva.reviewTitle': 'Plan vs Actual Review',
   'pva.completionTitle': 'Prescribed set completion rate',

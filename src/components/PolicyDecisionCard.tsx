@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
-import { TrainingDecisionRecord, Unit, validatePolicyDecisionApplication } from '@/lib/types';
+import { TrainingDecisionRecord, Unit, decisionEffectiveStatus, validatePolicyDecisionApplication } from '@/lib/types';
 import { useStore } from '@/lib/store';
 import {
   Check,
@@ -76,7 +76,11 @@ export default function PolicyDecisionCard({
   const isAccepted = decision.status === 'accepted';
   const isOverridden = decision.status === 'overridden';
   const isDismissed = decision.status === 'dismissed';
-  const isApplied = Boolean(decision.appliedAt);
+  // §20: applied-ness comes from the one selector — it also joins
+  // the audit list, so a record whose appliedAt stamp was lost in
+  // a sync round-trip still reads applied when its audit exists.
+  const isApplied =
+    decisionEffectiveStatus(decision, policyDecisionApplications) === 'applied';
   const isApplicableAction =
     decision.ruleId !== 'SAFETY-01' &&
     decision.actionCategory !== 'review_required' &&

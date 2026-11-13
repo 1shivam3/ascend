@@ -2777,6 +2777,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'decision.accept': 'स्वीकार करें',
   'decision.editOverride': 'बदलाव संपादित करें',
   'decision.override': 'बदलें',
+  'decision.dismiss': 'खारिज करें',
+  'decision.dismissedState': 'खारिज किया गया',
   'pva.title': 'प्लान बनाम वास्तविक',
   'pva.reviewTitle': 'प्लान बनाम वास्तविक समीक्षा',
   'pva.completionTitle': 'निर्धारित सेट पूर्णता दर',

@@ -11,6 +11,7 @@ import {
   Info,
   ShieldCheck,
   Sparkles,
+  X,
 } from 'lucide-react';
 import { useToast } from './ui/Toast';
 import { Button } from '@/components/ui/Button';
@@ -23,6 +24,7 @@ interface TrainingDecisionCardProps {
   userUnit?: 'kg' | 'lbs';
   onAccepted?: (decision: TrainingDecision) => void;
   onOverridden?: (decision: TrainingDecision) => void;
+  onDismissed?: (decision: TrainingDecision) => void;
 }
 
 export default function TrainingDecisionCard({
@@ -30,9 +32,11 @@ export default function TrainingDecisionCard({
   userUnit = 'kg',
   onAccepted,
   onOverridden,
+  onDismissed,
 }: TrainingDecisionCardProps) {
   const acceptTrainingDecision = useStore((state) => state.acceptTrainingDecision);
   const overrideTrainingDecision = useStore((state) => state.overrideTrainingDecision);
+  const dismissTrainingDecision = useStore((state) => state.dismissTrainingDecision);
   const { t } = useTranslation();
   const toast = useToast();
 
@@ -41,6 +45,12 @@ export default function TrainingDecisionCard({
 
   const isAccepted = decision.status === 'accepted';
   const isOverridden = decision.status === 'overridden';
+  const isDismissed = decision.status === 'dismissed';
+
+  const handleDismiss = () => {
+    dismissTrainingDecision(decision.exerciseName, decision);
+    if (onDismissed) onDismissed({ ...decision, status: 'dismissed' });
+  };
 
   const handleAccept = () => {
     acceptTrainingDecision(decision.exerciseName, decision);
@@ -162,38 +172,50 @@ export default function TrainingDecisionCard({
               <Sparkles className="w-4 h-4" />
               <span>{t('decision.manualActive')}</span>
             </div>
+          ) : isDismissed ? (
+            <div className="flex items-center gap-1.5 text-text-muted text-xs font-mono font-bold">
+              <X className="w-4 h-4" />
+              <span>{t('decision.dismissedState')}</span>
+            </div>
           ) : (
             <span className="text-[0.625rem] text-text-muted font-mono">
               {t('decision.suggested')}
             </span>
           )}
 
-          <div className="flex items-center gap-2">
-            {!isAccepted && (
+          {!isDismissed && (
+            <div className="flex items-center gap-2">
+              {!isAccepted && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleAccept}
+                  leftIcon={<Check className="w-3.5 h-3.5 stroke-[3]" />}
+                >
+                  {t('decision.accept')}
+                </Button>
+              )}
               <Button
-                variant="primary"
+                variant="secondary"
                 size="sm"
-                onClick={handleAccept}
-                leftIcon={<Check className="w-3.5 h-3.5 stroke-[3]" />}
+                onClick={() => {
+                  setCustomWeight(
+                    isOverridden
+                      ? decision.userOverrideWeight || decision.nextPrescription.weight
+                      : decision.nextPrescription.weight
+                  );
+                  setIsOverriding(true);
+                }}
               >
-                {t('decision.accept')}
+                {isOverridden ? t('decision.editOverride') : t('decision.override')}
               </Button>
-            )}
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                setCustomWeight(
-                  isOverridden
-                    ? decision.userOverrideWeight || decision.nextPrescription.weight
-                    : decision.nextPrescription.weight
-                );
-                setIsOverriding(true);
-              }}
-            >
-              {isOverridden ? t('decision.editOverride') : t('decision.override')}
-            </Button>
-          </div>
+              {!isAccepted && !isOverridden && (
+                <Button variant="ghost" size="sm" onClick={handleDismiss}>
+                  {t('decision.dismiss')}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </Card>
