@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { SquatAnalyzer } from '@/features/form-coach/analyzers/SquatAnalyzer';
-import { resolveAnalysisOutcome } from '@/features/form-coach/hooks/useFormCoach';
+import { resolveDetectionOutcome } from '@/features/form-coach/hooks/useFormCoach';
 import { NormalizedLandmark, PoseLandmarkIndex } from '@/features/form-coach/models/pose.types';
 
 /**
@@ -228,21 +228,53 @@ describe('movement signature (D6) — squats stay squats', () => {
   });
 });
 
-describe('resolveAnalysisOutcome (D6 routing)', () => {
+describe('resolveDetectionOutcome (D6 routing, §30)', () => {
+  // §30: the legacy 'not-squat' outcome is gone. Its modern
+  // equivalents: a squat PRESET whose stream confidently detects
+  // as the other exercise routes to 'mismatch' (the user
+  // decides); an AUTO run simply reports as what was detected.
   const tracked = { framesProcessed: 200, framesTracked: 190 };
 
-  it('routes a positively-hinge set to not-squat', () => {
-    expect(resolveAnalysisOutcome(tracked, 'not_squat')).toBe('not-squat');
+  it('routes a hinge-detected squat preset to mismatch, not a squat report', () => {
+    expect(
+      resolveDetectionOutcome({
+        stats: tracked,
+        mode: { type: 'preset', exerciseId: 'squat' },
+        detection: 'deadlift',
+      }),
+    ).toEqual({ kind: 'mismatch', detectedExerciseId: 'deadlift' });
   });
 
-  it('keeps the report for squat and unjudged signatures', () => {
-    expect(resolveAnalysisOutcome(tracked, 'squat')).toBe('report');
-    expect(resolveAnalysisOutcome(tracked, 'insufficient_evidence')).toBe('report');
-    expect(resolveAnalysisOutcome(tracked, undefined)).toBe('report');
+  it('keeps the report for the detected/preset exercise and unjudged detection', () => {
+    expect(
+      resolveDetectionOutcome({ stats: tracked, mode: { type: 'auto' }, detection: 'squat' }),
+    ).toEqual({ kind: 'report', exerciseId: 'squat' });
+    expect(
+      resolveDetectionOutcome({
+        stats: tracked,
+        mode: { type: 'preset', exerciseId: 'squat' },
+        detection: 'insufficient_evidence',
+      }),
+    ).toEqual({ kind: 'report', exerciseId: 'squat' });
+    expect(
+      resolveDetectionOutcome({ stats: tracked, mode: { type: 'auto' }, detection: 'deadlift' }),
+    ).toEqual({ kind: 'report', exerciseId: 'deadlift' });
   });
 
-  it('tracking failure takes precedence over the movement signature', () => {
-    expect(resolveAnalysisOutcome({ framesProcessed: 200, framesTracked: 0 }, 'not_squat')).toBe('no-tracking');
-    expect(resolveAnalysisOutcome({ framesProcessed: 300, framesTracked: 3 }, 'not_squat')).toBe('no-tracking');
+  it('tracking failure takes precedence over detection', () => {
+    expect(
+      resolveDetectionOutcome({
+        stats: { framesProcessed: 200, framesTracked: 0 },
+        mode: { type: 'auto' },
+        detection: 'deadlift',
+      }).kind,
+    ).toBe('no-tracking');
+    expect(
+      resolveDetectionOutcome({
+        stats: { framesProcessed: 300, framesTracked: 3 },
+        mode: { type: 'preset', exerciseId: 'squat' },
+        detection: 'deadlift',
+      }).kind,
+    ).toBe('no-tracking');
   });
 });
