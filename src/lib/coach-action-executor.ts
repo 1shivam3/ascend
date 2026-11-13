@@ -34,7 +34,7 @@ import type {
   ProposeProgramAction,
   SetMacroGoalsAction,
 } from './coach-actions';
-import type { CoachChatMessage } from './coach-chat-store';
+import type { CoachActionState, CoachChatMessage } from './coach-chat-store';
 
 /** Pending action cards expire after 30 minutes (design brief). */
 export const COACH_ACTION_EXPIRY_MS = 30 * 60 * 1000;
@@ -268,37 +268,89 @@ export function applyProgramProposal(proposal: BlockProposal): boolean {
 // Pending-card lifecycle (pure — operate on the messages array)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Effective state of one message's action at `now`: a pending action
- * older than the expiry reads as stale, even before anything rewrites
- * the array. Messages without a timestamp never expire (pre-Slice-A
- * threads carry none — and carry no actions either). */
-export function effectiveActionState(
-  message: CoachChatMessage,
-  now: number
-): CoachChatMessage['actionState'] | undefined {
-  if (!message.action || !message.actionState) return undefined;
-  if (
-    message.actionState === 'pending' &&
-    message.ts !== undefined &&
-    now - message.ts > COACH_ACTION_EXPIRY_MS
-  ) {
-    return 'stale';
+/**
+ * §28: the captured base of a message, normalized. Returns
+ * `undefined` when nothing has been captured yet, else the
+ * proposal-time goals (null = none existed). Reads BOTH the
+ * current tagged capture and the legacy raw shape (a persisted
+ * MacroGoals object, or null) — legacy threads keep their
+ * version-check base forever, no storage migration needed.
+ */
+export function readActionBase(
+  message: CoachChatMessage
+): MacroGoals | null | undefined {
+  const raw: unknown = (message as { actionBase?: unknown }).actionBase;
+  if (raw === undefined) return undefined;
+  if (raw === null) return null; // legacy: captured, no goals
+  if (typeof raw === 'object') {
+    const tagged = raw as { status?: unknown; goals?: MacroGoals | null };
+    if (tagged.status === 'captured') return tagged.goals ?? null;
+    return raw as MacroGoals; // legacy: the goals object itself
   }
-  return message.actionState;
+  return undefined;
 }
 
 /**
- * Settle a thread's pending actions at `now`:
- *  - expired pendings (older than COACH_ACTION_EXPIRY_MS) become
- *    'stale' — the state enum has no separate expired value; the card
- *    distinguishes "expired" from "changed underneath you" by age;
- *  - per action TYPE, only the newest pending survives — older ones
- *    become 'superseded' (a newer draft replaces them, visibly).
+ * §28: THE one derivation of an action's effective state — the
+ * render path and the settle pass both use it, so stored and
+ * derived can no longer disagree (previously render derived
+ * expiry only, the card derived base-moved only, and settle
+ * wrote a third combination).
+ *
+ * Rules, in order:
+ *  - no action → undefined;
+ *  - legacy undone: a stored 'applied' beside the pre-§28
+ *    `undone: true` flag reads as the 'undone' state;
+ *  - terminal stored states (applied / dismissed / superseded /
+ *    stale / undone) stand as stored;
+ *  - a pending action is 'stale' when expired (older than
+ *    COACH_ACTION_EXPIRY_MS — messages without a timestamp never
+ *    expire), 'superseded' when the caller (the settle pass,
+ *    which can see the thread) says a newer pending of the same
+ *    type exists, and 'stale' when a set_macro_goals base was
+ *    captured and the live goals have moved off it;
+ *  - otherwise 'pending'.
+ */
+export function deriveActionState(
+  message: CoachChatMessage,
+  ctx: { now: number; liveGoals?: MacroGoals | null; superseded?: boolean }
+): CoachActionState | undefined {
+  if (!message.action) return undefined;
+  const stored = message.actionState;
+  if (
+    stored === 'applied' &&
+    (message as { undone?: unknown }).undone === true
+  ) {
+    return 'undone';
+  }
+  if (stored !== undefined && stored !== 'pending') return stored;
+  // pending (or, defensively, an action whose state a legacy
+  // write lost — treated as pending so it can still settle).
+  if (message.ts !== undefined && ctx.now - message.ts > COACH_ACTION_EXPIRY_MS) {
+    return 'stale';
+  }
+  if (ctx.superseded) return 'superseded';
+  if (message.action.type === 'set_macro_goals' && ctx.liveGoals !== undefined) {
+    const base = readActionBase(message);
+    if (base !== undefined && !macroFieldsEqual(ctx.liveGoals, base)) {
+      return 'stale';
+    }
+  }
+  return 'pending';
+}
+
+/**
+ * Settle a thread's action states: write back whatever
+ * deriveActionState derives (expired → 'stale' — the card
+ * distinguishes "expired" from "changed underneath you" by age;
+ * older same-type pendings → 'superseded'; base-moved macro
+ * pendings → 'stale'; legacy undone flags → the 'undone' state).
  * Returns the original array reference when nothing changed.
  */
 export function settlePendingActions(
   messages: CoachChatMessage[],
-  now: number
+  now: number,
+  liveGoals?: MacroGoals | null
 ): CoachChatMessage[] {
   const newestPendingByType = new Map<CoachActionType, number>();
   messages.forEach((m, i) => {
@@ -307,16 +359,17 @@ export function settlePendingActions(
 
   let changed = false;
   const next = messages.map((m, i) => {
-    if (!m.action || m.actionState !== 'pending') return m;
-    if (m.ts !== undefined && now - m.ts > COACH_ACTION_EXPIRY_MS) {
-      changed = true;
-      return { ...m, actionState: 'stale' as const };
-    }
-    if (newestPendingByType.get(m.action.type) !== i) {
-      changed = true;
-      return { ...m, actionState: 'superseded' as const };
-    }
-    return m;
+    if (!m.action) return m;
+    const derived = deriveActionState(m, {
+      now,
+      liveGoals,
+      superseded:
+        m.actionState === 'pending' &&
+        newestPendingByType.get(m.action.type) !== i,
+    });
+    if (derived === undefined || derived === m.actionState) return m;
+    changed = true;
+    return { ...m, actionState: derived };
   });
   return changed ? next : messages;
 }

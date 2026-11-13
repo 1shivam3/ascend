@@ -24,7 +24,7 @@ import {
 import { useStore } from '../src/lib/store';
 import { getInitialCoachBlocksState } from '../src/lib/block-engine';
 import { translate } from '../src/lib/i18n';
-import type { CoachChatMessage } from '../src/lib/coach-chat-store';
+import type { ActionCoachChatMessage, CoachChatMessage } from '../src/lib/coach-chat-store';
 import type { MacroGoals, WeeklySchedule } from '../src/lib/types';
 
 /**
@@ -70,13 +70,14 @@ function seedStore(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => seedStore());
 
-const macroMsg = (partial: Partial<CoachChatMessage> = {}): CoachChatMessage => ({
+const macroMsg = (partial: Partial<ActionCoachChatMessage> = {}): ActionCoachChatMessage => ({
   role: 'assistant',
   content: 'Drafted a change for you — tap Apply to set it.',
   action: { type: 'set_macro_goals', proteinG: 180 },
   actionState: 'pending',
   ts: NOW,
-  actionBase: { ...GOALS },
+  // §28: captures are tagged — absent field = not captured yet.
+  actionBase: { status: 'captured', goals: { ...GOALS } },
   ...partial,
 });
 
@@ -158,15 +159,17 @@ describe('CoachActionCard: base capture and rows', () => {
   it('captures the live goals once, as a copy, on first pending render', () => {
     const m = macroMsg({ actionBase: undefined });
     const patch = captureActionBasePatch(m, GOALS);
-    expect(patch?.actionBase).toEqual(GOALS);
-    expect(patch?.actionBase).not.toBe(GOALS);
+    expect(patch?.actionBase).toEqual({ status: 'captured', goals: GOALS });
+    expect((patch?.actionBase as any)?.goals).not.toBe(GOALS);
     // Already captured → never re-captured.
     expect(captureActionBasePatch(macroMsg(), GOALS)).toBeNull();
     // Not pending / not a macro action → nothing to capture.
     expect(captureActionBasePatch(macroMsg({ actionState: 'applied' }), GOALS)).toBeNull();
     expect(captureActionBasePatch(programMsg(), GOALS)).toBeNull();
     // No goals yet is itself a captured base (null), distinct from uncaptured.
-    expect(captureActionBasePatch(m, null)).toEqual({ actionBase: null });
+    expect(captureActionBasePatch(m, null)).toEqual({
+      actionBase: { status: 'captured', goals: null },
+    });
   });
 
   it('diff rows show base → proposed for the fields the action names', () => {
@@ -232,7 +235,13 @@ describe('CoachActionCard: macro renders', () => {
     const html = renderCard(applied);
     expect(html).toContain('Targets updated');
     expect(html).toContain('>Undo<');
-    const undone = renderCard({ ...applied, undone: true });
+    // §28: undone is a state in the union, not a flag.
+    const undone = renderCard(
+      macroMsg({
+        actionState: 'undone',
+        appliedSnapshot: { previous: { ...GOALS }, applied: { ...GOALS, proteinG: 180 } },
+      })
+    );
     expect(undone).toContain('Undone — your previous targets are back.');
     expect(undone).not.toContain('>Undo<');
   });
@@ -264,7 +273,7 @@ describe('CoachActionCard: macro transitions', () => {
     useStore.getState().setMacroGoals(live);
     const patch = rebaseMacroFromCard(macroMsg(), live, NOW + 5000);
     expect(patch.actionState).toBe('applied');
-    expect(patch.actionBase).toEqual(live);
+    expect(patch.actionBase).toEqual({ status: 'captured', goals: live });
     expect(patch.ts).toBe(NOW + 5000);
     expect(useStore.getState().macroGoals).toEqual({ ...GOALS, calories: 2200, proteinG: 180 });
   });
@@ -273,7 +282,7 @@ describe('CoachActionCard: macro transitions', () => {
     const appliedPatch = applyMacroFromCard(macroMsg(), { ...GOALS });
     const appliedMsg = { ...macroMsg(), ...appliedPatch };
     const undo = undoMacroFromCard(appliedMsg);
-    expect(undo).toEqual({ patch: { undone: true }, stale: false });
+    expect(undo).toEqual({ patch: { actionState: 'undone' }, stale: false });
     expect(useStore.getState().macroGoals).toEqual(GOALS);
 
     // Apply again, then change the goals once more — undo must refuse.
