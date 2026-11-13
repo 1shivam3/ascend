@@ -9,11 +9,6 @@ import { consumeBootSessionFlag, decideBootTab, hasBootSessionFlag } from '@/lib
 export type TabId = 'home' | 'workout' | 'progress' | 'meals' | 'prs' | 'profile' | 'settings';
 export type ProgressTabId = 'overview' | 'strength' | 'prs' | 'bodyweight' | 'training';
 
-export interface BackHandler {
-  id: string;
-  fn: () => boolean | void;
-  priority: number;
-}
 
 export interface NavigationContextValue {
   activeTab: TabId;

@@ -913,7 +913,6 @@ export function getLibrarySubstitutes(
 
 export const MUSCLE_GROUPS: MuscleGroup[] = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Conditioning'];
 export const RESISTANCE_MUSCLE_GROUPS: ResistanceMuscleGroup[] = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core'];
-export const EQUIPMENT_TYPES: EquipmentType[] = ['Barbell', 'Dumbbell', 'Cable', 'Machine', 'Bodyweight', 'Smith Machine', 'Cardio'];
 
 /**
  * Filter exercises by muscle, equipment, and search query.
@@ -970,9 +969,6 @@ export function registerCustomExerciseMuscles(
   }
 }
 
-export function getCustomExerciseMuscle(name: string): MuscleGroup | undefined {
-  return customMuscleOverrides.get((name || '').trim().toLowerCase());
-}
 
 /**
  * Resolves any exercise name (including custom or partial names) to its

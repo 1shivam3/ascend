@@ -149,37 +149,13 @@ function load<T>(key: string, defaultValue: T): T {
   return defaultValue;
 }
 
-export function saveProfile(profile: UserProfile | null): void {
-  save('profile', profile);
-}
 
-export function getProfile(): UserProfile | null {
-  return load<UserProfile | null>('profile', null);
-}
 
-export function savePRs(prs: PersonalRecord[]): void {
-  save('prs', prs);
-}
 
-export function getPRs(): PersonalRecord[] {
-  return load<PersonalRecord[]>('prs', []);
-}
 
-export function saveWorkouts(workouts: WorkoutEntry[]): void {
-  save('workouts', workouts);
-}
 
-export function getWorkouts(): WorkoutEntry[] {
-  return load<WorkoutEntry[]>('workouts', []);
-}
 
-export function saveMeals(meals: MealEntry[]): void {
-  save('meals', meals);
-}
 
-export function getMeals(): MealEntry[] {
-  return load<MealEntry[]>('meals', []);
-}
 
 export interface CustomBarcodeItem {
   barcode: string;

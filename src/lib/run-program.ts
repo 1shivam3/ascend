@@ -18,9 +18,7 @@
  */
 import type { WorkoutEntry } from './types';
 
-export const RUN_PROGRAM_ID = 'couch-to-5k';
 export const RUN_PROGRAM_WEEKS = 8;
-export const RUNS_PER_WEEK = 3;
 export const WARMUP_SECONDS = 300;
 export const COOLDOWN_SECONDS = 300;
 

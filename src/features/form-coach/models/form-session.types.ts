@@ -194,10 +194,3 @@ export interface FormCoachConfig {
   smoothingEnabled: boolean;
 }
 
-export const DEFAULT_FORM_COACH_CONFIG: FormCoachConfig = {
-  depthTargetDeg: 90,
-  minTrackingConfidence: 0.5,
-  preferredCamera: 'environment',
-  audioFeedbackEnabled: true,
-  smoothingEnabled: true,
-};

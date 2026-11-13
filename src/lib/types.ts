@@ -825,22 +825,7 @@ export interface AIPlannedWorkout {
   createdAt: string;
 }
 
-export interface AISubstitutionResult {
-  originalExercise: string;
-  replacementExercise: string;
-  reason: string;
-  movementPattern: string;
-  targetWeightKg?: number;
-  targetReps?: string;
-  targetSets?: number;
-}
 
-export interface AIWorkoutCommandResult {
-  actionType: 'SHORTEN_TIME' | 'SWAP_EQUIPMENT' | 'DELOAD_INTENSITY' | 'WEIGHT_ADVICE' | 'CUSTOM';
-  summary: string;
-  coachAdvice: string;
-  modifiedExercises?: AIPlannedExercise[];
-}
 
 export interface AIPostWorkoutTake {
   headline: string;

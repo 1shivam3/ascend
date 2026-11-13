@@ -36,12 +36,6 @@ export function isValidDob(dob: string): boolean {
 }
 
 /** Local "today" as YYYY-MM-DD (no UTC shift). */
-export function localTodayStr(date = new Date()): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
 
 /**
  * Age in whole years at `today` (default: now, local parts).
