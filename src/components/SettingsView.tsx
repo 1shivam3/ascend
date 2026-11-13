@@ -78,6 +78,7 @@ import {
   isHealthConnectSupported,
   openHealthConnectSettings,
   requestHealthAuthorization,
+  type HealthReadType,
 } from '@/lib/health-connect';
 import { syncHealthConnectIfEnabled } from '@/lib/health-sync';
 
@@ -358,11 +359,15 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   const healthSupported = isHealthConnectSupported();
   const healthConnectLastSyncedAt = useStore((state) => state.healthConnectLastSyncedAt);
   const [healthStatus, setHealthStatus] = useState<'idle' | 'connecting' | 'denied' | 'unavailable'>('idle');
+  // §36: when a grant comes back partial/none, exactly which
+  // data types are missing — shown under the permission help.
+  const [healthMissing, setHealthMissing] = useState<HealthReadType[]>([]);
 
   const handleHealthConnectToggle = async () => {
     if (uiPreferences.healthConnectEnabled === true) {
       setUiPreferences({ healthConnectEnabled: false });
       setHealthStatus('idle');
+      setHealthMissing([]);
       toast.info(t('settings.healthOffMsg'), t('health.title'));
       return;
     }
@@ -373,7 +378,8 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       return;
     }
     const auth = await requestHealthAuthorization();
-    if (auth === 'granted') {
+    if (auth.state === 'all') {
+      setHealthMissing([]);
       setUiPreferences({ healthConnectEnabled: true });
       setHealthStatus('idle');
       const outcome = await syncHealthConnectIfEnabled();
@@ -383,9 +389,12 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
           : t('settings.healthConnectedMsg'),
         t('health.title')
       );
-    } else if (auth === 'denied') {
+    } else if (auth.state === 'partial' || auth.state === 'none') {
       // Same denied-permission pattern as everywhere else (Item 0):
       // purpose line + button into Health Connect's own settings.
+      // §36: a partial grant is no longer a blanket denial — the
+      // missing types are named under the help block.
+      setHealthMissing(auth.missing);
       setHealthStatus('denied');
     } else {
       setHealthStatus('idle');
@@ -1193,6 +1202,23 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               )}
               {healthStatus === 'unavailable' && (
                 <p className="text-2xs text-amber-300 leading-relaxed">{t('health.unavailable')}</p>
+              )}
+              {healthStatus === 'denied' && healthMissing.length > 0 && (
+                <p className="text-2xs text-amber-300 leading-relaxed">
+                  {t('health.partialMissing', {
+                    types: healthMissing
+                      .map((ty) =>
+                        t(
+                          ty === 'steps'
+                            ? 'health.typeSteps'
+                            : ty === 'sleep'
+                              ? 'health.typeSleep'
+                              : 'health.typeWeight',
+                        ),
+                      )
+                      .join(', '),
+                  })}
+                </p>
               )}
               {healthStatus === 'denied' && (
                 <PermissionHelp

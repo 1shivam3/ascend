@@ -417,6 +417,10 @@ export const hi: Partial<Record<StringKey, string>> = {
   'health.neverSynced': 'अभी तक सिंक नहीं हुआ',
   'health.stepsToday': 'आज के स्टेप्स',
   'health.unavailable': 'इस डिवाइस पर Health Connect उपलब्ध नहीं है।',
+  'health.partialMissing': 'अभी चाहिए: {types}। Health सिंक के लिए तीनों ज़रूरी हैं — Health Connect सेटिंग्स में अनुमति दें।',
+  'health.typeSteps': 'कदम',
+  'health.typeSleep': 'नींद',
+  'health.typeWeight': 'वज़न',
 
   // ── Progress: muscle volume & recovery ──────────────────────────────
   'progress.muscleVolume': 'मसल वॉल्यूम',

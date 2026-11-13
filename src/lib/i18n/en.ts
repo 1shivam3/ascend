@@ -408,6 +408,10 @@ export const en = {
   'health.neverSynced': 'Not synced yet',
   'health.stepsToday': 'Steps today',
   'health.unavailable': 'Health Connect is not available on this device.',
+  'health.partialMissing': 'Still needed: {types}. Health sync needs all three — grant them in Health Connect settings.',
+  'health.typeSteps': 'Steps',
+  'health.typeSleep': 'Sleep',
+  'health.typeWeight': 'Weight',
 
   // ── Progress: muscle volume & recovery ──────────────────────────────
   'progress.muscleVolume': 'Muscle Volume',

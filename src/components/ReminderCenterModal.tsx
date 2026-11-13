@@ -190,8 +190,11 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
 
   const handleEnablePermission = async () => {
     if (isNative) {
-      const granted = await requestLocalNotificationPermission();
-      if (granted) {
+      // §36: the request returns the full state — a dismissed
+      // sheet is not a denial, and the UI no longer says
+      // "still off" for it.
+      const result = await requestLocalNotificationPermission();
+      if (result === 'granted') {
         setPermissionState('granted');
         toast.success(t('rem.enabledMsg'), t('rem.enabledTitle'));
         if (!prefs.enabled) {
@@ -199,7 +202,13 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
         } else {
           await syncLocalNotifications();
         }
+      } else if (result === 'dismissed') {
+        // Still undecided — this modal's vocabulary for that is
+        // the web-style 'default' (the enable prompt stays up).
+        setPermissionState('default');
       } else {
+        // denied | bridge-error (unsupported-web can't occur —
+        // this path is native-only): notifications are off.
         setPermissionState('denied');
         toast.error(t('rem.stillOffMsg'), t('rem.permTitle'));
       }

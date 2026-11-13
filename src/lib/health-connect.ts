@@ -219,28 +219,76 @@ export async function isHealthConnectAvailable(): Promise<boolean> {
   }
 }
 
-export type HealthAuthorizationState = 'granted' | 'denied' | 'unknown';
+/**
+ * §36: grants are PER-TYPE, and the summary state is derived:
+ * 'all' | 'partial' | 'none' | 'unknown'. (Before, the per-type
+ * answer was collapsed through every() into granted/denied, so
+ * "steps + sleep granted, weight missing" was indistinguishable
+ * from a blanket denial.)
+ *
+ * Enabling sync still requires 'all' — readiness consumes sleep
+ * and steps, metrics consume weight — but a partial result now
+ * says exactly which types are missing (healthGrants.missing),
+ * and Settings shows them.
+ */
+export type HealthReadType = (typeof HEALTH_READ_TYPES)[number];
+export type HealthGrantState = 'all' | 'partial' | 'none' | 'unknown';
 
-export async function checkHealthAuthorization(): Promise<HealthAuthorizationState> {
-  if (!isHealthConnectSupported()) return 'unknown';
+export interface HealthGrants {
+  state: HealthGrantState;
+  granted: HealthReadType[];
+  missing: HealthReadType[];
+}
+
+const UNKNOWN_GRANTS: HealthGrants = { state: 'unknown', granted: [], missing: [] };
+
+/** Pure derivation from the bridge's authorized list. */
+export function healthGrantsFromAuthorized(
+  authorized: Iterable<string> | null | undefined,
+): HealthGrants {
+  if (authorized == null) return UNKNOWN_GRANTS;
+  const set = new Set(authorized);
+  const granted = HEALTH_READ_TYPES.filter((t) => set.has(t));
+  const missing = HEALTH_READ_TYPES.filter((t) => !set.has(t));
+  const state: HealthGrantState =
+    missing.length === 0 ? 'all' : granted.length === 0 ? 'none' : 'partial';
+  return { state, granted, missing };
+}
+
+/**
+ * §36 cache: authorization is re-checked on every foreground
+ * sync otherwise. The cache is invalidated on app resume (the
+ * health-sync foreground listeners call invalidateHealthGrants)
+ * and refreshed by every request (a permission change IS the
+ * invalidation event).
+ */
+let cachedHealthGrants: HealthGrants | null = null;
+
+export function invalidateHealthGrants(): void {
+  cachedHealthGrants = null;
+}
+
+export async function checkHealthAuthorization(): Promise<HealthGrants> {
+  if (cachedHealthGrants) return cachedHealthGrants;
+  if (!isHealthConnectSupported()) return UNKNOWN_GRANTS;
   try {
     const status = await Health.checkAuthorization({ read: [...HEALTH_READ_TYPES] });
-    const authorized = new Set(status.readAuthorized || []);
-    return HEALTH_READ_TYPES.every((t) => authorized.has(t)) ? 'granted' : 'denied';
+    cachedHealthGrants = healthGrantsFromAuthorized(status.readAuthorized);
+    return cachedHealthGrants;
   } catch {
-    return 'unknown';
+    return UNKNOWN_GRANTS;
   }
 }
 
-/** Opens the Health Connect permission sheet. Returns granted types. */
-export async function requestHealthAuthorization(): Promise<HealthAuthorizationState> {
-  if (!isHealthConnectSupported()) return 'unknown';
+/** Opens the Health Connect permission sheet. Returns the per-type result. */
+export async function requestHealthAuthorization(): Promise<HealthGrants> {
+  if (!isHealthConnectSupported()) return UNKNOWN_GRANTS;
   try {
     const status = await Health.requestAuthorization({ read: [...HEALTH_READ_TYPES] });
-    const authorized = new Set(status.readAuthorized || []);
-    return HEALTH_READ_TYPES.every((t) => authorized.has(t)) ? 'granted' : 'denied';
+    cachedHealthGrants = healthGrantsFromAuthorized(status.readAuthorized);
+    return cachedHealthGrants;
   } catch {
-    return 'unknown';
+    return UNKNOWN_GRANTS;
   }
 }
 
