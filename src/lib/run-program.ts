@@ -204,16 +204,86 @@ export interface RunProgramState {
   /** YYYY-MM-DD the user enrolled (or re-enrolled). Runs before this date
    *  belong to a previous attempt and don't count toward progress. */
   enrolledDate: string;
+  /**
+   * §22: identity of THIS enrollment attempt. Every run logged
+   * while enrolled is stamped with it (WorkoutEntry.runEnrollmentId),
+   * so progress attribution survives date edits and re-enrollment
+   * keeps prior attempts' runs intact-but-not-counted instead of
+   * erasing them. Optional in the type: states persisted before
+   * §22 lack it — sanitizeRunProgramState fills the deterministic
+   * legacy id below, and progress resolves it the same way.
+   */
+  enrollmentId?: string;
+}
+
+/** §22: the stable id for pre-§22 enrollments (derived from the
+ *  enrolled date so every device resolves the same id). */
+export function legacyEnrollmentId(enrolledDate: string): string {
+  return `enr-legacy-${enrolledDate}`;
+}
+
+/** §22: the effective enrollment id for any state shape. */
+export function resolveEnrollmentId(state: RunProgramState): string {
+  return state.enrollmentId ?? legacyEnrollmentId(state.enrolledDate);
 }
 
 export function sanitizeRunProgramState(raw: unknown): RunProgramState | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const date = (raw as { enrolledDate?: unknown }).enrolledDate;
   if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  return { enrolledDate: date };
+  const id = (raw as { enrollmentId?: unknown }).enrollmentId;
+  return {
+    enrolledDate: date,
+    enrollmentId:
+      typeof id === 'string' && id.length > 0 ? id : legacyEnrollmentId(date),
+  };
 }
 
 // ── Progress derived from logged runs ────────────────────────────────────────
+
+/**
+ * §22: the completion threshold. A run counts toward its session
+ * only when at least this fraction of the session's intervals
+ * were finished (intervals completed naturally — skipping a phase
+ * earns no credit, see the player). Ending a run early still LOGS
+ * the run (it counts as a training day for streaks/habits and
+ * stays in history, noted as partial) — it just doesn't complete
+ * the program session, which stays next-up.
+ */
+export const RUN_COMPLETION_THRESHOLD = 0.8;
+
+/**
+ * §22: does this entry COMPLETE its session? Entries recorded by
+ * the §22 player carry structured interval counts and are judged
+ * by the threshold. Legacy entries (counts only in the notes
+ * text) are taken as completed — re-judging history from a prose
+ * note would be fiction.
+ */
+export function isRunEntryComplete(entry: WorkoutEntry): boolean {
+  const total = entry.runIntervalsTotal;
+  const done = entry.runIntervalsCompleted;
+  if (typeof total !== 'number' || typeof done !== 'number' || total <= 0) {
+    return true;
+  }
+  return done / total >= RUN_COMPLETION_THRESHOLD;
+}
+
+/**
+ * §22: does this entry count toward the CURRENT enrollment?
+ * Stamped entries answer by enrollment identity (immune to date
+ * edits); unstamped legacy entries answer by the enrolled date.
+ */
+export function doesRunEntryCount(
+  entry: WorkoutEntry,
+  state: RunProgramState | null,
+): boolean {
+  if (!state || entry.kind !== 'run' || !entry.runSessionId) return false;
+  if (!isRunEntryComplete(entry)) return false;
+  if (entry.runEnrollmentId) {
+    return entry.runEnrollmentId === resolveEnrollmentId(state);
+  }
+  return entry.date >= state.enrolledDate;
+}
 
 export interface RunProgramProgress {
   completedCount: number;
@@ -223,17 +293,20 @@ export interface RunProgramProgress {
   /** Week of the next session (8 when complete). */
   currentWeek: number;
   complete: boolean;
+  /** §22: the session ids counted complete under this enrollment. */
+  completedSessionIds: Set<string>;
 }
 
 export function getCompletedRunSessionIds(
   workouts: WorkoutEntry[],
-  enrolledDate?: string,
+  state: RunProgramState | null,
 ): Set<string> {
   const ids = new Set<string>();
+  // §22: no enrollment → nothing counts, and the program can
+  // never read "complete" off stray logged runs.
+  if (!state) return ids;
   for (const w of workouts) {
-    if (w.kind !== 'run' || !w.runSessionId) continue;
-    if (enrolledDate && w.date < enrolledDate) continue;
-    ids.add(w.runSessionId);
+    if (doesRunEntryCount(w, state)) ids.add(w.runSessionId!);
   }
   return ids;
 }
@@ -242,15 +315,35 @@ export function getRunProgramProgress(
   workouts: WorkoutEntry[],
   state: RunProgramState | null,
 ): RunProgramProgress {
-  const done = getCompletedRunSessionIds(workouts, state?.enrolledDate);
+  const done = getCompletedRunSessionIds(workouts, state);
   const next = RUN_SESSIONS.find((s) => !done.has(s.id)) ?? null;
   return {
     completedCount: RUN_SESSIONS.filter((s) => done.has(s.id)).length,
     totalCount: RUN_SESSIONS.length,
     nextSession: next,
     currentWeek: next ? next.week : RUN_PROGRAM_WEEKS,
-    complete: next === null,
+    // §22: completion requires an enrollment — with none, the
+    // program is simply not started, never "complete".
+    complete: state !== null && next === null,
+    completedSessionIds: done,
   };
+}
+
+/**
+ * §22: would deleting this entry un-complete a program session?
+ * True only when the entry counts AND no other counted entry
+ * covers the same session — the history delete confirm warns in
+ * exactly that case.
+ */
+export function wouldUncompleteRunSession(
+  entry: WorkoutEntry,
+  workouts: WorkoutEntry[],
+  state: RunProgramState | null,
+): boolean {
+  if (!doesRunEntryCount(entry, state)) return false;
+  return !workouts.some(
+    (w) => w.id !== entry.id && w.runSessionId === entry.runSessionId && doesRunEntryCount(w, state),
+  );
 }
 
 // ── Logging ──────────────────────────────────────────────────────────────────
@@ -269,6 +362,9 @@ export function buildRunWorkoutEntry(input: {
   intervalsCompleted: number;
   intervalsTotal: number;
   distanceKm?: number;
+  /** §22: the enrollment this run belongs to (stamped so progress
+   *  attribution survives re-enrollment and date edits). */
+  enrollmentId?: string;
 }): WorkoutEntry {
   const { session } = input;
   const durationSeconds = Math.max(0, Math.round(input.durationSeconds));
@@ -283,6 +379,12 @@ export function buildRunWorkoutEntry(input: {
     name: `Couch to 5K — Week ${session.week}, Run ${session.day}`,
     kind: 'run',
     runSessionId: session.id,
+    // §22: structured interval counts (the completion threshold
+    // judges these — the notes text stays the human summary) and
+    // the enrollment stamp.
+    runIntervalsCompleted: Math.max(0, Math.round(input.intervalsCompleted)),
+    runIntervalsTotal: Math.max(0, Math.round(input.intervalsTotal)),
+    ...(input.enrollmentId ? { runEnrollmentId: input.enrollmentId } : {}),
     ...(distanceKm !== undefined ? { distanceKm } : {}),
     durationMinutes: Math.round(durationSeconds / 60),
     durationSeconds,

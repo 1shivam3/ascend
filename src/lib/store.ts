@@ -1742,7 +1742,11 @@ export const useAppStore = create<AppState>()(
 
       // Run Program enrollment (opt-in; progress derives from logged runs)
       runProgram: null,
-      enrollRunProgram: (dateStr) => set({ runProgram: { enrolledDate: dateStr } }),
+      enrollRunProgram: (dateStr) =>
+        // §22: every (re-)enrollment mints a fresh enrollmentId —
+        // runs from a previous attempt keep their old stamp and
+        // stop counting; nothing is erased.
+        set({ runProgram: { enrolledDate: dateStr, enrollmentId: safeRandomId('enr') } }),
       leaveRunProgram: () => set({ runProgram: null }),
 
       // Coach Engine

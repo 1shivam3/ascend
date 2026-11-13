@@ -403,6 +403,15 @@ export interface WorkoutEntry {
   kind?: 'run';
   /** Run program session id ('c25k-w3d2') when kind is 'run'. */
   runSessionId?: string;
+  /** §22: enrollment attempt this run belongs to (see
+   *  RunProgramState.enrollmentId). Absent on pre-§22 entries —
+   *  those attribute by date. */
+  runEnrollmentId?: string;
+  /** §22: structured interval counts for a run entry — the
+   *  completion threshold (RUN_COMPLETION_THRESHOLD) judges these.
+   *  Absent on pre-§22 entries, which count as completed. */
+  runIntervalsCompleted?: number;
+  runIntervalsTotal?: number;
   /** Optional user-entered distance for a run, in kilometres. */
   distanceKm?: number;
   /**

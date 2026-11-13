@@ -132,7 +132,10 @@ describe('run logging → progress, streaks, habits', () => {
 
   it('ignores runs from before (re-)enrollment', () => {
     const workouts = [runEntry('c25k-w1d1', '2026-09-01')];
-    const ids = getCompletedRunSessionIds(workouts, '2026-10-05');
+    // §22: the second argument is the program STATE (was a bare
+    // enrolledDate string) — attribution now resolves through the
+    // enrollment identity, with the date rule for legacy entries.
+    const ids = getCompletedRunSessionIds(workouts, { enrolledDate: '2026-10-05' });
     expect(ids.size).toBe(0);
     const progress = getRunProgramProgress(workouts, { enrolledDate: '2026-10-05' });
     expect(progress.nextSession!.id).toBe('c25k-w1d1');
@@ -177,9 +180,11 @@ describe('run program store state', () => {
     const store = useStore.getState();
     expect(store.runProgram).toBeNull();
     store.enrollRunProgram('2026-10-05');
-    expect(useStore.getState().runProgram).toEqual({ enrolledDate: '2026-10-05' });
+    // §22: enrolling also mints the enrollmentId (attempt identity).
+    expect(useStore.getState().runProgram).toMatchObject({ enrolledDate: '2026-10-05' });
+    expect(useStore.getState().runProgram?.enrollmentId).toBeTruthy();
     const persisted = partializeAppState(useStore.getState()) as Record<string, unknown>;
-    expect(persisted.runProgram).toEqual({ enrolledDate: '2026-10-05' });
+    expect(persisted.runProgram).toMatchObject({ enrolledDate: '2026-10-05' });
     useStore.getState().leaveRunProgram();
     expect(useStore.getState().runProgram).toBeNull();
   });
@@ -188,7 +193,12 @@ describe('run program store state', () => {
     useStore.getState().enrollRunProgram('2026-10-05');
     useStore.getState().clearAllData();
     expect(useStore.getState().runProgram).toBeNull();
-    expect(sanitizeRunProgramState({ enrolledDate: '2026-10-05' })).toEqual({ enrolledDate: '2026-10-05' });
+    // §22: sanitize fills the deterministic legacy enrollment id
+    // for pre-§22 shapes.
+    expect(sanitizeRunProgramState({ enrolledDate: '2026-10-05' })).toEqual({
+      enrolledDate: '2026-10-05',
+      enrollmentId: 'enr-legacy-2026-10-05',
+    });
     expect(sanitizeRunProgramState({ enrolledDate: 'not-a-date' })).toBeNull();
     expect(sanitizeRunProgramState(null)).toBeNull();
     expect(sanitizeRunProgramState('junk')).toBeNull();

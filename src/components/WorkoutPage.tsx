@@ -104,6 +104,7 @@ import {
   normalizeRunDistanceKm,
   describeSession,
   sessionTotalSeconds,
+  wouldUncompleteRunSession,
   type RunSession,
 } from '@/lib/run-program';
 import WorkoutDetailsView from '@/components/WorkoutDetailsView';
@@ -3068,6 +3069,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                         {confirmDeleteId === workout.id ? (
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-text-muted">Delete this workout?</span>
+                            {/* §22: deleting the only counted entry for a
+                                program session un-completes that session —
+                                say so before it happens. */}
+                            {wouldUncompleteRunSession(workout, workouts, runProgram) && (
+                              <span className="text-xs text-amber-400">{t('run.deleteUncomplete')}</span>
+                            )}
                             <button
                               type="button"
                               onClick={async () => {
@@ -3206,6 +3213,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       {activeRunSession && (
         <RunSessionScreen
           session={activeRunSession}
+          runProgram={runProgram}
           onFinish={(entry) => {
             addWorkout(entry);
             setActiveRunSession(null);

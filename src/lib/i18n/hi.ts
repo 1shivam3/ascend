@@ -469,6 +469,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'run.runComplete': 'रन पूरी',
   'run.distanceLabel': 'दूरी km में (वैकल्पिक)',
   'run.saveRun': 'रन सेव करें',
+  'run.deleteUncomplete': 'इस रन ने प्रोग्राम का एक सेशन पूरा किया था — इसे हटाने से वह सेशन फिर अधूरा हो जाएगा।',
   'run.intervalsDone': '{total} में से {done} इंटरवल पूरे',
   'run.nextUp': 'अगला: {label}',
   'run.sessionLabel': 'हफ़्ता {week} · रन {day}',

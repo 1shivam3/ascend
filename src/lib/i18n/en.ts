@@ -462,6 +462,7 @@ export const en = {
   'run.runComplete': 'Run complete',
   'run.distanceLabel': 'Distance in km (optional)',
   'run.saveRun': 'Save run',
+  'run.deleteUncomplete': 'This run completed a program session — deleting it will un-complete that session.',
   'run.intervalsDone': '{done} of {total} intervals done',
   'run.nextUp': 'Next: {label}',
   'run.sessionLabel': 'Week {week} · Run {day}',
