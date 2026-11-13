@@ -140,6 +140,14 @@ export function recoveryStatusFor(
   daysSince: number | null,
   setsLast48h: number
 ): RecoveryStatus {
+  // §D3 (Phase 5): PRECEDENCE IS DELIBERATE — 'fatigued'
+  // outranks 'recent'. A muscle trained yesterday with 8+
+  // working sets in 48h is BOTH "recently trained" and
+  // "fatigued"; the fatigue signal is the one the lifter must
+  // see (it is the recovery warning), so the volume check runs
+  // before the recency check. Reordering these two lines would
+  // silently downgrade every hard session to a neutral
+  // 'recent'. Pinned by tests/muscle-recovery-phase5.test.ts.
   if (daysSince === null) return 'never';
   if (setsLast48h >= FATIGUE_SETS_48H) return 'fatigued';
   if (daysSince <= 4) return 'recent';
