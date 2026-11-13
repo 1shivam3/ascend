@@ -555,10 +555,16 @@ export function clearSignInIntent(): void {
 }
 
 /**
- * Which device data a merge-choice resolution applies to, by
- * retained-history shape (counts + id sets of the five synced
- * collections). A resolution never covers DIFFERENT data the user
- * accumulates afterwards.
+ * Which device data a merge-choice resolution applies to: a CONTENT
+ * signature of the five synced collections (Phase 1.3, §4). The
+ * original version joined sorted row ids only, so editing a workout
+ * after resolving the choice left the resolution in force for data
+ * the user never saw when they chose. Rows are sorted by id before
+ * hashing so the signature is order-stable; any value edit changes
+ * it (collectionSignature: length + FNV-1a of the serialized rows +
+ * id-set hash). A resolution recorded under the old ids-only format
+ * simply never matches — the choice is offered once more after the
+ * upgrade, the fail-safe direction.
  */
 export function mergeChoiceDataSignature(input: {
   workouts?: { id: string }[];
@@ -567,13 +573,16 @@ export function mergeChoiceDataSignature(input: {
   prs?: { id: string }[];
   bodyMetrics?: { id: string }[];
 }): string {
-  const ids = (rows?: { id: string }[]) => (rows || []).map((r) => r.id).sort().join(',');
+  const sig = (rows?: { id: string }[]) =>
+    collectionSignature(
+      [...(rows || [])].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+    );
   return [
-    ids(input.workouts),
-    ids(input.meals),
-    ids(input.plannedWorkouts),
-    ids(input.prs),
-    ids(input.bodyMetrics),
+    sig(input.workouts),
+    sig(input.meals),
+    sig(input.plannedWorkouts),
+    sig(input.prs),
+    sig(input.bodyMetrics),
   ].join('|');
 }
 
@@ -592,6 +601,58 @@ export function writeMergeChoiceResolved(userId: string, dataSignature: string):
     localStorage.setItem(MERGE_CHOICE_RESOLVED_KEY, `${userId}:${dataSignature}`);
   } catch {
     // Best-effort — worst case the choice is offered once more.
+  }
+}
+
+/**
+ * The PENDING merge choice, persisted (Phase 1.3, §4). The original
+ * pending state lived only in an engine field, so a page reload while
+ * the merge modal was up let the next sync silently merge the guest
+ * data — the exact outcome the gate exists to prevent. The record is
+ * keyed by (userId, dataSignature): it restores only for the same
+ * user over the same data; a record whose data moved underneath it
+ * is stale and discarded (the gate then re-evaluates fresh).
+ */
+export const MERGE_CHOICE_PENDING_KEY = 'ascend_merge_choice_pending';
+
+export interface PendingMergeChoice {
+  userId: string;
+  dataSignature: string;
+}
+
+export function writePendingMergeChoice(userId: string, dataSignature: string): void {
+  try {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(
+      MERGE_CHOICE_PENDING_KEY,
+      JSON.stringify({ userId, dataSignature, at: Date.now() }),
+    );
+  } catch {
+    // Best-effort — worst case a reload re-evaluates the gate fresh.
+  }
+}
+
+export function readPendingMergeChoice(): PendingMergeChoice | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    const raw = localStorage.getItem(MERGE_CHOICE_PENDING_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { userId?: unknown; dataSignature?: unknown };
+    if (typeof parsed.userId !== 'string' || typeof parsed.dataSignature !== 'string') {
+      return null;
+    }
+    return { userId: parsed.userId, dataSignature: parsed.dataSignature };
+  } catch {
+    return null;
+  }
+}
+
+export function clearPendingMergeChoice(): void {
+  try {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(MERGE_CHOICE_PENDING_KEY);
+  } catch {
+    // Best-effort.
   }
 }
 
@@ -1277,6 +1338,7 @@ class SupabaseSyncEngine {
         this.currentUser = null;
         // S4: session gone — a pending merge choice dies with it.
         this.pendingMergeChoiceFor = null;
+        clearPendingMergeChoice();
         this.notify();
       }
     });
@@ -1544,11 +1606,27 @@ class SupabaseSyncEngine {
     is_anonymous?: boolean;
   }): Promise<boolean> {
     if (this.pendingMergeChoiceFor === user.id) return true;
+    const state = useStore.getState();
+    const dataSignature = mergeChoiceDataSignature(state);
+    // Phase 1.3 (§4): restore a persisted pending choice — a reload
+    // while the merge modal was up must re-present the choice, never
+    // fall through to a silent merge. The record restores only for
+    // the same user over the same data; anything else is stale and
+    // discarded before the fresh evaluation below.
+    const persisted = readPendingMergeChoice();
+    if (persisted) {
+      if (persisted.userId === user.id && persisted.dataSignature === dataSignature) {
+        this.pendingMergeChoiceFor = user.id;
+        this.status = 'idle';
+        this.notify();
+        return true;
+      }
+      clearPendingMergeChoice();
+    }
     const intentAt = readSignInIntentAt();
     if (intentAt === null) return false;
     const evalKey = `${user.id}:${intentAt}`;
     if (this.mergeGateEvaluatedKey === evalKey) return false;
-    const state = useStore.getState();
     const localHasData = hasRetainedHistory(state);
     // Cheap local half first: with no guest data on this device
     // there is nothing to choose about — skip the cloud probe.
@@ -1562,10 +1640,11 @@ class SupabaseSyncEngine {
       localHasData,
       cloudHasData,
       resolvedMarker: readMergeChoiceResolved(),
-      dataSignature: mergeChoiceDataSignature(state),
+      dataSignature,
     });
     if (verdict === 'gate') {
       this.pendingMergeChoiceFor = user.id;
+      writePendingMergeChoice(user.id, dataSignature);
       this.status = 'idle';
       this.notify();
       return true;
@@ -1601,6 +1680,7 @@ class SupabaseSyncEngine {
     }
     writeMergeChoiceResolved(userId, mergeChoiceDataSignature(useStore.getState()));
     this.pendingMergeChoiceFor = null;
+    clearPendingMergeChoice();
     clearSignInIntent();
     this.errorMessage = null;
     this.notify();
@@ -1615,7 +1695,22 @@ class SupabaseSyncEngine {
    * same window cannot re-gate the sync AuthModal is about to run.
    */
   public suppressMergeGateFor(userId: string): void {
+    // Phase 1.3 (§4): record the resolution ONLY while a fresh sign-in
+    // intent exists. The original code wrote the marker
+    // unconditionally, so a call outside any sign-in flow could record
+    // a "resolution" for data the user never saw a choice about.
+    const intentAt = readSignInIntentAt();
+    if (intentAt === null) return;
+    const now = Date.now();
+    if (now < intentAt || now - intentAt > SIGN_IN_INTENT_MAX_AGE_MS) return;
     writeMergeChoiceResolved(userId, mergeChoiceDataSignature(useStore.getState()));
+    // If the engine gate had ALSO engaged for this user, the choice
+    // AuthModal just resolved is the same one — release the pause.
+    if (this.pendingMergeChoiceFor === userId) {
+      this.pendingMergeChoiceFor = null;
+      clearPendingMergeChoice();
+      this.notify();
+    }
   }
 
   public async resetPasswordForEmail(email: string): Promise<{ error?: string; success?: boolean }> {
@@ -1702,6 +1797,7 @@ class SupabaseSyncEngine {
     // the next sign-in re-evaluates from its own intent flag.
     this.pendingMergeChoiceFor = null;
     this.mergeGateEvaluatedKey = null;
+    clearPendingMergeChoice();
     clearSignInIntent();
     this.status = 'unconfigured';
     this.notify();
