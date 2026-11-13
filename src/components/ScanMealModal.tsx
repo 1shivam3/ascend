@@ -1,8 +1,14 @@
 'use client';
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useReducer } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
+import {
+  INITIAL_MEAL_SCAN_STATE,
+  cameraPermissionReducer,
+  isSelectFamily,
+  mealScanReducer,
+} from '@/lib/meal-scan-flow';
 import { MealAnalysisResult, ScannedFoodItem, MealEntry, FoodItem, OilLevelId } from '@/lib/types';
 import { analyzeMealPhoto, recalculateMealResult, generateOfflineMealEstimate } from '@/lib/ai-scan-meal';
 import { computeMealConfidence } from '@/lib/scan-confidence';
@@ -75,15 +81,23 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // In-app live camera state (bypasses Android OS camera intent to eliminate low-memory crash completely)
-  const [isLiveCameraActive, setIsLiveCameraActive] = useState(false);
-  const [cameraDenied, setCameraDenied] = useState(false);
+  // §29: the scan flow is one explicit state machine
+  // (meal-scan-flow.ts) — the camera flags, denied flag, capture
+  // flag, step and error string that used to be five separate
+  // useStates are projections of it now. Camera permission is
+  // its own small machine beside it.
+  const [flow, dispatchFlow] = useReducer(mealScanReducer, INITIAL_MEAL_SCAN_STATE);
+  const [, dispatchCameraPermission] = useReducer(cameraPermissionReducer, 'unknown');
+  const step = flow.step;
+  const isLiveCameraActive = flow.step === 'cameraLive' || flow.step === 'capturing';
+  const isCapturingFrame = flow.step === 'capturing';
+  const cameraDenied = flow.step === 'cameraDenied';
+  const scanError = flow.step === 'error' ? flow.reason : null;
   const [cameraFacingMode, setCameraFacingMode] = useState<'environment' | 'user'>('environment');
-  const [isCapturingFrame, setIsCapturingFrame] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   // Flow states: 'select' | 'analyzing' | 'review'
-  const [step, setStep] = useState<'select' | 'analyzing' | 'review'>('select');
 
   // Input state: only stores the compact resized/compressed Blob (~80-150KB), NEVER raw 20MB Camera File!
   const [processedBlob, setProcessedBlob] = useState<Blob | null>(null);
@@ -117,7 +131,6 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   const [editFat, setEditFat] = useState<number>(0);
 
   // Error state
-  const [scanError, setScanError] = useState<string | null>(null);
 
   // "Tell AI" refinement state
   const [refinementInput, setRefinementInput] = useState('');
@@ -132,7 +145,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   const scanAbortControllerRef = useRef<AbortController | null>(null);
 
   // Stop in-app camera stream and release camera hardware
-  const stopLiveCamera = useCallback(() => {
+  const stopCameraTracks = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -140,9 +153,12 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
-    setIsLiveCameraActive(false);
-    setIsCapturingFrame(false);
   }, []);
+
+  const stopLiveCamera = useCallback(() => {
+    stopCameraTracks();
+    dispatchFlow({ type: 'camera-closed' });
+  }, [stopCameraTracks]);
 
   // Start in-app camera viewfinder (bypasses Android camera app to prevent low memory crashes)
   const startLiveCamera = useCallback(
@@ -154,13 +170,16 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
       if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
         // Fallback: trigger file picker without capture attribute
+        dispatchCameraPermission({ type: 'unsupported' });
         fileInputRef.current?.click();
         return;
       }
 
-      setScanError(null);
-      setCameraDenied(false);
-      setIsLiveCameraActive(true);
+      // §29: the viewfinder mounts (cameraLive) while the
+      // permission request resolves — same optimistic open as
+      // before, now an explicit transition.
+      dispatchCameraPermission({ type: 'request' });
+      dispatchFlow({ type: 'camera-request' });
       setCameraFacingMode(facing);
 
       try {
@@ -174,32 +193,36 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         });
 
         streamRef.current = stream;
+        dispatchCameraPermission({ type: 'granted' });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play().catch(() => {});
         }
       } catch (err: any) {
         console.warn('Camera stream error:', err);
-        stopLiveCamera();
         if (err.name === 'NotAllowedError') {
           // Denied: show the PermissionHelp panel instead of silently
           // bouncing to the gallery — the user can still pick a photo
           // from the upload area below whenever they want.
-          setCameraDenied(true);
+          stopCameraTracks();
+          dispatchCameraPermission({ type: 'denied' });
+          dispatchFlow({ type: 'camera-denied' });
         } else {
+          stopLiveCamera();
+          dispatchCameraPermission({ type: 'error' });
           toast.info(t('scan.cameraUnavailable'), t('scan.cameraNotice'));
           fileInputRef.current?.click();
         }
       }
     },
-    [stopLiveCamera, toast]
+    [stopLiveCamera, stopCameraTracks, toast]
   );
 
   // Snaps frame from in-app video element directly into compressed 1280px Blob
   const handleSnapFrame = async () => {
-    if (!videoRef.current || isCapturingFrame) return;
+    if (!videoRef.current || flow.step !== 'cameraLive') return;
 
-    setIsCapturingFrame(true);
+    dispatchFlow({ type: 'capture-start' });
     try {
       const { blob } = await captureVideoFrame(videoRef.current, {
         maxDimension: MAX_IMAGE_DIMENSION,
@@ -216,16 +239,16 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       previewUrlRef.current = objectUrl;
 
       // Stop camera hardware stream immediately
-      stopLiveCamera();
+      stopCameraTracks();
+      dispatchFlow({ type: 'capture-done' });
 
       setPreviewUrl(objectUrl);
       setProcessedBlob(blob);
     } catch (err: any) {
       console.error('Frame capture failed:', err);
       toast.error(t('scan.captureFailed'), t('scan.cameraNotice'));
-      stopLiveCamera();
-    } finally {
-      setIsCapturingFrame(false);
+      stopCameraTracks();
+      dispatchFlow({ type: 'capture-failed' });
     }
   };
 
@@ -243,7 +266,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     }
     setPreviewUrl(null);
     setProcessedBlob(null);
-    setCameraDenied(false);
+    dispatchFlow({ type: 'camera-closed' });
   }, [stopLiveCamera]);
 
   // Ensure object URLs and camera streams are released on unmount
@@ -310,7 +333,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     }
     stopLiveCamera();
     cleanupPreview();
-    setStep('select');
+    dispatchFlow({ type: 'reset' });
     setOilLevels({});
     setEditedIndices(new Set());
     setUserNotes('');
@@ -320,7 +343,6 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     setEditingItemIndex(null);
     setRefinementInput('');
     setShowAddItem(false);
-    setScanError(null);
   };
 
   const handleClose = () => {
@@ -336,13 +358,13 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   const handleFileSelected = async (file: File) => {
     if (!file) return;
 
-    setScanError(null);
+    dispatchFlow({ type: 'dismiss-error' });
 
     // REQUIREMENT 11: Maximum input size/resolution guard
     const validation = validateImageFile(file);
     if (!validation.valid) {
       const err = validation.error || t('scan.invalidImage');
-      setScanError(err);
+      dispatchFlow({ type: 'file-error', reason: err });
       toast.error(err, t('scan.imageNotice'));
       return;
     }
@@ -377,7 +399,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       // safe, actionable copy (no URLs, status codes, provider names).
       const message = localizedUserMessage(t, language, err, 'image', false);
 
-      setScanError(message);
+      dispatchFlow({ type: 'file-error', reason: message });
       toast.error(message, t('scan.photoNotice'));
       cleanupPreview();
     } finally {
@@ -432,7 +454,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       setEditedIndices(new Set());
       setAnalysis(result);
       setMealName(result.mealName || t('scan.estimatedMealName'));
-      setStep('review');
+      dispatchFlow({ type: 'offline-estimate' });
       toast.info(t('scan.offlineEstimateMsg'), t('scan.offlineEstimateTitle'));
     } catch (err: any) {
       toast.error(t('scan.estimateErrorMsg'), t('scan.estimateErrorTitle'));
@@ -451,9 +473,8 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     const controller = new AbortController();
     scanAbortControllerRef.current = controller;
 
-    setScanError(null);
     setScanElapsedSec(0);
-    setStep('analyzing');
+    dispatchFlow({ type: 'analyze-start' });
     try {
       const rawResult = await analyzeMealPhoto({
         file: processedBlob,
@@ -468,10 +489,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       setEditedIndices(new Set());
       setAnalysis(result);
       setMealName(result.mealName || t('scan.defaultMealName'));
-      setStep('review');
+      dispatchFlow({ type: 'analyze-succeeded', source: 'cloud' });
     } catch (err: any) {
       if (err?.name === 'AbortError' || err?.message?.toLowerCase().includes('abort')) {
-        setStep('select');
+        dispatchFlow({ type: 'analyze-aborted' });
         return;
       }
       console.error('Meal scan failed:', err);
@@ -479,9 +500,8 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       // old code only sanitized provider-named errors and rendered
       // err.message raw for everything else (URLs, status codes, JSON).
       const errorMsg = localizedUserMessage(t, language, err, 'scan', false);
-      setScanError(errorMsg);
+      dispatchFlow({ type: 'analyze-failed', reason: errorMsg });
       toast.error(errorMsg, t('scan.noticeTitle'));
-      setStep('select');
     } finally {
       if (scanAbortControllerRef.current === controller) {
         scanAbortControllerRef.current = null;
@@ -672,6 +692,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         setOilLevels({});
         setEditedIndices(new Set());
         setAnalysis(refinedResult);
+        dispatchFlow({ type: 'analyze-succeeded', source: 'refined' });
         toast.success(t('scan.aiRefinedMsg'), t('scan.aiRefinedTitle'));
         setRefinementInput('');
       } catch {
@@ -803,7 +824,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         </div>
 
         {/* ── STEP 1: SELECT / CAPTURE PHOTO ───────────────────────────────── */}
-        {step === 'select' && (
+        {isSelectFamily(flow) && (
           <div className="p-4 sm:p-5 space-y-4 max-h-[80vh] overflow-y-auto">
             {scanError && (
               <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/25 text-xs text-red-600 dark:text-red-400 space-y-2 animate-fade-in">
@@ -1080,7 +1101,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                     scanAbortControllerRef.current.abort();
                     scanAbortControllerRef.current = null;
                   }
-                  setStep('select');
+                  dispatchFlow({ type: 'analyze-aborted' });
                 }}
                 className="btn-secondary w-full py-2 text-xs font-semibold"
               >
@@ -1124,6 +1145,19 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
           return (
             <div className="p-4 sm:p-5 max-h-[80vh] flex flex-col gap-4">
+              {/* §29: the review shows WHERE the result came from —
+                  the source travels in the flow state itself. */}
+              {flow.step === 'review' && (
+                <p className="text-2xs font-semibold uppercase tracking-wider text-text-muted">
+                  {t(
+                    flow.source === 'offline'
+                      ? 'scan.sourceOffline'
+                      : flow.source === 'refined'
+                        ? 'scan.sourceRefined'
+                        : 'scan.sourceCloud'
+                  )}
+                </p>
+              )}
               {isEmptyDetection ? (
                 /* Empty / Non-food detection state */
                 <div className="space-y-4 overflow-y-auto min-h-0">
@@ -1214,7 +1248,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                         type="button"
                         onClick={() => {
                           cleanupPreview();
-                          setStep('select');
+                          dispatchFlow({ type: 'reset' });
                         }}
                         className="btn-primary flex-1 py-2.5 text-xs font-bold flex items-center justify-center gap-1.5"
                       >
@@ -1237,7 +1271,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                       type="button"
                       onClick={() => {
                         cleanupPreview();
-                        setStep('select');
+                        dispatchFlow({ type: 'reset' });
                       }}
                       className="btn-primary py-2.5 text-xs font-bold flex-1 flex items-center justify-center gap-1.5"
                     >
@@ -1684,7 +1718,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                       type="button"
                       onClick={() => {
                         cleanupPreview();
-                        setStep('select');
+                        dispatchFlow({ type: 'reset' });
                       }}
                       className="btn-secondary py-2.5 text-xs font-semibold order-2 sm:order-1"
                     >
