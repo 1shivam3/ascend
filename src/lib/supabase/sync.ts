@@ -787,10 +787,12 @@ export function syncRetryDelayMs(attempt: number): number {
 // failed every cycle and held the red "Backup hit a server problem"
 // banner up forever — while everything else actually synced. A row the
 // server will reject identically forever (constraint violation, invalid
-// value shape, unknown column, RLS denial) can never heal by retrying,
+// value shape, RLS denial) can never heal by retrying,
 // so it is quarantined: excluded from future pushes, recorded here with
-// its error, and surfaced in Settings in plain words. The cycle then
-// completes as 'synced' for everything else.
+// its error class, and surfaced in Settings in plain words. The cycle then
+// completes as 'synced' for everything else. (Phase 1.7: unknown-column
+// SCHEMA errors are table-level, not per-row — see SCHEMA_PUSH_ERROR_CODES;
+// they fail the cycle instead of quarantining.)
 //
 // TRANSIENT failures (network, 5xx, timeouts, stamp-fetch failures) are
 // NOT quarantined — they keep the classic whole-cycle error state + R6
@@ -816,10 +818,19 @@ export type SyncQuarantineCollection =
 export interface QuarantinedSyncRow {
   collection: SyncQuarantineCollection;
   rowId: string;
-  /** Local updatedAt stamp at quarantine time — the release trigger. */
+  /**
+   * The pushed payload's updated_at at quarantine time — the release
+   * trigger (Phase 1.7: read from the payload, not a local-row
+   * lookup, so it is the stamp the server actually rejected).
+   */
   stamp: string | null;
   code: string | null;
-  message: string;
+  /**
+   * Stable error class (Phase 1.7) — NEVER the raw server message:
+   * server text carries table/constraint details and does not belong
+   * in persisted local state or the Settings UI.
+   */
+  errorClass: string;
   quarantinedAt: string;
 }
 
@@ -833,7 +844,19 @@ const PERMANENT_ROW_ERROR_CODES = new Set([
   '22003', // numeric_value_out_of_range
   '22P02', // invalid_text_representation
   '42501', // insufficient_privilege (RLS denial — deterministic per row)
-  '42703', // undefined_column (pre-migration app build)
+]);
+
+/**
+ * Table-level schema errors (Phase 1.7, §7): a missing column means
+ * the DEPLOYMENT predates a migration — every row fails identically,
+ * and quarantining them would bury healthy rows until each is edited
+ * by hand. These are never quarantined: the cycle fails as a whole
+ * (classic F29 error + backoff) and retries after the migration. The
+ * bare-variant retry in pushRowBatch still handles the known cases
+ * before this classification is consulted.
+ */
+const SCHEMA_PUSH_ERROR_CODES = new Set([
+  '42703', // undefined_column
   'PGRST204', // PostgREST schema cache: column not found
 ]);
 
@@ -841,6 +864,30 @@ const PERMANENT_ROW_ERROR_CODES = new Set([
 export function isPermanentRowError(err: unknown): boolean {
   const code = (err as { code?: unknown } | null)?.code;
   return typeof code === 'string' && PERMANENT_ROW_ERROR_CODES.has(code);
+}
+
+/** True when `err` is a table-level schema error (never quarantined). */
+export function isSchemaPushError(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code;
+  return typeof code === 'string' && SCHEMA_PUSH_ERROR_CODES.has(code);
+}
+
+const ROW_ERROR_CLASSES: Record<string, string> = {
+  '23505': 'unique_violation',
+  '23503': 'foreign_key_violation',
+  '23502': 'not_null_violation',
+  '23514': 'check_violation',
+  '22007': 'invalid_datetime',
+  '22008': 'datetime_overflow',
+  '22003': 'numeric_out_of_range',
+  '22P02': 'invalid_text_representation',
+  '42501': 'permission_denied',
+};
+
+/** Stable, persistable label for a push error — never the raw message. */
+export function syncErrorClass(err: unknown): string {
+  const code = (err as { code?: unknown } | null)?.code;
+  return (typeof code === 'string' && ROW_ERROR_CLASSES[code]) || 'unknown_error';
 }
 
 /**
@@ -881,12 +928,51 @@ function writeSyncQuarantineMap(map: Record<string, QuarantinedSyncRow[]>): void
   }
 }
 
+const SYNC_QUARANTINE_COLLECTIONS: readonly SyncQuarantineCollection[] = [
+  'personal_records',
+  'workouts',
+  'meals',
+  'body_metrics',
+  'planned_workouts',
+];
+
+/**
+ * Validate + normalize one stored entry (Phase 1.7). The collection
+ * must be a member of the union and every field must carry its
+ * declared type — anything else is dropped (it cannot be acted on
+ * safely). Legacy entries (PR #126 shape) hold a raw server `message`
+ * and no errorClass: they normalize to errorClass 'unknown_error'
+ * and the raw text is discarded, never carried forward.
+ */
+function normalizeQuarantineEntry(e: unknown): QuarantinedSyncRow | null {
+  if (!e || typeof e !== 'object') return null;
+  const o = e as Record<string, unknown>;
+  if (typeof o.rowId !== 'string' || o.rowId.length === 0) return null;
+  if (
+    typeof o.collection !== 'string' ||
+    !SYNC_QUARANTINE_COLLECTIONS.includes(o.collection as SyncQuarantineCollection)
+  ) {
+    return null;
+  }
+  if (o.stamp !== null && typeof o.stamp !== 'string') return null;
+  if (o.code !== null && typeof o.code !== 'string') return null;
+  if (typeof o.quarantinedAt !== 'string') return null;
+  return {
+    collection: o.collection as SyncQuarantineCollection,
+    rowId: o.rowId,
+    stamp: o.stamp as string | null,
+    code: o.code as string | null,
+    errorClass: typeof o.errorClass === 'string' ? o.errorClass : 'unknown_error',
+    quarantinedAt: o.quarantinedAt,
+  };
+}
+
 export function readSyncQuarantine(userId: string): QuarantinedSyncRow[] {
   const entries = readSyncQuarantineMap()[userId];
   if (!Array.isArray(entries)) return [];
-  return entries.filter(
-    (e): e is QuarantinedSyncRow => !!e && typeof e === 'object' && typeof e.rowId === 'string' && typeof e.collection === 'string',
-  );
+  return entries
+    .map(normalizeQuarantineEntry)
+    .filter((e): e is QuarantinedSyncRow => e !== null);
 }
 
 export function quarantineSyncRow(userId: string, entry: QuarantinedSyncRow): void {
@@ -2989,10 +3075,10 @@ class SupabaseSyncEngine {
     onConflict?: string;
     bareVariant?: (rows: any[]) => any[];
     bareNote?: string;
-  }): Promise<{ okIds: string[]; permanentFailures: { id: string; error: unknown }[]; transientError: unknown }> {
+  }): Promise<{ okIds: string[]; permanentFailures: { id: string; error: unknown; stamp: string | null }[]; transientError: unknown }> {
     const outcome = {
       okIds: [] as string[],
-      permanentFailures: [] as { id: string; error: unknown }[],
+      permanentFailures: [] as { id: string; error: unknown; stamp: string | null }[],
       transientError: null as unknown,
     };
     const supabase = getSupabase();
@@ -3008,6 +3094,12 @@ class SupabaseSyncEngine {
       outcome.okIds = opts.payloads.map((r) => r.id as string);
       return outcome;
     }
+    // §7: a schema error that survived the bare retry is table-level —
+    // fail the cycle (transient path), never fan out or quarantine.
+    if (isSchemaPushError(error)) {
+      outcome.transientError = error;
+      return outcome;
+    }
     if (!isPermanentRowError(error)) {
       outcome.transientError = error;
       return outcome;
@@ -3018,8 +3110,23 @@ class SupabaseSyncEngine {
         res = await upsert(opts.bareVariant([row]));
       }
       if (!res.error) outcome.okIds.push(row.id as string);
-      else if (isPermanentRowError(res.error)) outcome.permanentFailures.push({ id: row.id as string, error: res.error });
-      else if (!outcome.transientError) outcome.transientError = res.error;
+      else if (isSchemaPushError(res.error)) {
+        if (!outcome.transientError) outcome.transientError = res.error;
+      } else if (isPermanentRowError(res.error)) {
+        outcome.permanentFailures.push({
+          id: row.id as string,
+          error: res.error,
+          // §7: the stamp of the payload the server rejected — always
+          // the value that was actually pushed, never a lookup that
+          // can come back undefined for stamp-less local rows.
+          stamp:
+            typeof (row as { updated_at?: unknown }).updated_at === 'string'
+              ? ((row as { updated_at: string }).updated_at as string)
+              : typeof (row as { updatedAt?: unknown }).updatedAt === 'string'
+                ? ((row as { updatedAt: string }).updatedAt as string)
+                : null,
+        });
+      } else if (!outcome.transientError) outcome.transientError = res.error;
     }
     return outcome;
   }
@@ -3034,20 +3141,21 @@ class SupabaseSyncEngine {
   private applyPushOutcome(
     userId: string,
     collection: SyncQuarantineCollection,
-    localRows: { id: string; updatedAt?: unknown }[],
-    outcome: { okIds: string[]; permanentFailures: { id: string; error: unknown }[]; transientError: unknown },
+    outcome: { okIds: string[]; permanentFailures: { id: string; error: unknown; stamp: string | null }[]; transientError: unknown },
     record: (e: { message?: string } | null | undefined) => void,
   ): void {
     if (outcome.okIds.length > 0) releaseSyncQuarantine(userId, collection, outcome.okIds);
     for (const failure of outcome.permanentFailures) {
-      const local = localRows.find((r) => r.id === failure.id);
-      const e = failure.error as { code?: unknown; message?: unknown } | null;
+      const e = failure.error as { code?: unknown } | null;
       quarantineSyncRow(userId, {
         collection,
         rowId: failure.id,
-        stamp: typeof local?.updatedAt === 'string' ? local.updatedAt : null,
+        // §7: payload stamp + error class only — never the raw
+        // server message (it carries schema details and is not the
+        // user's business in Settings).
+        stamp: failure.stamp,
         code: typeof e?.code === 'string' ? e.code : null,
-        message: typeof e?.message === 'string' ? e.message : String(failure.error),
+        errorClass: syncErrorClass(failure.error),
         quarantinedAt: new Date().toISOString(),
       });
       console.warn(
@@ -3080,7 +3188,11 @@ class SupabaseSyncEngine {
       const entry = quarantined.get(row.id);
       if (!entry) return true;
       const stamp = typeof row.updatedAt === 'string' ? row.updatedAt : null;
-      return stamp !== entry.stamp;
+      // §7: release only on a CONCRETE, changed stamp (an edit). A
+      // stamp-less row stays quarantined — with payload stamps on the
+      // entries, "null !== entry.stamp" would otherwise retry it (and
+      // re-quarantine it under a fresh generated stamp) every cycle.
+      return stamp !== null && stamp !== entry.stamp;
     });
   }
 
@@ -3231,7 +3343,7 @@ class SupabaseSyncEngine {
             updated_at: p.updatedAt || new Date().toISOString(),
           }));
           const outcome = await this.pushRowBatch({ table: 'personal_records', payloads: prRows, onConflict: 'id' });
-          this.applyPushOutcome(userId, 'personal_records', toUpsert, outcome, record);
+          this.applyPushOutcome(userId, 'personal_records', outcome, record);
         }
       }
     }
@@ -3261,7 +3373,7 @@ class SupabaseSyncEngine {
             updated_at: w.updatedAt || new Date().toISOString(),
           }));
           const outcome = await this.pushRowBatch({ table: 'workouts', payloads: workoutRows, onConflict: 'id' });
-          this.applyPushOutcome(userId, 'workouts', toUpsert, outcome, record);
+          this.applyPushOutcome(userId, 'workouts', outcome, record);
         }
       }
     }
@@ -3289,7 +3401,7 @@ class SupabaseSyncEngine {
             updated_at: m.updatedAt || new Date().toISOString(),
           }));
           const outcome = await this.pushRowBatch({ table: 'meals', payloads: mealRows, onConflict: 'id' });
-          this.applyPushOutcome(userId, 'meals', toUpsert, outcome, record);
+          this.applyPushOutcome(userId, 'meals', outcome, record);
         }
       }
     }
@@ -3334,7 +3446,7 @@ class SupabaseSyncEngine {
             bareVariant: bareBodyMetrics,
             bareNote: '[sync] body_metrics measurement columns not present on server yet — retrying without them',
           });
-          this.applyPushOutcome(userId, 'body_metrics', plan.idUpserts, outcome, record);
+          this.applyPushOutcome(userId, 'body_metrics', outcome, record);
           outcome.okIds.forEach((id) => landedIds.add(id));
         }
         if (plan.dateUpserts.length > 0) {
@@ -3345,7 +3457,7 @@ class SupabaseSyncEngine {
             bareVariant: bareBodyMetrics,
             bareNote: '[sync] body_metrics measurement columns not present on server yet — retrying without them',
           });
-          this.applyPushOutcome(userId, 'body_metrics', plan.dateUpserts, outcome, record);
+          this.applyPushOutcome(userId, 'body_metrics', outcome, record);
           outcome.okIds.forEach((id) => landedIds.add(id));
         }
         if (supersededIds.length > 0) {
@@ -3444,7 +3556,7 @@ class SupabaseSyncEngine {
             // case where the `extras` column itself is missing.
             bareVariant: (rows) => rows.map(({ extras: _extras, ...rest }) => rest),
           });
-          this.applyPushOutcome(userId, 'planned_workouts', toUpsert, outcome, record);
+          this.applyPushOutcome(userId, 'planned_workouts', outcome, record);
         }
       }
     }

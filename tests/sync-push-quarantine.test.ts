@@ -180,9 +180,15 @@ beforeEach(() => {
 });
 
 describe('isPermanentRowError classification (D1)', () => {
-  it('treats constraint/value/schema codes as permanent', () => {
-    for (const code of ['23505', '23503', '23502', '23514', '22007', '22008', '22003', '22P02', '42501', '42703', 'PGRST204']) {
+  it('treats constraint/value codes as permanent', () => {
+    for (const code of ['23505', '23503', '23502', '23514', '22007', '22008', '22003', '22P02', '42501']) {
       expect(isPermanentRowError({ code, message: 'x' }), code).toBe(true);
+    }
+  });
+
+  it('Phase 1.7 (§7): schema codes are table-level, NOT permanent row errors', () => {
+    for (const code of ['42703', 'PGRST204']) {
+      expect(isPermanentRowError({ code, message: 'x' }), code).toBe(false);
     }
   });
 
