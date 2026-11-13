@@ -114,9 +114,11 @@ describe('R6: engine failure state + recovery (mocked transport)', () => {
     upsertByTable.clear();
     upsertPayloads.length = 0;
     useStore.getState().clearAllData();
-    engine.status = 'unconfigured';
-    engine.errorMessage = null;
-    engine.errorKind = null;
+    // Phase 2.1 (§1/§2): status/errorMessage/errorKind are no
+    // longer engine fields — they are projections of the one
+    // SyncState (read via getStatus()/getState() below). The
+    // backoff ladder fields poked here (retryAttempt, retryTimer,
+    // pendingSyncPromise) are still real engine members.
     engine.retryAttempt = 0;
     engine.pendingSyncPromise = null;
     engine.clearSyncRetryTimer();
@@ -131,7 +133,7 @@ describe('R6: engine failure state + recovery (mocked transport)', () => {
     useStore.setState({ workouts: [workout] });
     upsertByTable.set('workouts', { error: { status: 500, message: 'Internal Server Error' } });
     await engine.syncPush();
-    expect(engine.status).toBe('error');
+    expect(engine.getStatus().status).toBe('error');
     expect(engine.getStatus().errorKind).toBe('server');
     // The local write is untouched by the failed sync.
     expect(useStore.getState().workouts.map((w: any) => w.id)).toEqual(['w_r6']);
@@ -141,12 +143,12 @@ describe('R6: engine failure state + recovery (mocked transport)', () => {
     useStore.setState({ workouts: [workout] });
     upsertByTable.set('workouts', { error: { status: 500, message: 'Internal Server Error' } });
     await engine.syncPush();
-    expect(engine.status).toBe('error');
+    expect(engine.getStatus().status).toBe('error');
 
     upsertByTable.clear();
     upsertPayloads.length = 0;
     await engine.syncPush();
-    expect(engine.status).toBe('synced');
+    expect(engine.getStatus().status).toBe('synced');
     expect(engine.getStatus().errorKind).toBeNull();
     const pushed = upsertPayloads.find((p) => p.table === 'workouts');
     expect(pushed).toBeTruthy();
@@ -157,7 +159,7 @@ describe('R6: engine failure state + recovery (mocked transport)', () => {
     useStore.setState({ workouts: [workout] });
     upsertByTable.set('workouts', { error: { status: 503, message: 'Service Unavailable' } });
     await engine.syncPush();
-    expect(engine.status).toBe('error');
+    expect(engine.getStatus().status).toBe('error');
     expect(engine.retryTimer).not.toBeNull();
     expect(engine.retryAttempt).toBe(1);
 

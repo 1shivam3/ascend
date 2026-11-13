@@ -57,6 +57,7 @@ import HomeMatrix from '@/components/HomeMatrix';
 import CustomizeSheet from '@/components/CustomizeSheet';
 import { resolveTodayLayout, sanitizeTodayLayout, DEFAULT_TODAY_LAYOUT, type TodaySectionId } from '@/lib/today-layout';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
+import { selectSyncLabel } from '@/lib/supabase/sync-state';
 
 const READINESS_LABEL_KEY: Record<string, StringKey> = {
   primed: 'home.readinessPrimed',
@@ -625,14 +626,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
   // Sync caption: honest status for cloud-synced data only. The new
   // personalization keys are local-only and are never described as synced.
-  const { status: syncStatus, errorKind: syncErrorKind } = useSupabaseSync();
-  const syncText =
-    syncStatus === 'syncing' ? t('home.syncSyncing')
-    : syncStatus === 'synced' ? t('home.syncSynced')
-    // QA-hardening R6: the caption reads the same classified state as
-    // the banner — offline failures say so instead of 'Sync failed'.
-    : syncStatus === 'error' ? (syncErrorKind === 'offline' ? t('home.syncOffline') : t('home.syncFailed'))
-    : t('home.syncLocalOnly');
+  // §2 (Phase 2.1): the caption reads the ONE sync state through the
+  // shared selector — the same derivation the banner and Settings
+  // use, so the three surfaces cannot disagree (B3).
+  const { syncState, user: syncUser } = useSupabaseSync();
+  const syncText = t(selectSyncLabel(syncState, !!syncUser).key);
 
   // UI-1b-06 (final certification): Today section blocks, keyed by
   // section id and rendered below in resolvedToday order — DOM order

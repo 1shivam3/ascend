@@ -2,10 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { syncEngine, SyncStatus, AuthUser, QuarantinedSyncRow } from './sync';
+import type { SyncState } from './sync-state';
 
 export function useSupabaseSync() {
   const [state, setState] = useState<{
     status: SyncStatus;
+    // §1/§2 (Phase 2.1): THE sync state — UI surfaces describe it
+    // through selectSyncLabel (sync-state.ts), never by re-deriving
+    // from the legacy fields below. The legacy fields remain as
+    // projections for the subscribers that predate the machine.
+    syncState: SyncState;
     lastSyncedAt: string | null;
     error: string | null;
     user: AuthUser | null;
@@ -15,7 +21,7 @@ export function useSupabaseSync() {
     errorKind: 'offline' | 'auth' | 'server' | null;
     // Defect 2: permanently-rejected rows held in sync quarantine.
     quarantined: QuarantinedSyncRow[];
-  }>(syncEngine.getStatus());
+  }>({ ...syncEngine.getStatus(), syncState: syncEngine.getState() });
 
   useEffect(() => {
     syncEngine.init();
@@ -24,6 +30,7 @@ export function useSupabaseSync() {
       // signature predates S4 and other subscribers rely on it.
       setState({
         status,
+        syncState: syncEngine.getState(),
         lastSyncedAt,
         error,
         user,
