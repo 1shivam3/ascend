@@ -104,6 +104,9 @@ export const hi: Partial<Record<StringKey, string>> = {
   'train.discardDraftMsg': 'इससे रुका हुआ वर्कआउट हट जाएगा। ड्राफ़्ट में लॉग किए गए सेट खो जाएंगे।',
   'train.discardDraftConfirm': 'ड्राफ़्ट हटाएं',
   'train.keepDraft': 'ड्राफ़्ट रखें',
+  'train.staleDraftTitle': 'पुराना सत्र फिर शुरू करें?',
+  'train.staleDraftMsg': 'यह वर्कआउट 12 घंटे से पहले रुका था। इसे फिर शुरू करें, या इसे सहेजा रहने दें और नया शुरू करें?',
+  'train.staleDraftConfirm': 'सत्र फिर शुरू करें',
   'train.yourPlans': 'आपके वर्कआउट प्लान',
   'train.exercises': 'एक्सरसाइज़',
 
@@ -3109,6 +3112,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   // LIVE-P1-03: Today chrome + coach sentences converted to i18n.
   'home.quickLogPast': 'पहले ही ट्रेनिंग कर ली? पिछला सेशन जल्दी लॉग करें',
   'home.restDayLine': 'आराम का दिन — कोई वर्कआउट तय नहीं। हमेशा की तरह खाएं और सोएं।',
+  'home.emptyLogToday': 'आज के लिए एक खाली सत्र दर्ज है — कोई सेट पूरा नहीं हुआ।',
   'home.durationExercises': '{min} मिनट • {count} व्यायाम',
   'home.durationExercisesOne': '{min} मिनट • {count} व्यायाम',
   'home.durationOnly': '{min} मिनट',

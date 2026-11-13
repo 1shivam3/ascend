@@ -37,7 +37,7 @@ import {
   isExerciseJointBanned,
   type GeneratedPlanContext,
 } from '@/lib/workout-engine';
-import { EquipmentType } from '@/lib/types';
+import { EquipmentType, dayPlanRef } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
 import { useTranslation } from '@/lib/i18n';
 import type { StringKey } from '@/lib/i18n/en';
@@ -429,13 +429,18 @@ export default function SuggestedWorkoutModal({
     return weeklySchedule ? weeklySchedule[todayDayName] : null;
   }, [weeklySchedule, todayDayName]);
 
+  // §18: today's assignment via the one read (dayPlanRef).
+  const todayRef = useMemo(() => dayPlanRef(todaySchedule), [todaySchedule]);
+
   const todayRoutineName = useMemo(() => {
     if (!todaySchedule) return '';
-    if (todaySchedule.workoutPlanId === 'rest') return t('sg.restRecovery');
+    if (todayRef.kind === 'rest') return t('sg.restRecovery');
     if (todaySchedule.customTitle) return todaySchedule.customTitle;
-    const plan = plannedWorkouts.find((p) => p.id === todaySchedule.workoutPlanId);
-    return plan?.name || todaySchedule.workoutPlanId || t('sg.scheduledRoutine');
-  }, [todaySchedule, plannedWorkouts, t]);
+    const plan = todayRef.kind === 'plan'
+      ? plannedWorkouts.find((p) => p.id === todayRef.planId)
+      : undefined;
+    return plan?.name || (todayRef.kind === 'plan' ? todayRef.planId : '') || t('sg.scheduledRoutine');
+  }, [todaySchedule, todayRef, plannedWorkouts, t]);
 
   // Mode: 'bodyparts' | 'split'
   const [activeTab, setActiveTab] = useState<'bodyparts' | 'split'>('bodyparts');
@@ -453,7 +458,7 @@ export default function SuggestedWorkoutModal({
 
   // Auto-align with today's scheduled split routine when opened
   useEffect(() => {
-    if (isOpen && todaySchedule && todaySchedule.workoutPlanId !== 'rest') {
+    if (isOpen && todaySchedule && todayRef.kind !== 'rest') {
       const lowerName = todayRoutineName.toLowerCase();
       const validBodyParts: BodyPartOption[] = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core', 'push', 'pull'];
       const matchedParts = (todaySchedule.bodyParts || [])
@@ -474,7 +479,7 @@ export default function SuggestedWorkoutModal({
         setSelectedBodyParts(['legs', 'core']);
       }
     }
-  }, [isOpen, todaySchedule, todayRoutineName]);
+  }, [isOpen, todaySchedule, todayRef, todayRoutineName]);
 
   // Split selection state
   const [selectedSplitId, setSelectedSplitId] = useState<string>('ppl');
@@ -710,7 +715,7 @@ export default function SuggestedWorkoutModal({
         {/* Modal Scrollable Body */}
         <div className="p-4 space-y-4 overflow-y-auto flex-1">
           {/* Today's Scheduled Routine Banner (from user's weekly routine) */}
-          {todaySchedule && todaySchedule.workoutPlanId !== 'rest' ? (
+          {todaySchedule && todayRef.kind !== 'rest' ? (
             <div className="p-3.5 rounded-2xl bg-gradient-to-r from-accent/15 via-bg-card to-accent/5 border border-accent/40 flex items-center justify-between gap-3 shadow-sm">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-accent/20 text-accent flex items-center justify-center shrink-0">
@@ -728,7 +733,9 @@ export default function SuggestedWorkoutModal({
               <button
                 type="button"
                 onClick={() => {
-                  const matchedPlan = plannedWorkouts.find((p) => p.id === todaySchedule.workoutPlanId);
+                  const matchedPlan = todayRef.kind === 'plan'
+                    ? plannedWorkouts.find((p) => p.id === todayRef.planId)
+                    : undefined;
                   if (matchedPlan && matchedPlan.exercises.length > 0) {
                     onStartWorkout(matchedPlan.name, matchedPlan.exercises);
                     onClose();
@@ -743,7 +750,7 @@ export default function SuggestedWorkoutModal({
                 <span>{t('sg.startRoutine')}</span>
               </button>
             </div>
-          ) : todaySchedule && todaySchedule.workoutPlanId === 'rest' ? (
+          ) : todaySchedule && todayRef.kind === 'rest' ? (
             <div className="p-3 rounded-xl bg-bg-secondary/60 border border-border/80 flex items-center gap-2.5 text-xs text-text-muted">
               <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0" />
               <span>{t('sg.restBanner')}</span>

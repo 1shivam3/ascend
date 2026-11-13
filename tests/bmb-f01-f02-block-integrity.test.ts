@@ -18,7 +18,7 @@ import {
   type BlockProposal,
 } from '@/lib/block-engine';
 import type { BlockIntake } from '@/lib/block-intake';
-import type { PlannedWorkout, WeeklySchedule } from '@/lib/types';
+import { dayPlanRef, type PlannedWorkout, type WeeklySchedule } from '@/lib/types';
 
 const NULL_SCHEDULE: WeeklySchedule = {
   monday: { workoutPlanId: 'rest' },
@@ -120,8 +120,11 @@ describe('F-02: replacing a block clears its schedule residue', () => {
     }
     expect(stillScheduledOld).toEqual([]);
     // Exactly the new block's 3 days are scheduled.
+    // (§18, Phase 3.3: read via dayPlanRef — retired days are now
+    // {kind: 'rest'} with no plan id, which the old literal
+    // predicate `workoutPlanId !== 'rest'` miscounted as scheduled.)
     const scheduled = Object.values(after.weeklySchedule).filter(
-      (v) => v.workoutPlanId !== 'rest'
+      (v) => dayPlanRef(v).kind === 'plan'
     );
     expect(scheduled).toHaveLength(3);
   });

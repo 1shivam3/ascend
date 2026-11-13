@@ -425,6 +425,21 @@ export interface WorkoutEntry {
   updatedAt?: string;
 }
 
+/**
+ * The ONE workout draft (§15, Phase 3.3 — this type used to be
+ * defined twice, here and in store.ts).
+ *
+ * Ownership: the store holds exactly ONE draft slot, keyed by
+ * session — `sessionStartTime` is the session's identity (its
+ * startedAt, epoch ms) and `savedAt` is its updatedAt (ISO,
+ * rewritten on every save). Two autosave effects write the slot
+ * (the live session screen and the logger modal); an autosave may
+ * only write its own session or a session that began after the
+ * slot was last saved — see shouldAutosaveDraft in store.ts.
+ * Explicit user actions (Start from Home, Resume, Discard/Undo)
+ * may replace the slot outright. Saving a draft with zero
+ * exercises CLEARS the slot — an empty draft is not a state.
+ */
 export interface ActiveWorkoutDraft {
   id?: string;
   name?: string;
@@ -433,7 +448,9 @@ export interface ActiveWorkoutDraft {
   exercises: WorkoutExercise[];
   startedFromPlan?: string | null;
   startedFromPlanId?: string | null;
+  /** startedAt: epoch ms when the session began; also the slot's session identity. */
   sessionStartTime?: number;
+  /** updatedAt: ISO time of the last save of this draft. */
   savedAt: string;
 }
 
@@ -638,12 +655,53 @@ export type DayType = 'training' | 'rest';
 export type DayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
 
 export interface DayScheduleConfig {
-  workoutPlanId?: string | 'rest'; // ID of PlannedWorkout or 'rest'
+  /**
+   * §18 (Phase 3.3): the day's assignment — THE representation.
+   * 'rest' = deliberate rest day; 'plan' = workoutPlanId names the
+   * plan; absent = unassigned ('none'). Before 3.3 the rest fact
+   * was smuggled through the plan-id field as the magic string
+   * 'rest'; the persist migration converts stored schedules, and
+   * dayPlanRef() (scheduled-days.ts) — the one read path — still
+   * resolves the legacy shape for un-migrated/old-client payloads.
+   */
+  kind?: 'rest' | 'plan';
+  /** Plan id (or, in legacy rows, plan name) — only when kind is 'plan'. Never 'rest'. */
+  workoutPlanId?: string;
   customTitle?: string;            // e.g. "Chest & Triceps"
   bodyParts?: string[];            // e.g. ["Chest", "Arms"]
 }
 
 export type WeeklySchedule = Record<DayOfWeek, DayScheduleConfig>;
+
+// ─── The one schedule read (§18, Phase 3.3) ─────────────────────────────────
+//
+// A day's assignment used to be encoded as a magic string: 'rest'
+// inside the plan-id field, re-interpreted at a dozen sites. The
+// config now carries `kind`; this resolver is the ONLY read path,
+// and it deliberately still understands the legacy shape so an
+// un-migrated stored schedule or an old client's sync payload
+// resolves exactly the same way. (Lives beside the type it
+// interprets: scheduled-days and workout-schedule import each
+// other's helpers, so the shared leaf cannot sit in either.)
+
+export type DayPlanRef =
+  | { kind: 'none' }
+  | { kind: 'rest' }
+  | { kind: 'plan'; planId: string };
+
+export function dayPlanRef(cfg: DayScheduleConfig | null | undefined): DayPlanRef {
+  if (!cfg) return { kind: 'none' };
+  if (cfg.kind === 'rest') return { kind: 'rest' };
+  if (cfg.kind === 'plan') {
+    return cfg.workoutPlanId && cfg.workoutPlanId !== 'rest'
+      ? { kind: 'plan', planId: cfg.workoutPlanId }
+      : { kind: 'none' };
+  }
+  // Legacy shape (pre-§18 rows): the plan-id field carried both facts.
+  if (cfg.workoutPlanId === 'rest') return { kind: 'rest' };
+  if (cfg.workoutPlanId) return { kind: 'plan', planId: cfg.workoutPlanId };
+  return { kind: 'none' };
+}
 
 export interface HydrationConfig {
   baseMl?: number;

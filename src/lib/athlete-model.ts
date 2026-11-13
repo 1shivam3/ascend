@@ -23,7 +23,7 @@ import type {
   WeeklySchedule,
   WorkoutEntry,
 } from './types';
-import { isSetCompleted } from './types';
+import { isSetCompleted, dayPlanRef } from './types';
 import type { ManualCheckin, ReadinessHistoryEntry } from './coach-engine';
 import { calculateOneRepMax } from './strength-standards';
 import { canonicalizeExerciseName } from './workout-outcome-evidence';
@@ -632,8 +632,8 @@ function buildAdherence(
   // and shared with the coach check-in and the week stats — one
   // definition, so the denominator cannot drift between passes.
   const rawScheduledDays = DAY_KEYS.filter((d) => {
-    const cfg = input.weeklySchedule?.[d];
-    return !!cfg?.workoutPlanId && cfg.workoutPlanId !== 'rest';
+    // §18: via the one read (dayPlanRef) — a plan day, not rest/none.
+    return dayPlanRef(input.weeklySchedule?.[d]).kind === 'plan';
   });
   const scheduledDays = getScheduledPlanEntries(
     input.weeklySchedule,

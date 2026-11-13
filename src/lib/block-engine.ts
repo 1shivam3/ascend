@@ -30,6 +30,7 @@ import type {
   WeeklySchedule,
   WorkoutEntry,
 } from './types';
+import { dayPlanRef } from './types';
 import {
   adaptSplitForEquipment,
   estimateSessionMinutes,
@@ -1326,15 +1327,17 @@ export function materializeProposal(
   // the lifter's own non-block plans are never touched.
   const blockIdByPlanId = new Map(existingPlans.map((p) => [p.id, p.coachBlockId]));
   for (const d of Object.keys(nextSchedule) as DayOfWeek[]) {
-    const pid = nextSchedule[d]?.workoutPlanId;
-    if (typeof pid !== 'string' || pid === 'rest') continue;
-    const owner = blockIdByPlanId.get(pid);
+    // §18: the day's plan via the one read (dayPlanRef).
+    const ref = dayPlanRef(nextSchedule[d]);
+    if (ref.kind !== 'plan') continue;
+    const owner = blockIdByPlanId.get(ref.planId);
     if (owner && owner !== proposal.id) {
-      nextSchedule[d] = { workoutPlanId: 'rest' };
+      nextSchedule[d] = { kind: 'rest' };
     }
   }
   for (const day of liveDays) {
     nextSchedule[day.weekday] = {
+      kind: 'plan',
       workoutPlanId: planIdByWeekday.get(day.weekday)!,
       bodyParts: getWorkoutBodyParts(day.exercises),
     };

@@ -37,7 +37,7 @@ import { getMondayOfWeek, parseLocalDate, formatVolume } from './formatters';
 import { getExerciseMuscle, getExerciseSecondaryMuscles } from './exercise-library';
 import { calculateOneRepMax } from './strength-standards';
 import { canonicalizeExerciseName } from './workout-outcome-evidence';
-import { isSetCompleted } from './types';
+import { isSetCompleted, dayPlanRef } from './types';
 import type { AthleteModel } from './athlete-model';
 import type { ManualCheckin, StallFlag } from './coach-engine';
 import type { LocalizedSentence } from './coach-i18n';
@@ -248,8 +248,12 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
   const { workouts, weeklySchedule } = input;
 
   // Adherence: scheduled days vs days actually trained.
+  // §18: via the one read (dayPlanRef). The historical predicate is
+  // preserved exactly — a configured day that is not a rest day
+  // counts (including unassigned days; narrowing that is a separate
+  // product decision, not part of the representation change).
   const scheduledDays = WEEKDAYS.filter(
-    (d) => weeklySchedule[d] && weeklySchedule[d].workoutPlanId !== 'rest'
+    (d) => weeklySchedule[d] && dayPlanRef(weeklySchedule[d]).kind !== 'rest'
   );
   const trainedDays = new Set(
     workouts.filter((w) => inWeek(w.date, monday)).map((w) => weekdayOf(w.date))
@@ -636,13 +640,15 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
     (model?.adherence.plannedSessions ?? 0) >= 8
   ) {
     const fromIdx = WEEKDAYS.indexOf(mostSkipped);
-    const planId = weeklySchedule[mostSkipped]?.workoutPlanId;
+    const skippedRef = dayPlanRef(weeklySchedule[mostSkipped]);
+    const planId = skippedRef.kind === 'plan' ? skippedRef.planId : undefined;
     const freeDay = WEEKDAYS.find(
       (d, i) =>
         Math.abs(i - fromIdx) === 1 &&
-        (!weeklySchedule[d] || weeklySchedule[d].workoutPlanId === 'rest')
+        // Historical predicate, preserved: no entry at all, or a rest day.
+        (!weeklySchedule[d] || dayPlanRef(weeklySchedule[d]).kind === 'rest')
     );
-    if (planId && planId !== 'rest' && freeDay) {
+    if (planId && freeDay) {
       revisions.push({
         kind: 'schedule_move',
         fromDay: mostSkipped,
@@ -906,8 +912,9 @@ export function buildBlockDebrief(input: {
   // Completion: scheduled block sessions vs days trained in the window.
   const blockPlans = input.plannedWorkouts.filter((p) => block.planIds.includes(p.id));
   const planDays = WEEKDAYS.filter((d) => {
-    const pid = input.weeklySchedule[d]?.workoutPlanId;
-    return pid && block.planIds.includes(pid);
+    // §18: via the one read (dayPlanRef).
+    const ref = dayPlanRef(input.weeklySchedule[d]);
+    return ref.kind === 'plan' && block.planIds.includes(ref.planId);
   });
   const plannedPerWeek = planDays.length || blockPlans.length;
   const plannedTotal = plannedPerWeek * block.weeks.length;

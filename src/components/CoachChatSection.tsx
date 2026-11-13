@@ -200,9 +200,11 @@ export default function CoachChatSection() {
         ? { state: 'in_progress', title: sessionInfo.title, exercises: sessionInfo.exercises ?? [], date: todayStr }
         : sessionInfo.status === 'completed'
           ? { state: 'completed', title: sessionInfo.title, exercises: sessionInfo.exercises ?? [], date: todayStr }
-          : sessionInfo.status === 'planned'
+          : sessionInfo.status === 'planned' || sessionInfo.status === 'rest'
             ? {
-                state: sessionInfo.isRestDay ? 'rest' : 'planned',
+                // §16: rest is its own status now (was: planned + the
+                // isRestDay side flag, re-derived here).
+                state: sessionInfo.status === 'rest' ? 'rest' : 'planned',
                 title: sessionInfo.title,
                 exercises: sessionInfo.exercises ?? [],
                 date: todayStr,

@@ -26,6 +26,7 @@ import {
   CreatineConfig,
   CreatineSupply,
   DailyTimelineEvent,
+  ActiveWorkoutDraft,
   AICoachInsight,
   AITrainingProfile,
   AIPlannedWorkout,
@@ -39,6 +40,7 @@ import {
   WeeklySchedule,
   isSetCompleted,
   normalizePersistedWorkoutSet,
+  dayPlanRef,
   TrainingDecisionRecord,
   CurrentPrescriptionTarget,
   DEFAULT_GOALS,
@@ -171,17 +173,9 @@ import { hasRealBodyStats } from './body-stats';
 
 export * from './types';
 
-export interface ActiveWorkoutDraft {
-  id?: string;
-  name?: string;
-  planId?: string;
-  date: string;
-  exercises: WorkoutExercise[];
-  startedFromPlan?: string | null;
-  startedFromPlanId?: string | null;
-  sessionStartTime?: number;
-  savedAt: string;
-}
+// §15 (Phase 3.3): ActiveWorkoutDraft is defined ONCE, in types.ts
+// (it used to be duplicated here verbatim). Its ownership contract
+// — one slot, keyed by sessionStartTime — is documented there.
 
 export interface UiPreferences {
   /** XP level card, streak card, monthly challenge card on Home. */
@@ -1024,6 +1018,58 @@ export function migratePersistedState(
     if (workoutsChanged) next.workouts = mappedWorkouts;
   }
 
+  // §18 (Phase 3.3): schedule days become the kind union. Legacy
+  // rows stored rest as kind: 'rest' and plans as a bare
+  // id (or, older still, a plan NAME — the resolver's match rule);
+  // convert both to `kind`, and REPAIR dangling plan references on
+  // load: a plan ref that matches no planned workout (by id or by
+  // name) is cleared to unassigned instead of being tolerated
+  // forever. Reference-preserving when nothing changes.
+  if (state.weeklySchedule && typeof state.weeklySchedule === 'object') {
+    const planIds = new Set<string>();
+    const planNames = new Set<string>();
+    for (const p of Array.isArray(state.plannedWorkouts) ? state.plannedWorkouts : []) {
+      if (p?.id) planIds.add(p.id);
+      if (p?.name) planNames.add(String(p.name).toLowerCase());
+    }
+    let scheduleChanged = false;
+    const mappedSchedule: Record<string, unknown> = {};
+    for (const [day, cfg] of Object.entries(state.weeklySchedule as Record<string, any>)) {
+      if (!cfg || typeof cfg !== 'object') {
+        mappedSchedule[day] = cfg;
+        continue;
+      }
+      const legacyId = cfg.workoutPlanId;
+      if (cfg.kind === 'rest' || legacyId === 'rest') {
+        if (cfg.kind === 'rest' && legacyId === undefined) {
+          mappedSchedule[day] = cfg;
+        } else {
+          scheduleChanged = true;
+          const { workoutPlanId: _dropped, ...restCfg } = cfg;
+          mappedSchedule[day] = { ...restCfg, kind: 'rest' };
+        }
+      } else if (cfg.kind === 'plan' || (cfg.kind === undefined && typeof legacyId === 'string' && legacyId)) {
+        const resolves =
+          typeof legacyId === 'string' &&
+          (planIds.has(legacyId) || planNames.has(legacyId.toLowerCase()));
+        if (!resolves) {
+          // Dangling: repair to unassigned (keep title/bodyParts).
+          scheduleChanged = true;
+          const { workoutPlanId: _dropped, kind: _droppedKind, ...restCfg } = cfg;
+          mappedSchedule[day] = restCfg;
+        } else if (cfg.kind === 'plan') {
+          mappedSchedule[day] = cfg;
+        } else {
+          scheduleChanged = true;
+          mappedSchedule[day] = { ...cfg, kind: 'plan' };
+        }
+      } else {
+        mappedSchedule[day] = cfg;
+      }
+    }
+    if (scheduleChanged) next.weeklySchedule = mappedSchedule;
+  }
+
   return next;
 }
 
@@ -1038,6 +1084,41 @@ export function migratePersistedState(
  */
 export function stampNewRow<T extends { updatedAt?: string }>(row: T): T {
   return { ...row, updatedAt: row.updatedAt ?? new Date().toISOString() };
+}
+
+/**
+ * §15 (Phase 3.3): the draft slot's autosave ownership rule. Two
+ * autosave effects write the one slot (live session screen, logger
+ * modal); an autosave may write only when the slot is empty, holds
+ * the SAME session (sessionStartTime identity), or holds a session
+ * that was last saved BEFORE this session began (an explicit newer
+ * start supersedes). A stale editor holding an older session must
+ * never silently overwrite a newer draft. Explicit user actions
+ * (Start, Resume, Discard/Undo) bypass this — they call
+ * saveWorkoutDraft directly, on purpose.
+ */
+export function shouldAutosaveDraft(
+  current: ActiveWorkoutDraft | null | undefined,
+  sessionStartTime: number | undefined,
+): boolean {
+  if (!current) return true;
+  if (sessionStartTime === undefined) return false;
+  if (current.sessionStartTime === sessionStartTime) return true;
+  const slotSavedAt = Date.parse(current.savedAt || '');
+  return Number.isFinite(slotSavedAt) && sessionStartTime > slotSavedAt;
+}
+
+/** §15: a draft older than 12h is stale — resuming it is a decision
+ *  the user makes at a prompt, not a silent restore. */
+export const DRAFT_STALE_AGE_MS = 12 * 60 * 60 * 1000;
+
+export function isStaleDraft(
+  draft: ActiveWorkoutDraft | null | undefined,
+  nowMs: number,
+): boolean {
+  if (!draft) return false;
+  const savedAt = Date.parse(draft.savedAt || '');
+  return Number.isFinite(savedAt) && nowMs - savedAt > DRAFT_STALE_AGE_MS;
 }
 
 export function stampEditedRow<T>(row: T): T & { updatedAt: string } {
@@ -1353,13 +1434,13 @@ export function buildFreshHistoryState(): Partial<AppState> {
     policyDecisionsLedgerHistory: [],
     policyDecisionApplications: [],
     weeklySchedule: {
-      monday: { workoutPlanId: 'rest' },
-      tuesday: { workoutPlanId: 'rest' },
-      wednesday: { workoutPlanId: 'rest' },
-      thursday: { workoutPlanId: 'rest' },
-      friday: { workoutPlanId: 'rest' },
-      saturday: { workoutPlanId: 'rest' },
-      sunday: { workoutPlanId: 'rest' },
+      monday: { kind: 'rest' },
+      tuesday: { kind: 'rest' },
+      wednesday: { kind: 'rest' },
+      thursday: { kind: 'rest' },
+      friday: { kind: 'rest' },
+      saturday: { kind: 'rest' },
+      sunday: { kind: 'rest' },
     },
     deletedPlanIds: [],
     deletedPrIds: [],
@@ -1481,13 +1562,13 @@ export const useAppStore = create<AppState>()(
 
       // Weekly Workout Schedule & Body Parts
       weeklySchedule: {
-        monday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-        tuesday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-        wednesday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-        thursday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-        friday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-        saturday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
-        sunday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+        monday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+        tuesday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+        wednesday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+        thursday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+        friday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+        saturday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+        sunday: { kind: 'rest', customTitle: 'Rest Day', bodyParts: [] },
       },
       setWeeklySchedule: (weeklySchedule) => set((state) => ({
         weeklySchedule,
@@ -2751,7 +2832,9 @@ export const useAppStore = create<AppState>()(
         if (userCustomPlans.length > 0) {
           const freshCustomSched = buildDefaultWeeklySchedule(userCustomPlans, state.trainingProfile?.daysPerWeek || 4);
           for (const day of DAYS_OF_WEEK) {
-            if (day !== todayDay && baseSchedule[day]?.workoutPlanId?.startsWith('builtin_')) {
+            // §18: the day's plan via the one read (dayPlanRef).
+            const dayRef = dayPlanRef(baseSchedule[day]);
+            if (day !== todayDay && dayRef.kind === 'plan' && dayRef.planId.startsWith('builtin_')) {
               baseSchedule[day] = freshCustomSched[day] || baseSchedule[day];
             }
           }
@@ -2812,7 +2895,7 @@ export const useAppStore = create<AppState>()(
                     bodyParts: getWorkoutBodyParts(fallbackPlan.exercises),
                   }
                 : {
-                    workoutPlanId: 'rest',
+                    kind: 'rest',
                     customTitle: 'Rest Day',
                     bodyParts: [],
                   };
@@ -3087,7 +3170,10 @@ export const useAppStore = create<AppState>()(
       }),
 
       saveWorkoutDraft: (draft) => {
-        if (!draft) {
+        // §15 (Phase 3.3): an empty-exercises draft is not a state —
+        // saving one CLEARS the slot explicitly, instead of leaving
+        // a phantom draft every reader then has to special-case.
+        if (!draft || !draft.exercises || draft.exercises.length === 0) {
           set({ activeWorkoutDraft: null });
           return;
         }
@@ -3531,13 +3617,15 @@ export const useAppStore = create<AppState>()(
         // The proposal was made when toDay was free. If the athlete has
         // since scheduled something else there, the proposal is stale —
         // never overwrite a newer decision silently.
-        const currentTarget = state.weeklySchedule[revision.toDay]?.workoutPlanId;
-        if (currentTarget && currentTarget !== 'rest' && currentTarget !== revision.planId) {
+        // §18: via the one read (dayPlanRef); writes carry `kind`.
+        const targetRef = dayPlanRef(state.weeklySchedule[revision.toDay]);
+        if (targetRef.kind === 'plan' && targetRef.planId !== revision.planId) {
           return;
         }
         const nextSchedule: WeeklySchedule = { ...state.weeklySchedule };
-        nextSchedule[revision.fromDay] = { workoutPlanId: 'rest' };
+        nextSchedule[revision.fromDay] = { kind: 'rest' };
         nextSchedule[revision.toDay] = {
+          kind: 'plan',
           workoutPlanId: revision.planId,
           bodyParts: getWorkoutBodyParts(plan.exercises),
         };

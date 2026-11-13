@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { tabListKeyDown } from '@/lib/tab-keyboard';
-import { useStore } from '@/lib/store';
+import { useStore, shouldAutosaveDraft, isStaleDraft } from '@/lib/store';
 import { resolveDefaultCoachSegment } from '@/lib/coach-session';
 import { renderLocalizedSentence } from '@/lib/coach-i18n';
 import { useTranslation } from '@/lib/i18n';
@@ -1501,8 +1501,13 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   }, [confirmDeleteId, registerBackHandler]);
 
   // ── Auto-save Draft to Local Storage ──────────────────────────────────────
+  // §15 (Phase 3.3): this is one of the slot's two autosave writers
+  // (the live session screen is the other). The ownership rule
+  // (shouldAutosaveDraft) keeps a stale editor from silently
+  // overwriting a newer session's draft.
   useEffect(() => {
     if (isModalOpen && exercises.some((e) => e.name.trim() || e.sets.some((s) => (typeof s.weight === 'number' && s.weight > 0) || s.reps > 0))) {
+      if (!shouldAutosaveDraft(useStore.getState().activeWorkoutDraft, sessionStartTime)) return;
       saveWorkoutDraft({
         date,
         name: startedFromPlan || undefined,
@@ -1515,6 +1520,19 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       });
     }
   }, [isModalOpen, exercises, date, startedFromPlan, startedFromPlanId, sessionStartTime, saveWorkoutDraft]);
+
+  // §15 (Phase 3.3): a draft older than 12h is resumed only after
+  // an explicit prompt — a day-old half-finished session is a
+  // decision, not a silent restore.
+  const [isStaleResumeConfirmOpen, setIsStaleResumeConfirmOpen] = useState(false);
+  const handleResumeClick = () => {
+    if (!activeWorkoutDraft) return;
+    if (isStaleDraft(activeWorkoutDraft, Date.now())) {
+      setIsStaleResumeConfirmOpen(true);
+      return;
+    }
+    handleResumeWorkout();
+  };
 
   const handleResumeWorkout = () => {
     if (!activeWorkoutDraft) return;
@@ -1773,6 +1791,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       const setDaySchedule = useStore.getState().setDaySchedule;
       if (setDaySchedule) {
         setDaySchedule(todayDayOfWeek, {
+          kind: 'plan',
           workoutPlanId: plan.id,
           customTitle: plan.name,
           bodyParts: getWorkoutBodyParts(plan.exercises),
@@ -2521,7 +2540,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             </button>
             <button
               type="button"
-              onClick={handleResumeWorkout}
+              onClick={handleResumeClick}
               className="btn-primary py-1.5 px-3 text-xs font-bold flex items-center gap-1.5"
             >
               <Play className="w-3 h-3 fill-white" />
@@ -3275,6 +3294,20 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         confirmText={t('workout.deletePlanConfirm')}
         cancelText={t('workout.keepPlan')}
         variant="danger"
+      />
+
+      {/* ── Stale Draft Resume Prompt (§15, Phase 3.3) ─────────────────── */}
+      <ConfirmationModal
+        isOpen={isStaleResumeConfirmOpen}
+        onClose={() => setIsStaleResumeConfirmOpen(false)}
+        onConfirm={() => {
+          setIsStaleResumeConfirmOpen(false);
+          handleResumeWorkout();
+        }}
+        title={t('train.staleDraftTitle')}
+        message={t('train.staleDraftMsg')}
+        confirmText={t('train.staleDraftConfirm')}
+        cancelText={t('train.keepDraft')}
       />
 
       {/* ── Draft Discard Confirmation (F5) ─────────────────────────────── */}

@@ -17,6 +17,7 @@ import {
   DayScheduleConfig,
   WeeklySchedule,
   PlannedWorkout,
+  dayPlanRef,
 } from '@/lib/types';
 import {
   DAYS_OF_WEEK,
@@ -61,7 +62,7 @@ export default function WeeklyScheduleModal({
     if (
       currentWeeklySchedule &&
       Object.keys(currentWeeklySchedule).length > 0 &&
-      Object.values(currentWeeklySchedule).some((d) => d.workoutPlanId)
+      Object.values(currentWeeklySchedule).some((d) => dayPlanRef(d).kind !== 'none')
     ) {
       return currentWeeklySchedule;
     }
@@ -76,7 +77,7 @@ export default function WeeklyScheduleModal({
       if (
         currentWeeklySchedule &&
         Object.keys(currentWeeklySchedule).length > 0 &&
-        Object.values(currentWeeklySchedule).some((d) => d.workoutPlanId)
+        Object.values(currentWeeklySchedule).some((d) => dayPlanRef(d).kind !== 'none')
       ) {
         setDraft(currentWeeklySchedule);
       } else {
@@ -92,7 +93,7 @@ export default function WeeklyScheduleModal({
       setDraft((prev) => ({
         ...prev,
         [day]: {
-          workoutPlanId: 'rest',
+          kind: 'rest',
           customTitle: t('home.restDay'),
           bodyParts: [],
         },
@@ -106,6 +107,7 @@ export default function WeeklyScheduleModal({
     setDraft((prev) => ({
       ...prev,
       [day]: {
+        kind: 'plan',
         workoutPlanId: planId,
         customTitle: matched?.name || t('sched.workoutFallback'),
         bodyParts,
@@ -115,7 +117,7 @@ export default function WeeklyScheduleModal({
 
   const handleToggleBodyPart = (day: DayOfWeek, part: string) => {
     setDraft((prev) => {
-      const currentDay = prev[day] || { workoutPlanId: 'rest', bodyParts: [] };
+      const currentDay = prev[day] || { kind: 'rest', bodyParts: [] };
       const currentParts = currentDay.bodyParts || [];
       const exists = currentParts.includes(part);
       const nextParts = exists
@@ -174,8 +176,9 @@ export default function WeeklyScheduleModal({
   };
 
   // Count active training days in draft
+  // §18: plan days via the one read (dayPlanRef).
   const activeTrainingDays = Object.values(draft).filter(
-    (d) => d.workoutPlanId && d.workoutPlanId !== 'rest'
+    (d) => dayPlanRef(d).kind === 'plan'
   ).length;
 
   return (
@@ -246,8 +249,8 @@ export default function WeeklyScheduleModal({
         <main className="p-4 sm:p-5 overflow-y-auto space-y-3.5 flex-1">
           {DAYS_OF_WEEK.map((day) => {
             const info = DAY_DISPLAY_INFO[day];
-            const dayConfig = draft[day] || { workoutPlanId: 'rest', bodyParts: [] };
-            const isRest = !dayConfig.workoutPlanId || dayConfig.workoutPlanId === 'rest';
+            const dayConfig = draft[day] || { kind: 'rest', bodyParts: [] };
+            const isRest = dayPlanRef(dayConfig).kind !== 'plan';
             const isToday = day === todayDay;
 
             return (
@@ -318,7 +321,7 @@ export default function WeeklyScheduleModal({
                       </span>
                       <div className="relative flex-1">
                         <select
-                          value={dayConfig.workoutPlanId || ''}
+                          value={dayPlanRef(dayConfig).kind === 'plan' ? (dayConfig.workoutPlanId || '') : ''}
                           onChange={(e) => handleDayPlanSelect(day, e.target.value)}
                           className="w-full text-xs font-semibold py-1.5 px-3 rounded-lg bg-bg-card border border-border/80 text-text-primary outline-none focus:border-accent appearance-none pr-8 cursor-pointer"
                         >
@@ -404,7 +407,7 @@ export default function WeeklyScheduleModal({
           setDraft(() => {
             const cleared = {} as WeeklySchedule;
             for (const day of DAYS_OF_WEEK) {
-              cleared[day] = { workoutPlanId: 'rest', customTitle: t('home.restDay'), bodyParts: [] };
+              cleared[day] = { kind: 'rest', customTitle: t('home.restDay'), bodyParts: [] };
             }
             return cleared;
           });

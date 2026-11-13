@@ -106,6 +106,9 @@ export const en = {
   'train.discardDraftMsg': 'This deletes the paused workout in progress. The sets logged in the draft will be lost.',
   'train.discardDraftConfirm': 'Discard draft',
   'train.keepDraft': 'Keep draft',
+  'train.staleDraftTitle': 'Resume an older session?',
+  'train.staleDraftMsg': 'This workout was paused more than 12 hours ago. Resume it, or keep it saved and start fresh instead?',
+  'train.staleDraftConfirm': 'Resume session',
   'train.yourPlans': 'Your Workout Plans',
   'train.exercises': 'Exercises',
 
@@ -3102,6 +3105,7 @@ export const en = {
   // LIVE-P1-03: Today chrome + coach sentences converted to i18n.
   'home.quickLogPast': 'Already trained? Quick log a past session',
   'home.restDayLine': 'Rest day — no workout scheduled. Eat and sleep as usual.',
+  'home.emptyLogToday': 'An empty session is logged for today — no sets were completed.',
   'home.durationExercises': '{min} min • {count} exercises',
   'home.durationExercisesOne': '{min} min • {count} exercise',
   'home.durationOnly': '{min} min',

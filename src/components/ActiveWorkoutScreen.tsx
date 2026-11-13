@@ -29,7 +29,7 @@ import {
   MoreHorizontal,
   Search,
 } from 'lucide-react';
-import { useStore } from '@/lib/store';
+import { useStore, shouldAutosaveDraft } from '@/lib/store';
 import { computeSessionBest, gateSessionOutcome, outcomeNote } from '@/lib/pr-reevaluation';
 import { getDemoForExercise } from '@/lib/exercise-media';
 import FormCuesSheet from '@/components/FormCuesSheet';
@@ -741,6 +741,10 @@ export default function ActiveWorkoutScreen({
   // began (template exercises are pre-named on open).
   useEffect(() => {
     if (exercises.some((e) => e.sets.some((s) => isActiveSetCompleted(s)))) {
+      // §15 (Phase 3.3): one of the draft slot's two autosave
+      // writers (the logger modal is the other) — the ownership
+      // rule keeps this screen from overwriting a newer session.
+      if (!shouldAutosaveDraft(useStore.getState().activeWorkoutDraft, sessionStartTime)) return;
       saveWorkoutDraft({
         date: getLocalTodayStr(),
         name: workoutName,
@@ -2088,15 +2092,22 @@ export default function ActiveWorkoutScreen({
 
   // Pause Workout & Save Draft to resume later
   const handlePauseWorkout = () => {
-    saveWorkoutDraft({
-      date: getLocalTodayStr(),
-      name: workoutName,
-      exercises,
-      startedFromPlan: workoutName,
-      sessionStartTime,
-      savedAt: new Date().toISOString(),
-    });
-    toast.info(t('workout.toastPaused'), t('workout.toastPausedTitle'));
+    // §15: pausing is this session's own save — the ownership rule
+    // applies, but leaving must never be blocked by it: if a newer
+    // session owns the slot, this one exits unsaved (and no "paused"
+    // toast lies about it).
+    const ownsSlot = shouldAutosaveDraft(useStore.getState().activeWorkoutDraft, sessionStartTime);
+    if (ownsSlot) {
+      saveWorkoutDraft({
+        date: getLocalTodayStr(),
+        name: workoutName,
+        exercises,
+        startedFromPlan: workoutName,
+        sessionStartTime,
+        savedAt: new Date().toISOString(),
+      });
+      toast.info(t('workout.toastPaused'), t('workout.toastPausedTitle'));
+    }
     if (onPause) {
       onPause();
     } else {
