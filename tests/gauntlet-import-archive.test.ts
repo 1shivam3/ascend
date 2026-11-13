@@ -63,7 +63,9 @@ describe('gauntlet R4: import archives first', () => {
 
     const archiveRaw = memory.get(ARCHIVE_KEY);
     expect(archiveRaw).toBeDefined();
-    const archive = JSON.parse(archiveRaw!);
+    // §12: the key holds the generation list; the newest generation
+    // is the pre-import archive this test is about.
+    const archive = JSON.parse(archiveRaw!).archives[0];
     expect((archive.workouts || []).map((w: any) => w.id)).toContain('before-1');
 
     // Restore undoes the import, and the archive survives for a repeat.

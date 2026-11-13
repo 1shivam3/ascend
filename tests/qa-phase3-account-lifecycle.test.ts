@@ -213,7 +213,9 @@ describe("Check 6a — 'keep' mechanics (store archive)", () => {
     // history, restorable from Settings → Data & Account.
     const raw = mockStorage.getItem(ARCHIVED_HISTORY_KEY);
     expect(raw).toBeTruthy();
-    const archive = JSON.parse(raw!);
+    // §12: the key holds the generation list; the newest generation
+    // is the archive this Start-fresh just wrote.
+    const archive = JSON.parse(raw!).archives[0];
     expect(archive.workouts.map((r: { id: string }) => r.id).sort()).toEqual(['w1', 'w2']);
     expect(archive.meals.map((r: { id: string }) => r.id)).toEqual(['m1']);
     expect(archive.plannedWorkouts.map((r: { id: string }) => r.id)).toEqual(['p1']);

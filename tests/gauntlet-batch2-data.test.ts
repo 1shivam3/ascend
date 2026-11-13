@@ -386,7 +386,7 @@ describe('DI-13: archiving rotates the previous archive into the prev slot', () 
     delete (globalThis as any).localStorage;
   });
 
-  it('the first archive survives a second Start-fresh in the prev slot', () => {
+  it('the first archive survives a second Start-fresh as the previous generation', () => {
     expect(useStore.getState().archiveRetainedHistory()).toBe(true);
     const first = storage.getItem(ARCHIVED_HISTORY_KEY);
     expect(first).toBeTruthy();
@@ -394,10 +394,16 @@ describe('DI-13: archiving rotates the previous archive into the prev slot', () 
       workouts: [{ id: 'w2', date: '2026-10-02', exercises: [] } as any],
     });
     expect(useStore.getState().archiveRetainedHistory()).toBe(true);
-    expect(storage.getItem(ARCHIVED_HISTORY_PREV_KEY)).toBe(first);
+    // §12 format change (deliberate): the two-key rotation is gone —
+    // nothing writes the PREV key anymore. The DI-13 guarantee is
+    // unchanged in substance: the first archive survives the second
+    // Start-fresh intact, now as generation 2 of the single-key
+    // list, byte-for-byte the same backup object.
+    expect(storage.getItem(ARCHIVED_HISTORY_PREV_KEY)).toBeNull();
     const second = storage.getItem(ARCHIVED_HISTORY_KEY);
     expect(second).toBeTruthy();
     expect(second).not.toBe(first);
+    expect(JSON.parse(second!).archives[1]).toEqual(JSON.parse(first!).archives[0]);
   });
 });
 
