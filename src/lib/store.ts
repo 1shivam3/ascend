@@ -174,6 +174,7 @@ import {
 } from './health-connect';
 import { kgToLbs } from './units';
 import { enforceMinorMacroGoals, enforceUnknownAgeMacroGoals, hasKnownAge, isMinorAge } from './minor-targets';
+import { deriveNutritionPhase } from './nutrition-phase';
 import { calculateRecommendedMacroGoals } from './macros';
 import { hasRealBodyStats } from './body-stats';
 
@@ -3395,11 +3396,14 @@ export const useAppStore = create<AppState>()(
           existingPlans: state.plannedWorkouts,
           unit: state.profile?.unit ?? 'kg',
           todayStr,
-          // Phase 3 (Task 3.1): a minor's block never carries a
-          // deficit nutrition phase — minors are maintenance-only
-          // (lib/minor-targets.ts), whatever the training goal.
-          nutritionPhase:
-            intake.goal === 'lose_fat' && !isMinorAge(state.profile?.age) ? 'deficit' : null,
+          // §D2: the phase comes from the ONE derivation
+          // (nutrition-phase.ts) — the same one Fuel's calorie
+          // targets are clamped by. It yields 'deficit' only for
+          // an adult lose_fat goal; minors and unknown-age
+          // profiles are maintenance-only, so a minor's block
+          // never carries a deficit (Phase 3 Task 3.1 rule,
+          // preserved inside the derivation).
+          nutritionPhase: deriveNutritionPhase(intake.goal, state.profile?.age),
           bodyweightKg: state.profile?.bodyweightKg,
           ageYears: state.profile?.age,
           dislikedExercises: state.trainingProfile?.dislikedExercises ?? [],
