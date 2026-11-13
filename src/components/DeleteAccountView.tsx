@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase/client';
 import { parseDeletionUrl } from '@/lib/deletion-url';
+import { markLoggedOut } from '@/lib/logged-out-latch';
 import { SUPPORT_EMAIL } from '@/lib/legal';
 import { localizedUserMessage } from '@/lib/user-error';
 import { useTranslation } from '@/lib/i18n';
@@ -271,7 +272,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
             localStorage.removeItem(k);
           }
         }
-        localStorage.setItem('ascend_logged_out', 'true');
+        markLoggedOut();
       } catch {
         // Best effort local wipe
       }

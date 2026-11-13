@@ -97,6 +97,7 @@ import {
 } from './workout-outcome-evidence';
 import { isSetPrescribed } from './workout-adherence';
 import { planDerivedPRsAfterHistoryChange } from './pr-reevaluation';
+import { clearLoggedOutLatch, isLoggedOutLatchSet, markLoggedOut } from './logged-out-latch';
 import { DEFAULT_BODYWEIGHT_KG } from './defaults';
 import { isBodyweightExercise } from './strength-standards';
 import {
@@ -1666,7 +1667,7 @@ export const useAppStore = create<AppState>()(
         }
         if (typeof window !== 'undefined') {
           try {
-            localStorage.removeItem('ascend_logged_out');
+            clearLoggedOutLatch();
           } catch {}
         }
         // Keep the avatar mirror in step with the profile (see AVATAR_MIRROR_KEY).
@@ -3806,7 +3807,7 @@ export const useAppStore = create<AppState>()(
         } catch {}
         if (typeof window !== 'undefined') {
           try {
-            localStorage.setItem('ascend_logged_out', 'true');
+            markLoggedOut();
             localStorage.removeItem('ascend_emergency_snapshot');
             localStorage.removeItem('ascend_profile');
           } catch {}
@@ -4100,7 +4101,7 @@ export const useAppStore = create<AppState>()(
           }
           if (typeof window !== 'undefined') {
             try {
-              localStorage.removeItem('ascend_logged_out');
+              clearLoggedOutLatch();
             } catch {}
           }
 
@@ -4634,7 +4635,7 @@ export const useAppStore = create<AppState>()(
           if (typeof window !== 'undefined') {
             queueMicrotask(() => {
               try {
-                if (localStorage.getItem('ascend_logged_out') === 'true') {
+                if (isLoggedOutLatchSet()) {
                   // Athlete explicitly logged out. Do not resurrect old profile session.
                   return;
                 }

@@ -27,6 +27,7 @@ import {
 } from './reconcile';
 import { isCrossAccountSwitch as isCrossAccountSwitchFn, decideStartFreshGate, isGuestProfileId } from '../start-fresh-guard';
 import { hasRetainedHistory, ARCHIVED_HISTORY_KEY, ARCHIVED_HISTORY_PREV_KEY } from '../history-fork';
+import { clearLoggedOutLatch, isLoggedOutLatchSet, markLoggedOut } from '../logged-out-latch';
 import { DEFAULT_BODYWEIGHT_KG } from '../defaults';
 import { getInitialCoachBlocksState, type CoachBlocksState } from '../block-engine';
 
@@ -1245,7 +1246,7 @@ class SupabaseSyncEngine {
       if (session?.user) {
         if (typeof window !== 'undefined') {
           try {
-            localStorage.removeItem('ascend_logged_out');
+            clearLoggedOutLatch();
           } catch {}
         }
         this.currentUser = {
@@ -1333,7 +1334,7 @@ class SupabaseSyncEngine {
   public async signInWithGoogle(): Promise<{ error?: string }> {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem('ascend_logged_out');
+        clearLoggedOutLatch();
       } catch {}
     }
     // S4: record the intent so the completing sign-in routes through
@@ -1366,7 +1367,7 @@ class SupabaseSyncEngine {
   public async signInWithApple(): Promise<{ error?: string }> {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem('ascend_logged_out');
+        clearLoggedOutLatch();
       } catch {}
     }
     // S4: same intent routing as Google sign-in.
@@ -1399,7 +1400,7 @@ class SupabaseSyncEngine {
   ): Promise<{ error?: string; user?: AuthUser; requiresEmailVerification?: boolean }> {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem('ascend_logged_out');
+        clearLoggedOutLatch();
       } catch {}
     }
     const supabase = getSupabase();
@@ -1444,7 +1445,7 @@ class SupabaseSyncEngine {
   ): Promise<{ error?: string; user?: AuthUser }> {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem('ascend_logged_out');
+        clearLoggedOutLatch();
       } catch {}
     }
     const supabase = getSupabase();
@@ -1637,7 +1638,7 @@ class SupabaseSyncEngine {
   public async sendEmailOtp(email: string): Promise<{ error?: string }> {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem('ascend_logged_out');
+        clearLoggedOutLatch();
       } catch {}
     }
     // S4: covers both completions of this flow — verifyEmailOtp and
@@ -1664,7 +1665,7 @@ class SupabaseSyncEngine {
   public async verifyEmailOtp(email: string, token: string): Promise<{ error?: string }> {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem('ascend_logged_out');
+        clearLoggedOutLatch();
       } catch {}
     }
     const supabase = getSupabase();
@@ -1707,7 +1708,7 @@ class SupabaseSyncEngine {
 
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem('ascend_logged_out', 'true');
+        markLoggedOut();
       } catch {}
     }
 
@@ -1873,7 +1874,7 @@ class SupabaseSyncEngine {
              localStorage.removeItem(k);
            }
          });
-         localStorage.setItem('ascend_logged_out', 'true');
+         markLoggedOut();
        } catch (err: any) {
          localWipeError = err?.message || 'Local wipe failed';
        }
@@ -1959,7 +1960,7 @@ class SupabaseSyncEngine {
       this.clearSyncRetryTimer();
     }
 
-    if (typeof window !== 'undefined' && localStorage.getItem('ascend_logged_out') === 'true') {
+    if (typeof window !== 'undefined' && isLoggedOutLatchSet()) {
       const supabaseClient = getSupabase();
       let hasActiveSession = false;
       if (supabaseClient) {
@@ -1967,7 +1968,7 @@ class SupabaseSyncEngine {
           const { data: { session } } = await supabaseClient.auth.getSession();
           if (session?.user) {
             hasActiveSession = true;
-            localStorage.removeItem('ascend_logged_out');
+            clearLoggedOutLatch();
           }
         } catch {}
       }

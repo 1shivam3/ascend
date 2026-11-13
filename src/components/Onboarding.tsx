@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
+import { clearLoggedOutLatch, isLoggedOutLatchSet } from '@/lib/logged-out-latch';
 import type { AuthUser } from '@/lib/supabase/sync';
 import { AthleteGoal, Gender, Unit, UserMode, DietPreference, AITrainingProfile, ATHLETE_GOAL_CONFIGS, resolvePrimaryGoal, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
 import { useAppNavigation } from '@/lib/navigation';
@@ -250,7 +251,7 @@ export default function Onboarding() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        if (localStorage.getItem('ascend_logged_out') === 'true') {
+        if (isLoggedOutLatchSet()) {
           return;
         }
         let snap = localStorage.getItem('ascend_emergency_snapshot');
@@ -496,7 +497,7 @@ export default function Onboarding() {
 
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem('ascend_logged_out');
+        clearLoggedOutLatch();
       } catch {}
     }
 
