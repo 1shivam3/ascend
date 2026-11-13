@@ -225,11 +225,26 @@ export interface PersonalRecord {
 
 export type SetExecutionStatus = 'pending' | 'completed' | 'skipped' | 'not_attempted';
 
+/**
+ * The statuses a PERSISTED history set may carry (§17, Phase 3.4):
+ * 'pending' is a live-draft concept and never persists — an
+ * entered-but-unfinished set is saved as 'not_attempted' with its
+ * reps kept as data (see normalizePersistedWorkoutSet).
+ */
+export type PersistedSetStatus = 'completed' | 'skipped' | 'not_attempted';
+
 export interface WorkoutSet {
   // Performed / actual execution values
   reps: number;
   weight?: number;
   unit: Unit;
+  /**
+   * LEGACY dual encoding (§17): the live draft still toggles this
+   * while a session runs, but persisted history no longer writes it
+   * (finalizeWorkoutSet strips it; stored history is canonicalized
+   * by normalizePersistedWorkoutSet). Read it ONLY through the
+   * resolvers below — never directly.
+   */
   completed?: boolean;
   rpe?: number;
   isPR?: boolean;
@@ -244,32 +259,39 @@ export interface WorkoutSet {
   // Provenance linking back to an applied policy decision (set only when verified via audit)
   appliedDecisionId?: string;
 
-  // Explicit execution status (optional for backwards compatibility with legacy records)
+  /**
+   * THE execution status (§17, Phase 3.4): the single stored truth
+   * for persisted sets. Optional on the type only because legacy
+   * records and live drafts may not have stamped it yet — the
+   * resolvers below define what an absent status means.
+   */
   status?: SetExecutionStatus;
 }
 
 /**
- * Execution Status Resolution Precedence:
- * ----------------------------------------
- * 1. Explicit `status` field:
- *    If `set.status` is provided ('completed' | 'skipped' | 'not_attempted' | 'pending'),
- *    it takes highest priority over legacy boolean flags.
+ * §17 (Phase 3.4): THE ONE status precedence implementation. The
+ * three public resolvers below all delegate here; they used to be
+ * three separate implementations that could disagree (and did —
+ * e.g. weekly-review read the raw boolean beside them).
  *
- * 2. Legacy `completed` boolean:
- *    If `set.status` is undefined:
- *    - `completed === true`: resolves to 'completed'.
- *    - `completed === false`:
- *        - if `reps > 0`: resolves to 'pending' (planned/entered set awaiting completion).
- *        - if `reps <= 0`: resolves to 'not_attempted'.
- *        (Note: legacy records are never silently assumed to be 'skipped').
- *
- * 3. Omitted `completed` field (historical stored records):
- *    If neither `status` nor `completed` is provided:
- *    - `reps > 0`: resolves to 'completed' (matches existing ASCEND behavior where historical
- *      records without `completed` but with positive reps represent logged sets).
- *    - `reps <= 0`: resolves to 'not_attempted'.
+ * Precedence:
+ * 1. Explicit `status` wins over every legacy encoding — including a
+ *    conflicting `completed: true` beside `status: 'skipped'`.
+ * 2. Legacy `completed === true` → 'completed';
+ *    `completed === false` → 'pending' when reps were entered
+ *    (a planned/entered set awaiting completion), else
+ *    'not_attempted'. (Legacy records are never assumed 'skipped'.)
+ * 3. Neither field (historical stored records): the ONE deliberate
+ *    context difference, named by `inferCompletedFromReps` —
+ *    history (true): reps > 0 means a logged set → 'completed'
+ *    (long-standing ASCEND behavior for flag-less records);
+ *    live draft (false): typed reps alone never complete a set →
+ *    'pending'.
  */
-export function getSetExecutionStatus(set: WorkoutSet): SetExecutionStatus {
+function resolveSetStatus(
+  set: WorkoutSet,
+  inferCompletedFromReps: boolean,
+): SetExecutionStatus {
   if (set?.status) {
     return set.status;
   }
@@ -277,44 +299,49 @@ export function getSetExecutionStatus(set: WorkoutSet): SetExecutionStatus {
     return 'completed';
   }
   if (set?.completed === false) {
-    return (set.reps && set.reps > 0) ? 'pending' : 'not_attempted';
+    return set.reps && set.reps > 0 ? 'pending' : 'not_attempted';
   }
-  return (set?.reps && set.reps > 0) ? 'completed' : 'not_attempted';
+  if (set?.reps && set.reps > 0) {
+    return inferCompletedFromReps ? 'completed' : 'pending';
+  }
+  return 'not_attempted';
 }
 
-/**
- * Determines whether a set counts as successfully completed.
- *
- * Precedence rules:
- * 1. If explicit `status` is present, returns true only when status === 'completed'.
- * 2. If `status` is omitted and `completed` boolean is present, returns `set.completed`.
- * 3. If neither is present (legacy historical records), returns true if `reps > 0`.
- */
+/** The set's execution status under HISTORY semantics. */
+export function getSetExecutionStatus(set: WorkoutSet): SetExecutionStatus {
+  return resolveSetStatus(set, true);
+}
+
+/** Whether a (history) set counts as successfully completed. */
 export function isSetCompleted(set: WorkoutSet): boolean {
-  if (set?.status) {
-    return set.status === 'completed';
-  }
-  if (typeof set?.completed === 'boolean') {
-    return set.completed;
-  }
-  return Boolean(set?.reps && set.reps > 0);
+  return resolveSetStatus(set, true) === 'completed';
 }
 
 /**
- * Determines whether a set in an active workout draft or active session has been completed.
- *
- * Precedence rules:
- * 1. If explicit `status` is present, returns true ONLY when status === 'completed'.
- *    Explicit `status` of 'skipped', 'pending', or 'not_attempted' ALWAYS returns false,
- *    even if a conflicting legacy `completed: true` flag exists.
- * 2. If `status` is omitted, returns true ONLY when `completed === true`.
- * 3. Never infers completion from positive reps or weights in an active draft.
+ * Whether a set in an ACTIVE workout draft/session is completed.
+ * Same precedence, draft semantics: never inferred from reps alone.
  */
 export function isActiveSetCompleted(set: WorkoutSet): boolean {
-  if (set?.status) {
-    return set.status === 'completed';
-  }
-  return set?.completed === true;
+  return resolveSetStatus(set, false) === 'completed';
+}
+
+/**
+ * §17 (Phase 3.4): canonicalize a set for PERSISTED history — one
+ * stored field (`status`, a PersistedSetStatus), the legacy
+ * `completed` boolean removed. Resolution follows the old
+ * precedence exactly, so no set changes meaning: an explicit status
+ * wins over a conflicting boolean, and a resolved 'pending' (entered
+ * but never finished) persists as 'not_attempted' with reps kept.
+ * Idempotent; applied by finalizeWorkoutSet (born canonical), the
+ * persist migration, and backup import.
+ */
+export function normalizePersistedWorkoutSet(set: WorkoutSet): WorkoutSet {
+  if (!set || typeof set !== 'object') return set;
+  const resolved = resolveSetStatus(set, true);
+  const status: PersistedSetStatus = resolved === 'pending' ? 'not_attempted' : resolved;
+  if (set.status === status && !('completed' in set)) return set;
+  const { completed: _legacyCompleted, ...rest } = set;
+  return { ...rest, status };
 }
 
 /**

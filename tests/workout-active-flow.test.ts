@@ -515,8 +515,10 @@ describe('Active Workout Flow & Prescription Preservation (Task 3B-2 & 3B-2A)', 
       expect(finalizedSets.length).toBe(4);
 
       // Set 1: Completed with original prescription and actual performance
+      // (§17, Phase 3.4: finalized sets carry status ONLY — the
+      // legacy `completed` boolean is stripped at finalize.)
       expect(finalizedSets[0].status).toBe('completed');
-      expect(finalizedSets[0].completed).toBe(true);
+      expect(finalizedSets[0].completed).toBeUndefined();
       expect(finalizedSets[0].weight).toBe(80);
       expect(finalizedSets[0].reps).toBe(8);
       expect(finalizedSets[0].prescribedWeight).toBe(80);
@@ -526,31 +528,28 @@ describe('Active Workout Flow & Prescription Preservation (Task 3B-2 & 3B-2A)', 
 
       // Set 2: Completed with modified performance and original prescription
       expect(finalizedSets[1].status).toBe('completed');
-      expect(finalizedSets[1].completed).toBe(true);
+      expect(finalizedSets[1].completed).toBeUndefined();
       expect(finalizedSets[1].weight).toBe(82.5);
       expect(finalizedSets[1].reps).toBe(7);
       expect(finalizedSets[1].prescribedWeight).toBe(80);
       expect(finalizedSets[1].prescribedReps).toBe(8);
 
-      // Set 3: Explicitly skipped with completed boolean false
+      // Set 3: Explicitly skipped
       expect(finalizedSets[2].status).toBe('skipped');
-      expect(finalizedSets[2].completed).toBe(false);
+      expect(finalizedSets[2].completed).toBeUndefined();
       expect(finalizedSets[2].prescribedWeight).toBe(80);
       expect(finalizedSets[2].prescribedReps).toBe(8);
 
-      // Set 4: Pending resolves to not_attempted with completed boolean false
+      // Set 4: Pending resolves to not_attempted
       expect(finalizedSets[3].status).toBe('not_attempted');
-      expect(finalizedSets[3].completed).toBe(false);
+      expect(finalizedSets[3].completed).toBeUndefined();
       expect(finalizedSets[3].prescribedWeight).toBe(80);
       expect(finalizedSets[3].prescribedReps).toBe(8);
 
-      // Verify strict consistency between explicit status and legacy completed boolean
+      // §17: the resolver must agree with the stored status on every
+      // finalized set (status is the only encoding left to read).
       for (const s of finalizedSets) {
-        if (s.status === 'completed') {
-          expect(s.completed).toBe(true);
-        } else {
-          expect(s.completed).toBe(false);
-        }
+        expect(isSetCompleted(s)).toBe(s.status === 'completed');
       }
     });
 
@@ -573,10 +572,10 @@ describe('Active Workout Flow & Prescription Preservation (Task 3B-2 & 3B-2A)', 
       expect(hasCompletedSets).toBe(false);
       expect(validExercises.length).toBe(1);
 
-      // All sets are preserved as not_attempted with completed: false
+      // All sets are preserved as not_attempted (status only, §17)
       const sets = validExercises[0].sets;
       expect(sets.length).toBe(3);
-      expect(sets.every((s) => s.status === 'not_attempted' && s.completed === false)).toBe(true);
+      expect(sets.every((s) => s.status === 'not_attempted' && !('completed' in s))).toBe(true);
       expect(sets.every((s) => s.prescribedWeight === 100 && s.prescribedReps === 5)).toBe(true);
 
       // Zero completed volume and no PRs can ever be generated
@@ -621,7 +620,7 @@ describe('Active Workout Flow & Prescription Preservation (Task 3B-2 & 3B-2A)', 
       expect(hasMeaningfulData).toBe(true);
       expect(hasCompletedSets).toBe(false);
       expect(validExercises.length).toBe(1);
-      expect(validExercises[0].sets.every((s) => s.status === 'skipped' && s.completed === false)).toBe(true);
+      expect(validExercises[0].sets.every((s) => s.status === 'skipped' && !('completed' in s))).toBe(true);
     });
 
     it('5. ensures unattempted and skipped sets do NOT contribute to volume, progression, or PR calculations', () => {
@@ -697,7 +696,7 @@ describe('Active Workout Flow & Prescription Preservation (Task 3B-2 & 3B-2A)', 
       const { validExercises, hasCompletedSets } = finalizeWorkoutExercises([cleanExercise]);
       expect(hasCompletedSets).toBe(true);
       expect(validExercises[0].sets.length).toBe(3);
-      expect(validExercises[0].sets.every((s) => s.status === 'completed' && s.completed)).toBe(true);
+      expect(validExercises[0].sets.every((s) => s.status === 'completed' && !('completed' in s))).toBe(true);
     });
 
     it('8. preserves unattempted and skipped sets in manual workout logging (handleSaveWorkout parity)', () => {

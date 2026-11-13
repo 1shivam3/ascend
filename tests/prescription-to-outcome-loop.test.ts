@@ -889,7 +889,9 @@ describe('Prescription-to-Outcome Loop (Task 3C-8)', () => {
 
       const finalized = finalizeWorkoutSet(unenteredSet);
       expect(finalized.weight).toBeUndefined();
-      expect(finalized.completed).toBe(false);
+      // §17 (Phase 3.4): the legacy `completed` boolean is no longer
+      // written — status is the only stored encoding.
+      expect(finalized.completed).toBeUndefined();
       expect(finalized.status).toBe('not_attempted');
 
       // Also verify that passing an empty string as weight is sanitized to undefined, not coerced to 0
@@ -984,7 +986,8 @@ describe('Prescription-to-Outcome Loop (Task 3C-8)', () => {
 
       const finalized = finalizeWorkoutSet(enteredSet);
       expect(finalized.weight).toBe(102.5);
-      expect(finalized.completed).toBe(true);
+      // §17 (Phase 3.4): see above — status only, no boolean.
+      expect(finalized.completed).toBeUndefined();
       expect(finalized.status).toBe('completed');
 
       const observation = analyzeSetOutcome(finalized, 'Barbell Bench Press', 0);

@@ -31,6 +31,7 @@ import type {
   Unit,
   WeeklySchedule,
   WorkoutEntry,
+  WorkoutSet,
 } from './types';
 import { getMondayOfWeek, parseLocalDate, formatVolume } from './formatters';
 import { getExerciseMuscle, getExerciseSecondaryMuscles } from './exercise-library';
@@ -831,7 +832,10 @@ export function buildSessionDebrief(input: {
     const planEx = plan.exercises.find(
       (pe) => canonicalizeExerciseName(pe.name) === canonicalizeExerciseName(ex.name)
     );
-    const done = ex.sets.filter((s) => s.completed === true || s.status === 'completed');
+    // §17: the one resolver — the old dual read (raw boolean OR
+    // status) disagreed with it on flag-less legacy sets. (The cast:
+    // this input shape carries unit as a loose string.)
+    const done = ex.sets.filter((s) => isSetCompleted(s as WorkoutSet));
     const working = done.filter((s) => s.reps > 0);
     if (!planEx || working.length === 0) continue;
     const topReps = Math.max(...working.map((s) => s.reps));

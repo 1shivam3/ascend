@@ -69,9 +69,12 @@ export function clampWorkoutReps(reps: number): number {
  * Normalizes a set at save time: floors, ceilings, and status derivation.
  *
  * Rules:
- * - If set is active-completed and reps > 0: status is 'completed', completed is true.
- * - Else if status was 'skipped': status is 'skipped', completed is false.
- * - Else: status is 'not_attempted', completed is false.
+ * - If set is active-completed and reps > 0: status is 'completed'.
+ * - Else if status was 'skipped': status is 'skipped'.
+ * - Else: status is 'not_attempted'.
+ * - §17 (Phase 3.4): `status` is the ONLY stored encoding — the
+ *   legacy `completed` boolean is stripped here so new history is
+ *   born canonical (normalizePersistedWorkoutSet's shape).
  * - Preserves all prescription fields (prescribedWeight, prescribedReps, prescribedRpe, prescribedUnit).
  */
 export function finalizeWorkoutSet(set: WorkoutSet): WorkoutSet {
@@ -106,11 +109,11 @@ export function finalizeWorkoutSet(set: WorkoutSet): WorkoutSet {
     finalStatus = 'not_attempted';
   }
 
+  const { completed: _legacyCompleted, ...rest } = set;
   return {
-    ...set,
+    ...rest,
     weight: w,
     reps: r,
-    completed: isCompleted,
     status: finalStatus,
   };
 }
@@ -128,7 +131,9 @@ export function finalizeWorkoutSet(set: WorkoutSet): WorkoutSet {
  */
 export function shouldPreserveWorkoutSet(set: WorkoutSet): boolean {
   const hasPrescription = set.prescribedWeight !== undefined || set.prescribedReps !== undefined;
-  return set.completed || set.status === 'skipped' || hasPrescription || (set.reps > 0);
+  // §17: read completion through the one resolver, never the raw
+  // legacy boolean (canonical sets do not carry it).
+  return isSetCompleted(set) || set.status === 'skipped' || hasPrescription || (set.reps > 0);
 }
 
 export interface NextSessionTargetInput {
@@ -1166,7 +1171,7 @@ export function getProgressionRecommendation(
 
   const lastSession = sessions[0];
   // Filter out explicit warmups and unperformed sets
-  const explicitWorkSets = lastSession.sets.filter((s) => !s.isWarmup && s.reps > 0 && s.completed !== false);
+  const explicitWorkSets = lastSession.sets.filter((s) => !s.isWarmup && s.reps > 0 && isSetCompleted(s));
   const candidateSets = explicitWorkSets.length > 0 ? explicitWorkSets : lastSession.sets.filter((s) => s.reps > 0);
 
   const isBW = isBodyweightExercise(exerciseName);

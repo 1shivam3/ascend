@@ -38,6 +38,7 @@ import {
   DayScheduleConfig,
   WeeklySchedule,
   isSetCompleted,
+  normalizePersistedWorkoutSet,
   TrainingDecisionRecord,
   CurrentPrescriptionTarget,
   DEFAULT_GOALS,
@@ -968,6 +969,26 @@ export function migratePersistedState(
 
   if (state.xp && typeof state.xp === 'object') {
     next.xp = { ...getInitialXpState(), ...state.xp };
+  }
+
+  // §17 (Phase 3.4): canonicalize persisted workout sets to the one
+  // stored encoding (status only, legacy `completed` boolean
+  // stripped, 'pending' never persists). Runs at EVERY version —
+  // the normalizer is idempotent and resolution-preserving, so
+  // already-canonical blobs pass through unchanged in meaning.
+  if (Array.isArray(state.workouts)) {
+    next.workouts = state.workouts.map((w: any) =>
+      w && Array.isArray(w.exercises)
+        ? {
+            ...w,
+            exercises: w.exercises.map((ex: any) =>
+              ex && Array.isArray(ex.sets)
+                ? { ...ex, sets: ex.sets.map((s: any) => normalizePersistedWorkoutSet(s)) }
+                : ex,
+            ),
+          }
+        : w,
+    );
   }
 
   return next;
@@ -4342,10 +4363,14 @@ export const useAppStore = create<AppState>()(
                                 const p = parseFloat(s.weight);
                                 if (!isNaN(p)) cleanWeight = p;
                               }
-                              return {
+                              // §17 (Phase 3.4): imported history is
+                              // canonicalized to the one stored set
+                              // encoding (status only), same as the
+                              // persist migration.
+                              return normalizePersistedWorkoutSet({
                                 ...s,
                                 weight: cleanWeight,
-                              };
+                              });
                             })
                           : [],
                       }))
