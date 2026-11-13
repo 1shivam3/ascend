@@ -214,7 +214,13 @@ export class DeadliftRepStateMachine {
         return null;
       }
 
-      case 'standing': {
+      // §31: 'lockout' is the standing position a completed rep
+      // ends in — entered on the frame the pull reaches full
+      // extension (see 'ascending'), held until the next hinge.
+      // Its exits are exactly standing's exits: the next descent
+      // begins from here, timed from lastLockoutTimeMs as before.
+      case 'standing':
+      case 'lockout': {
         if (hipAngleDeg <= this.config.hingeZoneHipAngleDeg) {
           // Stream (or set) starts already hinged — e.g. the lifter is
           // in setup when the video begins. That is the bottom.
@@ -284,7 +290,10 @@ export class DeadliftRepStateMachine {
           kneeAngleDeg >= this.config.lockoutKneeAngleDeg
         ) {
           const rep = this.buildRep(timestampMs, true);
-          this.phase = 'standing';
+          // §31: the rep ends IN lockout, not in an undifferentiated
+          // 'standing' — the phase now names the position the
+          // lifter is holding (the modal already had its label).
+          this.phase = 'lockout';
           this.repStartTimeMs = null;
           return rep;
         }

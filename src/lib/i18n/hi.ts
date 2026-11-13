@@ -238,7 +238,6 @@ export const hi: Partial<Record<StringKey, string>> = {
   'formCoach.phaseBottom': 'सबसे नीचे की स्थिति',
   'formCoach.phaseAscending': 'ऊपर आ रहे हैं',
   'formCoach.phaseLockout': 'लॉकआउट',
-  'formCoach.phaseRepCompleted': 'रेप पूरा हुआ',
   'formCoach.phaseTrackingLost': 'ट्रैकिंग रुकी',
   'formCoach.minKneeAngle': 'न्यूनतम घुटने का कोण',
   'formCoach.jointAngle': 'जोड़ का कोण',

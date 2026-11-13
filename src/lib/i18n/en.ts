@@ -231,7 +231,6 @@ export const en = {
   'formCoach.phaseBottom': 'Bottom',
   'formCoach.phaseAscending': 'Ascending',
   'formCoach.phaseLockout': 'Lockout',
-  'formCoach.phaseRepCompleted': 'Rep completed',
   'formCoach.phaseTrackingLost': 'Tracking lost',
   'formCoach.minKneeAngle': 'Min Knee Angle',
   'formCoach.jointAngle': 'Joint angle',

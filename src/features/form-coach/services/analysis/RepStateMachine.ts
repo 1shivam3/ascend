@@ -241,11 +241,6 @@ export class RepStateMachine {
           this.setPhase('standing', timestampMs);
         }
         break;
-
-      case 'lockout':
-      case 'rep_completed':
-        this.setPhase('standing', timestampMs);
-        break;
     }
 
     return completedRep;

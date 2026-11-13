@@ -30,7 +30,6 @@ const PHASE_KEYS: Record<string, StringKey> = {
   bottom: 'formCoach.phaseBottom',
   ascending: 'formCoach.phaseAscending',
   lockout: 'formCoach.phaseLockout',
-  rep_completed: 'formCoach.phaseRepCompleted',
   tracking_lost: 'formCoach.phaseTrackingLost',
 };
 

@@ -7,8 +7,14 @@ export type MovementPhase =
   | 'descending'
   | 'bottom'
   | 'ascending'
+  /** The deadlift's top position: entered when a pull reaches
+   * full hip+knee extension (the rep is emitted on entry) and
+   * held until the next hinge begins. §31: this member used to
+   * be dead — no machine ever assigned it. 'rep_completed' was
+   * deleted in the same pass: grep proved zero assignments
+   * anywhere (its only traces were an unreachable squat switch
+   * arm and a UI label for a phase that could never occur). */
   | 'lockout'
-  | 'rep_completed'
   | 'tracking_lost';
 
 export type CuePriority = 'critical' | 'high' | 'medium' | 'low';

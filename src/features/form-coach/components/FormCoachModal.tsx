@@ -71,7 +71,7 @@ const EXERCISE_INITIALS: Record<FormExerciseId, string> = {
 };
 
 /** UI-string map for the engine's MovementPhase values (P1-1): the
- * raw enum ('tracking_lost', 'rep_completed', …) must never reach
+ * raw enum ('tracking_lost', 'lockout', …) must never reach
  * the screen — every phase renders through this map, en+hi. */
 const PHASE_LABEL_KEYS: Record<MovementPhase, StringKey> = {
   standing: 'formCoach.phaseStanding',
@@ -79,7 +79,6 @@ const PHASE_LABEL_KEYS: Record<MovementPhase, StringKey> = {
   bottom: 'formCoach.phaseBottom',
   ascending: 'formCoach.phaseAscending',
   lockout: 'formCoach.phaseLockout',
-  rep_completed: 'formCoach.phaseRepCompleted',
   tracking_lost: 'formCoach.phaseTrackingLost',
 };
 
