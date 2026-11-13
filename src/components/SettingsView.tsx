@@ -392,7 +392,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       toast.error(t('settings.healthFailedMsg'), t('health.title'));
     }
   };
-  const [telemetryConsent, setTelemetryConsentState] = useState<TelemetryConsent>(null);
+  const [telemetryConsent, setTelemetryConsentState] = useState<TelemetryConsent>('unasked');
 
   useEffect(() => {
     setTelemetryConsentState(getTelemetryConsent());

@@ -14,7 +14,7 @@ import {
 import TelemetryConsentBanner from './TelemetryConsentBanner';
 
 export default function TelemetryProvider() {
-  const [consent, setConsent] = useState<TelemetryConsent>(null);
+  const [consent, setConsent] = useState<TelemetryConsent>('unasked');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
