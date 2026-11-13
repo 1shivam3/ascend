@@ -129,7 +129,15 @@ describe('audit3 FE-12/21/22/08/10: Home + Settings wiring', () => {
     expect(src('components/HomePage.tsx')).not.toContain('slice(1).toLowerCase()');
   });
   it('FE-22: completed-workout modal opens the FIRST of today (same as the card)', () => {
-    expect(src('components/HomePage.tsx')).toContain('return todayWks[0] || null;');
+    // §16: the guarantee is unchanged — card and modal open the
+    // FIRST completed workout of today — but the derivation moved
+    // from a HomePage memo to the one Today resolver: HomePage
+    // aliases the resolver's completedWorkout, and the resolver
+    // takes the first entry with a completed set.
+    expect(src('components/HomePage.tsx')).toContain(
+      'const completedWorkoutForToday = sessionInfo.completedWorkout ?? null;'
+    );
+    expect(src('lib/workout-engine.ts')).toContain('const w = completedToday[0];');
   });
   it('FE-08: the fabricated 6-exercise fallback is gone', () => {
     const s = src('components/HomePage.tsx');

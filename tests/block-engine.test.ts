@@ -15,6 +15,7 @@ import {
 } from '@/lib/block-engine';
 import { buildIntakePrefill, type BlockIntake } from '@/lib/block-intake';
 import type { AthleteModel, LiftResponse } from '@/lib/athlete-model';
+import { dayPlanRef } from '@/lib/types';
 import type { PlannedWorkout, WeeklySchedule, WorkoutEntry } from '@/lib/types';
 import type { StallFlag } from '@/lib/coach-engine';
 import { findLibraryExercise, type MovementFamily } from '@/lib/exercise-library';
@@ -444,7 +445,9 @@ describe('continuity (Fix D)', () => {
     };
     const { schedule } = materializeProposal(p, [oldBlockPlan, userPlan], scheduleIn, TODAY);
     // Stale coach-block day → rest; the lifter's own plan is untouched.
-    expect(schedule[spare[0]].workoutPlanId).toBe('rest');
+    // §18: rest is the discriminated ref ({ kind: 'rest' }, no plan
+    // id) — read through dayPlanRef, not the old 'rest'-in-the-id.
+    expect(dayPlanRef(schedule[spare[0]]).kind).toBe('rest');
     expect(schedule[spare[1]].workoutPlanId).toBe('user-plan');
     // And the new block's own days are set as before.
     for (const day of p.days) {

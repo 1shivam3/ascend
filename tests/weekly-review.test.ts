@@ -9,6 +9,7 @@ import {
 } from '@/lib/weekly-review';
 import { deriveAdoptionSchemes, getInitialCoachBlocksState, type ActiveCoachBlock } from '@/lib/block-engine';
 import type { AthleteModel } from '@/lib/athlete-model';
+import { dayPlanRef } from '@/lib/types';
 import type { PlannedWorkout, WeeklySchedule, WorkoutEntry } from '@/lib/types';
 import type { StallFlag } from '@/lib/coach-engine';
 import { useStore } from '@/lib/store';
@@ -624,7 +625,10 @@ describe('store: weekly review lifecycle', () => {
     } as never);
     useStore.getState().applyScheduleRevision('2026-10-12');
     const after = useStore.getState();
-    expect(after.weeklySchedule.friday.workoutPlanId).toBe('rest');
+    // §18: the vacated day is a rest REF ({ kind: 'rest' }, no plan
+    // id) — read through dayPlanRef, not the old 'rest'-in-the-id
+    // encoding. The move itself is unchanged.
+    expect(dayPlanRef(after.weeklySchedule.friday).kind).toBe('rest');
     expect(after.weeklySchedule.thursday.workoutPlanId).toBe('p1');
     const rev = after.weeklyReviews[0].revisions.find((r) => r.kind === 'schedule_move');
     expect(rev && rev.kind === 'schedule_move' && rev.applied).toBe(true);

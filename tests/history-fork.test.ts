@@ -6,6 +6,7 @@ import {
   retainedHistoryCounts,
 } from '../src/lib/history-fork';
 import { useStore } from '@/lib/store';
+import { dayPlanRef } from '@/lib/types';
 
 // FND-06: a fresh profile must never silently inherit retained history.
 // Start fresh archives (never deletes); the archive stays restorable.
@@ -99,7 +100,9 @@ describe('startFreshFromRetainedHistory / restoreArchivedHistory', () => {
     expect(after.meals).toEqual([]);
     expect(after.plannedWorkouts).toEqual([]);
     expect(after.prTargets).toEqual({});
-    expect(after.weeklySchedule.monday.workoutPlanId).toBe('rest');
+    // §18: the default schedule's rest days are rest REFS
+    // ({ kind: 'rest' }, no plan id) — read through dayPlanRef.
+    expect(dayPlanRef(after.weeklySchedule.monday).kind).toBe('rest');
 
     // NEW (user decision, 2026-10-26): Start fresh creates the same
     // default profile untouched onboarding produces — no DOB, no
