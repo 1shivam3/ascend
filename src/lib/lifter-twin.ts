@@ -484,11 +484,17 @@ export function generateLifterTwinProfile(
 
   if (!workouts || workouts.length === 0) return profile;
 
-  // Track all unique exercise names
+  // Track all unique exercise names. Rows can arrive partial
+  // (imports, archives, sync pulls): a workout without an
+  // exercises array — or an exercise without sets — contributes
+  // no names instead of throwing. (§26 gate fallout: the refresh
+  // subscription now derives its gate from profile presence, so
+  // this runs for every profile-holding state, partial rows
+  // included.)
   const exerciseNames = new Set<string>();
   for (const w of workouts) {
-    for (const e of w.exercises) {
-      if (e.name && e.sets.some((s) => s.reps > 0)) {
+    for (const e of w.exercises ?? []) {
+      if (e.name && (e.sets ?? []).some((s) => s.reps > 0)) {
         exerciseNames.add(e.name.trim());
       }
     }
