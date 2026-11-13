@@ -35,7 +35,6 @@ import {
   coachBlocksRowForPush,
   coachBlocksStateFromPayload,
   isCoachBlocksStateEmpty,
-  shouldAdoptCoachBlocks,
   isMissingCoachBlocksTable,
 } from '@/lib/supabase/sync';
 
@@ -121,59 +120,19 @@ describe('F-11: row mapping', () => {
   });
 });
 
-describe('F-11: emptiness + adoption rules', () => {
+describe('F-11: emptiness', () => {
   it('the initial state is empty; a state with an active block is not', () => {
     expect(isCoachBlocksStateEmpty(getInitialCoachBlocksState())).toBe(true);
     expect(isCoachBlocksStateEmpty(null)).toBe(true);
     expect(isCoachBlocksStateEmpty(realState())).toBe(false);
   });
 
-  it('no remote state -> never adopt', () => {
-    expect(
-      shouldAdoptCoachBlocks({
-        isCrossAccountSwitch: false,
-        local: getInitialCoachBlocksState(),
-        remote: null,
-      })
-    ).toBe(false);
-    expect(
-      shouldAdoptCoachBlocks({
-        isCrossAccountSwitch: true,
-        local: getInitialCoachBlocksState(),
-        remote: getInitialCoachBlocksState(),
-      })
-    ).toBe(false);
-  });
-
-  it('fresh device (same account, local empty) adopts the remote block', () => {
-    expect(
-      shouldAdoptCoachBlocks({
-        isCrossAccountSwitch: false,
-        local: getInitialCoachBlocksState(),
-        remote: realState(),
-      })
-    ).toBe(true);
-  });
-
-  it('both sides have a block (same account): keep local — push will overwrite', () => {
-    expect(
-      shouldAdoptCoachBlocks({
-        isCrossAccountSwitch: false,
-        local: realState(),
-        remote: realState(),
-      })
-    ).toBe(false);
-  });
-
-  it('cross-account switch adopts the new account row regardless of local', () => {
-    expect(
-      shouldAdoptCoachBlocks({
-        isCrossAccountSwitch: true,
-        local: realState(),
-        remote: realState(),
-      })
-    ).toBe(true);
-  });
+  // The four adoption cases that used to pin shouldAdoptCoachBlocks
+  // (removed in Phase 2.3 §11 — no production caller) are covered
+  // against the live stamp-gated successor, decideCoachBlocksSync,
+  // in tests/coach-blocks-stamp-sync.test.ts: no remote → keep,
+  // empty remote → keep, cross-account → adopt, empty local →
+  // adopt, both non-empty without a baseline → keep.
 });
 
 describe('F-11: missing-table tolerance is exact', () => {

@@ -387,32 +387,14 @@ export function isCoachBlocksStateEmpty(
 }
 
 /**
- * Adoption decision for the singleton coach-blocks row:
- *  - no usable remote state -> never adopt;
- *  - cross-account switch -> adopt (the reset already zeroed local;
- *    the row is the NEW account's own state);
- *  - same account -> adopt only into an EMPTY local state (the
- *    fresh-device recovery case F-11 exists for). When both sides
- *    have a block, the local one wins and the push below overwrites
- *    the row — the local state carries no updated_at stamp, so
- *    content-level last-sync-wins is the honest rule here.
- */
-export function shouldAdoptCoachBlocks(args: {
-  isCrossAccountSwitch: boolean;
-  local: CoachBlocksState | null | undefined;
-  remote: CoachBlocksState | null;
-}): boolean {
-  const { isCrossAccountSwitch, local, remote } = args;
-  if (!remote || isCoachBlocksStateEmpty(remote)) return false;
-  if (isCrossAccountSwitch) return true;
-  return isCoachBlocksStateEmpty(local);
-}
-
-/**
  * S3 (sync convergence): stamp-gated coach-blocks adoption.
  *
- * shouldAdoptCoachBlocks above never adopts when both sides are
- * non-empty, so two devices with a block each diverged silently —
+ * The pre-S3 adoption rule (shouldAdoptCoachBlocks, removed in
+ * Phase 2.3 §11 — grep proved it had no production caller; its
+ * cases are covered against the live gate in
+ * tests/coach-blocks-stamp-sync.test.ts) never adopted when both
+ * sides were non-empty, so two devices with a block each diverged
+ * silently —
  * whichever pushed last won the row, and the other device never
  * learned. The gate below keeps the F-11 cases (no remote → keep;
  * cross-account → adopt; empty local → adopt) and adds ordering for
@@ -443,9 +425,64 @@ export interface CoachBlocksSyncMeta {
 
 export const COACH_BLOCKS_SYNC_META_KEY = 'ascend_coach_blocks_sync_meta';
 
-/** Content signature for the singleton state (JSON, key order is stable for store-produced states). */
+/**
+ * Canonical (sorted-key) serialization: object keys are sorted at
+ * every level, array order is preserved (sequence is content).
+ * Two states with identical content but different key order — a
+ * payload round-trip can reorder keys — serialize identically.
+ */
+export function canonicalStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value) ?? 'null';
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((v) => canonicalStringify(v)).join(',')}]`;
+  }
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj).sort();
+  return `{${keys
+    .map((k) => `${JSON.stringify(k)}:${canonicalStringify(obj[k])}`)
+    .join(',')}}`;
+}
+
+/**
+ * Content signature for the singleton state (§11, Phase 2.3:
+ * canonical — key order is NOT content; the pre-2.3 JSON.stringify
+ * signature read a key-reordered round-trip as a divergence and
+ * poisoned the baseline). NOTE: signature VALUES changed with
+ * canonicalization; a persisted pre-2.3 baseline simply reads as
+ * "local changed" once, resolves keep-local (the safe side), and
+ * the next settle re-seeds it in canonical form.
+ */
 export function coachBlocksSignature(state: CoachBlocksState | null | undefined): string {
-  return JSON.stringify(state ?? null);
+  return canonicalStringify(state ?? null);
+}
+
+/**
+ * The baseline-maintenance transition (§11, Phase 2.3), pure so the
+ * store subscription stays a thin caller. Returns the meta to
+ * persist, or null when nothing needs writing:
+ *  - no baseline -> null (the engine seeds baselines at settle);
+ *  - state diverges from the baseline sig -> stamp localEditedAt;
+ *  - state MATCHES the baseline sig again (an edit was reverted)
+ *    -> CLEAR localEditedAt. The field's contract is "null while
+ *    it matches"; before 2.3 the subscription only ever set the
+ *    stamp, so a reverted edit left a stale divergence time that
+ *    the gate could read as a live edit.
+ */
+export function nextCoachBlocksSyncMeta(
+  meta: CoachBlocksSyncMeta | null,
+  currentSignature: string,
+  nowIso: string,
+): CoachBlocksSyncMeta | null {
+  if (!meta) return null;
+  if (currentSignature !== meta.sig) {
+    return meta.localEditedAt === nowIso ? null : { ...meta, localEditedAt: nowIso };
+  }
+  if (meta.localEditedAt !== null) {
+    return { ...meta, localEditedAt: null };
+  }
+  return null;
 }
 
 export function readCoachBlocksSyncMeta(): CoachBlocksSyncMeta | null {
@@ -712,7 +749,7 @@ export function isMissingCoachBlocksTable(
 /**
  * Task 2.2: verdict for the accountHasCloudData probe (Task 1.4's
  * merge choice). Pure + exported so the decision is unit-testable
- * without a Supabase client, in the style of shouldAdoptCoachBlocks.
+ * without a Supabase client, in the style of decideCoachBlocksSync.
  *
  * - 'has-data': at least one probed table returned a row.
  * - 'no-data': every probe answered cleanly and found nothing.
@@ -1456,13 +1493,15 @@ class SupabaseSyncEngine {
       // own pull-applied changes; adoptions settle the baseline
       // before applying, so they never land here as "edits".)
       if (state.coachBlocks !== prevState.coachBlocks) {
-        const meta = readCoachBlocksSyncMeta();
-        if (meta && coachBlocksSignature(state.coachBlocks) !== meta.sig) {
-          writeCoachBlocksSyncMeta({
-            ...meta,
-            localEditedAt: new Date().toISOString(),
-          });
-        }
+        // §11 (Phase 2.3): one pure transition maintains the stamp —
+        // set on divergence, CLEARED when the state returns to the
+        // baseline signature (a reverted edit is not an edit).
+        const nextMeta = nextCoachBlocksSyncMeta(
+          readCoachBlocksSyncMeta(),
+          coachBlocksSignature(state.coachBlocks),
+          new Date().toISOString(),
+        );
+        if (nextMeta) writeCoachBlocksSyncMeta(nextMeta);
       }
       if (!navigator.onLine) return;
       // QA4-010: a follower tab never pushes — its in-memory state is
