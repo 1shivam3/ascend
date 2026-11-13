@@ -1,4 +1,5 @@
 import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, ProgressPhoto } from './types';
+import { LOGGED_OUT_LATCH_KEY } from './logged-out-latch';
 import { normalizeRowDates, normalizeAndDedupeBodyMetricDates } from './formatters';
 
 /** Mirrors PROGRESS_PHOTOS_KEY in store.ts (duplicated to avoid an import cycle). */
@@ -17,7 +18,7 @@ export const PRESERVED_LOCAL_KEYS: ReadonlySet<string> = new Set([
   'ascend_supabase_anon_key',
   'ascend_theme',
   'ascend_has_custom_theme',
-  'ascend_logged_out',
+  LOGGED_OUT_LATCH_KEY,
 ]);
 
 /**

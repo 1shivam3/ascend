@@ -25,8 +25,10 @@ import {
   type StampedTombstone,
   type TombstoneCollection,
 } from './reconcile';
-import { isCrossAccountSwitch as isCrossAccountSwitchFn, decideStartFreshGate, isGuestProfileId } from '../start-fresh-guard';
-import { hasRetainedHistory, ARCHIVED_HISTORY_KEY, ARCHIVED_HISTORY_PREV_KEY } from '../history-fork';
+import { decideStartFreshGate, isGuestProfileId } from '../start-fresh-guard';
+import { classifyIdentity, isCrossAccountProfile } from '../identity';
+import { hasRetainedHistory, readArchiveGenerations } from '../history-fork';
+import { clearLoggedOutLatch, isLoggedOutLatchSet, markLoggedOut } from '../logged-out-latch';
 import { DEFAULT_BODYWEIGHT_KG } from '../defaults';
 import { getInitialCoachBlocksState, type CoachBlocksState } from '../block-engine';
 
@@ -554,10 +556,16 @@ export function clearSignInIntent(): void {
 }
 
 /**
- * Which device data a merge-choice resolution applies to, by
- * retained-history shape (counts + id sets of the five synced
- * collections). A resolution never covers DIFFERENT data the user
- * accumulates afterwards.
+ * Which device data a merge-choice resolution applies to: a CONTENT
+ * signature of the five synced collections (Phase 1.3, §4). The
+ * original version joined sorted row ids only, so editing a workout
+ * after resolving the choice left the resolution in force for data
+ * the user never saw when they chose. Rows are sorted by id before
+ * hashing so the signature is order-stable; any value edit changes
+ * it (collectionSignature: length + FNV-1a of the serialized rows +
+ * id-set hash). A resolution recorded under the old ids-only format
+ * simply never matches — the choice is offered once more after the
+ * upgrade, the fail-safe direction.
  */
 export function mergeChoiceDataSignature(input: {
   workouts?: { id: string }[];
@@ -566,13 +574,16 @@ export function mergeChoiceDataSignature(input: {
   prs?: { id: string }[];
   bodyMetrics?: { id: string }[];
 }): string {
-  const ids = (rows?: { id: string }[]) => (rows || []).map((r) => r.id).sort().join(',');
+  const sig = (rows?: { id: string }[]) =>
+    collectionSignature(
+      [...(rows || [])].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+    );
   return [
-    ids(input.workouts),
-    ids(input.meals),
-    ids(input.plannedWorkouts),
-    ids(input.prs),
-    ids(input.bodyMetrics),
+    sig(input.workouts),
+    sig(input.meals),
+    sig(input.plannedWorkouts),
+    sig(input.prs),
+    sig(input.bodyMetrics),
   ].join('|');
 }
 
@@ -591,6 +602,58 @@ export function writeMergeChoiceResolved(userId: string, dataSignature: string):
     localStorage.setItem(MERGE_CHOICE_RESOLVED_KEY, `${userId}:${dataSignature}`);
   } catch {
     // Best-effort — worst case the choice is offered once more.
+  }
+}
+
+/**
+ * The PENDING merge choice, persisted (Phase 1.3, §4). The original
+ * pending state lived only in an engine field, so a page reload while
+ * the merge modal was up let the next sync silently merge the guest
+ * data — the exact outcome the gate exists to prevent. The record is
+ * keyed by (userId, dataSignature): it restores only for the same
+ * user over the same data; a record whose data moved underneath it
+ * is stale and discarded (the gate then re-evaluates fresh).
+ */
+export const MERGE_CHOICE_PENDING_KEY = 'ascend_merge_choice_pending';
+
+export interface PendingMergeChoice {
+  userId: string;
+  dataSignature: string;
+}
+
+export function writePendingMergeChoice(userId: string, dataSignature: string): void {
+  try {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(
+      MERGE_CHOICE_PENDING_KEY,
+      JSON.stringify({ userId, dataSignature, at: Date.now() }),
+    );
+  } catch {
+    // Best-effort — worst case a reload re-evaluates the gate fresh.
+  }
+}
+
+export function readPendingMergeChoice(): PendingMergeChoice | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    const raw = localStorage.getItem(MERGE_CHOICE_PENDING_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { userId?: unknown; dataSignature?: unknown };
+    if (typeof parsed.userId !== 'string' || typeof parsed.dataSignature !== 'string') {
+      return null;
+    }
+    return { userId: parsed.userId, dataSignature: parsed.dataSignature };
+  } catch {
+    return null;
+  }
+}
+
+export function clearPendingMergeChoice(): void {
+  try {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(MERGE_CHOICE_PENDING_KEY);
+  } catch {
+    // Best-effort.
   }
 }
 
@@ -724,10 +787,12 @@ export function syncRetryDelayMs(attempt: number): number {
 // failed every cycle and held the red "Backup hit a server problem"
 // banner up forever — while everything else actually synced. A row the
 // server will reject identically forever (constraint violation, invalid
-// value shape, unknown column, RLS denial) can never heal by retrying,
+// value shape, RLS denial) can never heal by retrying,
 // so it is quarantined: excluded from future pushes, recorded here with
-// its error, and surfaced in Settings in plain words. The cycle then
-// completes as 'synced' for everything else.
+// its error class, and surfaced in Settings in plain words. The cycle then
+// completes as 'synced' for everything else. (Phase 1.7: unknown-column
+// SCHEMA errors are table-level, not per-row — see SCHEMA_PUSH_ERROR_CODES;
+// they fail the cycle instead of quarantining.)
 //
 // TRANSIENT failures (network, 5xx, timeouts, stamp-fetch failures) are
 // NOT quarantined — they keep the classic whole-cycle error state + R6
@@ -753,10 +818,19 @@ export type SyncQuarantineCollection =
 export interface QuarantinedSyncRow {
   collection: SyncQuarantineCollection;
   rowId: string;
-  /** Local updatedAt stamp at quarantine time — the release trigger. */
+  /**
+   * The pushed payload's updated_at at quarantine time — the release
+   * trigger (Phase 1.7: read from the payload, not a local-row
+   * lookup, so it is the stamp the server actually rejected).
+   */
   stamp: string | null;
   code: string | null;
-  message: string;
+  /**
+   * Stable error class (Phase 1.7) — NEVER the raw server message:
+   * server text carries table/constraint details and does not belong
+   * in persisted local state or the Settings UI.
+   */
+  errorClass: string;
   quarantinedAt: string;
 }
 
@@ -770,7 +844,19 @@ const PERMANENT_ROW_ERROR_CODES = new Set([
   '22003', // numeric_value_out_of_range
   '22P02', // invalid_text_representation
   '42501', // insufficient_privilege (RLS denial — deterministic per row)
-  '42703', // undefined_column (pre-migration app build)
+]);
+
+/**
+ * Table-level schema errors (Phase 1.7, §7): a missing column means
+ * the DEPLOYMENT predates a migration — every row fails identically,
+ * and quarantining them would bury healthy rows until each is edited
+ * by hand. These are never quarantined: the cycle fails as a whole
+ * (classic F29 error + backoff) and retries after the migration. The
+ * bare-variant retry in pushRowBatch still handles the known cases
+ * before this classification is consulted.
+ */
+const SCHEMA_PUSH_ERROR_CODES = new Set([
+  '42703', // undefined_column
   'PGRST204', // PostgREST schema cache: column not found
 ]);
 
@@ -778,6 +864,30 @@ const PERMANENT_ROW_ERROR_CODES = new Set([
 export function isPermanentRowError(err: unknown): boolean {
   const code = (err as { code?: unknown } | null)?.code;
   return typeof code === 'string' && PERMANENT_ROW_ERROR_CODES.has(code);
+}
+
+/** True when `err` is a table-level schema error (never quarantined). */
+export function isSchemaPushError(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code;
+  return typeof code === 'string' && SCHEMA_PUSH_ERROR_CODES.has(code);
+}
+
+const ROW_ERROR_CLASSES: Record<string, string> = {
+  '23505': 'unique_violation',
+  '23503': 'foreign_key_violation',
+  '23502': 'not_null_violation',
+  '23514': 'check_violation',
+  '22007': 'invalid_datetime',
+  '22008': 'datetime_overflow',
+  '22003': 'numeric_out_of_range',
+  '22P02': 'invalid_text_representation',
+  '42501': 'permission_denied',
+};
+
+/** Stable, persistable label for a push error — never the raw message. */
+export function syncErrorClass(err: unknown): string {
+  const code = (err as { code?: unknown } | null)?.code;
+  return (typeof code === 'string' && ROW_ERROR_CLASSES[code]) || 'unknown_error';
 }
 
 /**
@@ -818,12 +928,51 @@ function writeSyncQuarantineMap(map: Record<string, QuarantinedSyncRow[]>): void
   }
 }
 
+const SYNC_QUARANTINE_COLLECTIONS: readonly SyncQuarantineCollection[] = [
+  'personal_records',
+  'workouts',
+  'meals',
+  'body_metrics',
+  'planned_workouts',
+];
+
+/**
+ * Validate + normalize one stored entry (Phase 1.7). The collection
+ * must be a member of the union and every field must carry its
+ * declared type — anything else is dropped (it cannot be acted on
+ * safely). Legacy entries (PR #126 shape) hold a raw server `message`
+ * and no errorClass: they normalize to errorClass 'unknown_error'
+ * and the raw text is discarded, never carried forward.
+ */
+function normalizeQuarantineEntry(e: unknown): QuarantinedSyncRow | null {
+  if (!e || typeof e !== 'object') return null;
+  const o = e as Record<string, unknown>;
+  if (typeof o.rowId !== 'string' || o.rowId.length === 0) return null;
+  if (
+    typeof o.collection !== 'string' ||
+    !SYNC_QUARANTINE_COLLECTIONS.includes(o.collection as SyncQuarantineCollection)
+  ) {
+    return null;
+  }
+  if (o.stamp !== null && typeof o.stamp !== 'string') return null;
+  if (o.code !== null && typeof o.code !== 'string') return null;
+  if (typeof o.quarantinedAt !== 'string') return null;
+  return {
+    collection: o.collection as SyncQuarantineCollection,
+    rowId: o.rowId,
+    stamp: o.stamp as string | null,
+    code: o.code as string | null,
+    errorClass: typeof o.errorClass === 'string' ? o.errorClass : 'unknown_error',
+    quarantinedAt: o.quarantinedAt,
+  };
+}
+
 export function readSyncQuarantine(userId: string): QuarantinedSyncRow[] {
   const entries = readSyncQuarantineMap()[userId];
   if (!Array.isArray(entries)) return [];
-  return entries.filter(
-    (e): e is QuarantinedSyncRow => !!e && typeof e === 'object' && typeof e.rowId === 'string' && typeof e.collection === 'string',
-  );
+  return entries
+    .map(normalizeQuarantineEntry)
+    .filter((e): e is QuarantinedSyncRow => e !== null);
 }
 
 export function quarantineSyncRow(userId: string, entry: QuarantinedSyncRow): void {
@@ -894,15 +1043,7 @@ export function macroGoalsFromArchive(archive: unknown, userId: string): MacroGo
   return g as MacroGoals;
 }
 
-function readLocalArchive(key: string): unknown {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
+
 
 
 export interface AuthUser {
@@ -1087,19 +1228,49 @@ export function hasSyncedContentChanged(
  */
 export const LAST_PUSHED_SIGNATURE_KEY = 'ascend_last_pushed_signature';
 
-export function readLastPushedSignature(): string | null {
+/**
+ * §8 (Phase 1.2): the adoption baseline is scoped PER USER. The original
+ * key held one global string, so account A's baseline could satisfy
+ * account B's adoption check whenever the datasets' signatures
+ * coincided. Scoped keys make that unrepresentable: a baseline exists
+ * only for the user whose push wrote it.
+ */
+export function lastPushedSignatureKey(userId: string): string {
+  return `${LAST_PUSHED_SIGNATURE_KEY}:${userId}`;
+}
+
+/**
+ * Migration for the pre-scoping value: the legacy unscoped key is
+ * DISCARDED on first contact, never honored. Losing it costs one full
+ * per-row reconciliation on the next pull (adoption stays off until
+ * the next successful push re-baselines) — it can never lose data.
+ */
+function discardLegacyAdoptionSignature(): void {
+  try {
+    if (typeof window === 'undefined') return;
+    if (localStorage.getItem(LAST_PUSHED_SIGNATURE_KEY) !== null) {
+      localStorage.removeItem(LAST_PUSHED_SIGNATURE_KEY);
+    }
+  } catch {
+    // Best-effort: a leftover legacy key is inert — nothing reads it.
+  }
+}
+
+export function readLastPushedSignature(userId: string): string | null {
   try {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem(LAST_PUSHED_SIGNATURE_KEY);
+    discardLegacyAdoptionSignature();
+    return localStorage.getItem(lastPushedSignatureKey(userId));
   } catch {
     return null;
   }
 }
 
-export function writeLastPushedSignature(signature: string): void {
+export function writeLastPushedSignature(userId: string, signature: string): void {
   try {
     if (typeof window === 'undefined') return;
-    localStorage.setItem(LAST_PUSHED_SIGNATURE_KEY, signature);
+    discardLegacyAdoptionSignature();
+    localStorage.setItem(lastPushedSignatureKey(userId), signature);
   } catch {
     // Best-effort only: a failed write leaves the older signature,
     // which fails safe to "do not adopt" on the next pull.
@@ -1116,6 +1287,24 @@ export function shouldAdoptRemoteChanges(
   freshSignature: string,
 ): boolean {
   return lastPushedSignature !== null && lastPushedSignature === freshSignature;
+}
+
+/**
+ * The ONE session resolution both sync paths use (§27 symmetry,
+ * Phase 1.4): distinguishes "the check resolved — here is the user
+ * (or genuinely none)" from "the check FAILED" (network). Callers
+ * must never fold a failure into `user: null`; classifyIdentity
+ * (src/lib/identity.ts) decides what a failure means.
+ */
+export async function resolveSessionUser(supabase: {
+  auth: { getUser: () => Promise<{ data: { user: any } }> };
+}): Promise<{ user: any | null; checkFailed: boolean; error?: unknown }> {
+  try {
+    const res = await supabase.auth.getUser();
+    return { user: res?.data?.user ?? null, checkFailed: false };
+  } catch (error) {
+    return { user: null, checkFailed: true, error };
+  }
 }
 
 class SupabaseSyncEngine {
@@ -1215,7 +1404,7 @@ class SupabaseSyncEngine {
       if (session?.user) {
         if (typeof window !== 'undefined') {
           try {
-            localStorage.removeItem('ascend_logged_out');
+            clearLoggedOutLatch();
           } catch {}
         }
         this.currentUser = {
@@ -1246,6 +1435,7 @@ class SupabaseSyncEngine {
         this.currentUser = null;
         // S4: session gone — a pending merge choice dies with it.
         this.pendingMergeChoiceFor = null;
+        clearPendingMergeChoice();
         this.notify();
       }
     });
@@ -1303,7 +1493,7 @@ class SupabaseSyncEngine {
   public async signInWithGoogle(): Promise<{ error?: string }> {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem('ascend_logged_out');
+        clearLoggedOutLatch();
       } catch {}
     }
     // S4: record the intent so the completing sign-in routes through
@@ -1336,7 +1526,7 @@ class SupabaseSyncEngine {
   public async signInWithApple(): Promise<{ error?: string }> {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem('ascend_logged_out');
+        clearLoggedOutLatch();
       } catch {}
     }
     // S4: same intent routing as Google sign-in.
@@ -1369,7 +1559,7 @@ class SupabaseSyncEngine {
   ): Promise<{ error?: string; user?: AuthUser; requiresEmailVerification?: boolean }> {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem('ascend_logged_out');
+        clearLoggedOutLatch();
       } catch {}
     }
     const supabase = getSupabase();
@@ -1414,7 +1604,7 @@ class SupabaseSyncEngine {
   ): Promise<{ error?: string; user?: AuthUser }> {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem('ascend_logged_out');
+        clearLoggedOutLatch();
       } catch {}
     }
     const supabase = getSupabase();
@@ -1513,11 +1703,27 @@ class SupabaseSyncEngine {
     is_anonymous?: boolean;
   }): Promise<boolean> {
     if (this.pendingMergeChoiceFor === user.id) return true;
+    const state = useStore.getState();
+    const dataSignature = mergeChoiceDataSignature(state);
+    // Phase 1.3 (§4): restore a persisted pending choice — a reload
+    // while the merge modal was up must re-present the choice, never
+    // fall through to a silent merge. The record restores only for
+    // the same user over the same data; anything else is stale and
+    // discarded before the fresh evaluation below.
+    const persisted = readPendingMergeChoice();
+    if (persisted) {
+      if (persisted.userId === user.id && persisted.dataSignature === dataSignature) {
+        this.pendingMergeChoiceFor = user.id;
+        this.status = 'idle';
+        this.notify();
+        return true;
+      }
+      clearPendingMergeChoice();
+    }
     const intentAt = readSignInIntentAt();
     if (intentAt === null) return false;
     const evalKey = `${user.id}:${intentAt}`;
     if (this.mergeGateEvaluatedKey === evalKey) return false;
-    const state = useStore.getState();
     const localHasData = hasRetainedHistory(state);
     // Cheap local half first: with no guest data on this device
     // there is nothing to choose about — skip the cloud probe.
@@ -1531,10 +1737,11 @@ class SupabaseSyncEngine {
       localHasData,
       cloudHasData,
       resolvedMarker: readMergeChoiceResolved(),
-      dataSignature: mergeChoiceDataSignature(state),
+      dataSignature,
     });
     if (verdict === 'gate') {
       this.pendingMergeChoiceFor = user.id;
+      writePendingMergeChoice(user.id, dataSignature);
       this.status = 'idle';
       this.notify();
       return true;
@@ -1570,6 +1777,7 @@ class SupabaseSyncEngine {
     }
     writeMergeChoiceResolved(userId, mergeChoiceDataSignature(useStore.getState()));
     this.pendingMergeChoiceFor = null;
+    clearPendingMergeChoice();
     clearSignInIntent();
     this.errorMessage = null;
     this.notify();
@@ -1584,7 +1792,22 @@ class SupabaseSyncEngine {
    * same window cannot re-gate the sync AuthModal is about to run.
    */
   public suppressMergeGateFor(userId: string): void {
+    // Phase 1.3 (§4): record the resolution ONLY while a fresh sign-in
+    // intent exists. The original code wrote the marker
+    // unconditionally, so a call outside any sign-in flow could record
+    // a "resolution" for data the user never saw a choice about.
+    const intentAt = readSignInIntentAt();
+    if (intentAt === null) return;
+    const now = Date.now();
+    if (now < intentAt || now - intentAt > SIGN_IN_INTENT_MAX_AGE_MS) return;
     writeMergeChoiceResolved(userId, mergeChoiceDataSignature(useStore.getState()));
+    // If the engine gate had ALSO engaged for this user, the choice
+    // AuthModal just resolved is the same one — release the pause.
+    if (this.pendingMergeChoiceFor === userId) {
+      this.pendingMergeChoiceFor = null;
+      clearPendingMergeChoice();
+      this.notify();
+    }
   }
 
   public async resetPasswordForEmail(email: string): Promise<{ error?: string; success?: boolean }> {
@@ -1607,7 +1830,7 @@ class SupabaseSyncEngine {
   public async sendEmailOtp(email: string): Promise<{ error?: string }> {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem('ascend_logged_out');
+        clearLoggedOutLatch();
       } catch {}
     }
     // S4: covers both completions of this flow — verifyEmailOtp and
@@ -1634,7 +1857,7 @@ class SupabaseSyncEngine {
   public async verifyEmailOtp(email: string, token: string): Promise<{ error?: string }> {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem('ascend_logged_out');
+        clearLoggedOutLatch();
       } catch {}
     }
     const supabase = getSupabase();
@@ -1671,13 +1894,14 @@ class SupabaseSyncEngine {
     // the next sign-in re-evaluates from its own intent flag.
     this.pendingMergeChoiceFor = null;
     this.mergeGateEvaluatedKey = null;
+    clearPendingMergeChoice();
     clearSignInIntent();
     this.status = 'unconfigured';
     this.notify();
 
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem('ascend_logged_out', 'true');
+        markLoggedOut();
       } catch {}
     }
 
@@ -1843,7 +2067,7 @@ class SupabaseSyncEngine {
              localStorage.removeItem(k);
            }
          });
-         localStorage.setItem('ascend_logged_out', 'true');
+         markLoggedOut();
        } catch (err: any) {
          localWipeError = err?.message || 'Local wipe failed';
        }
@@ -1929,7 +2153,7 @@ class SupabaseSyncEngine {
       this.clearSyncRetryTimer();
     }
 
-    if (typeof window !== 'undefined' && localStorage.getItem('ascend_logged_out') === 'true') {
+    if (typeof window !== 'undefined' && isLoggedOutLatchSet()) {
       const supabaseClient = getSupabase();
       let hasActiveSession = false;
       if (supabaseClient) {
@@ -1937,7 +2161,7 @@ class SupabaseSyncEngine {
           const { data: { session } } = await supabaseClient.auth.getSession();
           if (session?.user) {
             hasActiveSession = true;
-            localStorage.removeItem('ascend_logged_out');
+            clearLoggedOutLatch();
           }
         } catch {}
       }
@@ -1970,9 +2194,29 @@ class SupabaseSyncEngine {
 
     const sync = async () => {
     try {
-      // 1. Ensure active session
-      const userRes = await supabase.auth.getUser().catch(() => null);
-      const user = userRes?.data?.user;
+      // 1. Ensure active session. Phase 1.4 (§5): a FAILED check
+      // (network) is not "signed out" — the old code caught the
+      // rejection into null and took the guest branch, clearing the
+      // user and flipping the app to its signed-out state on a
+      // transient error. The identity classifier decides instead.
+      const { user, checkFailed: sessionCheckFailed, error: sessionError } =
+        await resolveSessionUser(supabase);
+      const identity = classifyIdentity({
+        sessionUser: user ? { id: user.id, isAnonymous: Boolean(user.is_anonymous) } : null,
+        sessionCheckFailed,
+        lastKnownUserId: this.currentUser?.id ?? null,
+        profile: useStore.getState().profile,
+      });
+
+      if (identity.kind === 'account-offline-stale') {
+        // Keep the last known user; report an ordinary sync failure
+        // (the classifier reads the fetch error as offline) with the
+        // usual backoff, and retry later.
+        this.isSyncing = false;
+        this.recordSyncFailure(sessionError ?? new Error('Session check failed'));
+        this.notify();
+        return;
+      }
 
       if (!user) {
         this.currentUser = null;
@@ -2053,7 +2297,10 @@ class SupabaseSyncEngine {
       // is safe only together with the sign-out-first gate in
       // startFreshAfterVerifiedSignOut: without it, a signed-in
       // Start-fresh would merge while a session is still live.
-      const isCrossAccountSwitch = isCrossAccountSwitchFn(localState.profile?.id, user.id);
+      // Phase 1.4 (§5/§6): the rule itself lives in identity.ts and
+      // reads provenance (createdByUid / importedFromBackup) before
+      // falling back to the F20 id shapes.
+      const isCrossAccountSwitch = isCrossAccountProfile(localState.profile, user.id);
 
       // 3. Reconcile Cloud -> Local (Recovery on phone, device switch, or account switch)
       let needsLocalUpdate = false;
@@ -2095,6 +2342,10 @@ class SupabaseSyncEngine {
           updates.profile = {
             ...(isCrossAccountSwitch ? {} : localState.profile || {}),
             id: rp.id,
+            // §6 provenance: this profile now provably belongs to
+            // the session account (Phase 1.4).
+            createdByUid: user.id,
+            importedFromBackup: undefined,
             name: rp.name,
             gender: rp.gender,
             bodyweightKg: Number(rp.bodyweight_kg) || DEFAULT_BODYWEIGHT_KG,
@@ -2125,6 +2376,10 @@ class SupabaseSyncEngine {
           updates.profile = {
             ...localState.profile,
             id: user.id,
+            // §6 provenance: the guest profile just linked to this
+            // account (Phase 1.4).
+            createdByUid: user.id,
+            importedFromBackup: undefined,
             name: resolvedName,
           };
           needsLocalUpdate = true;
@@ -2137,6 +2392,7 @@ class SupabaseSyncEngine {
         // Cloud account has records, but profiles row was missing/empty. Synthesize athlete profile so returning user is not locked out.
         updates.profile = {
           id: user.id,
+          createdByUid: user.id,
           name: extractedName || '',
           gender: 'male',
           bodyweightKg: DEFAULT_BODYWEIGHT_KG,
@@ -2453,7 +2709,7 @@ class SupabaseSyncEngine {
         const adoptRemoteChanges =
           !isCrossAccountSwitch &&
           shouldAdoptRemoteChanges(
-            readLastPushedSignature(),
+            readLastPushedSignature(user.id),
             syncedStateSignature({
               profile: freshState.profile,
               prs: freshState.prs || [],
@@ -2595,9 +2851,14 @@ class SupabaseSyncEngine {
       // existing local value is never overwritten. (See the helper's
       // comment block for the full mechanism.)
       if (!updates.macroGoals && !freshState.macroGoals) {
-        const restored =
-          macroGoalsFromArchive(readLocalArchive(ARCHIVED_HISTORY_KEY), user.id) ??
-          macroGoalsFromArchive(readLocalArchive(ARCHIVED_HISTORY_PREV_KEY), user.id);
+        // §12: iterate the shared generation list (newest first) —
+        // the same current-then-previous order the old two-key ??
+        // chain had, now over one read path for every format.
+        let restored: MacroGoals | null = null;
+        for (const generation of readArchiveGenerations()) {
+          restored = macroGoalsFromArchive(generation, user.id);
+          if (restored) break;
+        }
         if (restored) updates.macroGoals = restored;
       }
       // The captured needsLocalUpdate reflects pre-round-trip state;
@@ -2811,10 +3072,10 @@ class SupabaseSyncEngine {
     onConflict?: string;
     bareVariant?: (rows: any[]) => any[];
     bareNote?: string;
-  }): Promise<{ okIds: string[]; permanentFailures: { id: string; error: unknown }[]; transientError: unknown }> {
+  }): Promise<{ okIds: string[]; permanentFailures: { id: string; error: unknown; stamp: string | null }[]; transientError: unknown }> {
     const outcome = {
       okIds: [] as string[],
-      permanentFailures: [] as { id: string; error: unknown }[],
+      permanentFailures: [] as { id: string; error: unknown; stamp: string | null }[],
       transientError: null as unknown,
     };
     const supabase = getSupabase();
@@ -2830,6 +3091,12 @@ class SupabaseSyncEngine {
       outcome.okIds = opts.payloads.map((r) => r.id as string);
       return outcome;
     }
+    // §7: a schema error that survived the bare retry is table-level —
+    // fail the cycle (transient path), never fan out or quarantine.
+    if (isSchemaPushError(error)) {
+      outcome.transientError = error;
+      return outcome;
+    }
     if (!isPermanentRowError(error)) {
       outcome.transientError = error;
       return outcome;
@@ -2840,8 +3107,23 @@ class SupabaseSyncEngine {
         res = await upsert(opts.bareVariant([row]));
       }
       if (!res.error) outcome.okIds.push(row.id as string);
-      else if (isPermanentRowError(res.error)) outcome.permanentFailures.push({ id: row.id as string, error: res.error });
-      else if (!outcome.transientError) outcome.transientError = res.error;
+      else if (isSchemaPushError(res.error)) {
+        if (!outcome.transientError) outcome.transientError = res.error;
+      } else if (isPermanentRowError(res.error)) {
+        outcome.permanentFailures.push({
+          id: row.id as string,
+          error: res.error,
+          // §7: the stamp of the payload the server rejected — always
+          // the value that was actually pushed, never a lookup that
+          // can come back undefined for stamp-less local rows.
+          stamp:
+            typeof (row as { updated_at?: unknown }).updated_at === 'string'
+              ? ((row as { updated_at: string }).updated_at as string)
+              : typeof (row as { updatedAt?: unknown }).updatedAt === 'string'
+                ? ((row as { updatedAt: string }).updatedAt as string)
+                : null,
+        });
+      } else if (!outcome.transientError) outcome.transientError = res.error;
     }
     return outcome;
   }
@@ -2856,20 +3138,21 @@ class SupabaseSyncEngine {
   private applyPushOutcome(
     userId: string,
     collection: SyncQuarantineCollection,
-    localRows: { id: string; updatedAt?: unknown }[],
-    outcome: { okIds: string[]; permanentFailures: { id: string; error: unknown }[]; transientError: unknown },
+    outcome: { okIds: string[]; permanentFailures: { id: string; error: unknown; stamp: string | null }[]; transientError: unknown },
     record: (e: { message?: string } | null | undefined) => void,
   ): void {
     if (outcome.okIds.length > 0) releaseSyncQuarantine(userId, collection, outcome.okIds);
     for (const failure of outcome.permanentFailures) {
-      const local = localRows.find((r) => r.id === failure.id);
-      const e = failure.error as { code?: unknown; message?: unknown } | null;
+      const e = failure.error as { code?: unknown } | null;
       quarantineSyncRow(userId, {
         collection,
         rowId: failure.id,
-        stamp: typeof local?.updatedAt === 'string' ? local.updatedAt : null,
+        // §7: payload stamp + error class only — never the raw
+        // server message (it carries schema details and is not the
+        // user's business in Settings).
+        stamp: failure.stamp,
         code: typeof e?.code === 'string' ? e.code : null,
-        message: typeof e?.message === 'string' ? e.message : String(failure.error),
+        errorClass: syncErrorClass(failure.error),
         quarantinedAt: new Date().toISOString(),
       });
       console.warn(
@@ -2902,7 +3185,11 @@ class SupabaseSyncEngine {
       const entry = quarantined.get(row.id);
       if (!entry) return true;
       const stamp = typeof row.updatedAt === 'string' ? row.updatedAt : null;
-      return stamp !== entry.stamp;
+      // §7: release only on a CONCRETE, changed stamp (an edit). A
+      // stamp-less row stays quarantined — with payload stamps on the
+      // entries, "null !== entry.stamp" would otherwise retry it (and
+      // re-quarantine it under a fresh generated stamp) every cycle.
+      return stamp !== null && stamp !== entry.stamp;
     });
   }
 
@@ -2917,6 +3204,13 @@ class SupabaseSyncEngine {
     if (this.pendingMergeChoiceFor && this.pendingMergeChoiceFor === userId) return;
 
     const state = useStore.getState();
+
+    // Phase 1.4 (§5/§27): the push NEVER runs over a cross-account
+    // profile. The debounced path reaches here without a pull, and
+    // pushing would re-home the other account's rows under this
+    // session's uid. A full sync classifies first (its pull archives
+    // + replaces), after which this guard passes again.
+    if (isCrossAccountProfile(state.profile, userId)) return;
 
     // S1/S2: the server tombstone layer, read once per push. null =
     // unavailable (pre-migration) → every consumer below falls back
@@ -3046,7 +3340,7 @@ class SupabaseSyncEngine {
             updated_at: p.updatedAt || new Date().toISOString(),
           }));
           const outcome = await this.pushRowBatch({ table: 'personal_records', payloads: prRows, onConflict: 'id' });
-          this.applyPushOutcome(userId, 'personal_records', toUpsert, outcome, record);
+          this.applyPushOutcome(userId, 'personal_records', outcome, record);
         }
       }
     }
@@ -3076,7 +3370,7 @@ class SupabaseSyncEngine {
             updated_at: w.updatedAt || new Date().toISOString(),
           }));
           const outcome = await this.pushRowBatch({ table: 'workouts', payloads: workoutRows, onConflict: 'id' });
-          this.applyPushOutcome(userId, 'workouts', toUpsert, outcome, record);
+          this.applyPushOutcome(userId, 'workouts', outcome, record);
         }
       }
     }
@@ -3104,7 +3398,7 @@ class SupabaseSyncEngine {
             updated_at: m.updatedAt || new Date().toISOString(),
           }));
           const outcome = await this.pushRowBatch({ table: 'meals', payloads: mealRows, onConflict: 'id' });
-          this.applyPushOutcome(userId, 'meals', toUpsert, outcome, record);
+          this.applyPushOutcome(userId, 'meals', outcome, record);
         }
       }
     }
@@ -3149,7 +3443,7 @@ class SupabaseSyncEngine {
             bareVariant: bareBodyMetrics,
             bareNote: '[sync] body_metrics measurement columns not present on server yet — retrying without them',
           });
-          this.applyPushOutcome(userId, 'body_metrics', plan.idUpserts, outcome, record);
+          this.applyPushOutcome(userId, 'body_metrics', outcome, record);
           outcome.okIds.forEach((id) => landedIds.add(id));
         }
         if (plan.dateUpserts.length > 0) {
@@ -3160,7 +3454,7 @@ class SupabaseSyncEngine {
             bareVariant: bareBodyMetrics,
             bareNote: '[sync] body_metrics measurement columns not present on server yet — retrying without them',
           });
-          this.applyPushOutcome(userId, 'body_metrics', plan.dateUpserts, outcome, record);
+          this.applyPushOutcome(userId, 'body_metrics', outcome, record);
           outcome.okIds.forEach((id) => landedIds.add(id));
         }
         if (supersededIds.length > 0) {
@@ -3259,7 +3553,7 @@ class SupabaseSyncEngine {
             // case where the `extras` column itself is missing.
             bareVariant: (rows) => rows.map(({ extras: _extras, ...rest }) => rest),
           });
-          this.applyPushOutcome(userId, 'planned_workouts', toUpsert, outcome, record);
+          this.applyPushOutcome(userId, 'planned_workouts', outcome, record);
         }
       }
     }
@@ -3338,6 +3632,7 @@ class SupabaseSyncEngine {
     // next pull would adopt over it). A later pull adopts remote edits
     // only while the fresh local signature still equals this value.
     writeLastPushedSignature(
+      userId,
       syncedStateSignature({
         profile: state.profile,
         prs: state.prs || [],
@@ -3510,7 +3805,11 @@ class SupabaseSyncEngine {
 
     const sync = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        // §27: same session resolution as the full sync — a failed
+        // check throws into the failure path below (offline backoff),
+        // never a silent "signed out".
+        const { user, checkFailed, error } = await resolveSessionUser(supabase);
+        if (checkFailed) throw error ?? new Error('Session check failed');
         if (!user) return;
 
         await this.pushLocalData(user.id);

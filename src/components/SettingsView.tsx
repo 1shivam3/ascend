@@ -99,6 +99,23 @@ const SYNC_COLLECTION_LABEL_KEYS: Record<SyncQuarantineCollection, StringKey> = 
   personal_records: 'settings.syncCollectionPrs',
 };
 
+/**
+ * Phase 1.7 (§7): plain-words label per quarantine error CLASS. The
+ * store keeps only the class (never the raw server message), so this
+ * lookup is total: any unknown class falls back to the generic line.
+ */
+const SYNC_REASON_LABEL_KEYS: Record<string, StringKey> = {
+  unique_violation: 'settings.syncReasonUnique',
+  foreign_key_violation: 'settings.syncReasonValues',
+  not_null_violation: 'settings.syncReasonValues',
+  check_violation: 'settings.syncReasonValues',
+  invalid_datetime: 'settings.syncReasonValues',
+  datetime_overflow: 'settings.syncReasonValues',
+  numeric_out_of_range: 'settings.syncReasonValues',
+  invalid_text_representation: 'settings.syncReasonValues',
+  permission_denied: 'settings.syncReasonPermission',
+};
+
 export default function SettingsView({ onBack, onNavigate, isModal = false }: SettingsViewProps) {
   const storeProfile = useStore((state) => state.profile);
   const profile = storeProfile ?? useStore.getState().profile;
@@ -718,7 +735,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               <p key={`${q.collection}:${q.rowId}`} className="text-2xs text-text-muted">
                 {t('settings.syncQuarantineItem', {
                   collection: t(SYNC_COLLECTION_LABEL_KEYS[q.collection] ?? 'settings.syncCollectionPrs'),
-                  reason: q.message,
+                  reason: t(SYNC_REASON_LABEL_KEYS[q.errorClass] ?? 'settings.syncReasonUnknown'),
                 })}
               </p>
             ))}

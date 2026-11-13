@@ -250,21 +250,26 @@ export async function verifyDeletionToken(
     }
 
     if (ledgerRow) {
-      const data = ledgerRow as { status?: NonceStatus };
+      const data = ledgerRow as { status?: unknown };
+      // §14 (Phase 1.1): validate the status instead of coercing it.
+      // Only 'partial' is retryable; 'consumed' — and any missing or
+      // unrecognized value, which the unconstrained text column can
+      // hold — is terminal (fail-closed).
+      const rowStatus: NonceStatus = data.status === 'partial' ? 'partial' : 'consumed';
       // Cache locally for subsequent calls
       inMemoryNonces.set(payload.jti, {
-        status: (data.status as NonceStatus) || 'consumed',
+        status: rowStatus,
         timestamp: Date.now(),
       });
 
-      if (data.status === 'consumed') {
+      if (rowStatus === 'consumed') {
         return {
           valid: false,
           error: 'TOKEN_ALREADY_USED',
           message: 'Verification token has already been used. Tokens are strictly single-use.',
         };
       }
-      // If data.status === 'partial', we explicitly ALLOW retry to complete incomplete deletion!
+      // If rowStatus === 'partial', we explicitly ALLOW retry to complete incomplete deletion!
     }
   }
 
@@ -297,25 +302,56 @@ export async function consumeDeletionNonce(
   status: NonceStatus = 'consumed',
   dbClient?: SupabaseClient | null
 ): Promise<void> {
-  // 1. Update in-memory cache
-  inMemoryNonces.set(jti, { status, timestamp: Date.now() });
+  // §14 (Phase 1.1): the ledger is a state machine — none → partial →
+  // consumed — and 'consumed' is TERMINAL. The original code upserted
+  // unconditionally, so a 'partial' write landing after a completed
+  // deletion regressed the row to partial, and verifyDeletionToken
+  // (which allows retry on partial) would accept the spent token
+  // again. Transitions are guarded in BOTH stores:
+  // 1. Memory: never downgrade a consumed record.
+  const existing = inMemoryNonces.get(jti);
+  if (!(existing?.status === 'consumed' && status === 'partial')) {
+    inMemoryNonces.set(jti, { status, timestamp: Date.now() });
+  }
   cleanupExpiredNonces();
 
   // 2. Persist to durable database store if available
   if (dbClient) {
     const isConsumed = status === 'consumed';
-    const { error } = await dbClient.from('consumed_deletion_nonces').upsert(
-      {
-        jti,
-        // Anonymize personal identifiers upon successful deletion; preserve only for partial recovery
-        user_id: isConsumed ? null : payload.sub,
-        email: isConsumed ? null : payload.email,
-        status,
-        consumed_at: new Date().toISOString(),
-        expires_at: new Date(payload.exp).toISOString(),
-      },
-      { onConflict: 'jti' }
-    );
+    const row = {
+      jti,
+      // Anonymize personal identifiers upon successful deletion; preserve only for partial recovery
+      user_id: isConsumed ? null : payload.sub,
+      email: isConsumed ? null : payload.email,
+      status,
+      consumed_at: new Date().toISOString(),
+      expires_at: new Date(payload.exp).toISOString(),
+    };
+    if (!isConsumed) {
+      // 'partial' write: ON CONFLICT DO NOTHING (ignoreDuplicates).
+      // A partial record may be CREATED, never overwritten — so it
+      // can never downgrade a consumed row, and a repeat partial for
+      // the same token (same jti ⇒ same payload) keeps the first
+      // record's recovery fields. Verified against the live table
+      // 2026-11-13: jti is the PK and status has no CHECK constraint,
+      // so this is the only thing enforcing the transition — do not
+      // replace it with a bare upsert. (A fenced UPDATE was the
+      // alternative; DO NOTHING keeps the write on the same upsert
+      // path every existing client/mock already speaks.)
+      const { error: partialError } = await dbClient
+        .from('consumed_deletion_nonces')
+        .upsert(row, { onConflict: 'jti', ignoreDuplicates: true });
+      if (partialError) {
+        console.warn('Failed to record deletion nonce to durable ledger:', partialError.message);
+        throw new Error(`Durable nonce ledger write failed: ${partialError.message}`);
+      }
+      return;
+    }
+    // 'consumed' write: every predecessor state (none, partial, and
+    // consumed itself) may legally reach consumed — upsert as before.
+    const { error } = await dbClient
+      .from('consumed_deletion_nonces')
+      .upsert(row, { onConflict: 'jti' });
     if (error) {
       console.warn('Failed to record deletion nonce to durable ledger:', error.message);
       throw new Error(`Durable nonce ledger write failed: ${error.message}`);
@@ -334,15 +370,24 @@ export async function isNonceConsumed(
   if (mem && mem.status === 'consumed') return true;
 
   if (dbClient) {
+    // §14 (Phase 1.1): FAIL CLOSED. The original code swallowed ledger
+    // read errors into `false` (fail-open), so a ledger hiccup read
+    // as "not consumed". When a durable ledger was supplied and
+    // cannot be read, the safe answer is "treat as consumed" — the
+    // same doctrine verifyDeletionToken already applies (SEC-R5).
+    // LIMITATION: without a dbClient this check is memory-only and
+    // cannot see other instances; the caller that owns the client is
+    // responsible for passing it.
     try {
-      const { data } = await dbClient
+      const { data, error } = await dbClient
         .from('consumed_deletion_nonces')
         .select('status')
         .eq('jti', jti)
         .maybeSingle();
+      if (error) return true;
       if (data && data.status === 'consumed') return true;
     } catch {
-      // Ignore
+      return true;
     }
   }
 

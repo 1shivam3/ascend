@@ -47,9 +47,13 @@ export function isGuestProfileId(id: string | null | undefined): boolean {
 }
 
 /**
- * True only when the local profile belongs to a DIFFERENT authenticated
- * account: an id exists, it is not the session user's id, and it is not
- * a guest-profile id. Guest profiles (guest_/user_) are never switches.
+ * The LEGACY cross-account rule (id shapes only): an id exists, it
+ * is not the session user's id, and it is not a guest-profile id.
+ * Guest profiles (guest_/user_) are never switches. Production
+ * routing goes through isCrossAccountProfile in src/lib/identity.ts
+ * (Phase 1.4), which reads provenance first and delegates to THIS
+ * rule for profiles carrying neither provenance field — so the two
+ * can never drift on legacy data.
  */
 export function isCrossAccountSwitch(
   localProfileId: string | null | undefined,
