@@ -427,6 +427,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'progress.thisWeek': 'इस सप्ताह',
   'progress.lastWeek': 'पिछले सप्ताह',
   'progress.weekCompare': 'इस सप्ताह बनाम पिछले सप्ताह: {thisSessions} बनाम {lastSessions} सेशन · {thisVolume} बनाम {lastVolume}',
+  'progress.weekCompareEmpty': 'पिछले दो सप्ताहों में अभी कोई सेशन लॉग नहीं हुआ — ट्रेनिंग शुरू करते ही यह लाइन आपके सप्ताहों की तुलना करेगी।',
   'progress.setsThisWeek': 'इस हफ़्ते के सेट',
   'progress.recoveryMap': 'रिकवरी',
   'progress.recoveryFresh': 'फ्रेश',

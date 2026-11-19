@@ -420,6 +420,7 @@ export const en = {
   'progress.thisWeek': 'This week',
   'progress.lastWeek': 'Last week',
   'progress.weekCompare': 'This week vs last week: {thisSessions} vs {lastSessions} sessions · {thisVolume} vs {lastVolume}',
+  'progress.weekCompareEmpty': 'No sessions logged in the last two weeks yet — once you train, this line compares your weeks.',
   'progress.setsThisWeek': 'sets this week',
   'progress.recoveryMap': 'Recovery',
   'progress.recoveryFresh': 'Fresh',

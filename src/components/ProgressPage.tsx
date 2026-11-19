@@ -1839,14 +1839,22 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 </div>
 
                 {/* Audit phase 5, task 5.1(i): one compact line —
-                    this week vs last week (sessions + volume). */}
+                    this week vs last week (sessions + volume).
+                    U1 (bug program Phase 5): with no sessions in
+                    either week the line read "0 vs 0 sessions · — vs
+                    —" — say what is missing instead, and render a
+                    real zero volume ("0 kg") rather than a dash when
+                    only one side is empty. */}
                 <p className="text-xs text-text-secondary tabular-nums border-t border-border/60 pt-3">
-                  {t('progress.weekCompare', {
-                    thisSessions: consistencyStats.weekCompare[0].sessions,
-                    lastSessions: consistencyStats.weekCompare[1].sessions,
-                    thisVolume: displayWeight(consistencyStats.weekCompare[0].volumeKg),
-                    lastVolume: displayWeight(consistencyStats.weekCompare[1].volumeKg),
-                  })}
+                  {consistencyStats.weekCompare[0].sessions === 0 &&
+                  consistencyStats.weekCompare[1].sessions === 0
+                    ? t('progress.weekCompareEmpty')
+                    : t('progress.weekCompare', {
+                        thisSessions: consistencyStats.weekCompare[0].sessions,
+                        lastSessions: consistencyStats.weekCompare[1].sessions,
+                        thisVolume: formatVolume(consistencyStats.weekCompare[0].volumeKg, userUnit),
+                        lastVolume: formatVolume(consistencyStats.weekCompare[1].volumeKg, userUnit),
+                      })}
                 </p>
               </div>
 
