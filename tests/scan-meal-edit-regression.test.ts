@@ -5,6 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { recalculateMealResult } from '@/lib/ai-scan-meal';
+import { estimateMacros } from '@/lib/macros';
 import type { MealAnalysisResult, ScannedFoodItem } from '@/lib/types';
 
 function scannedMeal(): MealAnalysisResult {
@@ -22,7 +23,10 @@ function scannedMeal(): MealAnalysisResult {
   };
 }
 
-/** Mirrors handleSaveItemEdit's item replacement logic. */
+/** Mirrors handleSaveItemEdit's item replacement logic — including
+ * the Phase 3 (M1) source marking: values that differ from the food
+ * database's estimate for the name + grams are stamped
+ * macroSource 'user' so the recalculation keeps them verbatim. */
 function applyItemEdit(
   analysis: MealAnalysisResult,
   index: number,
@@ -32,15 +36,26 @@ function applyItemEdit(
   const target = itemsCopy[index];
   const finalName = edit.name.trim() || target.name;
   const finalGrams = edit.grams > 0 ? edit.grams : 100;
+  const finalCalories = Math.max(0, Math.round(Number(edit.calories) || 0));
+  const finalProtein = Math.max(0, Math.round((Number(edit.proteinG) || 0) * 10) / 10);
+  const finalCarbs = Math.max(0, Math.round((Number(edit.carbsG) || 0) * 10) / 10);
+  const finalFat = Math.max(0, Math.round((Number(edit.fatG) || 0) * 10) / 10);
+  const dbEst = estimateMacros(finalName, finalGrams, 'g');
+  const userSourced =
+    Math.abs(finalCalories - dbEst.calories) > 1 ||
+    Math.abs(finalProtein - dbEst.proteinG) > 0.15 ||
+    Math.abs(finalCarbs - dbEst.carbsG) > 0.15 ||
+    Math.abs(finalFat - dbEst.fatG) > 0.15;
   itemsCopy[index] = {
     ...target,
     name: finalName,
     estimatedGrams: finalGrams,
     quantity: `${finalGrams}g`,
-    calories: Math.max(0, Math.round(edit.calories)),
-    proteinG: Math.max(0, Math.round(edit.proteinG * 10) / 10),
-    carbsG: Math.max(0, Math.round(edit.carbsG * 10) / 10),
-    fatG: Math.max(0, Math.round(edit.fatG * 10) / 10),
+    calories: finalCalories,
+    proteinG: finalProtein,
+    carbsG: finalCarbs,
+    fatG: finalFat,
+    macroSource: userSourced ? 'user' : undefined,
   };
   return recalculateMealResult(analysis, itemsCopy);
 }
@@ -54,9 +69,15 @@ describe('P0-2: scanned meal item edit never drops items', () => {
     expect(after.items).toHaveLength(2);
     expect(after.items[0].name).toBe('Chicken Biryani');
     expect(after.items[0].estimatedGrams).toBe(200);
+    // The edited values differ from the DB estimate (390 kcal), so
+    // they are user-sourced and kept verbatim (M1).
     expect(after.items[0].calories).toBe(300);
     expect(after.items[1].name).toBe('Raita'); // untouched item survives
-    expect(after.totalCalories).toBe(360);
+    // Phase 3 (M1): the untouched item is re-priced from the food
+    // database — raita is 75 kcal/100 g there, not the fixture's 60 —
+    // so the total is 300 + 75, not the old 360.
+    expect(after.items[1].calories).toBe(75);
+    expect(after.totalCalories).toBe(375);
   });
 
   it('editing the last item keeps the first item', () => {
