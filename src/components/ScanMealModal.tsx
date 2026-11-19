@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect, useReducer } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
+import { useKeyboardScrollIntoView } from '@/lib/keyboard-scroll';
 import { useStore } from '@/lib/store';
 import {
   INITIAL_MEAL_SCAN_STATE,
@@ -75,6 +76,10 @@ const HIDDEN_INGREDIENT_LABEL_KEYS: StringKey[] = [
 export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMealModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
+  // B2: keep the focused field visible when the keyboard opens —
+  // this modal's nested scrollers defeat the browser's native
+  // focus scroll once the viewport shrinks.
+  useKeyboardScrollIntoView(modalRef, isOpen);
   const store = useStore();
   const toast = useToast();
   const { t, language } = useTranslation();
