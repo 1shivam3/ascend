@@ -7,6 +7,7 @@ import {
   type CoachChatUserData,
 } from '@/lib/coach-chat';
 import { getAiAuthHeaders } from '@/lib/ai-client-auth';
+import TextInput from '@/components/ui/TextInput';
 import { toLocalDateString } from '@/lib/habits';
 import {
   useCoachChatStore,
@@ -505,10 +506,9 @@ export default function CoachChatSection() {
       )}
 
       <div className="flex gap-2">
-        <input
-          type="text"
+        <TextInput
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={setInput}
           onKeyDown={(e) => {
             if (e.key === 'Enter') void send();
           }}

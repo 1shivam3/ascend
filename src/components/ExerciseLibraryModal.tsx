@@ -20,6 +20,7 @@ import { getExerciseFormCues, getExerciseHindiName } from '@/lib/exercise-librar
 import { getDemoForExercise } from '@/lib/exercise-media';
 import ExerciseDemo from '@/components/ExerciseDemo';
 import { useTranslation } from '@/lib/i18n';
+import TextInput from '@/components/ui/TextInput';
 import type { StringKey } from '@/lib/i18n/en';
 
 interface ExerciseLibraryModalProps {
@@ -187,11 +188,10 @@ export default function ExerciseLibraryModal({
         <div className="p-3 border-b border-border bg-bg-secondary/40 space-y-2">
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-            <input
-              type="text"
+            <TextInput
               placeholder={t('lib.searchPlaceholder')}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={setSearchQuery}
               className="w-full bg-bg-card border border-border rounded-xl pl-9 pr-3 py-2 text-xs text-text-primary placeholder:text-text-muted focus:border-accent outline-none"
               autoFocus
             />

@@ -19,6 +19,7 @@ import { estimateMacros } from '@/lib/macros';
 import { tildeForFoods } from '@/lib/meal-display';
 import { getLocalTodayStr, round1, formatCalories } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
+import TextInput from '@/components/ui/TextInput';
 import ReportAIModal from '@/components/ReportAIModal';
 import AiNoticeBanner from '@/components/AiNoticeBanner';
 import { localizedUserMessage } from '@/lib/user-error';
@@ -1207,11 +1208,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                         {t('scan.addItemManually')}
                       </span>
                       <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="text"
+                        <TextInput
                           placeholder={t('scan.itemPlaceholder')}
                           value={newItemName}
-                          onChange={(e) => setNewItemName(e.target.value)}
+                          onChange={setNewItemName}
                           className="py-1.5 px-2.5 rounded-lg bg-bg-card border border-border text-xs text-text-primary outline-none focus:border-accent"
                         />
                         <div className="flex items-center gap-1.5">
@@ -1416,11 +1416,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                           {t('scan.addFoodItem')}
                         </span>
                         <div className="grid grid-cols-2 gap-2">
-                          <input
-                            type="text"
+                          <TextInput
                             placeholder={t('scan.foodNamePlaceholder')}
                             value={newItemName}
-                            onChange={(e) => setNewItemName(e.target.value)}
+                            onChange={setNewItemName}
                             className="py-1.5 px-2.5 rounded-lg bg-bg-card border border-border text-xs text-text-primary outline-none focus:border-accent"
                           />
                           <div className="flex items-center gap-1.5">
@@ -1563,11 +1562,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                               <div className="pt-2 border-t border-border/60 space-y-2.5 animate-fade-in bg-bg-secondary/40 -mx-3 -mb-3 p-3 rounded-b-xl">
                                 <div className="space-y-1">
                                   <label htmlFor={`scan-edit-name-${idx}`} className="text-[0.6875rem] font-mono uppercase tracking-wider text-text-muted block">{t('scan.foodNameLabel')}</label>
-                                  <input
+                                  <TextInput
                                     id={`scan-edit-name-${idx}`}
-                                    type="text"
                                     value={editName}
-                                    onChange={(e) => setEditName(e.target.value)}
+                                    onChange={setEditName}
                                     className="w-full py-1.5 px-2.5 rounded-lg bg-bg-card border border-border text-xs text-text-primary outline-none focus:border-accent"
                                     placeholder={t('scan.foodNameEditPlaceholder')}
                                   />
@@ -1678,10 +1676,9 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                       {t('scan.fineTune')}
                     </span>
                     <div className="flex gap-2">
-                      <input
-                        type="text"
+                      <TextInput
                         value={refinementInput}
-                        onChange={(e) => setRefinementInput(e.target.value)}
+                        onChange={setRefinementInput}
                         placeholder={t('scan.refinePlaceholder')}
                         className="flex-1 py-1.5 px-3 rounded-xl bg-bg-card border border-border text-xs text-text-primary focus:border-accent outline-none placeholder:text-text-muted"
                         onKeyDown={(e) => {

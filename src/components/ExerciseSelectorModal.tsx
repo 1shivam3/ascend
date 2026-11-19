@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
+import TextInput from '@/components/ui/TextInput';
 import { X, Search, Dumbbell, Plus, Check } from 'lucide-react';
 import {
   EXERCISE_LIBRARY,
@@ -110,11 +111,10 @@ export default function ExerciseSelectorModal({
           {/* Search Input */}
           <div className="relative">
             <Search className="w-3.5 h-3.5 text-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
+            <TextInput
               placeholder={t('exsel.searchPlaceholder')}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={setSearchQuery}
               autoFocus
               className="w-full bg-bg-secondary border border-border rounded-xl pl-9 pr-8 py-2 text-xs text-text-primary outline-none focus:border-accent transition-colors"
             />
