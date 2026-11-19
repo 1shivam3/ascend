@@ -136,6 +136,9 @@ describe('i18n wiring coverage (pinned)', () => {
     // other ui primitives — all copy (placeholder, aria-label) arrives
     // as props from wired call sites; it owns no strings.
     'src/components/ui/TextInput.tsx',
+    // U3 (bug program Phase 5): TrainIcon is a pure SVG glyph — it
+    // owns no strings at all (the tab's label comes from page.tsx).
+    'src/components/icons/TrainIcon.tsx',
     // TabGuardBanner wired in Round 5 (tabGuard.* keys).
     // App shells: error/loading delegate to the wired state components;
     // layout + legal pages carry metadata / formal legal text only.
