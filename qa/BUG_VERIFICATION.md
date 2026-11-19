@@ -433,20 +433,67 @@ Phase 0 baseline, branch `bug-program/phase-0` off master `adcb6c1`.
 ### U1 — Consistency "— vs —"
 - **Status:** confirmed. "This week vs last week: 0 vs 0 sessions —
   vs —" (WA0003 ~1:00).
+- **Phase 5 resolution (commit `2ea7c66`):** root cause —
+  `displayWeight(0)` renders "—" by design (it means "no value"),
+  and the compare line fed it real zeros. With no sessions in
+  either week the line now reads "No sessions logged in the last
+  two weeks yet — once you train, this line compares your weeks.";
+  with one side empty, that side's volume renders as a real
+  "0 kg" via formatVolume.
 
 ### U2 — Body weight staleness
 - **Status:** confirmed. "72 kg, +0.0 kg (+0%)" with the chart range
   ending 6 Nov while today is 19 Nov and no staleness cue
   (WA0003 ~0:46–0:52).
+- **Phase 5 resolution (commit `2bdcc25`):** the chart already
+  spans the selected range (1M/3M/6M/1Y filter in
+  bodyweightAnalytics) — what was missing was the age of the
+  headline number. The Body card now shows "Last logged today /
+  yesterday / N days ago" under the weight (real logs only; a
+  profile default keeps its est. marker), and at 14+ days a prompt
+  row offers the weight modal directly. The owner's video case
+  (6 Nov log, 19 Nov) is 13 days — labelled, one day under the
+  prompt threshold. Helper `daysSinceDate` (formatters) is
+  unit-tested incl. the 13/14 boundary: tests/bugp5-staleness
+  .test.ts.
 
 ### U3 — Earlier leftovers bundle
 - **Status:** not yet verified. Phase 5 audit.
+- **Phase 5 audit (commit `567e26d` + verification runs):**
+  - *Train tab icon* — redrawn: lucide's diagonal Dumbbell
+    collapsed into a blob at the 20 px tab size; replaced with a
+    front-on barbell (TrainIcon, same prop contract).
+  - *Toasts vs Complete Set* — verified already engineered: the
+    toast stack is bottom-anchored at 6rem + safe-area (Toast.tsx,
+    QA-hardening Phase 4) and the beginner action bar is in-flow;
+    the floating rest pill sits below the toast zone. No overlap
+    path found; no change.
+  - *Train header accessible names* — covered by
+    qa/e2e/r15-train-header.spec.ts (re-run in this phase's
+    Playwright set).
+  - *Truncation / mid-word breaks at 320/360/412 + Large/XL* —
+    covered by qa/e2e/r14-truncation.spec.ts + p3-textsize
+    (re-run in this phase's set).
+  - *Disabled-button consistency* — house rule enforced by
+    tests/audit-phase4-disabled.test.ts (re-run green).
+  - *Raw enums* — grep sweep over components: goal/experience
+    enums appear only in logic (comparisons, icon maps); every
+    user-facing render goes through i18n labels. No raw-enum
+    render found.
+  - *Quick log* — meal quick log (natural language) and Home's
+    "Quick log a past session" both present and exercised by the
+    b3/n1-era flows; no defect found.
 
 ### U4 — Google sign-in shows the raw supabase.co domain
 - **Status:** plan only, as ordered. A plan already exists
   (`~/workspace/goals/ascend-webapp-to-android-app/files/supabase-auth-domain-plan-2026-11-06.md`:
   full hide = Supabase Pro $25/mo + Custom Domain $10/mo). To be
   refreshed in Phase 5. No production auth change.
+- **Phase 5:** plan stands as delivered 2026-11-06 (full hide =
+  Supabase Pro $25/mo + Custom Domain add-on $10/mo; the free
+  partial options and their limits are in the plan). The go/no-go
+  remains the owner's — no production auth change made, per the
+  brief.
 
 ### Phase 6 checks
 - **Status:** not yet run. (Rest timer from every start path was

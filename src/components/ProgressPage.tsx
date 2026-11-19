@@ -40,7 +40,7 @@ import PRsPage from '@/components/PRsPage';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import MeetAttemptPlannerModal from '@/components/MeetAttemptPlannerModal';
 import WeeklyRecapModal from '@/components/WeeklyRecapModal';
-import { plural, safeRandomId, getLocalTodayStr, getWeekDateStrings, formatNumber, formatVolume } from '@/lib/formatters';
+import { plural, safeRandomId, getLocalTodayStr, getWeekDateStrings, formatNumber, formatVolume, daysSinceDate } from '@/lib/formatters';
 import { buildActiveDays, calculateStreak } from '@/lib/streak-freeze';
 import { useToday } from '@/lib/use-today';
 import { useAppNavigation } from '@/lib/navigation';
@@ -612,8 +612,13 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
   // Bodyweight trend chart & real delta
   const bodyweightAnalytics = useMemo(() => {
+    // U2 (bug program Phase 5): staleness of the newest REAL log —
+    // the headline weight used to sit there with no age attached, so
+    // a 13-day-old weigh-in read as today's number.
+    const lastLoggedDaysAgo =
+      sortedMetrics.length > 0 ? daysSinceDate(sortedMetrics[0].date, todayStr) : null;
     if (sortedMetrics.length === 0 && !profile?.bodyweightKg) {
-      return { dataPoints: [], deltaText: t('progress.noLogsYet'), latestWeight: null };
+      return { dataPoints: [], deltaText: t('progress.noLogsYet'), latestWeight: null, lastLoggedDaysAgo };
     }
 
     const now = Date.now();
@@ -661,8 +666,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       dataPoints,
       deltaText,
       latestWeight: currentWeightKg ? (userUnit === 'lbs' ? Math.round(kgToLbs(currentWeightKg)) : Math.round(currentWeightKg * 10) / 10) : null,
+      lastLoggedDaysAgo,
     };
-  }, [sortedMetrics, profile, userUnit, bodyTimeRange, currentWeightKg, t]);
+  }, [sortedMetrics, profile, userUnit, bodyTimeRange, currentWeightKg, t, todayStr]);
 
   // ── 3. REAL CONSISTENCY & STREAK DATA ─────────────────────────────────────
   const consistencyStats = useMemo(() => {
@@ -1533,6 +1539,36 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   </div>
                 </div>
 
+                {/* U2 (bug program Phase 5): how old the headline
+                    weight is — and past 14 days, a direct prompt to
+                    log a fresh one. Real logs only; a profile default
+                    already carries the est. marker above. */}
+                {weightIsMeasured && bodyweightAnalytics.lastLoggedDaysAgo !== null && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-text-muted">
+                      {bodyweightAnalytics.lastLoggedDaysAgo === 0
+                        ? t('progress.weightLoggedToday')
+                        : bodyweightAnalytics.lastLoggedDaysAgo === 1
+                          ? t('progress.weightLoggedYesterday')
+                          : t('progress.weightLastLogged', { days: bodyweightAnalytics.lastLoggedDaysAgo })}
+                    </p>
+                    {bodyweightAnalytics.lastLoggedDaysAgo >= 14 && (
+                      <div className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 bg-[var(--warning)]/10 border border-[var(--warning)]/40">
+                        <span className="text-xs font-medium text-text-primary">
+                          {t('progress.weightStalePrompt', { days: bodyweightAnalytics.lastLoggedDaysAgo })}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsWeightModalOpen(true)}
+                          className="btn-secondary text-xs px-3 py-1.5 shrink-0"
+                        >
+                          {t('progress.logWeightNow')}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Range pills */}
                 <div className="flex justify-end">
                   <SegmentedControl
@@ -1839,14 +1875,22 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 </div>
 
                 {/* Audit phase 5, task 5.1(i): one compact line —
-                    this week vs last week (sessions + volume). */}
+                    this week vs last week (sessions + volume).
+                    U1 (bug program Phase 5): with no sessions in
+                    either week the line read "0 vs 0 sessions · — vs
+                    —" — say what is missing instead, and render a
+                    real zero volume ("0 kg") rather than a dash when
+                    only one side is empty. */}
                 <p className="text-xs text-text-secondary tabular-nums border-t border-border/60 pt-3">
-                  {t('progress.weekCompare', {
-                    thisSessions: consistencyStats.weekCompare[0].sessions,
-                    lastSessions: consistencyStats.weekCompare[1].sessions,
-                    thisVolume: displayWeight(consistencyStats.weekCompare[0].volumeKg),
-                    lastVolume: displayWeight(consistencyStats.weekCompare[1].volumeKg),
-                  })}
+                  {consistencyStats.weekCompare[0].sessions === 0 &&
+                  consistencyStats.weekCompare[1].sessions === 0
+                    ? t('progress.weekCompareEmpty')
+                    : t('progress.weekCompare', {
+                        thisSessions: consistencyStats.weekCompare[0].sessions,
+                        lastSessions: consistencyStats.weekCompare[1].sessions,
+                        thisVolume: formatVolume(consistencyStats.weekCompare[0].volumeKg, userUnit),
+                        lastVolume: formatVolume(consistencyStats.weekCompare[1].volumeKg, userUnit),
+                      })}
                 </p>
               </div>
 

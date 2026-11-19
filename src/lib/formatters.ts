@@ -321,6 +321,23 @@ export const formatNumber = (n: number, locale?: string): string =>
  * toLocaleDateString orders fields by locale (en-US gives the
  * month-first "Nov 2, 2026" the brief rejected).
  */
+/**
+ * U2 (bug program Phase 5): whole local days from a YYYY-MM-DD date
+ * to today (also YYYY-MM-DD) — the bodyweight staleness measure.
+ * Future-dated input clamps to 0 (a log dated tomorrow reads as
+ * "today", never as a negative age); unparseable input returns null.
+ */
+export const daysSinceDate = (dateStr: string, todayStr: string): number | null => {
+  // Shape-guard first: parseLocalDate deliberately falls back to
+  // "now" for empty input, which would fabricate an age of 0 here.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr) || !/^\d{4}-\d{2}-\d{2}$/.test(todayStr)) return null;
+  const from = parseLocalDate(dateStr);
+  const to = parseLocalDate(todayStr);
+  if (isNaN(from.getTime()) || isNaN(to.getTime())) return null;
+  const days = Math.round((to.getTime() - from.getTime()) / 86_400_000);
+  return Math.max(0, days);
+};
+
 export const formatDate = (dateStr: string, locale?: string): string => {
   const parts = new Intl.DateTimeFormat(locale, {
     weekday: 'short',

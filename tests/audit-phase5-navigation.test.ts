@@ -6,7 +6,9 @@
  *  (b) Train tools button is named (already correct — regression pin)
  *  (d) Fuel has one photo-scan + one barcode entry, consistently named
  *  (e) active block → "View current block", never "Build next block"
- *  (f) Train tab icon is the dumbbell (already correct — pin)
+ *  (f) Train tab icon is a dumbbell/barbell glyph (pinned; the
+ *      glyph itself was REDRAWN in bug-program Phase 5 U3 — the
+ *      pin now covers the redrawn TrainIcon)
  *  (g) Today quote lives in a card
  *  (h) History rows carry title, volume, duration
  *  (i) two-letter day labels + week-over-week compare line
@@ -62,7 +64,13 @@ describe('5.1(b/f) — already-correct items stay correct', () => {
 
   it('Train tab icon is the dumbbell glyph', () => {
     const page = read('src/app/page.tsx');
-    expect(page).toContain("icon: Dumbbell");
+    // U3 (bug program Phase 5): the tab uses the redrawn front-on
+    // barbell (TrainIcon) instead of lucide's diagonal Dumbbell,
+    // which collapsed into a blob at 20 px. The pin follows the
+    // brief's explicit redraw order.
+    expect(page).toContain("icon: TrainIcon");
+    const icon = read('src/components/icons/TrainIcon.tsx');
+    expect(icon).toContain('viewBox="0 0 24 24"');
   });
 });
 

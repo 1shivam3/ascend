@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
-import { Home, Dumbbell, TrendingUp, UtensilsCrossed, User } from 'lucide-react';
+import { Home, TrendingUp, UtensilsCrossed, User } from 'lucide-react';
+import TrainIcon from '@/components/icons/TrainIcon';
 import dynamic from 'next/dynamic';
 import { useStore } from '@/lib/store';
 import { applyTextScale } from '@/lib/text-scale';
@@ -61,7 +62,10 @@ import type { StringKey } from '@/lib/i18n/en';
 
 const tabs = [
   { id: 'home', labelKey: 'nav.today', icon: Home, target: 'home' },
-  { id: 'workout', labelKey: 'nav.train', icon: Dumbbell, target: 'workout' },
+  // U3 (bug program Phase 5): Train uses the redrawn front-on
+  // barbell (components/icons/TrainIcon) — lucide's diagonal
+  // Dumbbell collapsed into a blob at tab-bar size.
+  { id: 'workout', labelKey: 'nav.train', icon: TrainIcon, target: 'workout' },
   { id: 'progress', labelKey: 'nav.progress', icon: TrendingUp, target: 'progress' },
   { id: 'meals', labelKey: 'nav.fuel', icon: UtensilsCrossed, target: 'meals' },
   // UX redesign Stage 2: "You" is a PRESENTATION grouping over the
