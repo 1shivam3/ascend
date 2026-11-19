@@ -2729,6 +2729,7 @@ export const en = {
   // NEXT block happens at block end via the debrief hand-off.
   'coachBlock.viewCurrent': 'View current block',
   'coachBlock.weekLabel': 'Week {n}',
+  'coachBlock.estimatedStart': 'Estimated start',
   'coachBlock.week_build': 'build',
   'coachBlock.week_deload': 'deload',
   'coachBlock.week_test': 'test',

@@ -2736,6 +2736,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   // Audit phase 5, task 5.1(e) (2026-11-06): machine translation — Hindi review parked.
   'coachBlock.viewCurrent': 'मौजूदा ब्लॉक देखें',
   'coachBlock.weekLabel': 'हफ़्ता {n}',
+  'coachBlock.estimatedStart': 'अनुमानित शुरुआत',
   'coachBlock.week_build': 'बिल्ड',
   'coachBlock.week_deload': 'डीलोड',
   'coachBlock.week_test': 'टेस्ट',

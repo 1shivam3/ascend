@@ -99,6 +99,13 @@ export interface BlockDayProposal {
   exercises: PlannedExercise[];
   /** Why each exercise is here — keyed by canonical exercise key. */
   whyByExercise: Record<string, string>;
+  /** T2 (bug program Phase 4): where each exercise's starting load
+   * came from, keyed by canonical exercise key — 'data' when it was
+   * derived from the athlete's own records/history, 'estimate' when
+   * it is the (scaled) template default with no data behind it. The
+   * review badges estimates so a guessed load never reads as a
+   * measured one. Absent for bodyweight/no-load exercises. */
+  loadBasisByExercise?: Record<string, 'data' | 'estimate'>;
   estimatedMinutes: number;
 }
 
@@ -911,6 +918,27 @@ const FILL_MUSCLES: Record<
 // The generator
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * T2 (bug program Phase 4): a beginner's ESTIMATED start on a
+ * barbell compound never exceeds their bodyweight. The template
+ * scaler (bodyweight ratio × 0.6 first-exposure factor) already
+ * lands below bodyweight for the current templates — this is the
+ * hard guarantee behind it, plate-rounded DOWN so the capped load
+ * is loadable and still ≤ bodyweight. Unknown bodyweight → no cap
+ * can be computed; the scaler's beginner factor still applies.
+ */
+export function capBeginnerEstimate(
+  load: number,
+  unit: Unit,
+  bodyweightKg: number | undefined,
+): number {
+  if (!bodyweightKg || bodyweightKg <= 0) return load;
+  const cap = unit === 'lbs' ? kgToLbs(bodyweightKg) : bodyweightKg;
+  if (load <= cap) return load;
+  const step = unit === 'lbs' ? 5 : 2.5;
+  return Math.max(step, Math.floor(cap / step) * step);
+}
+
 export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
   const { intake, athleteModel, unit, todayStr } = input;
   const disliked = input.dislikedExercises ?? [];
@@ -1189,6 +1217,7 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
   };
   const days: BlockDayProposal[] = skeletons.map((day, i) => {
     const whyByExercise: Record<string, string> = {};
+    const loadBasisByExercise: Record<string, 'data' | 'estimate'> = {};
     const exercises = day.exercises.map((ex) => {
       const role = roleOf(ex.name);
       const range = REP_RANGES[focus][role];
@@ -1233,6 +1262,7 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
       // as an anchoring artifact. An ENTERED top lift (§4.1) is the
       // athlete's own statement and outranks the floor; prefill-derived
       // top lifts ('history' / 'pr') are estimates and do not.
+      let flooredByData = false;
       if (
         typeof targetWeight === 'number' &&
         targetWeight >= 0 &&
@@ -1241,7 +1271,27 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
         const demonstrated = demonstratedFor(ex.name);
         if (demonstrated) {
           const floor = roundToLoadable(demonstrated / e1rmRepDivisor(targetReps), unit);
-          if (floor > targetWeight) targetWeight = floor;
+          if (floor > targetWeight) {
+            targetWeight = floor;
+            flooredByData = true;
+          }
+        }
+      }
+      // T2 (bug program Phase 4): record where this load came from.
+      // A load with no data behind it is an ESTIMATE — the review
+      // badges it and the why-line says so, for every role (before,
+      // only main lifts admitted it; accessories carried a confident
+      // number with no basis at all). A beginner's estimated start
+      // on a barbell compound is additionally capped at bodyweight:
+      // the template scaling usually lands below it, but "usually"
+      // is not a cap.
+      const loadFromData = (e1rm != null && role !== 'accessory') || flooredByData;
+      if (typeof targetWeight === 'number' && targetWeight > 0) {
+        loadBasisByExercise[canonicalizeExerciseName(ex.name)] = loadFromData
+          ? 'data'
+          : 'estimate';
+        if (!loadFromData && intake.experience === 'beginner' && compoundKey) {
+          targetWeight = capBeginnerEstimate(targetWeight, unit, input.bodyweightKg);
         }
       }
       // Strength blocks run mains at 5 sets — the old flat 4-set cap
@@ -1273,9 +1323,13 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
       } else if (role === 'main') {
         whyByExercise[key] = e1rm
           ? `Main lift for your ${getExerciseMuscle(ex.name).toLowerCase()}. The load is set from your estimated 1RM of about ${formatVolume(e1rm, 'kg')}.`
-          : `Main lift for your ${getExerciseMuscle(ex.name).toLowerCase()}. The starting load is a conservative default — week 1 calibrates it.`;
+          : `Main lift for your ${getExerciseMuscle(ex.name).toLowerCase()}. Estimated start — a conservative default from the standard template, scaled to you. Your first logged session replaces it.`;
+      } else if (loadFromData && e1rm) {
+        whyByExercise[key] = `${getExerciseMuscle(ex.name)} work to balance the day — ${targetSets} sets in the ${range.min}–${range.max} rep range. The load is set from your estimated 1RM of about ${formatVolume(e1rm, 'kg')}.`;
+      } else if (loadFromData) {
+        whyByExercise[key] = `${getExerciseMuscle(ex.name)} work to balance the day — ${targetSets} sets in the ${range.min}–${range.max} rep range. The load continues from what you have already lifted.`;
       } else {
-        whyByExercise[key] = `${getExerciseMuscle(ex.name)} work to balance the day — ${targetSets} sets in the ${range.min}–${range.max} rep range.`;
+        whyByExercise[key] = `${getExerciseMuscle(ex.name)} work to balance the day — ${targetSets} sets in the ${range.min}–${range.max} rep range. Estimated start — the load is a template default, scaled to you; your first logged session replaces it.`;
       }
       return next;
     });
@@ -1286,6 +1340,7 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
       planName: '',
       exercises,
       whyByExercise,
+      loadBasisByExercise,
       // F-08: estimateSessionMinutes returns a hardcoded 45 for an
       // empty exercise list (a default for OTHER features' planning
       // math). A block day with no exercises is not a 45-minute
@@ -1317,8 +1372,23 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
   }
   for (const day of days) {
     day.exercises = day.exercises.map((ex) => {
-      const w = unifiedLoadByKey.get(canonicalizeExerciseName(ex.name));
-      return w !== undefined && ex.targetWeight !== w ? { ...ex, targetWeight: w } : ex;
+      const k = canonicalizeExerciseName(ex.name);
+      const w = unifiedLoadByKey.get(k);
+      if (w === undefined || ex.targetWeight === w) return ex;
+      // T2: a load unified UP from another day's prescription keeps
+      // the weaker claim — if the winning value came from an
+      // estimate anywhere, this day's basis drops to 'estimate' too.
+      if (day.loadBasisByExercise && day.loadBasisByExercise[k] === 'data') {
+        const winnerIsEstimate = days.some(
+          (d) =>
+            d.loadBasisByExercise?.[k] === 'estimate' &&
+            d.exercises.some(
+              (e2) => canonicalizeExerciseName(e2.name) === k && e2.targetWeight === w,
+            ),
+        );
+        if (winnerIsEstimate) day.loadBasisByExercise[k] = 'estimate';
+      }
+      return { ...ex, targetWeight: w };
     });
   }
 
