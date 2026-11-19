@@ -132,6 +132,10 @@ describe('i18n wiring coverage (pinned)', () => {
     // SegmentedControl — labels arrive via ariaLabel / children props.
     'src/components/ui/Chip.tsx',
     'src/components/ui/Switch.tsx',
+    // B1 (bug program Phase 1): TextInput is presentational like the
+    // other ui primitives — all copy (placeholder, aria-label) arrives
+    // as props from wired call sites; it owns no strings.
+    'src/components/ui/TextInput.tsx',
     // TabGuardBanner wired in Round 5 (tabGuard.* keys).
     // App shells: error/loading delegate to the wired state components;
     // layout + legal pages carry metadata / formal legal text only.
