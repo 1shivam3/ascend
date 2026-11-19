@@ -14,6 +14,7 @@ import { MealAnalysisResult, ScannedFoodItem, MealEntry, FoodItem, OilLevelId } 
 import { analyzeMealPhoto, recalculateMealResult, generateOfflineMealEstimate } from '@/lib/ai-scan-meal';
 import { computeMealConfidence } from '@/lib/scan-confidence';
 import { itemNeedsConfirmation } from '@/lib/scan-verification';
+import { scrubHealthClaims } from '@/lib/health-claims';
 import { resolveIndianMeta, householdDraftFor } from '@/lib/indian-foods';
 import { OIL_LEVELS, defaultOilForFood, applyOilDelta, tspForOilLevel, servingsForOil } from '@/lib/oil-adjust';
 import { validateImageFile, resizeAndCompressImage, captureVideoFrame, MAX_IMAGE_DIMENSION } from '@/lib/image-processing';
@@ -1780,10 +1781,13 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                   </div>
 
                   {/* Coaching Observation */}
-                  {analysis.coachingNote && (
+                  {analysis.coachingNote && scrubHealthClaims(analysis.coachingNote) && (
                     <div className="p-3 rounded-xl bg-accent/10 border border-accent/20 text-xs text-text-secondary leading-relaxed flex items-start gap-2">
                       <Sparkles className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-                      <span>{analysis.coachingNote}</span>
+                      {/* M2: display-time scrub as well as the route's
+                          — a stored or offline note can't sneak a
+                          health claim past the filter. */}
+                      <span>{scrubHealthClaims(analysis.coachingNote)}</span>
                     </div>
                   )}
                   </div>

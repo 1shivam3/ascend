@@ -8,6 +8,7 @@ import { rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit,
 import { sanitizeScannedItems, recomputeMealTotals } from '@/lib/scan-meal-sanitize';
 import { stampScanConfidence } from '@/lib/scan-confidence';
 import { applyDatabaseMacros } from '@/lib/scan-verification';
+import { HEALTH_CLAIM_PROMPT_RULE, scrubHealthClaims } from '@/lib/health-claims';
 
 export const runtime = 'nodejs';
 
@@ -201,6 +202,7 @@ export async function POST(req: Request) {
 
     const prompt = `You are ASCEND's precision AI Sports Nutritionist, Supplement Analyst, and Computer Vision Food Classifier.
 Analyze the attached photograph with clinical precision.
+${HEALTH_CLAIM_PROMPT_RULE}
 
 STRICT ANTI-HALLUCINATION & ANTI-EXTRA-FOOD RULES:
 1. ONLY IDENTIFY WHAT IS DIRECTLY & CLEARLY VISIBLE:
@@ -352,6 +354,18 @@ Return ONLY valid, parseable JSON matching this schema with NO markdown ticks or
     if (!resultJson) {
       resultJson = generateOfflineMealEstimate(userNotes, hiddenIngredients);
     }
+
+    // M2 (bug program Phase 3): no health claims leave this route —
+    // the coaching note and per-item notes are scrubbed sentence by
+    // sentence; a note that was ONLY a claim falls back to empty and
+    // the client renders its own neutral hint.
+    if (resultJson.coachingNote) {
+      resultJson.coachingNote = scrubHealthClaims(resultJson.coachingNote);
+    }
+    resultJson.items = resultJson.items.map((item) => ({
+      ...item,
+      notes: item.notes ? scrubHealthClaims(item.notes) || undefined : item.notes,
+    }));
 
     return NextResponse.json(resultJson);
   } catch (error: any) {
