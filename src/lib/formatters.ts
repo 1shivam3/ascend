@@ -384,6 +384,33 @@ export const formatDateTime = (ms: number, locale?: string): string => {
 };
 
 /**
+ * N4 (bug program Phase 2): rewrite ISO dates (YYYY-MM-DD) inside
+ * free text — AI replies especially — into the ONE display format.
+ * Models write "2026-11-06" into sentences; users should never see
+ * the raw ISO form (the T3 finding: coach chat quoted ISO dates).
+ * Display-time only: stored text is never rewritten. Invalid date
+ * shapes (month 13, Feb 30) pass through untouched.
+ */
+const ISO_DATE_IN_TEXT_RE = /\b\d{4}-\d{2}-\d{2}\b/g;
+export function displayDatesInText(text: string, locale?: string): string {
+  if (!text) return text;
+  return text.replace(ISO_DATE_IN_TEXT_RE, (match) => {
+    const [y, m, d] = match.split('-').map(Number);
+    if (!y || m < 1 || m > 12 || d < 1 || d > 31) return match;
+    const dt = parseLocalDate(match);
+    if (
+      Number.isNaN(dt.getTime()) ||
+      dt.getFullYear() !== y ||
+      dt.getMonth() !== m - 1 ||
+      dt.getDate() !== d
+    ) {
+      return match;
+    }
+    return formatDate(match, locale);
+  });
+}
+
+/**
  * QA-hardening R12: a weight/volume in the user's display unit,
  * grouped like every other number: formatVolume(1800, 'kg') is
  * "1,800 kg", formatVolume(100, 'lbs') is "220 lbs". Input is always
@@ -417,6 +444,16 @@ export const formatKg = (kg: number, locale?: string): string =>
  */
 export const formatCalories = (kcal: number, locale?: string): string =>
   `${formatNumber(Math.round(kcal), locale)} kcal`;
+
+/** N4 (bug program Phase 2): the canonical kcal name — same rule. */
+export const formatKcal = formatCalories;
+
+/**
+ * N4: grams, grouped, the app's compact macro suffix:
+ * formatGrams(150) is "150g", formatGrams(1250) is "1,250g".
+ */
+export const formatGrams = (g: number, locale?: string): string =>
+  `${formatNumber(Math.round(g), locale)}g`;
 
 /**
  * Single source of truth for cm → imperial height display.

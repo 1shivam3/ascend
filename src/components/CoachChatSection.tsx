@@ -8,6 +8,7 @@ import {
 } from '@/lib/coach-chat';
 import { getAiAuthHeaders } from '@/lib/ai-client-auth';
 import TextInput from '@/components/ui/TextInput';
+import { displayDatesInText } from '@/lib/formatters';
 import { toLocalDateString } from '@/lib/habits';
 import {
   useCoachChatStore,
@@ -463,7 +464,10 @@ export default function CoachChatSection() {
                 {m.role === 'user' ? t('coachChat.you') : t('coachChat.coach')}
               </p>
               {m.role === 'assistant' ? (
-                <CoachMarkdown text={m.content} />
+                // N4: model prose leaks ISO dates ("2026-11-06") into
+                // sentences — display them in the one date format.
+                // Display-time only; the stored message is untouched.
+                <CoachMarkdown text={displayDatesInText(m.content)} />
               ) : (
                 <p className="text-sm text-text-primary whitespace-pre-wrap">{m.content}</p>
               )}
