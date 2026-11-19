@@ -129,7 +129,7 @@ test.describe('M1: scan verification', () => {
 
     // Unknown food: model numbers kept, but flagged.
     await expect(dialog.getByText('Qwzx Vbnm')).toBeVisible();
-    await expect(dialog.getByText('Not verified')).toBeVisible();
+    await expect(dialog.getByText('Not verified', { exact: true })).toBeVisible();
 
     // Save is blocked until the estimate is confirmed.
     const saveBtn = dialog.getByRole('button', { name: /add to today's nutrition/i });

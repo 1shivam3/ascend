@@ -423,7 +423,12 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
   const applyLearnedPortionPreferences = (result: MealAnalysisResult): MealAnalysisResult => {
     const preferences = store.userPortionPreferences || {};
-    if (Object.keys(preferences).length === 0) return result;
+    // M1: even with no portion preferences, the result still passes
+    // through recalculateMealResult for database verification — the
+    // early return that used to sit here bypassed it entirely.
+    if (Object.keys(preferences).length === 0) {
+      return recalculateMealResult(result, result.items);
+    }
 
     let hasChanges = false;
     const adjustedItems = result.items.map((item) => {
