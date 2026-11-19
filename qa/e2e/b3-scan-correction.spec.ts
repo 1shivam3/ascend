@@ -119,7 +119,8 @@ test.describe('B3: scan-correction journey', () => {
     // list renders from): exactly the corrected items, no Roti.
     await dialog.getByRole('button', { name: /add to today's nutrition/i }).click();
     await expect(dialog).toBeHidden({ timeout: 10_000 });
-    const savedFoods = await page.evaluate(() => {
+    type SavedFood = { name: string; quantity: number; unit: string; calories: number };
+    const savedFoods = await page.evaluate((): SavedFood[] | null => {
       const raw = window.localStorage.getItem('ascend_store');
       if (!raw) return null;
       const meals = JSON.parse(raw)?.state?.meals ?? [];
@@ -134,13 +135,13 @@ test.describe('B3: scan-correction journey', () => {
       );
     });
     expect(savedFoods).not.toBeNull();
-    expect(savedFoods!.map((f) => f.name)).toEqual(['Toor Dal Tadka', 'Curd']);
+    expect(savedFoods!.map((f: SavedFood) => f.name)).toEqual(['Toor Dal Tadka', 'Curd']);
     // Portions save as household-unit drafts where they map cleanly
     // (the dal's 200 g lands as a katori draft), so the portion
     // evidence is the calorie total: 220 (dal at 200 g) + ~92 (curd
     // refined to 150 g from the offline DB) = the 312 kcal the
     // "Meal Logged" toast reported.
-    const total = Math.round(savedFoods!.reduce((s, f) => s + f.calories, 0));
+    const total = Math.round(savedFoods!.reduce((s: number, f: SavedFood) => s + f.calories, 0));
     expect(total).toBe(312);
   });
 });
