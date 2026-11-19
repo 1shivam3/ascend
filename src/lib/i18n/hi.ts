@@ -1551,6 +1551,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'meals.logCreatine': '{grams}g क्रिएटिन दर्ज करें',
   'meals.options': 'विकल्प',
   'meals.tabMeals': 'खाना',
+  'meals.tabMealsCount': 'खाना · आज {count}',
   'meals.tabMacros': 'मैक्रो',
   'meals.dailyIntake': 'रोज़ का सेवन',
   'meals.setTarget': 'लक्ष्य सेट करें',

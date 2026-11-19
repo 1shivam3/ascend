@@ -1544,6 +1544,7 @@ export const en = {
   'meals.logCreatine': 'Log {grams}g creatine',
   'meals.options': 'Options',
   'meals.tabMeals': 'Meals',
+  'meals.tabMealsCount': 'Meals · {count} today',
   'meals.tabMacros': 'Macros',
   'meals.dailyIntake': 'Daily Intake',
   'meals.setTarget': 'Set Target',

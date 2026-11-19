@@ -1810,7 +1810,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           onClick={() => setFuelSubTab('meals')}
           className={`segmented-item ${fuelSubTab === 'meals' ? 'active' : ''}`}
         >
-          {t('meals.tabMeals')} {todayMeals.length > 0 && `(${todayMeals.length})`}
+          {/* M4: the bare "(2)" read as part of the tab's name —
+              spell out that the count is today's logged meals. */}
+          {todayMeals.length > 0
+            ? t('meals.tabMealsCount', { count: todayMeals.length })
+            : t('meals.tabMeals')}
         </button>
         <button
           type="button"
