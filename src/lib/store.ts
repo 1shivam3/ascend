@@ -472,6 +472,10 @@ export interface AppState {
   resetThemeToSystem: () => void;
   
   addPR: (pr: PersonalRecord) => void;
+  /** T4 (bug program Phase 4) Undo: re-insert a deleted PR at its
+   *  original index (no-op if present) and clear its tombstone —
+   *  PR deletion was the one delete path with no Undo. */
+  insertPRAt: (pr: PersonalRecord, index: number) => void;
   addMultiplePRs: (prs: PersonalRecord[]) => void;
   updatePR: (id: string, pr: Partial<PersonalRecord>) => void;
   deletePR: (id: string) => void;
@@ -2219,6 +2223,18 @@ export const useAppStore = create<AppState>()(
         // the S1/S2 deletion stamp rides along via the §10 deletion API.
         ...applyDeletionToState(state, 'personal_records', [id]),
       })),
+      insertPRAt: (pr, index) => set((state) => {
+        if (!pr?.id || state.prs.some((p) => p.id === pr.id)) return state;
+        const nextPrs = [...state.prs];
+        // §10 race fix: re-stamp the restore (see insertWorkoutAt).
+        nextPrs.splice(Math.max(0, Math.min(index, nextPrs.length)), 0, stampEditedRow(pr));
+        // Undoing the deletion must also clear its tombstone
+        // (QA4-001), or the next sync would delete the restored PR.
+        return {
+          prs: nextPrs,
+          ...applyRestoreToState(state, 'personal_records', [pr.id]),
+        };
+      }),
       
       setPRTarget: (exercise, targetKg) => set((state) => ({
         prTargets: { ...state.prTargets, [exercise]: targetKg }

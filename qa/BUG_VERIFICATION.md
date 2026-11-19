@@ -349,6 +349,17 @@ Phase 0 baseline, branch `bug-program/phase-0` off master `adcb6c1`.
   session-best outcome; the brief's rule (ties are not PRs, only the
   best qualifying set, first-ever = "Baseline") is stricter and is
   not what the code implements. Phase 4.
+- **Phase 4 resolution (commit `4e5d4eb`):** the gate/replay layer
+  already enforced the brief's record rules (strictly-exceeds,
+  first = baseline, recompute on delete/edit/Undo incl. chained,
+  manual records persist — pr-source-phase3 + qa-phase1-r1 suites).
+  The defect was the BADGE layer: `isPRSet` matched every set equal
+  to the mark. New `flaggedPRSets(marks, workout)` flags exactly
+  ONE set per mark — the first match in session order — and both
+  surfaces (History badge, Coach's Take PR count) now read it.
+  Evidence: tests/bugp4-pr-ties.test.ts (tie in one session, tie
+  across sessions, beat, rep-PR ties, duplicate blocks, store-level
+  delete/undo/delete).
 
 ### T2 — Coach prescribes loads for lifts with no data
 - **Status:** confirmed. Muscle Block · Lower A lists Squat 4×8 @
@@ -356,12 +367,48 @@ Phase 0 baseline, branch `bug-program/phase-0` off master `adcb6c1`.
   Calf Raise 3×12 @ 42.5 kg (WA0003 ~0:10) while Progress shows
   Squat "No data yet" (WA0003 ~0:42). Where the loads come from is
   traced in Phase 4.
+- **Phase 4 resolution (commit `46511a0`):** loads come from the
+  block engine, never the chat model (propose_program carries only
+  intake parameters). Templates are bodyweight-scaled, beginner-
+  factored and plate-rounded, and the review already allowed
+  editing — what was missing was any visible BASIS: accessories
+  carried a confident number with no explanation. Now every load
+  carries `loadBasisByExercise` ('data' | 'estimate'); estimated
+  starts say so in the why-line for every role ("Estimated start —
+  … your first logged session replaces it") and are badged
+  "Estimated start" in the block review. A beginner's estimated
+  barbell-compound start is hard-capped at bodyweight
+  (`capBeginnerEstimate`, plate-rounded down) — with today's
+  scaler constants the cap binds rarely; it is the guarantee
+  behind the scaling, not a replacement for it. Calibration path:
+  the first logged session's demonstrated load re-anchors later
+  proposals (demonstrated-floor machinery), and the why-line now
+  says exactly that. Evidence: tests/bugp4-load-basis.test.ts
+  (cold-start all-estimate + why text, PR-backed lift = data,
+  cap unit tests + cross-goal property test); block-engine suites
+  green.
 
 ### T3 — Coach chat stale / inconsistent content
 - **Status:** confirmed. The stored thread says "week 1 of 5" and
   cites "Bench Press 80kg (2026-11-02)" / "Deadlift 140kg
   (2026-11-06)" with ISO dates, while the Coach card reads "Week 2
   of 6" (WA0003 ~0:14–0:18).
+- **Phase 4 resolution (commit `39d07cc`):** (1) the thread renders
+  a day separator (Today / Yesterday / full display date) whenever
+  the local day changes — legacy messages without a timestamp get
+  none (their day is never fabricated); (2) settled action cards
+  (applied/undone) from a previous day collapse to one line —
+  "Action from {date} — settled" — with the full card one tap away;
+  stored history is never rewritten; (3) a two-tap "New chat"
+  button wires the store's existing clearCoachChat (first tap arms
+  — clearing has no Undo); (4) "Based on your data" evidence lines
+  pass through displayDatesInText like message bodies (Phase 2);
+  (5) the model context ALWAYS anchors "TODAY'S DATE" (previously
+  the date only reached the model when a session resolved for
+  today) alongside the existing block/week section. Evidence:
+  tests/bugp4-chat-freshness.test.ts + qa/e2e/t3-chat-freshness
+  .spec.ts (seeded 10-day-old thread: separators, collapsed card,
+  expand, two-tap clear — all in the real UI).
 
 ### T4 — Delete workout: Undo
 - **Status:** **not reproducible as stated.** The Undo toast does
@@ -371,6 +418,17 @@ Phase 0 baseline, branch `bug-program/phase-0` off master `adcb6c1`.
   The empty History later in the recording follows a second,
   deliberate delete by the owner. What remains unverified: chained
   Undo, and Undo for plan/meal/food/run/PR deletes — Phase 4 tests.
+- **Phase 4 resolution (commit `1f4bf87`):** audit of every delete
+  type — workout, meal, food-in-meal and plan deletes all offered
+  Undo already (toast-undo.test.tsx, qa-phase1-r1 chained tests).
+  PR deletion was the one gap: a plain info toast, no way back.
+  New store action `insertPRAt` restores the record at its
+  original index and clears its tombstone (applyRestoreToState),
+  and PRsPage snapshots record + index before deleting and offers
+  the standard 6-second action toast. Evidence:
+  tests/bugp4-delete-undo.test.ts (restore in place + tombstone
+  cleared, double-undo no-op, chained delete→undo ×2, interleaved
+  deletes).
 
 ### U1 — Consistency "— vs —"
 - **Status:** confirmed. "This week vs last week: 0 vs 0 sessions —

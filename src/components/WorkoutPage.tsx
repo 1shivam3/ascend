@@ -122,7 +122,7 @@ import {
 } from '@/lib/workout-schedule';
 import { plural, safeRandomId, getLocalTodayStr, formatLocalDate, parseLocalDate, formatNumber, formatDuration, formatDate, formatDateShort, formatMonthName } from '@/lib/formatters';
 import { calculateWorkoutVolumeKg } from '@/lib/volume';
-import { planPRChangesAfterSetEdit, computeSessionPRMarks, isPRSet, type SessionPRMark } from '@/lib/pr-reevaluation';
+import { planPRChangesAfterSetEdit, computeSessionPRMarks, flaggedPRSets, isPRSet, type SessionPRMark } from '@/lib/pr-reevaluation';
 import { getSessionDuration } from '@/lib/workout-elapsed';
 import { useAppNavigation } from '@/lib/navigation';
 import { kgToLbs, lbsToKg } from '@/lib/units';
@@ -703,6 +703,7 @@ function HistorySetChip({
   set,
   displayNumber,
   prMarks,
+  prFlaggedSets,
 }: {
   workout: WorkoutEntry;
   exerciseIndex: number;
@@ -711,6 +712,8 @@ function HistorySetChip({
   displayNumber: number;
   /** §23: read-time PR marks from the page's one replay (badge source). */
   prMarks?: SessionPRMark[];
+  /** T1: the ONE set per mark that carries the badge (ties don't). */
+  prFlaggedSets?: Set<WorkoutSet>;
 }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -914,7 +917,7 @@ function HistorySetChip({
             @{rpeVal}
           </span>
         )}
-        {isDone && exercise && prMarks && isPRSet(prMarks, workout.id, exercise.name, set) && (
+        {isDone && exercise && prMarks && (prFlaggedSets ? prFlaggedSets.has(set) : isPRSet(prMarks, workout.id, exercise.name, set)) && (
           <span
             className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold"
             title="Personal Record Set"
@@ -1139,6 +1142,13 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     () => computeSessionPRMarks(workouts, prs, profile?.bodyweightKg ?? DEFAULT_BODYWEIGHT_KG),
     [workouts, prs, profile?.bodyweightKg],
   );
+  // T1: per-workout flagged sets — one badge per mark, so two
+  // identical sets in one session don't both read as PRs.
+  const prFlaggedByWorkout = useMemo(() => {
+    const map = new Map<string, Set<WorkoutSet>>();
+    for (const w of workouts || []) map.set(w.id, flaggedPRSets(prMarks, w));
+    return map;
+  }, [prMarks, workouts]);
   const addWorkout = useStore((state) => state.addWorkout);
   const deleteWorkout = useStore((state) => state.deleteWorkout);
   const addPR = useStore((state) => state.addPR);
@@ -3054,6 +3064,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                                     set={p.set}
                                     displayNumber={j + 1}
                                     prMarks={prMarks}
+                                    prFlaggedSets={prFlaggedByWorkout.get(workout.id)}
                                   />
                                 ));
                               })()}

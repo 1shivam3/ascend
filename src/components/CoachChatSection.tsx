@@ -8,7 +8,7 @@ import {
 } from '@/lib/coach-chat';
 import { getAiAuthHeaders } from '@/lib/ai-client-auth';
 import TextInput from '@/components/ui/TextInput';
-import { displayDatesInText } from '@/lib/formatters';
+import { displayDatesInText, formatDate } from '@/lib/formatters';
 import { scrubHealthClaims } from '@/lib/health-claims';
 import { toLocalDateString } from '@/lib/habits';
 import {
@@ -68,6 +68,52 @@ const CHIP_KEYS = [
  * render bodies on purpose. */
 const epochNow = () => Date.now();
 
+/**
+ * T3 (bug program Phase 4): a settled action card from a previous
+ * day renders collapsed — one line saying when it settled, with the
+ * full card one tap away. Old threads used to stack full receipt
+ * cards forever, burying the current conversation. Display-only:
+ * the stored message is never rewritten.
+ */
+function OldActionCard({
+  message,
+  onPatch,
+  dateLabel,
+}: {
+  message: CoachChatMessage;
+  onPatch: (patch: Partial<CoachChatMessage>) => void;
+  dateLabel: string;
+}) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  if (!expanded) {
+    return (
+      <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-bg-secondary/60 px-3 py-2">
+        <p className="text-2xs text-text-secondary">{t('coachChat.oldActionNote', { date: dateLabel })}</p>
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="text-2xs font-bold text-accent-text cursor-pointer shrink-0"
+        >
+          {t('coachChat.showAction')}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-1">
+      <CoachActionCard message={message} onPatch={onPatch} />
+      <button
+        type="button"
+        onClick={() => setExpanded(false)}
+        className="text-2xs font-bold text-text-muted cursor-pointer"
+      >
+        {t('coachChat.hideAction')}
+      </button>
+    </div>
+  );
+}
+
 function weekIndexOf(startMonday: string, todayStr: string, weekCount: number): number {
   const parse = (s: string) => {
     const [y, m, d] = s.split('-').map(Number);
@@ -115,6 +161,10 @@ export default function CoachChatSection() {
   // ephemeral typing state and SHOULD reset on remount.
   const messages = useCoachChatStore((s) => s.messages);
   const setMessages = useCoachChatStore((s) => s.setMessages);
+  const clearCoachChat = useCoachChatStore((s) => s.clearCoachChat);
+  // T3: "New chat" is a two-tap action — clearing a thread is the
+  // one destructive act here with no Undo, so the first tap arms it.
+  const [confirmClear, setConfirmClear] = useState(false);
   const storedDailyLeft = useCoachChatStore((s) => s.dailyLeft);
   const storedDailyLeftDate = useCoachChatStore((s) => s.dailyLeftDate);
   const setDailyLeftRaw = useCoachChatStore((s) => s.setDailyLeft);
@@ -125,6 +175,37 @@ export default function CoachChatSection() {
     { dailyLeft: storedDailyLeft, dailyLeftDate: storedDailyLeftDate },
     toLocalDateString(new Date())
   );
+  // T3 (bug program Phase 4): day model for the thread — a separator
+  // per local day and a past-day flag for collapsing settled action
+  // cards, so a weeks-old answer can never read as today's advice.
+  // Legacy messages without a timestamp get no separator: their day
+  // is unknown and is never fabricated. (Plain body computation, not
+  // a memo: the react-hooks purity rules reject Date reads and the
+  // running-day mutation inside memo callbacks.)
+  const threadToday = toLocalDateString(new Date());
+  const threadYesterday = toLocalDateString(new Date(epochNow() - 86_400_000));
+  const threadDays: Array<{
+    day: string | null;
+    showSeparator: boolean;
+    isToday: boolean;
+    isYesterday: boolean;
+    isPastDay: boolean;
+  }> = [];
+  {
+    let last: string | null = null;
+    for (const m of messages) {
+      const day = typeof m.ts === 'number' ? toLocalDateString(new Date(m.ts)) : null;
+      const showSeparator = day !== null && day !== last;
+      if (day) last = day;
+      threadDays.push({
+        day,
+        showSeparator,
+        isToday: day === threadToday,
+        isYesterday: day === threadYesterday,
+        isPastDay: day !== null && day < threadToday,
+      });
+    }
+  }
   const listRef = useRef<HTMLDivElement | null>(null);
   // Scroll discipline (Slice B): auto-scroll only while the user is
   // already near the bottom — a new coach message must never yank a
@@ -226,6 +307,7 @@ export default function CoachChatSection() {
     const latestReadiness = readinessHistory[readinessHistory.length - 1];
 
     return {
+      todayStr,
       userName: profile?.name ?? null,
       // Phase 3 (Task 3.1): the coach sees the user's age as data;
       // the same field drives the MINOR ATHLETE prompt rule below.
@@ -416,6 +498,23 @@ export default function CoachChatSection() {
     >
       <div className="flex items-center gap-2">
         <h2 className="section-title text-[0.6875rem] mb-0">{t('coachChat.title')}</h2>
+        {messages.length > 0 && (
+          <button
+            type="button"
+            className="ml-auto text-2xs font-bold text-accent-text cursor-pointer"
+            onClick={() => {
+              if (confirmClear) {
+                clearCoachChat();
+                setConfirmClear(false);
+              } else {
+                setConfirmClear(true);
+                window.setTimeout(() => setConfirmClear(false), 3000);
+              }
+            }}
+          >
+            {t(confirmClear ? 'coachChat.newChatConfirm' : 'coachChat.newChat')}
+          </button>
+        )}
       </div>
       <p className="text-2xs text-text-muted">{t('coachChat.subtitle')}</p>
 
@@ -461,6 +560,17 @@ export default function CoachChatSection() {
         >
           {messages.map((m, i) => (
             <div key={i} className="space-y-1">
+              {threadDays[i]?.showSeparator && (
+                <div className="flex justify-center py-1">
+                  <span className="text-[0.625rem] font-bold text-text-muted bg-bg-secondary border border-border/60 rounded-full px-2 py-0.5">
+                    {threadDays[i].isToday
+                      ? t('common.today')
+                      : threadDays[i].isYesterday
+                        ? t('coachChat.yesterday')
+                        : formatDate(threadDays[i].day!)}
+                  </span>
+                </div>
+              )}
               <p className="text-2xs font-bold text-text-secondary">
                 {m.role === 'user' ? t('coachChat.you') : t('coachChat.coach')}
               </p>
@@ -475,14 +585,25 @@ export default function CoachChatSection() {
                 <p className="text-sm text-text-primary whitespace-pre-wrap">{m.content}</p>
               )}
               {m.role === 'assistant' && m.action && (
-                <CoachActionCard message={m} onPatch={(patch) => patchMessage(i, patch)} />
+                threadDays[i]?.isPastDay &&
+                (m.actionState === 'applied' || m.actionState === 'undone') ? (
+                  <OldActionCard
+                    message={m}
+                    onPatch={(patch) => patchMessage(i, patch)}
+                    dateLabel={formatDate(threadDays[i].day!)}
+                  />
+                ) : (
+                  <CoachActionCard message={m} onPatch={(patch) => patchMessage(i, patch)} />
+                )
               )}
               {m.role === 'assistant' && m.evidence && m.evidence.length > 0 && (
                 <div className="text-2xs text-text-muted">
                   <p className="font-bold">{t('coachChat.basedOn')}</p>
                   <ul className="list-disc list-inside">
                     {m.evidence.slice(0, 4).map((e, j) => (
-                      <li key={j}>{e}</li>
+                      // T3: stored evidence can carry ISO dates from
+                      // older builds — render them in the one format.
+                      <li key={j}>{displayDatesInText(e)}</li>
                     ))}
                   </ul>
                 </div>

@@ -41,7 +41,7 @@ import { getWeekDateStrings, plural, formatKg, getLocalTodayStr, parseLocalDate,
 import { EXERCISE_LIBRARY, findLibraryExercise } from './exercise-library';
 import type { MuscleGroup } from './exercise-library';
 import { isPlaceholderSubstitute } from './workout-engine';
-import { computeSessionPRMarks, isPRSet } from './pr-reevaluation';
+import { computeSessionPRMarks, flaggedPRSets } from './pr-reevaluation';
 import { DAY_ORDER, type LocalizedSentence } from './coach-i18n';
 import { DEFAULT_BODYWEIGHT_KG } from './defaults';
 import { kgToLbs, lbsToKg } from './units';
@@ -1223,15 +1223,9 @@ export function generateCoachWeeklyReview(
     prs,
     DEFAULT_BODYWEIGHT_KG
   );
-  const prCount = thisW.reduce(
-    (n, w) =>
-      n +
-      (w.exercises || []).reduce(
-        (m, e) => m + (e.sets || []).filter((s) => isPRSet(weekMarks, w.id, e.name, s)).length,
-        0
-      ),
-    0
-  );
+  // T1: count FLAGGED sets (one per mark) — counting every set that
+  // merely matches a mark double-counts identical tied sets.
+  const prCount = thisW.reduce((n, w) => n + flaggedPRSets(weekMarks, w).size, 0);
   if (prCount > 0) workedBits.push(`${prCount} ${plural(prCount, 'PR')} on the board`);
   const whatWorked =
     workedBits.length > 0

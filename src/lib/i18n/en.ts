@@ -2729,6 +2729,7 @@ export const en = {
   // NEXT block happens at block end via the debrief hand-off.
   'coachBlock.viewCurrent': 'View current block',
   'coachBlock.weekLabel': 'Week {n}',
+  'coachBlock.estimatedStart': 'Estimated start',
   'coachBlock.week_build': 'build',
   'coachBlock.week_deload': 'deload',
   'coachBlock.week_test': 'test',
@@ -3385,6 +3386,12 @@ export const en = {
 
   // ── Conversational coach chat (Train tab, Coach area; text chat only) ──
   'coachChat.title': 'COACH CHAT',
+  'coachChat.newChat': 'New chat',
+  'coachChat.newChatConfirm': 'Tap again to clear this chat',
+  'coachChat.yesterday': 'Yesterday',
+  'coachChat.oldActionNote': 'Action from {date} — settled',
+  'coachChat.showAction': 'Show details',
+  'coachChat.hideAction': 'Hide details',
   'coachChat.sectionAria': 'Coach chat',
   'coachChat.subtitle':
     'Ask your coach — every answer is based on your own logged training, not generic advice.',

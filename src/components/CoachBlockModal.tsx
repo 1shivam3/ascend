@@ -549,6 +549,15 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
                                 {ex.targetWeight ? ` @ ${ex.targetWeight}${ex.targetUnit ? ` ${ex.targetUnit}` : ''}` : ''}
                                 {ex.targetRpe ? ` · RPE ${ex.targetRpe}` : ''}
                               </span>
+                              {/* T2: a load with no data behind it is
+                                  badged as an estimate, never dressed
+                                  as a measured prescription. */}
+                              {ex.targetWeight &&
+                              day.loadBasisByExercise?.[canonicalizeExerciseName(ex.name)] === 'estimate' ? (
+                                <span className="ml-1.5 align-middle text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-warning/20 text-warning font-bold">
+                                  {t('coachBlock.estimatedStart')}
+                                </span>
+                              ) : null}
                             </p>
                             <p className="text-2xs text-text-muted">
                               {day.whyByExercise[canonicalizeExerciseName(ex.name)] ?? ''}

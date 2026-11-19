@@ -570,6 +570,15 @@ export function computeSessionPRMarks(
   return marks;
 }
 
+/** Whether a set's performance equals what a mark records. */
+function setMatchesMark(mark: SessionPRMark, set: WorkoutSet): boolean {
+  if (!set || set.isWarmup || !isSetCompleted(set)) return false;
+  const rawWeight = parseFloat(String(set.weight)) || 0;
+  const wKg = set.unit === 'lbs' ? lbsToKg(rawWeight) : rawWeight;
+  const reps = parseInt(String(set.reps), 10) || 0;
+  return Math.abs(mark.weightKg - wKg) <= 0.051 && mark.reps === reps;
+}
+
 /** Whether this exact set is the performance a session PR mark records. */
 export function isPRSet(
   marks: SessionPRMark[],
@@ -578,15 +587,44 @@ export function isPRSet(
   set: WorkoutSet,
 ): boolean {
   if (!set || set.isWarmup || !isSetCompleted(set)) return false;
-  const rawWeight = parseFloat(String(set.weight)) || 0;
-  const wKg = set.unit === 'lbs' ? lbsToKg(rawWeight) : rawWeight;
-  const reps = parseInt(String(set.reps), 10) || 0;
   const key = (exerciseName || '').trim().toLowerCase();
   return marks.some(
-    (m) =>
-      m.workoutId === workoutId &&
-      m.exerciseKey === key &&
-      Math.abs(m.weightKg - wKg) <= 0.051 &&
-      m.reps === reps,
+    (m) => m.workoutId === workoutId && m.exerciseKey === key && setMatchesMark(m, set),
   );
+}
+
+/**
+ * T1 (bug program Phase 4): the sets a workout's marks actually FLAG.
+ * A mark records ONE performance; when a session repeats it exactly
+ * (two identical 60 kg × 10 sets), `isPRSet` matches every copy and
+ * the history badged them all — a tie with yourself is not two PRs.
+ * The flagged set for each mark is the FIRST set in the session (in
+ * exercise-block order, then set order — the same aggregation the
+ * replay uses) whose performance matches it. Surfaces that badge or
+ * count PR sets read this, so they can never disagree with the mark
+ * count.
+ */
+export function flaggedPRSets(
+  marks: SessionPRMark[],
+  workout: WorkoutEntry,
+): Set<WorkoutSet> {
+  const flagged = new Set<WorkoutSet>();
+  if (!workout) return flagged;
+  const mine = (marks || []).filter((m) => m.workoutId === workout.id);
+  if (mine.length === 0) return flagged;
+  const setsByKey = new Map<string, WorkoutSet[]>();
+  for (const e of workout.exercises || []) {
+    const key = (e.name || '').trim().toLowerCase();
+    if (!key) continue;
+    const arr = setsByKey.get(key) || [];
+    arr.push(...(e.sets || []));
+    setsByKey.set(key, arr);
+  }
+  for (const m of mine) {
+    const hit = (setsByKey.get(m.exerciseKey) || []).find(
+      (s) => !flagged.has(s) && setMatchesMark(m, s),
+    );
+    if (hit) flagged.add(hit);
+  }
+  return flagged;
 }
