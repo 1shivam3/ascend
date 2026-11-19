@@ -700,8 +700,28 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
       toast.error(t('toast.deleteNotSaved'), t('toast.titleDeleteNotSaved'));
       return;
     }
+    // T4 (bug program Phase 4): snapshot the record + its index
+    // BEFORE the delete so the toast's Undo restores it exactly —
+    // every other delete path in the app offers Undo; this one
+    // didn't. Action toasts live 6 s (Toast.tsx), same as the rest.
+    const st = useStore.getState();
+    const index = st.prs.findIndex((p) => p.id === id);
+    const snapshot = index >= 0 ? st.prs[index] : undefined;
     deletePR(id);
-    toast.info(t('prs.toastDeleted', { exercise: ex, date }), t('prs.toastRemovedTitle'));
+    if (snapshot) {
+      toast.showToast(
+        'info',
+        t('prs.toastDeleted', { exercise: ex, date }),
+        t('prs.toastRemovedTitle'),
+        undefined,
+        {
+          label: 'Undo',
+          onAction: () => useStore.getState().insertPRAt(snapshot, index),
+        }
+      );
+    } else {
+      toast.info(t('prs.toastDeleted', { exercise: ex, date }), t('prs.toastRemovedTitle'));
+    }
   };
 
   const bigThreeStats = useMemo(() => getBigThreeStats(prs || []), [prs]);
