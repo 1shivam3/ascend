@@ -88,6 +88,7 @@ import HydrationModal from '@/components/HydrationModal';
 import CreatineModal from '@/components/CreatineModal';
 import { calculateHydrationTarget } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
+import TextInput from '@/components/ui/TextInput';
 
 import { useAppNavigation } from '@/lib/navigation';
 import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
@@ -2086,12 +2087,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
           {/* Natural Language Meal Logger Input */}
           <form onSubmit={handleNaturalLogSubmit} className="relative flex items-center">
-            <input
-              type="text"
+            <TextInput
               placeholder={t('meals.quickLogPlaceholder')}
               aria-label={t('meals.quickLogAria')}
               value={naturalQuery}
-              onChange={(e) => setNaturalQuery(e.target.value)}
+              onChange={setNaturalQuery}
               disabled={isNaturalParsing}
               className="w-full bg-bg-secondary border border-border/80 rounded-xl py-2.5 pl-3.5 pr-20 text-xs sm:text-sm text-text-primary outline-none focus:border-accent transition-colors placeholder:text-text-muted"
             />
@@ -2896,13 +2896,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   ))}
                 </div>
 
-                <input
+                <TextInput
                   id="meal-builder-name"
-                  type="text"
                   aria-required="true"
                   placeholder={`e.g. ${getDefaultMealName()}, Post-Workout Shake`}
                   value={mealName}
-                  onChange={(e) => setMealName(e.target.value)}
+                  onChange={setMealName}
                   className="w-full bg-bg-elevated border border-border rounded-lg p-2.5 text-text-primary text-sm focus:border-accent outline-none"
                 />
               </div>
@@ -3035,12 +3034,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                             className="relative"
                             ref={(el) => { suggestionRefs.current[i] = el; }}
                           >
-                            <input
+                            <TextInput
                               id={`food-${i}-name`}
-                              type="text"
                               placeholder={t('meals.foodNamePlaceholder')}
                               value={food.name}
-                              onChange={(e) => handleFoodChange(i, 'name', e.target.value)}
+                              onChange={(v) => handleFoodChange(i, 'name', v)}
                               className="w-full bg-bg-elevated border border-border rounded-lg p-2 text-text-primary text-sm focus:border-accent outline-none"
                             />
 
@@ -3733,12 +3731,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 <label htmlFor="pinned-food-name" className="text-2xs font-bold text-text-muted uppercase block mb-1">
                   {t('meals.foodNameLabel')}
                 </label>
-                <input
+                <TextInput
                   id="pinned-food-name"
-                  type="text"
                   placeholder={t('meals.foodNameExamplePlaceholder')}
                   value={pinnedName}
-                  onChange={(e) => setPinnedName(e.target.value)}
+                  onChange={setPinnedName}
                   className="w-full bg-bg-elevated border border-border rounded-lg p-2.5 text-text-primary text-sm focus:border-accent outline-none font-medium"
                 />
               </div>

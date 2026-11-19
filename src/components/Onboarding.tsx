@@ -83,6 +83,17 @@ function resumePointFor(screen: OnboardingScreenId): OnboardingScreenId | null {
 export default function Onboarding() {
   const { t } = useTranslation();
   const toast = useToast();
+  // O1 (bug program Phase 1): the session-restore effect below must
+  // run ONCE on mount. It previously depended on [toast], and
+  // useToast() returns a fresh object whenever the ToastProvider
+  // re-renders (its context value is an inline literal) — so EVERY
+  // toast re-ran the restore effect, whose sync subscription fires
+  // immediately with the current status and reset the screen to
+  // 'goals'. That is why the goals screen's Skip (which shows an info
+  // toast before advancing) could never leave the goals step. The
+  // effect reads toast through this ref instead.
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
   const { navigate } = useAppNavigation();
   const [currentScreen, setCurrentScreen] = useState<OnboardingScreenId>('splash');
 
@@ -220,7 +231,7 @@ export default function Onboarding() {
       // Provider redirect errors used to render verbatim (provider
       // wordings, URLs) — show neutral copy instead. The raw value is
       // still cleared from the URL below.
-      toast.error(t('auth.googleSignInIncomplete'), t('auth.signInError'));
+      toastRef.current.error(t('auth.googleSignInIncomplete'), t('auth.signInError'));
       window.history.replaceState(null, '', window.location.pathname);
       setIsRestoringAccount(false);
       setCurrentScreen('welcome');
@@ -294,7 +305,7 @@ export default function Onboarding() {
           } else if (status === 'error') {
             setIsRestoringAccount(false);
             if (error) {
-              toast.error(error, t('toast.titleSyncError'));
+              toastRef.current.error(error, t('toast.titleSyncError'));
             }
             if (!useStore.getState().profile) {
               setCurrentScreen('welcome');
@@ -304,7 +315,10 @@ export default function Onboarding() {
         return unsub;
       });
     }
-  }, [toast]);
+    // Mount-only by design (O1): re-running this restore on any later
+    // render resets the flow to 'goals' — see toastRef above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Check for previous device snapshot
   useEffect(() => {
