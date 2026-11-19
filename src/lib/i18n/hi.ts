@@ -3392,6 +3392,12 @@ export const hi: Partial<Record<StringKey, string>> = {
 
   // ── बातचीत वाला कोच ─────────────────────────────────────────────────
   'coachChat.title': 'कोच चैट',
+  'coachChat.newChat': 'नई चैट',
+  'coachChat.newChatConfirm': 'यह चैट साफ़ करने के लिए फिर से टैप करें',
+  'coachChat.yesterday': 'कल',
+  'coachChat.oldActionNote': '{date} की कार्रवाई — पूरी हो गई',
+  'coachChat.showAction': 'विवरण देखें',
+  'coachChat.hideAction': 'विवरण छिपाएँ',
   'coachChat.sectionAria': 'कोच चैट',
   'coachChat.subtitle':
     'अपने कोच से पूछें — हर जवाब सामान्य सलाह पर नहीं, बल्कि आपके अपने लॉग किए गए प्रशिक्षण पर आधारित होता है।',

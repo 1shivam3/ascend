@@ -540,6 +540,11 @@ export interface CoachChatUserData {
    * client derives the system prompt's MINOR ATHLETE rule flag from
    * the same profile field. Optional: older builders omit it. */
   ageYears?: number | null;
+  /** T3 (bug program Phase 4): the client's local today (yyyy-mm-dd).
+   * The context always anchors "today" explicitly — before, the date
+   * only reached the model when a session happened to resolve for
+   * today, so a stale thread's week numbers could drift unchallenged. */
+  todayStr?: string;
   bodyweightKg: number | null;
   unit: 'kg' | 'lbs';
   goal: string | null;
@@ -864,6 +869,12 @@ export function buildCoachChatContext(
     `Days/week: ${data.daysPerWeek ?? 'not set'}`,
   ].join(' | ');
   sections.push(`USER: ${userLine}`);
+
+  if (data.todayStr) {
+    sections.push(
+      `TODAY'S DATE: ${formatDate(data.todayStr)}. Anchor every "today", "this week" and staleness judgement to this date — earlier messages in this thread may predate it.`
+    );
+  }
 
   if (data.todaySession) {
     const ts = data.todaySession;
