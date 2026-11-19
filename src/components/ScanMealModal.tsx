@@ -1824,7 +1824,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                       type="button"
                       onClick={handleSaveToNutrition}
                       disabled={analysis.items.some((it) => itemNeedsConfirmation(it))}
-                      className="btn-primary py-3 text-sm font-bold flex-1 flex items-center justify-center gap-2 shadow-md shadow-accent/25 order-1 sm:order-2 disabled:opacity-50"
+                      className="btn-primary py-3 text-sm font-bold flex-1 flex items-center justify-center gap-2 shadow-md shadow-accent/25 order-1 sm:order-2"
                     >
                       <CheckCircle2 className="w-4 h-4" />
                       <span>{t('scan.addToNutrition')}</span>
