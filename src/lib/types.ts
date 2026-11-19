@@ -626,6 +626,42 @@ export interface OverallLevel {
   isEstimate?: boolean;
 }
 
+/**
+ * N1 (bug program Phase 2): where a stored macro target came from.
+ * 'manual' = the user typed these numbers (never overwritten by
+ * automatic recalculation); 'recommended' = derived by the app's
+ * engine (onboarding, goal change, Fuel prefs); 'coach' = applied
+ * from a coach suggestion/action the user confirmed.
+ */
+export type MacroGoalSource = 'manual' | 'recommended' | 'coach';
+
+/**
+ * N3: the profile inputs a target was derived from, stamped at write
+ * time so the "Why these targets?" surface can show exactly what
+ * produced the numbers — and what was missing.
+ */
+export interface MacroGoalInputsSnapshot {
+  bodyweightKg?: number;
+  heightCm?: number;
+  age?: number;
+  gender?: Gender;
+  goal?: AthleteGoal;
+  activityLevel?: string;
+}
+
+/**
+ * N3: one entry in the local goal-recompute diagnostics log — every
+ * time the app changes stored targets other than by the user's own
+ * save, a line lands here so drift is explainable after the fact.
+ */
+export interface GoalDiagnosticEntry {
+  at: string;
+  kind: 'safety-clamp' | 'profile-recalc' | 'manual-save' | 'reset-recommended';
+  beforeKcal?: number;
+  afterKcal?: number;
+  reason?: string;
+}
+
 export interface MacroGoals {
   calories: number;
   proteinG: number;
@@ -635,6 +671,14 @@ export interface MacroGoals {
   maintenanceCalories?: number;
   /** Target minus maintenance: negative = deficit, positive = surplus (optional, informational). */
   calorieDelta?: number;
+  /** N1 provenance: who wrote this target. Absent on pre-Phase-2
+   * saves — readers resolve it via goalSource() (lib/macro-goal-state);
+   * absent provenance is NOT treated as 'manual' (see there). */
+  source?: MacroGoalSource;
+  /** N1: ISO timestamp of the write that produced this target. */
+  updatedAt?: string;
+  /** N3: the profile inputs this target was derived from. */
+  inputsSnapshot?: MacroGoalInputsSnapshot;
 }
 
 export interface PlannedExercise {

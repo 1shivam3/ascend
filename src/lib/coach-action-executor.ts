@@ -164,7 +164,7 @@ export function applyMacroGoalsAction(
     applied.calorieDelta = applied.calories - applied.maintenanceCalories;
   }
 
-  state.setMacroGoals(applied);
+  state.setMacroGoals(applied, 'coach');
   return { ok: true, receipt: { previous, applied } };
 }
 
@@ -181,7 +181,11 @@ export function undoMacroGoals(receipt: MacroGoalsReceipt): UndoMacroGoalsResult
   if (!macroFieldsEqual(state.macroGoals, receipt.applied)) {
     return { ok: false, stale: true };
   }
-  state.setMacroGoals(receipt.previous ? { ...receipt.previous } : null);
+  // Undo restores the previous target WITH its original provenance.
+  state.setMacroGoals(
+    receipt.previous ? { ...receipt.previous } : null,
+    receipt.previous?.source ?? 'coach',
+  );
   return { ok: true };
 }
 

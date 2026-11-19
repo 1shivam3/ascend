@@ -15,6 +15,8 @@ import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   BodyMetricEntry,
   MacroGoals,
+  MacroGoalSource,
+  GoalDiagnosticEntry,
   resolvePrimaryGoal,
   PlannedWorkout,
   PlannedExercise,
@@ -174,6 +176,17 @@ import {
 } from './health-connect';
 import { kgToLbs } from './units';
 import { enforceMinorMacroGoals, enforceUnknownAgeMacroGoals, hasKnownAge, isMinorAge } from './minor-targets';
+import { goalSource, snapshotGoalInputs, stampMacroGoals } from './macro-goal-state';
+
+/** N3: the goal-recompute diagnostics log is capped — it is a
+ * debugging/explainability aid, not a history archive. */
+const GOAL_DIAGNOSTICS_CAP = 50;
+function appendGoalDiagnostic(
+  list: GoalDiagnosticEntry[] | undefined,
+  entry: GoalDiagnosticEntry,
+): GoalDiagnosticEntry[] {
+  return [...(list ?? []), entry].slice(-GOAL_DIAGNOSTICS_CAP);
+}
 import { deriveNutritionPhase } from './nutrition-phase';
 import { calculateRecommendedMacroGoals } from './macros';
 import { hasRealBodyStats } from './body-stats';
@@ -500,7 +513,27 @@ export interface AppState {
   deleteFoodFromMeal: (mealId: string, foodIndex: number) => void;
   copyMealsFromDate: (sourceDate: string, targetDate?: string) => number;
 
-  setMacroGoals: (goals: MacroGoals | null) => void;
+  /**
+   * N1 (bug program Phase 2): the ONE write path for macro targets.
+   * Stamps provenance (source / updatedAt / inputsSnapshot), applies
+   * the safety envelope, and RETURNS the goals as stored (read-back)
+   * so callers report what actually landed. `source` defaults to
+   * 'recommended'; the manual editor passes 'manual', coach paths
+   * pass 'coach'.
+   */
+  setMacroGoals: (goals: MacroGoals | null, source?: MacroGoalSource) => MacroGoals | null;
+  /** N1: automatic recalculation of derived targets on profile
+   * changes. Default ON; old saves lack the field — consumers treat
+   * anything but `false` as on. A 'manual' target is never
+   * recalculated regardless of this setting. */
+  autoRecalculateGoals: boolean;
+  setAutoRecalculateGoals: (on: boolean) => void;
+  /** N1: the ask-once "turn off auto-recalculate?" prompt has been
+   * shown. Old saves lack the field (treated as not shown). */
+  goalRecalcPromptSeen: boolean;
+  setGoalRecalcPromptSeen: () => void;
+  /** N3: local diagnostics log of automatic target changes. */
+  goalDiagnostics: GoalDiagnosticEntry[];
 
   addBodyMetric: (entry: BodyMetricEntry) => void;
   deleteBodyMetric: (id: string) => void;
@@ -1357,6 +1390,12 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   themeMode: state.themeMode,
   prTargets: state.prTargets,
   macroGoals: state.macroGoals,
+  // N1/N3 (bug program Phase 2): goal provenance preferences + the
+  // local recompute diagnostics log persist with the rest of the
+  // state (they are not part of the sync payload — device-local).
+  autoRecalculateGoals: state.autoRecalculateGoals,
+  goalRecalcPromptSeen: state.goalRecalcPromptSeen,
+  goalDiagnostics: state.goalDiagnostics,
   plannedWorkouts: state.plannedWorkouts,
   customExerciseMuscles: state.customExerciseMuscles,
   deletedPlanIds: state.deletedPlanIds,
@@ -1501,6 +1540,9 @@ export function buildFreshHistoryState(): Partial<AppState> {
     bodyMetrics: [],
     prTargets: {},
     macroGoals: null,
+    autoRecalculateGoals: true,
+    goalRecalcPromptSeen: false,
+    goalDiagnostics: [],
     plannedWorkouts: [],
     favoriteFoods: DEFAULT_FAVORITE_FOODS,
     customFoods: [],
@@ -1577,6 +1619,9 @@ export const useAppStore = create<AppState>()(
       themeMode: 'system',
       prTargets: {},
       macroGoals: null,
+      autoRecalculateGoals: true,
+      goalRecalcPromptSeen: false,
+      goalDiagnostics: [],
       plannedWorkouts: [],
       customExerciseMuscles: {},
       setCustomExerciseMuscle: (name, muscle) => {
@@ -2026,15 +2071,30 @@ export const useAppStore = create<AppState>()(
         // body stats there is no honest maintenance to clamp to, and
         // stored goals (the user's own numbers) stay as they are.
         let nextMacroGoals = state.macroGoals;
+        let nextGoalDiagnostics = state.goalDiagnostics;
         if (nextMacroGoals && hasRealBodyStats(profile) && profile.bodyweightKg && profile.bodyweightKg > 0) {
           const activityLevel = state.trainingProfile?.activityLevel;
+          // N1 (bug program Phase 2): the safety envelope (minor /
+          // unknown-age maintenance) applies to EVERY target,
+          // whatever its source — but RECALCULATION is different: a
+          // 'manual' target is never overwritten automatically, and
+          // no target is recalculated while the user has turned
+          // auto-recalculate off.
+          const mayRecalculate =
+            state.autoRecalculateGoals !== false && goalSource(nextMacroGoals) !== 'manual';
+          let changeKind: 'safety-clamp' | 'profile-recalc' | null = null;
+          let changeReason: string | undefined;
           if (isMinorAge(profile.age)) {
             nextMacroGoals = enforceMinorMacroGoals(nextMacroGoals, profile, activityLevel);
+            changeKind = 'safety-clamp';
+            changeReason = 'minor-maintenance';
           } else if (!hasKnownAge(profile.age)) {
             // QA-hardening R5: age unknown (no DOB) — stored targets
             // may not sit off maintenance in either direction.
             nextMacroGoals = enforceUnknownAgeMacroGoals(nextMacroGoals, profile, activityLevel);
-          } else if (isMinorAge(state.profile?.age) || !hasKnownAge(state.profile?.age)) {
+            changeKind = 'safety-clamp';
+            changeReason = 'unknown-age';
+          } else if (mayRecalculate && (isMinorAge(state.profile?.age) || !hasKnownAge(state.profile?.age))) {
             // Left the minor band, or age just became known (DOB
             // added): recompute under adult rules so the unlock
             // actually happens instead of leaving a clamp behind.
@@ -2046,6 +2106,35 @@ export const useAppStore = create<AppState>()(
               profile.age ?? undefined,
               activityLevel
             );
+            changeKind = 'profile-recalc';
+            changeReason = 'age-became-known';
+          }
+          // N3: any change this block makes is restamped (provenance
+          // kept, inputs refreshed) and written to the diagnostics
+          // log — drift is never silent again.
+          if (nextMacroGoals && state.macroGoals && nextMacroGoals.calories !== state.macroGoals.calories) {
+            const nowIso = new Date().toISOString();
+            const prevSource = goalSource(state.macroGoals);
+            nextMacroGoals = {
+              ...nextMacroGoals,
+              // A recalculation is an engine write: stamp it
+              // 'recommended'. A safety clamp keeps the target's
+              // own provenance (it adjusted, not replaced, it).
+              ...(changeKind === 'profile-recalc'
+                ? { source: 'recommended' as MacroGoalSource }
+                : prevSource
+                  ? { source: prevSource }
+                  : {}),
+              updatedAt: nowIso,
+              inputsSnapshot: snapshotGoalInputs({ ...profile, goals: nextGoals }, activityLevel),
+            };
+            nextGoalDiagnostics = appendGoalDiagnostic(state.goalDiagnostics, {
+              at: nowIso,
+              kind: changeKind ?? 'profile-recalc',
+              beforeKcal: state.macroGoals.calories,
+              afterKcal: nextMacroGoals.calories,
+              reason: changeReason,
+            });
           }
         }
         return {
@@ -2057,6 +2146,7 @@ export const useAppStore = create<AppState>()(
           profile: { ...profile, goals: nextGoals, updatedAt: new Date().toISOString() },
           goals: nextGoals,
           macroGoals: nextMacroGoals,
+          goalDiagnostics: nextGoalDiagnostics,
           bodyMetrics: nextMetrics,
           favoriteFoods: nextFavorites,
         };
@@ -2737,17 +2827,44 @@ export const useAppStore = create<AppState>()(
       // QA-hardening R5: the unknown-age guard composes on top — no
       // DOB on file means no off-maintenance target may be written
       // either (see enforceUnknownAgeMacroGoals).
-      setMacroGoals: (goals) => set((state) => ({
-        macroGoals: enforceUnknownAgeMacroGoals(
-          enforceMinorMacroGoals(
-            goals,
+      // N1 (bug program Phase 2): the write is stamped with
+      // provenance (source / updatedAt / inputsSnapshot) and rounded
+      // by the one rule in lib/macro-goal-state, and the setter
+      // RETURNS the stored goals — the read-back is the contract:
+      // callers report what landed, never what was typed. When the
+      // safety envelope changes the numbers, the change is written
+      // to the diagnostics log (N3) instead of happening silently.
+      setMacroGoals: (goals, source = 'recommended') => {
+        let stored: MacroGoals | null = null;
+        set((state) => {
+          if (!goals) return { macroGoals: null };
+          const activityLevel = state.trainingProfile?.activityLevel;
+          const stamped = stampMacroGoals(goals, source, state.profile, activityLevel);
+          const enforced = enforceUnknownAgeMacroGoals(
+            enforceMinorMacroGoals(stamped, state.profile, activityLevel),
             state.profile,
-            state.trainingProfile?.activityLevel
-          ),
-          state.profile,
-          state.trainingProfile?.activityLevel
-        ),
-      })),
+            activityLevel
+          );
+          stored = enforced;
+          if (!enforced || enforced.calories === stamped.calories) {
+            return { macroGoals: enforced };
+          }
+          return {
+            macroGoals: enforced,
+            goalDiagnostics: appendGoalDiagnostic(state.goalDiagnostics, {
+              at: new Date().toISOString(),
+              kind: 'safety-clamp',
+              beforeKcal: stamped.calories,
+              afterKcal: enforced.calories,
+              reason: !hasKnownAge(state.profile?.age) ? 'unknown-age' : 'minor-maintenance',
+            }),
+          };
+        });
+        return stored;
+      },
+
+      setAutoRecalculateGoals: (on) => set({ autoRecalculateGoals: on }),
+      setGoalRecalcPromptSeen: () => set({ goalRecalcPromptSeen: true }),
 
       addBodyMetric: (entry) => set((state) => {
         // Re-audit DI-R3: normalize the date like every other write path
@@ -4078,6 +4195,9 @@ export const useAppStore = create<AppState>()(
           progressPhotos: [],
           prTargets: {},
           macroGoals: null,
+          autoRecalculateGoals: true,
+          goalRecalcPromptSeen: false,
+          goalDiagnostics: [],
           plannedWorkouts: [],
           deletedPlanIds: [],
           deletedPrIds: [],
@@ -4187,6 +4307,9 @@ export const useAppStore = create<AppState>()(
             bodyMetrics: [],
             prTargets: {},
             macroGoals: null,
+            autoRecalculateGoals: true,
+            goalRecalcPromptSeen: false,
+            goalDiagnostics: [],
             plannedWorkouts: [],
             favoriteFoods: DEFAULT_FAVORITE_FOODS,
             customFoods: [],

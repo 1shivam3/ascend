@@ -210,6 +210,21 @@ function seedStore(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => seedStore());
 
+/**
+ * Bug program Phase 2 (N1): stored goals now also carry provenance
+ * (source / updatedAt / inputsSnapshot) stamped by the store write,
+ * so store assertions check the NUMBERS (the pre-Phase-2 contract)
+ * plus the stamp, not the exact object shape.
+ */
+function expectStoredNumbers(expected: MacroGoals) {
+  const stored = useStore.getState().macroGoals;
+  expect(stored).not.toBeNull();
+  expect(stored!.calories).toBe(expected.calories);
+  expect(stored!.proteinG).toBe(expected.proteinG);
+  expect(stored!.carbsG).toBe(expected.carbsG);
+  expect(stored!.fatG).toBe(expected.fatG);
+}
+
 describe('executor: macro goals apply / undo / stale', () => {
   it('base matches only when the live goals equal the snapshot', () => {
     expect(macroGoalsBaseMatches({ ...GOALS })).toBe(true);
@@ -225,7 +240,8 @@ describe('executor: macro goals apply / undo / stale', () => {
     if (!result.ok) return;
     expect(result.receipt.previous).toEqual(GOALS);
     expect(result.receipt.applied).toEqual({ ...GOALS, proteinG: 180 });
-    expect(useStore.getState().macroGoals).toEqual({ ...GOALS, proteinG: 180 });
+    expectStoredNumbers({ ...GOALS, proteinG: 180 });
+    expect(useStore.getState().macroGoals!.source).toBe('coach');
   });
 
   it('refuses as stale when the live goals moved since the snapshot', () => {
@@ -233,14 +249,15 @@ describe('executor: macro goals apply / undo / stale', () => {
     const result = applyMacroGoalsAction({ type: 'set_macro_goals', proteinG: 180 }, { ...GOALS });
     expect(result).toEqual({ ok: false, stale: true });
     // Nothing was written.
-    expect(useStore.getState().macroGoals).toEqual({ ...GOALS, calories: 2200 });
+    expectStoredNumbers({ ...GOALS, calories: 2200 });
   });
 
-  it('undo restores the previous goals verbatim', () => {
+  it('undo restores the previous goals (numbers verbatim; restore stamped as a coach write)', () => {
     const result = applyMacroGoalsAction({ type: 'set_macro_goals', proteinG: 180 }, { ...GOALS });
     if (!result.ok) throw new Error('apply failed');
     expect(undoMacroGoals(result.receipt)).toEqual({ ok: true });
-    expect(useStore.getState().macroGoals).toEqual(GOALS);
+    expectStoredNumbers(GOALS);
+    expect(useStore.getState().macroGoals!.source).toBe('coach');
   });
 
   it('undo refuses when the goals changed again after the apply', () => {

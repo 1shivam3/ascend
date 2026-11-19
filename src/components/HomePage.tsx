@@ -834,7 +834,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                     // carbs/fat, maintenance and the delta stale, breaking the
                     // zero-Atwater-drift guarantee the Meals page relies on.
                     if (current) {
-                      setMacroGoals(scaleMacroGoalsToCalories(current, nutritionSuggestion.newCalories));
+                      setMacroGoals(scaleMacroGoalsToCalories(current, nutritionSuggestion.newCalories), 'coach');
                     }
                     recordCalorieAdjustment(record);
                     toast.success(t('toast.targetUpdated', { kcal: formatNumber(nutritionSuggestion.newCalories) }), t('toast.titleCaloriesAdjusted'));

@@ -100,7 +100,7 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
         profile.heightCm,
         profile.age
       );
-      setMacroGoals(newMacros);
+      setMacroGoals(newMacros, 'recommended');
       toast.success(
         t('goals.recalcedMsg', { cal: newMacros.calories, protein: newMacros.proteinG, goal: ATHLETE_GOAL_CONFIGS[primaryGoal].label }),
         t('goals.recalcedTitle')

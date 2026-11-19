@@ -92,7 +92,10 @@ import TextInput from '@/components/ui/TextInput';
 
 import { useAppNavigation } from '@/lib/navigation';
 import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
-import { safeRandomId, getLocalTodayStr, formatLocalDate, round1, formatWater, formatNumber, formatCalories, formatDateShort } from '@/lib/formatters';
+import { safeRandomId, getLocalTodayStr, formatLocalDate, round1, formatWater, formatNumber, formatCalories, formatDateShort, formatDate } from '@/lib/formatters';
+import { goalSource } from '@/lib/macro-goal-state';
+import { macroGuardrailWarnings } from '@/lib/macro-guardrails';
+import { hasKnownAge } from '@/lib/minor-targets';
 import { useToday } from '@/lib/use-today';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -196,6 +199,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const restoreFoodToMeal  = useStore((state) => state.restoreFoodToMeal);
   const insertMealAt       = useStore((state) => state.insertMealAt);
   const setMacroGoals      = useStore((state) => state.setMacroGoals);
+  const autoRecalculateGoals = useStore((state) => state.autoRecalculateGoals);
+  const goalRecalcPromptSeen = useStore((state) => state.goalRecalcPromptSeen);
+  const goalDiagnostics    = useStore((state) => state.goalDiagnostics || []);
+  const setAutoRecalculateGoals = useStore((state) => state.setAutoRecalculateGoals);
+  const setGoalRecalcPromptSeen = useStore((state) => state.setGoalRecalcPromptSeen);
   const copyMealsFromDate  = useStore((state) => state.copyMealsFromDate);
   const uiPreferences      = useStore((state) => state.uiPreferences);
   const mealDayKinds       = useStore((state) => state.mealDayKinds || {});
@@ -387,6 +395,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [goalProtein,  setGoalProtein]  = useState('');
   const [goalCarbs,    setGoalCarbs]    = useState('');
   const [goalFat,      setGoalFat]      = useState('');
+  // N3: the "Why these targets?" panel + the N1 ask-once
+  // auto-recalculate prompt, both inside the goals modal.
+  const [showGoalWhy,    setShowGoalWhy]    = useState(false);
+  const [showRecalcPrompt, setShowRecalcPrompt] = useState(false);
 
   // ── Meal log form ─────────────────────────────────────────────────────────
   const [mealName, setMealName] = useState('');
@@ -1060,11 +1072,17 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   };
 
   const handleOpenGoalsModal = () => {
-    if (macroGoals) {
-      setGoalCalories(macroGoals.calories ? String(macroGoals.calories) : '');
-      setGoalProtein(macroGoals.proteinG ? String(macroGoals.proteinG) : '');
-      setGoalCarbs(macroGoals.carbsG ? String(macroGoals.carbsG) : '');
-      setGoalFat(macroGoals.fatG ? String(macroGoals.fatG) : '');
+    setShowGoalWhy(false);
+    setShowRecalcPrompt(false);
+    // N1: read the stored goals FRESH at open time — the editor must
+    // always show what is actually stored (WA0004 showed a blank
+    // calorie field over stored goals).
+    const storedGoals = useStore.getState().macroGoals;
+    if (storedGoals) {
+      setGoalCalories(storedGoals.calories ? String(storedGoals.calories) : '');
+      setGoalProtein(storedGoals.proteinG ? String(storedGoals.proteinG) : '');
+      setGoalCarbs(storedGoals.carbsG ? String(storedGoals.carbsG) : '');
+      setGoalFat(storedGoals.fatG ? String(storedGoals.fatG) : '');
     } else if (!hasRealBodyStats(profile)) {
       // Task 1.1: no stored goals and placeholder body stats — do NOT
       // pre-fill derived numbers the user never earned. The fields
@@ -1184,8 +1202,54 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     };
     newGoals.calorieDelta = normalizeCalorieDelta(newGoals.calories - (newGoals.maintenanceCalories as number));
 
-    setMacroGoals(newGoals);
-    toast.success(carbsAdjusted ? t('toast.goalsSavedCarbs', { kcal: newGoals.calories || 0, protein: newGoals.proteinG || 0, carbs: newGoals.carbsG || 0, fat: newGoals.fatG || 0 }) : t('toast.goalsSaved', { kcal: newGoals.calories || 0, protein: newGoals.proteinG || 0, carbs: newGoals.carbsG || 0, fat: newGoals.fatG || 0 }), t('toast.titleGoalsSaved'));
+    // N1 read-back: the store stamps provenance and applies the
+    // safety envelope (minor / unknown-age maintenance) — the toast
+    // quotes the STORED goals, never the typed ones. (WA0004: the
+    // toast claimed "3000 kcal" while 2,356 was stored.)
+    const stored = setMacroGoals(newGoals, 'manual');
+    const shown = stored ?? newGoals;
+    const safetyAdjusted =
+      stored !== null &&
+      (stored.calories !== newGoals.calories ||
+        stored.proteinG !== newGoals.proteinG ||
+        stored.carbsG !== newGoals.carbsG ||
+        stored.fatG !== newGoals.fatG);
+    if (safetyAdjusted) {
+      toast.info(
+        t(!hasKnownAge(profile?.age) ? 'goals.adjustedUnknownAge' : 'goals.adjustedMinor', {
+          kcal: shown.calories || 0,
+          protein: shown.proteinG || 0,
+          carbs: shown.carbsG || 0,
+          fat: shown.fatG || 0,
+        }),
+        t('toast.titleGoalsSaved')
+      );
+    } else {
+      toast.success(carbsAdjusted ? t('toast.goalsSavedCarbs', { kcal: shown.calories || 0, protein: shown.proteinG || 0, carbs: shown.carbsG || 0, fat: shown.fatG || 0 }) : t('toast.goalsSaved', { kcal: shown.calories || 0, protein: shown.proteinG || 0, carbs: shown.carbsG || 0, fat: shown.fatG || 0 }), t('toast.titleGoalsSaved'));
+    }
+    // N1 ask-once: after the first manual save, offer to turn
+    // auto-recalculate off (manual targets are protected either
+    // way; this governs derived targets). Asked exactly once.
+    if (autoRecalculateGoals !== false && !goalRecalcPromptSeen) {
+      setShowRecalcPrompt(true);
+    } else {
+      setIsGoalsModalOpen(false);
+    }
+  };
+
+  const handleResetRecommendedGoals = () => {
+    if (!profile?.bodyweightKg) return;
+    const rec = calculateRecommendedMacroGoals(
+      profile.bodyweightKg,
+      primaryGoal,
+      profile.gender || 'male',
+      profile.heightCm,
+      profile.age,
+      useStore.getState().trainingProfile?.activityLevel || 'light'
+    );
+    const stored = setMacroGoals(rec, 'recommended');
+    const shown = stored ?? rec;
+    toast.success(t('toast.goalsSaved', { kcal: shown.calories || 0, protein: shown.proteinG || 0, carbs: shown.carbsG || 0, fat: shown.fatG || 0 }), t('toast.titleGoalsSaved'));
     setIsGoalsModalOpen(false);
   };
 
@@ -3414,6 +3478,62 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </div>
             </div>
 
+            {/* N1/N3: provenance — where the stored target came from,
+                when it was set, and the "Why?" explainer. */}
+            {macroGoals && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2 py-0.5 rounded-full bg-accent/15 text-accent-text text-2xs font-bold">
+                    {goalSource(macroGoals) === 'manual'
+                      ? t('goals.sourceManual')
+                      : goalSource(macroGoals) === 'coach'
+                        ? t('goals.sourceCoach')
+                        : goalSource(macroGoals) === 'recommended'
+                          ? t('goals.sourceRecommended')
+                          : t('goals.sourceSaved')}
+                  </span>
+                  {macroGoals.updatedAt && (
+                    <span className="text-2xs text-text-muted">
+                      {t('goals.updatedOn', { date: formatDate(macroGoals.updatedAt.slice(0, 10)) })}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowGoalWhy((v) => !v)}
+                    className="ml-auto text-2xs font-bold text-accent-text hover:underline cursor-pointer"
+                    aria-expanded={showGoalWhy}
+                  >
+                    {t('goals.whyTitle')}
+                  </button>
+                </div>
+                {showGoalWhy && (
+                  <div className="p-3 rounded-lg bg-bg-secondary border border-border/70 space-y-1.5 text-[0.6875rem] text-text-secondary">
+                    {macroGoals.inputsSnapshot && (
+                      <p>
+                        {t('goals.whyInputs', {
+                          kg: macroGoals.inputsSnapshot.bodyweightKg ?? '—',
+                          cm: macroGoals.inputsSnapshot.heightCm ?? '—',
+                          age: macroGoals.inputsSnapshot.age ?? '—',
+                        })}
+                      </p>
+                    )}
+                    {!hasKnownAge(profile?.age) && (
+                      <p className="font-semibold text-text-primary">{t('goals.whyMissingAge')}</p>
+                    )}
+                    {goalDiagnostics.length > 0 && (
+                      <p>
+                        {t('goals.whyLastChange', {
+                          date: formatDate(goalDiagnostics[goalDiagnostics.length - 1].at.slice(0, 10)),
+                          before: goalDiagnostics[goalDiagnostics.length - 1].beforeKcal ?? '—',
+                          after: goalDiagnostics[goalDiagnostics.length - 1].afterKcal ?? '—',
+                        })}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Input Fields */}
             <div className="space-y-3 font-mono">
               <div>
@@ -3485,7 +3605,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
                 if (!showCheck) return null;
 
+                // N2: guardrail warnings — shown live, never blocking.
+                const guardrails = macroGuardrailWarnings(
+                  { calories: calVal, proteinG: protVal, fatG: fatVal },
+                  profile?.bodyweightKg
+                );
+
                 return (
+                  <>
                   <div className="p-2.5 rounded-xl bg-bg-secondary border border-border/70 flex items-center justify-between text-xs font-mono">
                     <div>
                       <span className="text-text-muted">{t('meals.macroSum')} </span>
@@ -3508,30 +3635,75 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       </button>
                     )}
                   </div>
+                  {guardrails.length > 0 && (
+                    <div className="space-y-1">
+                      {guardrails.map((w) => (
+                        <p key={w} className="text-[0.6875rem] font-semibold text-amber-700 dark:text-amber-400">
+                          {w === 'fat-below-kcal-fraction'
+                            ? t('goals.warnFatFraction')
+                            : w === 'fat-below-per-kg'
+                              ? t('goals.warnFatPerKg')
+                              : t('goals.warnProteinPerKg')}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                  </>
                 );
               })()}
             </div>
 
             {/* Action Buttons */}
-            <div className="pt-2 flex gap-2">
-              {macroGoals && (
+            {showRecalcPrompt ? (
+              <div className="pt-2 space-y-2">
+                <p className="text-xs text-text-secondary">{t('goals.recalcPrompt')}</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setGoalRecalcPromptSeen(); setShowRecalcPrompt(false); setIsGoalsModalOpen(false); }}
+                    className="btn-primary flex-1 py-2 text-xs font-bold font-mono uppercase"
+                  >
+                    {t('goals.keepOn')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAutoRecalculateGoals(false); setGoalRecalcPromptSeen(); setShowRecalcPrompt(false); setIsGoalsModalOpen(false); }}
+                    className="py-2 px-3 text-xs font-mono rounded-lg border border-border text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+                  >
+                    {t('goals.turnOff')}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="pt-2 flex gap-2">
+                {macroGoals && (
+                  <button
+                    type="button"
+                    onClick={handleClearGoals}
+                    className="btn-danger py-2 px-3 text-xs font-mono"
+                    title={t('meals.removeTargets')}
+                  >
+                    {t('meals.clear')}
+                  </button>
+                )}
+                {macroGoals && goalSource(macroGoals) === 'manual' && hasRealBodyStats(profile) && (
+                  <button
+                    type="button"
+                    onClick={handleResetRecommendedGoals}
+                    className="py-2 px-3 text-xs font-mono rounded-lg border border-border text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+                  >
+                    {t('goals.resetRecommended')}
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={handleClearGoals}
-                  className="btn-danger py-2 px-3 text-xs font-mono"
-                  title={t('meals.removeTargets')}
+                  onClick={handleSaveGoals}
+                  className="btn-primary flex-1 py-2 text-xs font-bold font-mono uppercase"
                 >
-                  {t('meals.clear')}
+                  {t('meals.saveTargets')}
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={handleSaveGoals}
-                className="btn-primary flex-1 py-2 text-xs font-bold font-mono uppercase"
-              >
-                {t('meals.saveTargets')}
-              </button>
-            </div>
+              </div>
+            )}
           </div>
         </div>
       )}
