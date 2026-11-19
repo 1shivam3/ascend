@@ -129,10 +129,10 @@ test.describe('B1: typing order in migrated inputs', () => {
 
   test('exercise search input keeps character order', async ({ page }) => {
     await page.getByRole('button', { name: /^train$/i }).first().click();
-    // Open the exercise selector from the Train surface.
-    const addExercise = page.getByRole('button', { name: /add exercise/i }).first();
-    await addExercise.click();
-    const search = page.locator('input[placeholder*="Search" i]').first();
+    // Train -> Log Past Session -> Add Exercise opens the selector.
+    await page.getByRole('button', { name: /log past session/i }).click();
+    await page.getByRole('button', { name: /add exercise/i }).first().click();
+    const search = page.locator('input[placeholder*="Search exercise" i]').first();
     await expect(search).toBeVisible({ timeout: 10_000 });
     await search.click();
     await page.keyboard.type('Bench', { delay: 90 });
