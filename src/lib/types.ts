@@ -916,6 +916,23 @@ export interface ScannedFoodItem {
   confidence: 'high' | 'medium' | 'low';
   preparation?: string;
   notes?: string;
+  /**
+   * M1 (bug program Phase 3): true only when this item's macros come
+   * from the verified food database (an exact DB match for the name).
+   * Absent on pre-Phase-3 results — readers treat absent as
+   * unverified.
+   */
+  verified?: boolean;
+  /** M1: where the numbers came from — the food database, the vision
+   * model (unverified estimate), or the user's own edit. */
+  macroSource?: 'database' | 'model' | 'user';
+  /** M1: the user explicitly accepted an unverified estimate in the
+   * review's confirm flow. */
+  userConfirmed?: boolean;
+  /** M1: the DB entry an approximate match resolved to, when the
+   * match was word-overlap only (shown for honesty, never as a
+   * verified match). */
+  matchedEntry?: string;
 }
 
 export interface MealAnalysisResult {

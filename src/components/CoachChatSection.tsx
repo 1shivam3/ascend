@@ -9,6 +9,7 @@ import {
 import { getAiAuthHeaders } from '@/lib/ai-client-auth';
 import TextInput from '@/components/ui/TextInput';
 import { displayDatesInText } from '@/lib/formatters';
+import { scrubHealthClaims } from '@/lib/health-claims';
 import { toLocalDateString } from '@/lib/habits';
 import {
   useCoachChatStore,
@@ -466,8 +467,10 @@ export default function CoachChatSection() {
               {m.role === 'assistant' ? (
                 // N4: model prose leaks ISO dates ("2026-11-06") into
                 // sentences — display them in the one date format.
+                // M2: health claims are scrubbed at display too, so
+                // stored history is covered, not just new replies.
                 // Display-time only; the stored message is untouched.
-                <CoachMarkdown text={displayDatesInText(m.content)} />
+                <CoachMarkdown text={displayDatesInText(scrubHealthClaims(m.content))} />
               ) : (
                 <p className="text-sm text-text-primary whitespace-pre-wrap">{m.content}</p>
               )}

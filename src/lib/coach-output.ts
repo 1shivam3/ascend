@@ -18,6 +18,8 @@
  * falls back to its local logic).
  */
 
+import { scrubHealthClaims } from './health-claims';
+
 export interface CoachValidationResult {
   data: Record<string, unknown>;
   safetyFiltered: boolean;
@@ -140,6 +142,15 @@ function sanitizeString(value: unknown, cap: number, state: { filtered: boolean 
   if (violatesCoachGuardrails(trimmed)) {
     state.filtered = true;
     return COACH_SAFETY_FALLBACK;
+  }
+  // M2 (bug program Phase 3): health CLAIMS (unverified therapeutic
+  // benefits — "boosts immunity", "reduces inflammation") are a
+  // different family from the dangerous-advice guardrails above:
+  // they are scrubbed sentence by sentence, not replaced wholesale.
+  const scrubbed = scrubHealthClaims(trimmed);
+  if (scrubbed !== trimmed) {
+    state.filtered = true;
+    return scrubbed;
   }
   return trimmed;
 }

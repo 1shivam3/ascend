@@ -23,6 +23,7 @@ import {
 import { AiActorAuthError, aiQuotaExceededResponse, checkAiDailyQuota } from '@/lib/ai-quota';
 import { validateCoachAction } from '@/lib/coach-actions';
 import { COACH_SAFETY_FALLBACK, violatesCoachGuardrails } from '@/lib/coach-output';
+import { scrubHealthClaims } from '@/lib/health-claims';
 import { RateLimitUnavailableError, checkRateLimit } from '@/lib/rate-limit';
 import {
   rateLimitUnavailableResponse,
@@ -321,6 +322,13 @@ export async function POST(req: Request) {
       const cautioned = ensureReplyCaution(reply, language);
       reply = cautioned.reply;
       cautionRisk = cautioned.risk;
+      // M2 (bug program Phase 3): health claims are scrubbed
+      // sentence-level after every other transform; a reply that was
+      // ONLY a claim falls back to the safety copy.
+      const scrubbed = scrubHealthClaims(reply);
+      if (scrubbed !== reply) {
+        reply = scrubbed || COACH_SAFETY_FALLBACK;
+      }
     }
 
     return NextResponse.json({

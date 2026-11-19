@@ -229,9 +229,14 @@ describe('Meal Scanner API & Nutrition Pipeline', () => {
 
     const recalculated = recalculateMealResult(baseAnalysis, updatedItems);
     expect(recalculated.totalCalories).toBe(525);
-    expect(recalculated.totalProtein).toBe(66);
+    // Phase 3 (M1): totals now sum DATABASE values — white rice's
+    // protein is 2.7 g/100 g in the DB (4.1 g at 150 g), not the
+    // fixture's rounded 4 g, so the total is 66.1, not 66.
+    expect(recalculated.totalProtein).toBe(66.1);
     expect(recalculated.totalCarbs).toBe(42);
-    expect(recalculated.totalFat).toBe(7.7);
+    // Same story for fat: DB rice fat is 0.3 g/100 g → 0.4 g at
+    // 150 g after the DB's 1-decimal rounding, so 7.6, not 7.7.
+    expect(recalculated.totalFat).toBe(7.6);
   });
 
   it('generates offline fallback estimation for Indian staples', () => {

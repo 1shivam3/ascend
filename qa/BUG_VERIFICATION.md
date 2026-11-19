@@ -266,22 +266,79 @@ Phase 0 baseline, branch `bug-program/phase-0` off master `adcb6c1`.
   estimate only as a fallback when the model returns no valid calorie
   number; when the model returns numbers, they win. Confidence is
   displayed as "High" without a database match.
+- **Phase 3 resolution (2026-11-19, commit 43669b9 + gates fix
+  7662e0c):** `src/lib/scan-verification.ts` — the model now supplies
+  only name + grams. An exact DB match REPLACES the macros with the
+  database values (`verified: true, macroSource: 'database'`); a
+  word-overlap match takes the matched entry's values but stays
+  unverified with `matchedEntry` recorded; no match keeps the model
+  numbers as a flagged estimate (`macroSource: 'model'`). Applied in
+  the scan-meal route, in `recalculateMealResult` (every edit/refine
+  re-resolves), and at modal ingest. The review shows the source per
+  item ("Verified · Food database" / "Not verified" / "Your values"
+  / "Estimate · confirmed by you"); **saving is disabled while any
+  item is unverified and unconfirmed** (button + handler guard).
+  User-edited values (`macroSource: 'user'`) are kept verbatim.
+  Confidence was already computed from signals (P0-4,
+  `scan-confidence.ts`) — unchanged. `qa/FOOD_TEST_SET.json` pins 79
+  foods at 5% tolerance; `tests/food-test-set.test.ts` fails on
+  drift. **Caught by the new e2e:** the modal's portion-preference
+  helper early-returned when no preferences existed, bypassing
+  verification for most users — fixed in 7662e0c; the M1 spec
+  (`qa/e2e/m1-scan-verification.spec.ts`) now passes: pineapple
+  renders ~100 kcal with the database source line, the unknown item
+  gates the save until "Confirm estimate" is tapped.
 
 ### M2 — Health claims in AI output
 - **Status:** confirmed. The scan note for pineapple reads it "may
   support muscle recovery and reduce inflammation" (WA0003 ~2:26).
   Whether any post-filter exists is a Phase 3 code check.
+- **Phase 3 resolution (2026-11-19, commit 6e026aa):** no filter
+  existed. `src/lib/health-claims.ts` — a prompt rule
+  (HEALTH_CLAIM_PROMPT_RULE, added to the scan prompt and coach-chat
+  rule 4b) plus a sentence-level post-filter (`scrubHealthClaims`):
+  therapeutic/disease/benefit claims are removed sentence by
+  sentence; composition facts and goal language survive (pinned by
+  `tests/health-claims.test.ts`, incl. the video's exact sentence).
+  Wired into: the scan-meal route (coachingNote + item notes), the
+  coach route's output validation (Coach's Take, WEEKLY_REVIEW,
+  insights — scrubbed inside `sanitizeString`, distinct from the
+  dangerous-advice guardrails), the coach-chat route, the chat
+  renderer (stored history covered), and the scan modal's note
+  display. Static app copy swept for claim phrases — none found.
+  The weekly review's own text is template-built (no model prose);
+  its AI-route variant passes through the same validation.
 
 ### M3 — Alias and naming (pigeon pea vs chana)
 - **Status:** not yet verified. An alias table exists
   (`src/lib/food-aliases.ts`); the toor/arhar/pigeon pea vs chana
   cases are Phase 3 tests.
+- **Phase 3 resolution (2026-11-19):** verified — the system was
+  already built and wired by the UI/UX audit (P0-4): the alias table
+  maps pigeon pea/arhar/red gram → toor dal (never chana), chana =
+  chickpea with 'chana dal' deliberately a separate DB entry,
+  roti/chapati/phulka family handled; `findBestMatch` consults the
+  table, the scan sanitizer canonicalizes display names
+  ("Cooked Pigeon Peas (Chana)" → "Toor Dal (Pigeon Pea)"), and
+  scan-confidence uses alias identity keys. What was missing was
+  regression evidence at the scan layer — added in
+  `tests/food-test-set.test.ts` (M3 block): alias resolution,
+  canonical display, and a scanned "Pigeon Pea" priced as toor dal,
+  explicitly NOT chana's values. No code change was needed.
 
 ### M4 — Scan result clarity
 - **Status:** partly. "Estimated" badge and "Analyzed by AI" label
   are present in the result (frames). The "Meals (2)" tab counts
   today's meals while Meal History groups by day — the ambiguity is
   as described; Phase 3.
+- **Phase 3 resolution (2026-11-19, commit c0b733e):** verified in
+  code — the Estimated badge, the "Analyzed by AI" source line
+  (§29 flow source), and the summary card pinned outside the scroll
+  region (total visible while scrolling) were all already in place
+  from P0-4. M1 added the missing piece: the macro SOURCE per item.
+  The one real fix: the Fuel tab rendered "Meals (2)" — it now reads
+  "Meals · 2 today" (`meals.tabMealsCount`, en + hi) so the count
+  can't be mistaken for part of the tab's name.
 
 ### T1 — PR flags on tied sets
 - **Status:** confirmed against the brief's rule. Both 60 kg × 10
