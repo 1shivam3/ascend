@@ -739,12 +739,14 @@ export default function ActiveWorkoutScreen({
           let updatedSets = ex.sets;
           if (isBodyweight && !wasBodyweight) {
             updatedSets = ex.sets.map((s) => (isActiveSetCompleted(s) ? s : { ...s, weight: 0 }));
-          } else if (!isBodyweight && wasBodyweight) {
-            const defaultWeight = userUnit === 'lbs' ? 115 : 50;
-            updatedSets = ex.sets.map((s) =>
-              isActiveSetCompleted(s) ? s : { ...s, weight: (parseFloat(String(s.weight)) || 0) === 0 ? defaultWeight : s.weight }
-            );
           }
+          // Phase 6 verification fix: the BW→weighted direction used
+          // to FABRICATE a 50 kg / 115 lb prefill on uncompleted
+          // sets. The prefill rule (previous set → last session →
+          // plan target → unset) has no "invented default" step —
+          // the sets stay unset, exactly like a fresh weighted
+          // exercise, and completing at no weight goes through the
+          // "Log without weight?" guard (P0-1).
 
           return {
             ...ex,
@@ -835,14 +837,9 @@ export default function ActiveWorkoutScreen({
           let updatedSets = ex.sets;
           if (isBodyweight && !wasBodyweight) {
             updatedSets = ex.sets.map((s) => (isActiveSetCompleted(s) ? s : { ...s, weight: 0 }));
-          } else if (!isBodyweight && wasBodyweight) {
-            const defaultWeight = userUnit === 'lbs' ? 115 : 50;
-            updatedSets = ex.sets.map((s) =>
-              isActiveSetCompleted(s)
-                ? s
-                : { ...s, weight: (parseFloat(String(s.weight)) || 0) === 0 ? defaultWeight : s.weight }
-            );
           }
+          // BW→weighted: no fabricated prefill (see the rename path
+          // above — Phase 6 verification fix).
           return { ...ex, name: swap.name, sets: updatedSets };
         })
       );
