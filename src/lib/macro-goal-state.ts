@@ -89,7 +89,9 @@ export function snapshotGoalInputs(
   return snap;
 }
 
-/** Round + stamp a target for storage. Pure: returns a new object. */
+/** Round + stamp a target for storage. Pure: returns a new object.
+ * The inputs snapshot is only attached when at least one input is
+ * actually known — an empty snapshot would be noise, not provenance. */
 export function stampMacroGoals(
   goals: MacroGoals,
   source: MacroGoalSource,
@@ -97,10 +99,11 @@ export function stampMacroGoals(
   activityLevel?: string,
   now: Date = new Date(),
 ): MacroGoals {
+  const snapshot = snapshotGoalInputs(profile, activityLevel);
   return {
     ...roundMacroGoals(goals),
     source,
     updatedAt: now.toISOString(),
-    inputsSnapshot: snapshotGoalInputs(profile, activityLevel),
+    ...(Object.keys(snapshot).length > 0 ? { inputsSnapshot: snapshot } : {}),
   };
 }

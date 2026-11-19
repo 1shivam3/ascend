@@ -169,12 +169,44 @@ Phase 0 baseline, branch `bug-program/phase-0` off master `adcb6c1`.
   the clamped 378/36.
 - The 2,356 vs 2,355 difference is two different rescale round-trips
   producing different rounding — the single-rounding-rule task stands.
+- **Phase 2 resolution (2026-11-19, branch bug-program/phase-2):**
+  `MacroGoals` now carries provenance — `source`
+  ('manual'|'recommended'|'coach'), `updatedAt`, `inputsSnapshot`
+  (types.ts) — stamped by the ONE write path. `setMacroGoals(goals,
+  source)` rounds via the one rule (`roundMacroGoals`,
+  lib/macro-goal-state.ts), applies the safety envelope, and RETURNS
+  the stored goals (read-back). The editor saves with source
+  'manual', quotes the READ-BACK in its toast, and when the envelope
+  adjusted the numbers it says so ("Saved at maintenance instead: …")
+  with the reason (unknown age / minor). A 'manual' target is never
+  recalculated by `setProfile`; an `autoRecalculateGoals` preference
+  (default on) gates recalculation for derived targets, with an
+  ask-once prompt after the first manual save. The editor now opens
+  from a fresh store read (the blank-field class). Two real bugs
+  found by the new tests en route: (1) the safety clamp stripped
+  provenance — `scaleMacroGoalsToCalories` rebuilds the object from
+  numeric fields only; `clampGoalsToMinorMaintenance` now re-attaches
+  the stamp; (2) legacy (pre-Phase-2, source-less) targets are NOT
+  treated as manual — the pre-Phase-2 contract was "targets follow
+  the profile", so the 18th-birthday / DOB-added unlock still applies
+  to them, now logged + stamped 'recommended'. Evidence:
+  `tests/bugp2-macro-goal-state.test.ts` (17 tests incl. the WA0004
+  replay at store level) and `qa/e2e/n1-goal-save.spec.ts` (missing-age
+  persona: save 3,000 → maintenance stored + notice shown → reopen
+  shows the stored value). The phase3-minors "verbatim" test was
+  updated to the new contract (numbers verbatim + provenance stamped).
 
 ### N2 — Fat target and macro sanity
 - **Status:** confirmed. The displayed split reached P22 / C68 / F10
   with fat at 27 g for a 72 kg user (0.375 g/kg) because auto-balance
   fills the calorie gap with carbs and no fat floor exists anywhere in
   the save/clamp path. Guardrails are a Phase 2 task.
+- **Phase 2 resolution:** `src/lib/macro-guardrails.ts` — fat ≥20% of
+  kcal (IOM AMDR 20–35%), fat ≥0.6 g/kg, protein warning floor
+  1.2 g/kg (Morton 2018 plateau ~1.6; ISSN 1.4–2.0 range) — sources in
+  the module comment, constants flagged OWNER REVIEW. Warnings render
+  live in the goals editor (never blocking); the editor's
+  auto-balance already adjusts carbs only. 6 unit tests.
 
 ### N3 — Target changes between sessions; missing age
 - **Status:** confirmed.
@@ -188,11 +220,40 @@ Phase 0 baseline, branch `bug-program/phase-0` off master `adcb6c1`.
   loses it. The owner ran Start Fresh on 2026-11-19 (Settings shows
   "Archived 2026-11-19: 0 sessions, 5 meals, 4 plans"). Losing the
   DOB is what arms the N1 clamp.
+- **Phase 2 resolution:** every target now stores its
+  `inputsSnapshot` (weight/height/age/gender/goal/activity at write
+  time). The goals editor shows a provenance chip (Manual /
+  Recommended / Set by coach), the updated date, and a "Why these
+  targets?" panel listing the snapshot inputs, the missing-age
+  maintenance note when age is unknown, and the last automatic change
+  from the new diagnostics log (`goalDiagnostics`, capped at 50:
+  every safety clamp and profile recalculation is recorded with
+  before/after kcal + reason — drift is never silent again).
+  Unknown-age still means no deficit (engine + editor + coach drafts
+  all enforce maintenance); it is now LABELLED instead of silent.
+  Deliberate-design note: DOB stays local-only (privacy); the fix is
+  labelling + provenance, not syncing DOB.
 
 ### N4 — Number formatting mixed
 - **Status:** confirmed. WA0003/WA0004 frames show "of 2592 daily
   target" (no thousands separator) alongside "2,592" elsewhere, and
   "TARGET 2355" next to "671 / 2,355 cal" on the same screen.
+- **Phase 2 resolution:** the one module already existed
+  (`src/lib/formatters.ts` — formatNumber / formatDate day-first /
+  formatVolume / formatWater / formatDuration / formatCalories from
+  the audit + QA-hardening programs; a grep for `toLocaleString(` /
+  `toLocaleDateString(` across components returns ZERO hits — ad-hoc
+  locale formatting was already eliminated). Phase 2 completes the
+  brief's named set: `formatKcal` (canonical alias of formatCalories)
+  and `formatGrams` added, plus `displayDatesInText()` — ISO dates
+  inside free text are rewritten to the display format at render
+  time (stored text untouched, invalid shapes pass through). Wired
+  into the coach chat's assistant-message renderer (the T3 ISO-date
+  leak). 6 unit tests in `tests/bugp2-formatters.test.ts`. Remaining
+  honest gap: a few surfaces still hand-render units inline
+  (`{n} kcal` in toasts/labels) — cosmetically consistent today via
+  formatNumber at the call sites; a full sweep is cosmetic, not
+  correctness.
 
 ### M1 — Scan macros come from the model, not the database
 - **Status:** confirmed. **Root cause found.**

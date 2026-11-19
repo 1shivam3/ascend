@@ -252,12 +252,19 @@ describe('CoachActionCard: macro renders', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('CoachActionCard: macro transitions', () => {
+  // Bug program Phase 2 (N1): stored goals carry provenance stamped
+  // by the store write — store assertions check the numbers.
+  const storedNumbers = () => {
+    const g = useStore.getState().macroGoals;
+    return g ? { calories: g.calories, proteinG: g.proteinG, carbsG: g.carbsG, fatG: g.fatG } : null;
+  };
+
   it('apply happy path updates the store and returns the receipt patch', () => {
     const patch = applyMacroFromCard(macroMsg(), { ...GOALS });
     expect(patch.actionState).toBe('applied');
     expect(patch.appliedSnapshot?.previous).toEqual(GOALS);
     expect(patch.appliedSnapshot?.applied).toEqual({ ...GOALS, proteinG: 180 });
-    expect(useStore.getState().macroGoals).toEqual({ ...GOALS, proteinG: 180 });
+    expect(storedNumbers()).toEqual({ ...GOALS, proteinG: 180 });
   });
 
   it('apply refuses as stale when the goals changed after the base was captured', () => {
@@ -265,7 +272,7 @@ describe('CoachActionCard: macro transitions', () => {
     const patch = applyMacroFromCard(macroMsg(), { ...GOALS, calories: 2200 });
     expect(patch.actionState).toBe('stale');
     // The action's value was NOT written over the user's own change.
-    expect(useStore.getState().macroGoals).toEqual({ ...GOALS, calories: 2200 });
+    expect(storedNumbers()).toEqual({ ...GOALS, calories: 2200 });
   });
 
   it('the stale card re-bases and applies against the live goals', () => {
@@ -275,7 +282,7 @@ describe('CoachActionCard: macro transitions', () => {
     expect(patch.actionState).toBe('applied');
     expect(patch.actionBase).toEqual({ status: 'captured', goals: live });
     expect(patch.ts).toBe(NOW + 5000);
-    expect(useStore.getState().macroGoals).toEqual({ ...GOALS, calories: 2200, proteinG: 180 });
+    expect(storedNumbers()).toEqual({ ...GOALS, calories: 2200, proteinG: 180 });
   });
 
   it('undo restores the previous goals; a stale undo patches nothing', () => {
@@ -283,7 +290,7 @@ describe('CoachActionCard: macro transitions', () => {
     const appliedMsg = { ...macroMsg(), ...appliedPatch };
     const undo = undoMacroFromCard(appliedMsg);
     expect(undo).toEqual({ patch: { actionState: 'undone' }, stale: false });
-    expect(useStore.getState().macroGoals).toEqual(GOALS);
+    expect(storedNumbers()).toEqual(GOALS);
 
     // Apply again, then change the goals once more — undo must refuse.
     const reapplied = { ...macroMsg(), ...applyMacroFromCard(macroMsg(), { ...GOALS }) };
