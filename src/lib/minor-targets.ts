@@ -119,6 +119,14 @@ export function clampGoalsToMinorMaintenance(
   const scaled = scaleMacroGoalsToCalories(goals, maintenance);
   return {
     ...scaled,
+    // N1 (bug program Phase 2): scaleMacroGoalsToCalories rebuilds
+    // the object from numeric fields only — without this, clamping
+    // would strip the target's provenance (source / updatedAt /
+    // inputsSnapshot) and a stamped manual target would come out of
+    // the safety envelope looking like a legacy one.
+    ...(goals.source !== undefined ? { source: goals.source } : {}),
+    ...(goals.updatedAt !== undefined ? { updatedAt: goals.updatedAt } : {}),
+    ...(goals.inputsSnapshot !== undefined ? { inputsSnapshot: goals.inputsSnapshot } : {}),
     maintenanceCalories: maintenance,
     calorieDelta: normalizeCalorieDelta(scaled.calories - maintenance),
   };

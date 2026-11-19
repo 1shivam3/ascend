@@ -247,7 +247,16 @@ describe('store.setMacroGoals: the write-path clamp', () => {
     seedStore({ profile: makeProfile({ age: 25 }) });
     const goals: MacroGoals = { calories: 1900, proteinG: 150, carbsG: 180, fatG: 60 };
     useStore.getState().setMacroGoals(goals);
-    expect(useStore.getState().macroGoals).toEqual(goals);
+    // Bug program Phase 2 (N1): the NUMBERS still land verbatim —
+    // the write now also stamps provenance (source / updatedAt /
+    // inputsSnapshot), so exact-shape equality no longer applies.
+    const stored = useStore.getState().macroGoals!;
+    expect(stored.calories).toBe(goals.calories);
+    expect(stored.proteinG).toBe(goals.proteinG);
+    expect(stored.carbsG).toBe(goals.carbsG);
+    expect(stored.fatG).toBe(goals.fatG);
+    expect(stored.source).toBe('recommended');
+    expect(stored.updatedAt).toBeTruthy();
   });
 
   it('clearing targets (null) stays allowed for a minor', () => {

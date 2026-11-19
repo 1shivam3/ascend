@@ -99,7 +99,7 @@ export default function FuelPrefsPrompt({ onDone }: FuelPrefsPromptProps) {
       profile.age,
       activity as 'sedentary' | 'light' | 'active' | 'very_active'
     );
-    setMacroGoals({ ...rec, calorieDelta: normalizeCalorieDelta(rec.calories - (rec.maintenanceCalories as number)) });
+    setMacroGoals({ ...rec, calorieDelta: normalizeCalorieDelta(rec.calories - (rec.maintenanceCalories as number)) }, 'recommended');
     onDone();
   };
 

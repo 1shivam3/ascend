@@ -560,7 +560,8 @@ export default function Onboarding() {
           effHeightCm,
           age,
           activityChoice
-        )
+        ),
+        'recommended'
       );
     }
 
