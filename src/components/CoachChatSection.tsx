@@ -179,24 +179,33 @@ export default function CoachChatSection() {
   // per local day and a past-day flag for collapsing settled action
   // cards, so a weeks-old answer can never read as today's advice.
   // Legacy messages without a timestamp get no separator: their day
-  // is unknown and is never fabricated.
-  const threadDays = useMemo(() => {
-    const today = toLocalDateString(new Date());
-    const yesterday = toLocalDateString(new Date(Date.now() - 86_400_000));
+  // is unknown and is never fabricated. (Plain body computation, not
+  // a memo: the react-hooks purity rules reject Date reads and the
+  // running-day mutation inside memo callbacks.)
+  const threadToday = toLocalDateString(new Date());
+  const threadYesterday = toLocalDateString(new Date(epochNow() - 86_400_000));
+  const threadDays: Array<{
+    day: string | null;
+    showSeparator: boolean;
+    isToday: boolean;
+    isYesterday: boolean;
+    isPastDay: boolean;
+  }> = [];
+  {
     let last: string | null = null;
-    return messages.map((m) => {
+    for (const m of messages) {
       const day = typeof m.ts === 'number' ? toLocalDateString(new Date(m.ts)) : null;
       const showSeparator = day !== null && day !== last;
       if (day) last = day;
-      return {
+      threadDays.push({
         day,
         showSeparator,
-        isToday: day === today,
-        isYesterday: day === yesterday,
-        isPastDay: day !== null && day < today,
-      };
-    });
-  }, [messages]);
+        isToday: day === threadToday,
+        isYesterday: day === threadYesterday,
+        isPastDay: day !== null && day < threadToday,
+      });
+    }
+  }
   const listRef = useRef<HTMLDivElement | null>(null);
   // Scroll discipline (Slice B): auto-scroll only while the user is
   // already near the bottom — a new coach message must never yank a
