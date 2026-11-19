@@ -1,6 +1,7 @@
 import { MealAnalysisResult, ScannedFoodItem } from './types';
 import { getAiAuthHeaders } from './ai-client-auth';
 import { estimateMacros } from './macros';
+import { applyDatabaseMacros } from './scan-verification';
 import {
   resizeAndCompressImage,
   MAX_IMAGE_DIMENSION,
@@ -119,25 +120,12 @@ export function recalculateMealResult(
   current: MealAnalysisResult,
   updatedItems: ScannedFoodItem[]
 ): MealAnalysisResult {
-  const verifiedItems = updatedItems.map((item) => {
-    // Only fall back to estimateMacros if the item does not have a valid calorie number
-    const hasValidMacros = typeof item.calories === 'number' && !isNaN(item.calories) && item.calories >= 0;
-    const dbEst = !hasValidMacros ? estimateMacros(item.name, item.estimatedGrams || 100, 'g') : null;
-
-    return {
-      ...item,
-      calories: hasValidMacros ? Math.max(0, Math.round(item.calories)) : (dbEst?.calories || 0),
-      proteinG: hasValidMacros
-        ? Math.max(0, Math.round((item.proteinG || 0) * 10) / 10)
-        : (dbEst?.proteinG || 0),
-      carbsG: hasValidMacros
-        ? Math.max(0, Math.round((item.carbsG || 0) * 10) / 10)
-        : (dbEst?.carbsG || 0),
-      fatG: hasValidMacros
-        ? Math.max(0, Math.round((item.fatG || 0) * 10) / 10)
-        : (dbEst?.fatG || 0),
-    };
-  });
+  // M1 (bug program Phase 3): EVERY recalculation re-resolves macros
+  // from the verified food database — the old rule kept the model's
+  // numbers whenever they were "valid", which is how a scan's
+  // 136 kcal pineapple survived every edit. Items the user edited by
+  // hand (macroSource 'user') keep the user's numbers.
+  const verifiedItems = applyDatabaseMacros(updatedItems);
 
   const totalCalories = verifiedItems.reduce((acc, it) => acc + (it.calories || 0), 0);
   const totalProtein = Number(
@@ -331,14 +319,23 @@ export function generateOfflineMealEstimate(
     };
   }
 
-  const totalCalories = Math.round(items.reduce((acc, it) => acc + it.calories, 0));
-  const totalProtein = Number(items.reduce((acc, it) => acc + it.proteinG, 0).toFixed(1));
-  const totalCarbs = Number(items.reduce((acc, it) => acc + it.carbsG, 0).toFixed(1));
-  const totalFat = Number(items.reduce((acc, it) => acc + it.fatG, 0).toFixed(1));
+  // M1: every item in this path was CONSTRUCTED from estimateMacros
+  // (or the app's own supplement constants) — database values by
+  // construction, stamped as such.
+  const stampedItems = items.map((it) => ({
+    ...it,
+    verified: true,
+    macroSource: 'database' as const,
+  }));
+
+  const totalCalories = Math.round(stampedItems.reduce((acc, it) => acc + it.calories, 0));
+  const totalProtein = Number(stampedItems.reduce((acc, it) => acc + it.proteinG, 0).toFixed(1));
+  const totalCarbs = Number(stampedItems.reduce((acc, it) => acc + it.carbsG, 0).toFixed(1));
+  const totalFat = Number(stampedItems.reduce((acc, it) => acc + it.fatG, 0).toFixed(1));
 
   return {
     mealName: userNotes ? `Meal (${userNotes.slice(0, 25)})` : 'Custom Food Entry',
-    items,
+    items: stampedItems,
     totalCalories,
     totalProtein,
     totalCarbs,

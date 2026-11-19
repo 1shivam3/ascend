@@ -13,6 +13,7 @@ import {
 import { MealAnalysisResult, ScannedFoodItem, MealEntry, FoodItem, OilLevelId } from '@/lib/types';
 import { analyzeMealPhoto, recalculateMealResult, generateOfflineMealEstimate } from '@/lib/ai-scan-meal';
 import { computeMealConfidence } from '@/lib/scan-confidence';
+import { itemNeedsConfirmation } from '@/lib/scan-verification';
 import { resolveIndianMeta, householdDraftFor } from '@/lib/indian-foods';
 import { OIL_LEVELS, defaultOilForFood, applyOilDelta, tspForOilLevel, servingsForOil } from '@/lib/oil-adjust';
 import { validateImageFile, resizeAndCompressImage, captureVideoFrame, MAX_IMAGE_DIMENSION } from '@/lib/image-processing';
@@ -442,10 +443,13 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       return item;
     });
 
-    if (hasChanges) {
-      return recalculateMealResult(result, adjustedItems);
-    }
-    return result;
+    // M1 (bug program Phase 3): EVERY ingested result passes through
+    // recalculateMealResult, which re-resolves macros from the
+    // verified food database — not only when a portion preference
+    // changed the grams. Model numbers never reach the review
+    // unverified-by-default again.
+    void hasChanges;
+    return recalculateMealResult(result, adjustedItems);
   };
 
   const handleOfflineEstimate = () => {
@@ -570,6 +574,17 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     // Save portion preference for future auto-calibration
     store.savePortionPreference(finalName, finalGrams);
 
+    // M1: when the saved values differ from what the food database
+    // gives for this name + grams, the USER is the source — their
+    // numbers are kept verbatim and the item counts as verified-by-
+    // user. Values equal to the DB estimate are left unstamped so
+    // the recalculation marks them 'database'.
+    const dbEst = estimateMacros(finalName, finalGrams, 'g');
+    const userSourced =
+      Math.abs(finalCalories - dbEst.calories) > 1 ||
+      Math.abs(finalProtein - dbEst.proteinG) > 0.15 ||
+      Math.abs(finalCarbs - dbEst.carbsG) > 0.15 ||
+      Math.abs(finalFat - dbEst.fatG) > 0.15;
     itemsCopy[index] = {
       ...targetItem,
       name: finalName,
@@ -579,6 +594,8 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       proteinG: finalProtein,
       carbsG: finalCarbs,
       fatG: finalFat,
+      macroSource: userSourced ? 'user' : undefined,
+      userConfirmed: userSourced ? true : targetItem.userConfirmed,
     };
 
     const updated = recalculateMealResult(analysis, itemsCopy);
@@ -589,6 +606,19 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       t('scan.itemUpdated', { name: finalName, grams: finalGrams, kcal: finalCalories }),
       t('scan.itemUpdatedTitle')
     );
+  };
+
+  /** M1: the user accepts an unverified estimate as-is. The numbers
+   * stay flagged with their real source; the flag only records that
+   * the user saw the "Not verified" state and chose to keep it. */
+  const handleConfirmItem = (index: number) => {
+    if (!analysis) return;
+    setAnalysis({
+      ...analysis,
+      items: analysis.items.map((it, i) =>
+        i === index ? { ...it, userConfirmed: true } : it
+      ),
+    });
   };
 
   const handleDeleteItem = (index: number) => {
@@ -697,7 +727,8 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         });
         setOilLevels({});
         setEditedIndices(new Set());
-        setAnalysis(refinedResult);
+        // M1: refined results re-verify against the food database too.
+        setAnalysis(recalculateMealResult(refinedResult, refinedResult.items));
         dispatchFlow({ type: 'analyze-succeeded', source: 'refined' });
         toast.success(t('scan.aiRefinedMsg'), t('scan.aiRefinedTitle'));
         setRefinementInput('');
@@ -711,6 +742,15 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
   const handleSaveToNutrition = () => {
     if (!analysis || analysis.items.length === 0) return;
+    // M1 defense in depth: the button is disabled in this state, but
+    // the handler refuses too — an unverified estimate is never
+    // logged silently.
+    if (analysis.items.some((it) => itemNeedsConfirmation(it))) {
+      toast.error(t('scan.confirmHint', {
+        count: analysis.items.filter((it) => itemNeedsConfirmation(it)).length,
+      }), t('scan.notVerified'));
+      return;
+    }
 
     const today = getLocalTodayStr();
     const validFoods: FoodItem[] = analysis.items.map((it, idx) => {
@@ -1500,6 +1540,40 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                     : ''}
                                   {item.preparation ? ` • ${item.preparation}` : ''}
                                 </span>
+                                {/* M1: where this item's numbers came
+                                    from. Verified database values say
+                                    so; anything else is labelled an
+                                    unverified estimate with a confirm
+                                    action — never presented as fact. */}
+                                {item.verified ? (
+                                  <span className="text-2xs text-emerald-500 font-semibold mt-0.5 block">
+                                    {item.macroSource === 'user'
+                                      ? t('scan.sourceUser')
+                                      : t('scan.sourceDatabase')}
+                                  </span>
+                                ) : item.userConfirmed ? (
+                                  <span className="text-2xs text-text-muted font-semibold mt-0.5 block">
+                                    {t('scan.sourceUserConfirmed')}
+                                  </span>
+                                ) : (
+                                  <span className="mt-0.5 flex items-center gap-2">
+                                    <span className="text-2xs font-bold uppercase tracking-wide text-amber-500">
+                                      {t('scan.notVerified')}
+                                    </span>
+                                    {item.matchedEntry && (
+                                      <span className="text-2xs text-text-muted">
+                                        {t('scan.estimateFrom', { entry: item.matchedEntry })}
+                                      </span>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleConfirmItem(idx)}
+                                      className="text-2xs font-bold text-accent underline underline-offset-2"
+                                    >
+                                      {t('scan.confirmEstimate')}
+                                    </button>
+                                  </span>
+                                )}
                               </div>
 
                               {/* Macros & Action Buttons */}
@@ -1714,6 +1788,17 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                   )}
                   </div>
 
+                  {/* M1: saving is blocked while any item is an
+                      unverified estimate the user has neither edited
+                      nor confirmed. */}
+                  {analysis.items.some((it) => itemNeedsConfirmation(it)) && (
+                    <p className="text-2xs font-semibold text-amber-500">
+                      {t('scan.confirmHint', {
+                        count: analysis.items.filter((it) => itemNeedsConfirmation(it)).length,
+                      })}
+                    </p>
+                  )}
+
                   {/* Bottom Actions */}
                   <div className="flex flex-col sm:flex-row gap-2.5 pt-2 border-t border-border">
                     <button
@@ -1729,7 +1814,8 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                     <button
                       type="button"
                       onClick={handleSaveToNutrition}
-                      className="btn-primary py-3 text-sm font-bold flex-1 flex items-center justify-center gap-2 shadow-md shadow-accent/25 order-1 sm:order-2"
+                      disabled={analysis.items.some((it) => itemNeedsConfirmation(it))}
+                      className="btn-primary py-3 text-sm font-bold flex-1 flex items-center justify-center gap-2 shadow-md shadow-accent/25 order-1 sm:order-2 disabled:opacity-50"
                     >
                       <CheckCircle2 className="w-4 h-4" />
                       <span>{t('scan.addToNutrition')}</span>

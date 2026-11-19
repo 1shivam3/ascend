@@ -1,0 +1,717 @@
+{
+ "description": "M1 (bug program Phase 3): golden per-100g values for the app food database. tests/food-test-set.test.ts asserts estimateMacros(name, 100, 'g') stays within 5% of these values - if the DB changes deliberately, regenerate this file in the same commit and say why; silent drift fails the build.",
+ "tolerancePct": 5,
+ "foods": [
+  {
+   "name": "chicken breast",
+   "per100g": {
+    "calories": 165,
+    "proteinG": 31,
+    "carbsG": 0,
+    "fatG": 3.6
+   }
+  },
+  {
+   "name": "chicken",
+   "per100g": {
+    "calories": 180,
+    "proteinG": 28,
+    "carbsG": 0,
+    "fatG": 7
+   }
+  },
+  {
+   "name": "eggs",
+   "per100g": {
+    "calories": 155,
+    "proteinG": 13,
+    "carbsG": 1.1,
+    "fatG": 11
+   }
+  },
+  {
+   "name": "egg",
+   "per100g": {
+    "calories": 155,
+    "proteinG": 13,
+    "carbsG": 1.1,
+    "fatG": 11
+   }
+  },
+  {
+   "name": "whey protein",
+   "per100g": {
+    "calories": 379,
+    "proteinG": 79.5,
+    "carbsG": 7.3,
+    "fatG": 3.3
+   }
+  },
+  {
+   "name": "tofu",
+   "per100g": {
+    "calories": 76,
+    "proteinG": 8,
+    "carbsG": 1.9,
+    "fatG": 4.8
+   }
+  },
+  {
+   "name": "greek yogurt",
+   "per100g": {
+    "calories": 59,
+    "proteinG": 10,
+    "carbsG": 3.6,
+    "fatG": 0.4
+   }
+  },
+  {
+   "name": "cottage cheese",
+   "per100g": {
+    "calories": 98,
+    "proteinG": 11,
+    "carbsG": 3.4,
+    "fatG": 4.3
+   }
+  },
+  {
+   "name": "milk",
+   "per100g": {
+    "calories": 50,
+    "proteinG": 3.4,
+    "carbsG": 4.8,
+    "fatG": 2
+   }
+  },
+  {
+   "name": "whole milk",
+   "per100g": {
+    "calories": 61,
+    "proteinG": 3.2,
+    "carbsG": 4.8,
+    "fatG": 3.3
+   }
+  },
+  {
+   "name": "cheese",
+   "per100g": {
+    "calories": 402,
+    "proteinG": 25,
+    "carbsG": 1.3,
+    "fatG": 33
+   }
+  },
+  {
+   "name": "paneer",
+   "per100g": {
+    "calories": 265,
+    "proteinG": 18,
+    "carbsG": 4,
+    "fatG": 20
+   }
+  },
+  {
+   "name": "yogurt",
+   "per100g": {
+    "calories": 61,
+    "proteinG": 3.5,
+    "carbsG": 7,
+    "fatG": 1.6
+   }
+  },
+  {
+   "name": "curd",
+   "per100g": {
+    "calories": 61,
+    "proteinG": 3.5,
+    "carbsG": 4.7,
+    "fatG": 3.3
+   }
+  },
+  {
+   "name": "white rice",
+   "per100g": {
+    "calories": 130,
+    "proteinG": 2.7,
+    "carbsG": 28,
+    "fatG": 0.3
+   }
+  },
+  {
+   "name": "brown rice",
+   "per100g": {
+    "calories": 111,
+    "proteinG": 2.6,
+    "carbsG": 23,
+    "fatG": 0.9
+   }
+  },
+  {
+   "name": "rice",
+   "per100g": {
+    "calories": 130,
+    "proteinG": 2.7,
+    "carbsG": 28,
+    "fatG": 0.3
+   }
+  },
+  {
+   "name": "oats",
+   "per100g": {
+    "calories": 389,
+    "proteinG": 16.9,
+    "carbsG": 66.3,
+    "fatG": 6.9
+   }
+  },
+  {
+   "name": "rolled oats",
+   "per100g": {
+    "calories": 389,
+    "proteinG": 17,
+    "carbsG": 66,
+    "fatG": 7
+   }
+  },
+  {
+   "name": "bread",
+   "per100g": {
+    "calories": 265,
+    "proteinG": 9,
+    "carbsG": 49,
+    "fatG": 3.2
+   }
+  },
+  {
+   "name": "whole wheat bread",
+   "per100g": {
+    "calories": 247,
+    "proteinG": 13,
+    "carbsG": 41,
+    "fatG": 3.4
+   }
+  },
+  {
+   "name": "roti",
+   "per100g": {
+    "calories": 265,
+    "proteinG": 8,
+    "carbsG": 55,
+    "fatG": 1.5
+   }
+  },
+  {
+   "name": "chapati",
+   "per100g": {
+    "calories": 265,
+    "proteinG": 8,
+    "carbsG": 55,
+    "fatG": 1.5
+   }
+  },
+  {
+   "name": "naan",
+   "per100g": {
+    "calories": 317,
+    "proteinG": 9,
+    "carbsG": 54,
+    "fatG": 7
+   }
+  },
+  {
+   "name": "pasta",
+   "per100g": {
+    "calories": 131,
+    "proteinG": 5,
+    "carbsG": 25,
+    "fatG": 1.1
+   }
+  },
+  {
+   "name": "quinoa",
+   "per100g": {
+    "calories": 120,
+    "proteinG": 4.4,
+    "carbsG": 21.3,
+    "fatG": 1.9
+   }
+  },
+  {
+   "name": "poha",
+   "per100g": {
+    "calories": 160,
+    "proteinG": 3.5,
+    "carbsG": 28,
+    "fatG": 4
+   }
+  },
+  {
+   "name": "upma",
+   "per100g": {
+    "calories": 144,
+    "proteinG": 4,
+    "carbsG": 24,
+    "fatG": 4
+   }
+  },
+  {
+   "name": "dosa",
+   "per100g": {
+    "calories": 168,
+    "proteinG": 4,
+    "carbsG": 24,
+    "fatG": 7
+   }
+  },
+  {
+   "name": "paratha",
+   "per100g": {
+    "calories": 310,
+    "proteinG": 6,
+    "carbsG": 44,
+    "fatG": 13
+   }
+  },
+  {
+   "name": "plain paratha",
+   "per100g": {
+    "calories": 310,
+    "proteinG": 6,
+    "carbsG": 44,
+    "fatG": 13
+   }
+  },
+  {
+   "name": "lentils",
+   "per100g": {
+    "calories": 116,
+    "proteinG": 9,
+    "carbsG": 20.1,
+    "fatG": 0.4
+   }
+  },
+  {
+   "name": "chickpeas",
+   "per100g": {
+    "calories": 164,
+    "proteinG": 8.9,
+    "carbsG": 27.4,
+    "fatG": 2.6
+   }
+  },
+  {
+   "name": "kidney beans",
+   "per100g": {
+    "calories": 127,
+    "proteinG": 8.7,
+    "carbsG": 22.8,
+    "fatG": 0.5
+   }
+  },
+  {
+   "name": "dal",
+   "per100g": {
+    "calories": 116,
+    "proteinG": 9,
+    "carbsG": 20,
+    "fatG": 0.4
+   }
+  },
+  {
+   "name": "yellow dal",
+   "per100g": {
+    "calories": 110,
+    "proteinG": 7,
+    "carbsG": 18,
+    "fatG": 2.5
+   }
+  },
+  {
+   "name": "toor dal",
+   "per100g": {
+    "calories": 110,
+    "proteinG": 7,
+    "carbsG": 18,
+    "fatG": 2.5
+   }
+  },
+  {
+   "name": "moong dal",
+   "per100g": {
+    "calories": 105,
+    "proteinG": 7.5,
+    "carbsG": 18,
+    "fatG": 1.5
+   }
+  },
+  {
+   "name": "rajma",
+   "per100g": {
+    "calories": 130,
+    "proteinG": 8.5,
+    "carbsG": 22,
+    "fatG": 2
+   }
+  },
+  {
+   "name": "chana",
+   "per100g": {
+    "calories": 164,
+    "proteinG": 8.9,
+    "carbsG": 27.4,
+    "fatG": 2.6
+   }
+  },
+  {
+   "name": "kala chana",
+   "per100g": {
+    "calories": 164,
+    "proteinG": 8.9,
+    "carbsG": 27.4,
+    "fatG": 2.6
+   }
+  },
+  {
+   "name": "soya chunks",
+   "per100g": {
+    "calories": 345,
+    "proteinG": 52,
+    "carbsG": 33,
+    "fatG": 0.5
+   }
+  },
+  {
+   "name": "potatoes",
+   "per100g": {
+    "calories": 77,
+    "proteinG": 2,
+    "carbsG": 17,
+    "fatG": 0.1
+   }
+  },
+  {
+   "name": "potato",
+   "per100g": {
+    "calories": 77,
+    "proteinG": 2,
+    "carbsG": 17,
+    "fatG": 0.1
+   }
+  },
+  {
+   "name": "sweet potato",
+   "per100g": {
+    "calories": 86,
+    "proteinG": 1.6,
+    "carbsG": 20.1,
+    "fatG": 0.1
+   }
+  },
+  {
+   "name": "corn",
+   "per100g": {
+    "calories": 96,
+    "proteinG": 3.4,
+    "carbsG": 21,
+    "fatG": 1.5
+   }
+  },
+  {
+   "name": "pineapple",
+   "per100g": {
+    "calories": 50,
+    "proteinG": 0.5,
+    "carbsG": 13,
+    "fatG": 0.1
+   }
+  },
+  {
+   "name": "banana",
+   "per100g": {
+    "calories": 89,
+    "proteinG": 1.1,
+    "carbsG": 22.8,
+    "fatG": 0.3
+   }
+  },
+  {
+   "name": "apple",
+   "per100g": {
+    "calories": 52,
+    "proteinG": 0.3,
+    "carbsG": 13.8,
+    "fatG": 0.2
+   }
+  },
+  {
+   "name": "mango",
+   "per100g": {
+    "calories": 60,
+    "proteinG": 0.8,
+    "carbsG": 15,
+    "fatG": 0.4
+   }
+  },
+  {
+   "name": "spinach",
+   "per100g": {
+    "calories": 23,
+    "proteinG": 2.9,
+    "carbsG": 3.6,
+    "fatG": 0.4
+   }
+  },
+  {
+   "name": "tomato",
+   "per100g": {
+    "calories": 18,
+    "proteinG": 0.9,
+    "carbsG": 3.9,
+    "fatG": 0.2
+   }
+  },
+  {
+   "name": "onion",
+   "per100g": {
+    "calories": 40,
+    "proteinG": 1.1,
+    "carbsG": 9.3,
+    "fatG": 0.1
+   }
+  },
+  {
+   "name": "ghee",
+   "per100g": {
+    "calories": 900,
+    "proteinG": 0.3,
+    "carbsG": 0,
+    "fatG": 99.5
+   }
+  },
+  {
+   "name": "butter",
+   "per100g": {
+    "calories": 717,
+    "proteinG": 0.9,
+    "carbsG": 0.1,
+    "fatG": 81
+   }
+  },
+  {
+   "name": "peanut butter",
+   "per100g": {
+    "calories": 588,
+    "proteinG": 25,
+    "carbsG": 20,
+    "fatG": 50
+   }
+  },
+  {
+   "name": "almonds",
+   "per100g": {
+    "calories": 579,
+    "proteinG": 21,
+    "carbsG": 21.6,
+    "fatG": 49.9
+   }
+  },
+  {
+   "name": "olive oil",
+   "per100g": {
+    "calories": 884,
+    "proteinG": 0,
+    "carbsG": 0,
+    "fatG": 100
+   }
+  },
+  {
+   "name": "coconut",
+   "per100g": {
+    "calories": 354,
+    "proteinG": 3.3,
+    "carbsG": 15,
+    "fatG": 33.5
+   }
+  },
+  {
+   "name": "sugar",
+   "per100g": {
+    "calories": 387,
+    "proteinG": 0,
+    "carbsG": 100,
+    "fatG": 0
+   }
+  },
+  {
+   "name": "honey",
+   "per100g": {
+    "calories": 304,
+    "proteinG": 0.3,
+    "carbsG": 82.4,
+    "fatG": 0
+   }
+  },
+  {
+   "name": "orange",
+   "per100g": {
+    "calories": 47,
+    "proteinG": 0.9,
+    "carbsG": 11.8,
+    "fatG": 0.1
+   }
+  },
+  {
+   "name": "watermelon",
+   "per100g": {
+    "calories": 30,
+    "proteinG": 0.6,
+    "carbsG": 7.6,
+    "fatG": 0.2
+   }
+  },
+  {
+   "name": "papaya",
+   "per100g": {
+    "calories": 43,
+    "proteinG": 0.5,
+    "carbsG": 11,
+    "fatG": 0.3
+   }
+  },
+  {
+   "name": "idli",
+   "per100g": {
+    "calories": 145,
+    "proteinG": 4.5,
+    "carbsG": 30,
+    "fatG": 0.7
+   }
+  },
+  {
+   "name": "sambar",
+   "per100g": {
+    "calories": 65,
+    "proteinG": 3,
+    "carbsG": 10,
+    "fatG": 1.5
+   }
+  },
+  {
+   "name": "biryani",
+   "per100g": {
+    "calories": 180,
+    "proteinG": 6,
+    "carbsG": 22,
+    "fatG": 6
+   }
+  },
+  {
+   "name": "khichdi",
+   "per100g": {
+    "calories": 120,
+    "proteinG": 4.5,
+    "carbsG": 21,
+    "fatG": 2.5
+   }
+  },
+  {
+   "name": "mutton curry",
+   "per100g": {
+    "calories": 235,
+    "proteinG": 20,
+    "carbsG": 4,
+    "fatG": 16
+   }
+  },
+  {
+   "name": "fish curry",
+   "per100g": {
+    "calories": 135,
+    "proteinG": 15,
+    "carbsG": 3,
+    "fatG": 7
+   }
+  },
+  {
+   "name": "butter chicken",
+   "per100g": {
+    "calories": 220,
+    "proteinG": 15,
+    "carbsG": 7,
+    "fatG": 15
+   }
+  },
+  {
+   "name": "chicken curry",
+   "per100g": {
+    "calories": 165,
+    "proteinG": 17,
+    "carbsG": 4,
+    "fatG": 9
+   }
+  },
+  {
+   "name": "egg curry",
+   "per100g": {
+    "calories": 145,
+    "proteinG": 10,
+    "carbsG": 4,
+    "fatG": 9.5
+   }
+  },
+  {
+   "name": "palak paneer",
+   "per100g": {
+    "calories": 165,
+    "proteinG": 8.5,
+    "carbsG": 6,
+    "fatG": 12
+   }
+  },
+  {
+   "name": "bhindi masala",
+   "per100g": {
+    "calories": 90,
+    "proteinG": 2.2,
+    "carbsG": 9,
+    "fatG": 5
+   }
+  },
+  {
+   "name": "chana masala",
+   "per100g": {
+    "calories": 155,
+    "proteinG": 7.5,
+    "carbsG": 24,
+    "fatG": 4.5
+   }
+  },
+  {
+   "name": "masala dosa",
+   "per100g": {
+    "calories": 185,
+    "proteinG": 4.5,
+    "carbsG": 28,
+    "fatG": 6.5
+   }
+  },
+  {
+   "name": "aloo paratha",
+   "per100g": {
+    "calories": 260,
+    "proteinG": 5,
+    "carbsG": 38,
+    "fatG": 10
+   }
+  },
+  {
+   "name": "milk tea",
+   "per100g": {
+    "calories": 65,
+    "proteinG": 2.5,
+    "carbsG": 8,
+    "fatG": 2.5
+   }
+  }
+ ]
+}

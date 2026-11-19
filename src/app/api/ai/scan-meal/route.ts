@@ -7,6 +7,7 @@ import { generateOfflineMealEstimate } from '@/lib/ai-scan-meal';
 import { rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit, readMultipartFormDataWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
 import { sanitizeScannedItems, recomputeMealTotals } from '@/lib/scan-meal-sanitize';
 import { stampScanConfidence } from '@/lib/scan-confidence';
+import { applyDatabaseMacros } from '@/lib/scan-verification';
 
 export const runtime = 'nodejs';
 
@@ -310,14 +311,20 @@ Return ONLY valid, parseable JSON matching this schema with NO markdown ticks or
         // (the old code preferred them whenever present), and
         // per-item values are clamped to sane maxima.
         const sanitizedItems = sanitizeScannedItems(parsed.items);
-        const totals = recomputeMealTotals(sanitizedItems);
+        // M1 (bug program Phase 3): the model supplies names + grams;
+        // macros come from the verified food database. Matched items
+        // get DB values (verified); unmatched items keep the model's
+        // numbers as a flagged, unverified estimate the user must
+        // confirm in the review.
+        const verifiedItems = applyDatabaseMacros(sanitizedItems);
+        const totals = recomputeMealTotals(verifiedItems);
 
         // P0-4 (UI/UX audit): confidence is COMPUTED from checkable
         // signals (DB match, portion plausibility, item-set
         // consistency) — the model's self-reported confidence is
         // discarded here and never reaches any client.
         const stamped = stampScanConfidence(
-          sanitizedItems,
+          verifiedItems,
           Array.isArray(parsed.hiddenIngredients) ? parsed.hiddenIngredients : hiddenIngredients
         );
 
