@@ -21,7 +21,10 @@ const screen = readFileSync(
 
 describe('Phase 6: no fabricated set-weight prefill', () => {
   it('ActiveWorkoutScreen contains no defaultWeight substitution', () => {
-    expect(screen).not.toContain('defaultWeight');
+    // The fabrication was `const defaultWeight = userUnit === 'lbs'
+    // ? 115 : 50` feeding a set-weight rewrite. (Other legitimate
+    // defaultWeight uses — plate math — are untouched by this pin.)
+    expect(screen).not.toMatch(/const defaultWeight = userUnit/);
     expect(screen).not.toMatch(/weight:\s*\(parseFloat\(String\(s\.weight\)\)/);
   });
 
