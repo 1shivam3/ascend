@@ -29,7 +29,8 @@ export type PersonaId =
   | 'minor-15'
   | 'injuries'
   | 'hindi'
-  | 'xl-text';
+  | 'xl-text'
+  | 'missing-age';
 
 export const PERSONA_IDS: PersonaId[] = [
   'empty-guest',
@@ -38,6 +39,7 @@ export const PERSONA_IDS: PersonaId[] = [
   'injuries',
   'hindi',
   'xl-text',
+  'missing-age',
 ];
 
 /** YYYY-MM-DD in local time, `n` days before today. */
@@ -274,6 +276,36 @@ function injuriesState(): Record<string, unknown> {
 }
 
 /**
+ * (e) Adult body stats but NO age and NO date of birth on the profile
+ * (bug-program Phase 0 — the owner's real state in the 2026-11-19 gym
+ * recordings: DOB is local-only, so a local rebuild loses it). The
+ * `age`/`dateOfBirth` keys are set to undefined so JSON.stringify
+ * drops them from the seed blob entirely — the persisted profile
+ * genuinely lacks both fields, it does not carry nulls.
+ */
+function missingAgeState(): Record<string, unknown> {
+  return {
+    profile: profile({
+      id: 'qa-persona-noage',
+      name: 'QA No Age',
+      bodyweightKg: 72,
+      bodyweightLbs: 158.7,
+      heightCm: 178,
+      age: undefined,
+      dateOfBirth: undefined,
+      goals: ['muscle'],
+    }),
+    hasCompletedOnboarding: true,
+    theme: 'dark',
+    workouts: [],
+    meals: [],
+    macroGoals: null,
+    uiPreferences: uiPreferences({}),
+    userMode: 'intermediate',
+  };
+}
+
+/**
  * Builds the persisted-state object for a persona, or null for
  * 'empty-guest' (no seed — the app must see a truly fresh profile).
  */
@@ -299,6 +331,8 @@ export function buildSeedState(persona: PersonaId): Record<string, unknown> | nu
       state.uiPreferences = uiPreferences({ textScale: 'xlarge' });
       return state;
     }
+    case 'missing-age':
+      return missingAgeState();
   }
 }
 
