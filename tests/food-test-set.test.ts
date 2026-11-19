@@ -14,6 +14,7 @@
 import { describe, expect, it } from 'vitest';
 import { estimateMacros } from '../src/lib/macros';
 import { verifyScanItem } from '../src/lib/scan-verification';
+import type { ScannedFoodItem } from '../src/lib/types';
 import { canonicalDisplayName, resolveFoodAlias } from '../src/lib/food-aliases';
 import testSet from '../qa/FOOD_TEST_SET.json';
 
@@ -64,7 +65,7 @@ describe('M1: scanned macros come from the database', () => {
       carbsG: 35,
       fatG: 0.2,
       confidence: 'high' as const,
-    });
+    } as ScannedFoodItem);
     expect(item.verified).toBe(true);
     expect(item.macroSource).toBe('database');
     // DB: pineapple is 50 kcal/100 g → 200 g = 100 kcal.
@@ -81,7 +82,7 @@ describe('M1: scanned macros come from the database', () => {
       carbsG: 40,
       fatG: 5,
       confidence: 'high' as const,
-    });
+    } as ScannedFoodItem);
     expect(item.verified).toBe(false);
     expect(item.macroSource).toBe('model');
     expect(item.calories).toBe(210); // estimate preserved, but flagged
@@ -100,7 +101,7 @@ describe('M1: scanned macros come from the database', () => {
       carbsG: 40,
       fatG: 5,
       confidence: 'high' as const,
-    });
+    } as ScannedFoodItem);
     expect(item.verified).toBe(false);
     expect(item.macroSource).toBe('database');
     expect(item.matchedEntry).toBeTruthy();
@@ -117,7 +118,7 @@ describe('M1: scanned macros come from the database', () => {
       fatG: 9,
       confidence: 'high' as const,
       macroSource: 'user' as const,
-    });
+    } as ScannedFoodItem);
     expect(item.calories).toBe(999);
     expect(item.verified).toBe(true);
   });
@@ -140,7 +141,7 @@ describe('M3: aliases at the scan layer', () => {
       carbsG: 99,
       fatG: 99,
       confidence: 'high' as const,
-    });
+    } as ScannedFoodItem);
     const toor = estimateMacros('toor dal', 150, 'g');
     const chana = estimateMacros('chana', 150, 'g');
     expect(item.calories).toBe(toor.calories);
