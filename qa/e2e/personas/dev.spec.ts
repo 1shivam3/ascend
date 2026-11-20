@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { installSeed, STORE_KEY } from '../../fixtures/personas';
 import { installAiMocks } from '../../fixtures/ai-mocks';
-import { PersonaRun, collectionCounts, expectBooted, finishWorkout, logAllSets, mainNav, readStoreState } from '../../fixtures/persona-run';
+import { PersonaRun, collectionCounts, expectBooted, finishWorkout, logAllSets, mainNav, readStoreState, tapTodayWorkoutEntry } from '../../fixtures/persona-run';
 
 /**
  * Phase 4 — Persona 8: Dev, adversarial tester (seeded
@@ -65,7 +65,7 @@ test('Dev — adversarial inputs, no corruption', async ({ page }, testInfo) => 
 
   await run.step('Start a session for value abuse', async () => {
     await run.tap(mainNav(page).getByRole('button', { name: /^today$/i }));
-    await run.tap(page.getByRole('button', { name: /^start workout$/i }).first());
+    await tapTodayWorkoutEntry(page, run);
     await run.tap(page.getByRole('button', { name: /^suggested workout$/i }).first());
     await expect(page.getByRole('button', { name: /^start workout$/i }).last()).toBeVisible();
     await run.tap(page.getByRole('button', { name: /^start workout$/i }).last());

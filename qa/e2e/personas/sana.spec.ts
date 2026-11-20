@@ -91,7 +91,9 @@ test('Sana — offline: cold failures, then warm offline logging', async ({ page
   await goOffline(page);
   await page.waitForTimeout(800);
   await run.step('Open Train offline without any prior online visit (cold)', async () => {
-    await tapVisibleButton(page, run, /^start workout$/);
+    // Phase 7: entry via the Train nav — Today's rest-day card has
+    // no Start Workout for a plan-less user (finding P7-1).
+    await tapVisibleButton(page, run, /^train$/);
     await page.waitForTimeout(2_000);
     await run.shotAt('cold-train-error-light');
     await expect(page.getByRole('button', { name: /^suggested workout$/i }).first()).toBeVisible({ timeout: 8_000 });
@@ -115,7 +117,7 @@ test('Sana — offline: cold failures, then warm offline logging', async ({ page
     // place the light one did.
     await tapVisibleButton(page, run, /^today$/);
     await page.waitForTimeout(800);
-    await tapVisibleButton(page, run, /^start workout$/);
+    await tapVisibleButton(page, run, /^train$/);
     await page.waitForTimeout(2_000);
     await run.shotAt('cold-train-error-dark');
     await expect(page.getByRole('button', { name: /^suggested workout$/i }).first()).toBeVisible({ timeout: 8_000 });
@@ -154,7 +156,7 @@ test('Sana — offline: cold failures, then warm offline logging', async ({ page
   await goOffline(page);
   await page.waitForTimeout(800);
   await run.step('Go offline and start the suggested workout', async () => {
-    await tapVisibleButton(page, run, /^start workout$/);
+    await tapVisibleButton(page, run, /^train$/);
     await tapVisibleButton(page, run, /^suggested workout$/);
     await page.waitForTimeout(800);
     await tapVisibleButton(page, run, /^start workout$/);

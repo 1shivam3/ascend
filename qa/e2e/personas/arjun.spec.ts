@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { installSeed } from '../../fixtures/personas';
 import { installAiMocks } from '../../fixtures/ai-mocks';
-import { PersonaRun, collectionCounts, expectBooted, finishWorkout, logAllSets } from '../../fixtures/persona-run';
+import { PersonaRun, collectionCounts, expectBooted, finishWorkout, logAllSets, tapTodayWorkoutEntry } from '../../fixtures/persona-run';
 
 /**
  * Phase 4 — Persona 3: Arjun, beginner (truly fresh profile,
@@ -49,7 +49,7 @@ test('Arjun — beginner onboarding + first workout', async ({ page }, testInfo)
   await run.shotsBoth('today');
 
   await run.step('Start the suggested workout (Simple view)', async () => {
-    await run.tap(page.getByRole('button', { name: /^start workout$/i }).first());
+    await tapTodayWorkoutEntry(page, run);
     await run.tap(page.getByRole('button', { name: /^suggested workout$/i }).first());
     await expect(page.getByRole('button', { name: /^start workout$/i }).last()).toBeVisible();
     await run.tap(page.getByRole('button', { name: /^start workout$/i }).last());

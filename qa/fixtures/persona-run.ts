@@ -192,6 +192,27 @@ export async function expectBooted(page: Page): Promise<void> {
  *    fires once per exercise with unset weight.
  * Throws on a stuck/repeating state; the caller records the step.
  */
+/**
+ * Phase 7 harness alignment: Today's workout entry. A scheduled
+ * day's card reads "Start Workout"; a rest day's card (the PR #127
+ * rest-day card, which postdates the original persona drives)
+ * reads "Train anyway" — both are the same entry into Train, and
+ * the journeys measure what happens after it. Tap whichever the
+ * card offers.
+ */
+export async function tapTodayWorkoutEntry(page: Page, run: PersonaRun): Promise<void> {
+  const start = page.getByRole('button', { name: /^start workout$/i }).first();
+  if (await start.isVisible().catch(() => false)) {
+    await run.tap(start);
+    return;
+  }
+  // Rest day: "Train anyway" opens the Change-Today's-Workout sheet,
+  // which for a plan-less user offers no way to train (finding P7-1
+  // in qa/PERSONA_REPORT.md) — the working entry is the Train tab
+  // itself, the same path the Hindi persona drive uses.
+  await run.tap(mainNav(page).getByRole('button', { name: /^train$/i }));
+}
+
 export async function logAllSets(page: Page, run: PersonaRun): Promise<void> {
   let guard = 0;
   let lastClicked = '';
