@@ -585,3 +585,22 @@ pass after).
   Aman's under-13 step records "yes" (block + explanation both asserted).
 - F4-7 (Low) — NOT in this batch: removing the plan-editor gate is a
   start-flow design change; left for the owner's call.
+
+## F4-7 fast start (2026-11-20, owner's design call)
+
+The owner chose "skip the editor for returning users" over leaving
+F4-7 open. Design: returning = at least one logged workout. Both
+Suggested Workout entries on Train now start the session directly
+with the editor's own default generation (schedule-aligned body
+parts or Chest + Arms; goal-derived intensity; the same
+limitations/exclusions adaptation via
+generateAdaptedExercisesFromSelection). The editor is unchanged and
+stays reachable via a Customize link (returning users) and as the
+first-timer path; an empty generation falls back to the editor.
+Evidence: qa/e2e/f4-7-fast-start.spec.ts (returning direct start +
+Customize opens editor; first-timer gets the editor, no Customize).
+Persona suite re-run: 12/12 tests pass; Rohan's and Arjun's F4-7
+difficulties are removed from their ledgers (Arjun keeps the editor
+for his first workout, by design). One flake observed and cleared:
+Rohan's finish-step click timed out once in the full-suite run
+under load and passed on the solo re-run.

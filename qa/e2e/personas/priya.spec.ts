@@ -62,9 +62,9 @@ test('Priya — Hindi nutrition-first journey', async ({ page }, testInfo) => {
 
   await run.step('Start the suggested workout (Hindi labels)', async () => {
     await run.tap(mainNav(page).getByRole('button', { name: 'ट्रेनिंग' }));
+    // F4-7: returning user — सुझाया वर्कआउट starts the session
+    // directly, no editor modal in between.
     await run.tap(page.getByRole('button', { name: /सुझाया वर्कआउट/ }).first());
-    await expect(page.getByRole('button', { name: /वर्कआउट शुरू करें/ }).last()).toBeVisible();
-    await run.tap(page.getByRole('button', { name: /वर्कआउट शुरू करें/ }).last());
     await expect(page.getByRole('button', { name: /सेट पूरा करें/ })).toBeVisible({ timeout: 20_000 });
   });
   await run.shotAt('workout-first-set-light');

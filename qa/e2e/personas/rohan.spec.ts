@@ -25,17 +25,14 @@ test('Rohan — core logging journey', async ({ page }, testInfo) => {
   expect(before.workouts).toBe(18);
   await run.shotsBoth('today');
 
-  await run.step('Start suggested workout (Today → Train → Suggested → Start)', async () => {
+  await run.step('Start suggested workout (Today → Train → Suggested)', async () => {
     await tapTodayWorkoutEntry(page, run);
+    // F4-7 closed (owner's design call): a returning user starts
+    // directly — no plan-editor modal between Suggested and the
+    // first set. The editor remains under Customize.
     await run.tap(page.getByRole('button', { name: /^suggested workout$/i }).first());
-    await expect(page.getByRole('button', { name: /^start workout$/i }).last()).toBeVisible();
-    await run.tap(page.getByRole('button', { name: /^start workout$/i }).last());
     await expect(page.getByRole('button', { name: /complete set/i })).toBeVisible({ timeout: 20_000 });
   });
-  run.markDifficulty(
-    'Start suggested workout (Today → Train → Suggested → Start)',
-    'Three taps and a plan-generator modal stand between Today\'s "Start Workout" and the first set; the modal is a plan editor, not a confirm screen.',
-  );
   await run.shotAt('workout-first-set-light');
 
   await run.step('Log every set (Complete Set → Next Set loop)', async () => {

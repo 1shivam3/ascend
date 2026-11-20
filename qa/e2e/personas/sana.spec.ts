@@ -157,9 +157,8 @@ test('Sana — offline: cold failures, then warm offline logging', async ({ page
   await page.waitForTimeout(800);
   await run.step('Go offline and start the suggested workout', async () => {
     await tapVisibleButton(page, run, /^train$/);
+    // F4-7: returning user — Suggested starts the session directly.
     await tapVisibleButton(page, run, /^suggested workout$/);
-    await page.waitForTimeout(800);
-    await tapVisibleButton(page, run, /^start workout$/);
     await expect(page.getByRole('button', { name: /complete set/i })).toBeVisible({ timeout: 20_000 });
   });
   await run.shotAt('offline-workout-light');

@@ -53,7 +53,9 @@ test('Vikram — injury limitations respected?', async ({ page }, testInfo) => {
 
   const openGenerator = async () => {
     await run.tap(mainNav(page).getByRole('button', { name: /^train$/i }));
-    await run.tap(page.getByRole('button', { name: /^suggested workout$/i }).first());
+    // F4-7: the generator editor opens via Customize for returning
+    // users (Suggested itself now starts a session directly).
+    await run.tap(page.getByRole('button', { name: /^customize$/i }).first());
     await expect(page.getByRole('button', { name: /^start workout$/i }).last()).toBeVisible({ timeout: 15_000 });
   };
   const selectLegs = async () => {

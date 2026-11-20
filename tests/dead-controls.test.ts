@@ -58,9 +58,13 @@ describe('(b) Today no longer mounts the unopenable SuggestedWorkoutModal', () =
     expect(home).not.toContain('handleStartSuggestedWorkout');
   });
 
-  it('the generator stays reachable from Train (two openers + mount)', () => {
-    expect(train).toContain("import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal'");
-    expect((train.match(/setIsSuggestedModalOpen\(true\)/g) ?? []).length).toBe(2);
+  it('the generator stays reachable from Train (openers + mount)', () => {
+    expect(train).toContain("from '@/components/SuggestedWorkoutModal'");
+    // F4-7 fast start (persona follow-ups): the count moved 2 → 3.
+    // The openers are now: handleSuggestedEntry's first-timer path,
+    // its empty-generation fallback, and the Customize button
+    // (returning users start directly from Suggested instead).
+    expect((train.match(/setIsSuggestedModalOpen\(true\)/g) ?? []).length).toBe(3);
     expect(train).toContain('<SuggestedWorkoutModal');
     expect(fs.existsSync(path.join(process.cwd(), 'src/components/SuggestedWorkoutModal.tsx'))).toBe(true);
   });
