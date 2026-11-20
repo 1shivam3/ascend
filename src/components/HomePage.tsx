@@ -1529,7 +1529,25 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                     })}
                   </div>
                 ) : (
-                  <p className="text-xs text-text-muted italic py-1">{t('home.noPlans')}</p>
+                  <div className="space-y-2">
+                    <p className="text-xs text-text-muted italic py-1">{t('home.noPlans')}</p>
+                    {/* P7-1: without this, a plan-less user opening
+                        this sheet from a rest day had no way to start
+                        training — only "Set today as Rest Day" below.
+                        Train's Suggested Workout generates a session
+                        immediately; send them there. */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsChangeWorkoutOpen(false);
+                        onNavigate('workout');
+                      }}
+                      className="btn-primary w-full py-2.5 px-3 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Play className="w-3 h-3 fill-white" />
+                      <span>{t('home.startSuggested')}</span>
+                    </button>
+                  </div>
                 )}
               </div>
 

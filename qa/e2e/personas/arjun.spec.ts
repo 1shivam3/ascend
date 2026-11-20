@@ -35,10 +35,9 @@ test('Arjun — beginner onboarding + first workout', async ({ page }, testInfo)
     await run.tap(page.getByRole('button', { name: /i'll add this later/i }));
     await run.tap(page.getByRole('button', { name: /^continue$/i }));
   });
-  run.markDifficulty(
-    'Skip goals, enter basic details',
-    'Continue silently does nothing until the bodyweight question is answered ("I\'ll add this later") — no hint is shown.',
-  );
+  // F4-5 closed by the persona-followups batch: a failed Continue now
+  // scrolls the validation banner into view (covered directly by
+  // qa/e2e/persona-followups.spec.ts), so no difficulty is recorded.
   await run.shotAt('details-light');
 
   await run.step('Decline the plan offer and start training', async () => {
