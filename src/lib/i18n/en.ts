@@ -3134,6 +3134,7 @@ export const en = {
   'sg.saveDay': 'Save Day to Plans',
   'sg.startWorkout': 'Start Workout',
   'sg.fallbackWorkout': 'Suggested Workout',
+  'sg.customize': 'Customize',
   'sg.fallbackRoutine': 'Suggested Routine',
   'sg.toastMinOne': 'Workout must have at least one exercise.',
   'sg.toastAlreadyIn': '{name} is already in the routine.',

@@ -84,14 +84,14 @@ import FormCoachModal from '@/features/form-coach/components/FormCoachModal';
 import ExerciseLibraryModal from '@/components/ExerciseLibraryModal';
 import PostWorkoutTakeModal from '@/components/PostWorkoutTakeModal';
 import { DEFAULT_BODYWEIGHT_KG } from '@/lib/defaults';
-import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
+import SuggestedWorkoutModal, { BODY_PARTS, INTENSITIES, generateAdaptedExercisesFromSelection, type BodyPartOption, type IntensityOption } from '@/components/SuggestedWorkoutModal';
 import CoachBlockModal from '@/components/CoachBlockModal';
 import CoachChatTab from '@/components/CoachChatTab';
 import CoachChatSection from '@/components/CoachChatSection';
 import PlanPrefsPrompt from '@/components/PlanPrefsPrompt';
 import CoachWeeklyReviewModal from '@/components/CoachWeeklyReviewModal';
 import BlockDebriefModal from '@/components/BlockDebriefModal';
-import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek, SetExecutionStatus, DEFAULT_GOALS, resolvePrimaryGoal, MAX_PLAN_NAME_LENGTH } from '@/lib/types';
+import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek, SetExecutionStatus, DEFAULT_GOALS, resolvePrimaryGoal, MAX_PLAN_NAME_LENGTH, dayPlanRef } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
 
 import ActiveWorkoutScreen from '@/components/ActiveWorkoutScreen';
@@ -2200,6 +2200,75 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     setIsModalOpen(true);
   };
 
+  // ─── F4-7 fast start (persona follow-ups, owner's design call) ────
+  // The Suggested Workout modal is a plan EDITOR: three taps and a
+  // review stood between Train and the first set. For a RETURNING
+  // user (any logged workout) the editor's defaults are what they
+  // would confirm anyway, so the Suggested entries start the session
+  // directly with the modal's own default generation; the editor
+  // stays one tap away via Customize, and first-time users (no
+  // logged workout yet) still get the review-first modal.
+  const suggestedDefaultIntensity: IntensityOption =
+    primaryGoal === 'get_stronger' ? 'high' : primaryGoal === 'stamina' ? 'low' : 'medium';
+
+  const resolveDefaultSuggestedParts = (): BodyPartOption[] => {
+    // Mirrors SuggestedWorkoutModal's open-time alignment: today's
+    // scheduled body parts when a non-rest schedule exists, else
+    // the modal's chest + arms default. Keep the two in step.
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+    const todaySchedule = weeklySchedule ? weeklySchedule[dayNames[new Date().getDay()]] : null;
+    if (todaySchedule && dayPlanRef(todaySchedule).kind !== 'rest') {
+      const valid: BodyPartOption[] = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core', 'push', 'pull'];
+      const matched = (todaySchedule.bodyParts || [])
+        .map((bp) => bp.toLowerCase() as BodyPartOption)
+        .filter((bp) => valid.includes(bp));
+      if (matched.length > 0) return matched;
+      const ref = dayPlanRef(todaySchedule);
+      const routineName = (
+        todaySchedule.customTitle ||
+        (ref.kind === 'plan' ? plannedWorkouts.find((p) => p.id === ref.planId)?.name : '') ||
+        ''
+      ).toLowerCase();
+      if (routineName.includes('push')) return ['push'];
+      if (routineName.includes('pull')) return ['pull'];
+      if (routineName.includes('leg')) return ['legs'];
+      if (routineName.includes('upper')) return ['chest', 'back', 'shoulders'];
+      if (routineName.includes('lower')) return ['legs', 'core'];
+    }
+    return ['chest', 'arms'];
+  };
+
+  const handleSuggestedEntry = () => {
+    if (workouts.length === 0) {
+      setIsSuggestedModalOpen(true);
+      return;
+    }
+    const parts = resolveDefaultSuggestedParts();
+    const generated = generateAdaptedExercisesFromSelection(parts, suggestedDefaultIntensity, userUnit, {
+      bodyweightKg: profile?.bodyweightKg,
+      experience: profile?.userMode,
+      ageYears: profile?.age,
+      equipment: trainingProfile?.equipment || 'full_gym',
+      exclusions: trainingProfile?.dislikedExercises || [],
+      limitations: trainingProfile?.injuriesOrLimitations || [],
+    });
+    const valid = generated.exercises.filter((e) => e.name.trim());
+    if (valid.length === 0) {
+      // Generation produced nothing usable — fall back to the editor
+      // rather than starting an empty session.
+      setIsSuggestedModalOpen(true);
+      return;
+    }
+    const names = parts
+      .map((bp) => {
+        const f = BODY_PARTS.find((b) => b.id === bp);
+        return f ? t(f.labelKey) : bp;
+      })
+      .join(' + ');
+    const intensityLabel = t(INTENSITIES.find((i) => i.id === suggestedDefaultIntensity)?.labelKey ?? 'sg.int.medium');
+    handleStartSuggestedWorkout(`${names} (${intensityLabel})`, valid);
+  };
+
   const handleSaveSuggestedPlan = (planData: Omit<PlannedWorkout, 'id' | 'createdAt'>) => {
     const newPlan: PlannedWorkout = {
       id: typeof crypto !== 'undefined' && crypto.randomUUID
@@ -2672,7 +2741,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                   with no plans had no one-tap suggestion path. */}
               <button
                 type="button"
-                onClick={() => setIsSuggestedModalOpen(true)}
+                onClick={handleSuggestedEntry}
                 className="py-2 px-4 text-xs font-bold flex items-center justify-center gap-1.5 flex-1 cursor-pointer rounded-xl bg-bg-secondary border border-border text-text-primary hover:border-accent/40 transition-colors"
               >
                 <Sparkles className="w-3.5 h-3.5 text-accent" />
@@ -2823,14 +2892,27 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
         {/* Quick Tools Row: Suggested Workout & Past Session */}
         <div className="pt-2 border-t border-border/40 flex items-center justify-between text-xs">
-          <button
-            type="button"
-            onClick={() => setIsSuggestedModalOpen(true)}
-            className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-accent" />
-            <span>{t('sg.fallbackWorkout')}</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleSuggestedEntry}
+              className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-accent" />
+              <span>{t('sg.fallbackWorkout')}</span>
+            </button>
+            {/* F4-7: returning users start directly from the button
+                above; the plan editor stays reachable here. */}
+            {workouts.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsSuggestedModalOpen(true)}
+                className="text-text-muted hover:text-accent font-medium transition-colors cursor-pointer"
+              >
+                {t('sg.customize')}
+              </button>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => setIsLogPastModalOpen(true)}
@@ -3407,7 +3489,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         isOpen={isSuggestedModalOpen}
         onClose={() => setIsSuggestedModalOpen(false)}
         userUnit={userUnit}
-        defaultIntensity={primaryGoal === 'get_stronger' ? 'high' : primaryGoal === 'stamina' ? 'low' : 'medium'}
+        defaultIntensity={suggestedDefaultIntensity}
         onStartWorkout={handleStartSuggestedWorkout}
         onSavePlan={handleSaveSuggestedPlan}
       />

@@ -64,7 +64,7 @@ interface SuggestedWorkoutModalProps {
   onSavePlan: (plan: Omit<PlannedWorkout, 'id' | 'createdAt'>) => void;
 }
 
-const BODY_PARTS: { id: BodyPartOption; labelKey: StringKey; icon: React.ComponentType<{ className?: string }>; descKey: StringKey }[] = [
+export const BODY_PARTS: { id: BodyPartOption; labelKey: StringKey; icon: React.ComponentType<{ className?: string }>; descKey: StringKey }[] = [
   { id: 'chest',      labelKey: 'sg.bp.chest',      icon: Target,   descKey: 'sg.bp.chestDesc' },
   { id: 'back',       labelKey: 'sg.bp.back',       icon: Layers,   descKey: 'sg.bp.backDesc' },
   { id: 'shoulders',  labelKey: 'sg.bp.shoulders',  icon: Shield,   descKey: 'sg.bp.shouldersDesc' },
@@ -138,7 +138,7 @@ const SPLIT_PRESETS: SplitPreset[] = [
   },
 ];
 
-const INTENSITIES: { id: IntensityOption; labelKey: StringKey; tagKey: StringKey; description: string; badgeColor: string }[] = [
+export const INTENSITIES: { id: IntensityOption; labelKey: StringKey; tagKey: StringKey; description: string; badgeColor: string }[] = [
   {
     id: 'low',
     labelKey: 'sg.int.low',

@@ -3141,6 +3141,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'sg.saveDay': 'दिन प्लान में सहेजें',
   'sg.startWorkout': 'वर्कआउट शुरू करें',
   'sg.fallbackWorkout': 'सुझाया वर्कआउट',
+  'sg.customize': 'कस्टमाइज़ करें',
   'sg.fallbackRoutine': 'सुझाई रूटीन',
   'sg.toastMinOne': 'वर्कआउट में कम से कम एक एक्सरसाइज़ होनी चाहिए।',
   'sg.toastAlreadyIn': '{name} पहले से रूटीन में है।',
