@@ -132,11 +132,11 @@ test('Aman — onboarding with DOB under 13 is refused', async ({ page }, testIn
     const newest = Math.max(...years);
     expect(newest).toBe(new Date().getFullYear() - 13);
     await expect(mainNav(page)).toHaveCount(0);
+    // F4-6 closed by the persona-followups batch: the 13+ rule is
+    // now stated next to the picker (onboarding.dobAgeNote), so the
+    // missing years have an explanation on the same screen.
+    await expect(page.getByText(/13 or older/i)).toBeVisible();
   });
-  run.markDifficulty(
-    'A DOB under 13 cannot be entered in onboarding',
-    'The block is real but silent: the year list simply ends 13 years ago and no copy anywhere states a 13+ rule — a young user gets no explanation, just a missing year.',
-  );
   await run.shotAt('under13-refusal-light');
 
   run.logSummary();
