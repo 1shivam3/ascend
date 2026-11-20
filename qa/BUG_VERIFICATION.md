@@ -496,11 +496,40 @@ Phase 0 baseline, branch `bug-program/phase-0` off master `adcb6c1`.
   brief.
 
 ### Phase 6 checks
-- **Status:** not yet run. (Rest timer from every start path was
-  rebuilt as one reducer in state-machines Phase 3.2 with unit
-  tests; accent contrast has `tests/audit-phase4-accent-safety.test.ts`;
-  the two-context offline check and the remaining items run in
-  Phase 6.)
+- **Status:** RUN 2026-11-20. Battery: 39 targeted vitest files,
+  432 tests, all passed; r8 workout-views Playwright passed on
+  small-320x568 and pixel-412x915 (4 passed, 1 project-conditional
+  skip) in addition to the standing android-360x740 set.
+  - *Workout views / prefill:* the cascade (previous set → last
+    session → plan target → unset, never 0-as-a-target) is covered
+    by tests/audit-phase1-zero-weight.test.ts (P0-1) and the r8
+    drives (tap-to-type rows, ≥44 px toggles, Complete bar in
+    viewport without scrolling at 360x740 AND 320x568, XL text).
+    **One defect found + fixed (commits `57164be`, `f7ca366`):**
+    swapping a bodyweight exercise for a weighted one mid-session
+    (rename path + crowded-gym swap path) stamped a FABRICATED
+    50 kg / 115 lb prefill on every uncompleted set. The sets now
+    stay unset; completing at no weight goes through the existing
+    "Log without weight?" guard. Pin: tests/bugp6-prefill.test.ts.
+  - *Rest timer from every start path:* rest-timer-phase3 +
+    rest-timer-sound suites green (single reducer since
+    state-machines Phase 3.2; start paths converge on it).
+  - *Form Coach:* qa-phase3-form-coach + the tests/form-coach
+    suites green — validity states, the lockout-unverified rule,
+    count reconciliation and pluralization all covered there.
+  - *Accent contrast:* qa-phase3-accent-contrast (all 6 presets
+    AA in both themes + fixed-seed random customs after
+    derivation), custom-accent-light, accent-themes and
+    audit-phase4-accent-safety suites green.
+  - *Hindi completeness:* tests/i18n.test.ts green (key parity +
+    pinned wiring list).
+  - *Offline log → sync → failure → recovery:*
+    offline-sync-resilience + qa-phase1-r6-sync-failure green.
+  - *Two-context concurrent edits:* gauntlet-sync-newest-wins
+    green — push/pull newest-wins gates incl. ties to remote,
+    missing-stamp rules and tombstone protection: two contexts
+    editing the same row converge on the newer stamp, never on
+    arrival order.
 
 ## Manual device checklist (started — grows per phase)
 - Gboard + Samsung Keyboard typing in every Phase 1 input (B1).
