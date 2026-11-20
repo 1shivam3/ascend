@@ -103,12 +103,21 @@ export async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<voi
   await page.addInitScript((t) => {
     try {
       window.localStorage.setItem('ascend_theme', t);
+      // §35 (state-machines): only the MODE persists now — the
+      // resolved theme is re-derived on load and the boot keys are
+      // rewritten from it, so patching the old blob.state.theme
+      // field (this helper's original write) no longer takes. Set
+      // the mode everywhere the boot path reads it. (Phase 7
+      // harness repair — the app itself follows the persisted
+      // mode correctly.)
+      window.localStorage.setItem('ascend_theme_mode', t);
       window.localStorage.setItem('ascend_has_custom_theme', 'true');
       const raw = window.localStorage.getItem('ascend_store');
       if (raw) {
         const blob = JSON.parse(raw);
         if (blob && blob.state) {
           blob.state.theme = t;
+          blob.state.themeMode = t;
           blob.state.hasCustomTheme = true;
           window.localStorage.setItem('ascend_store', JSON.stringify(blob));
         }
