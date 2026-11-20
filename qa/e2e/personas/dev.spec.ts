@@ -66,9 +66,8 @@ test('Dev — adversarial inputs, no corruption', async ({ page }, testInfo) => 
   await run.step('Start a session for value abuse', async () => {
     await run.tap(mainNav(page).getByRole('button', { name: /^today$/i }));
     await tapTodayWorkoutEntry(page, run);
+    // F4-7: returning user — Suggested starts the session directly.
     await run.tap(page.getByRole('button', { name: /^suggested workout$/i }).first());
-    await expect(page.getByRole('button', { name: /^start workout$/i }).last()).toBeVisible();
-    await run.tap(page.getByRole('button', { name: /^start workout$/i }).last());
     await expect(page.getByRole('button', { name: /complete set/i })).toBeVisible({ timeout: 20_000 });
   });
 

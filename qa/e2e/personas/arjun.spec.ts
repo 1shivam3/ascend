@@ -55,10 +55,10 @@ test('Arjun — beginner onboarding + first workout', async ({ page }, testInfo)
     await run.tap(page.getByRole('button', { name: /^start workout$/i }).last());
     await expect(page.getByRole('button', { name: /complete set/i })).toBeVisible({ timeout: 20_000 });
   });
-  run.markDifficulty(
-    'Start the suggested workout (Simple view)',
-    'Same three-tap path with a plan-editor modal as Rohan — a first-week beginner must confirm a generated plan before touching a set.',
-  );
+  // F4-7 closed by design (owner's call): the editor still opens
+  // for a FIRST workout — reviewing the first generated plan is the
+  // intended beginner path. From the second workout on, Suggested
+  // starts directly (see qa/e2e/f4-7-fast-start.spec.ts).
   await run.shotAt('workout-first-set-light');
 
   await run.step('Log every set of the first workout', async () => {

@@ -58,9 +58,8 @@ test('Meera — Advanced view + Progress/PRs', async ({ page }, testInfo) => {
 
   await run.step('Start a workout in the Advanced view', async () => {
     await run.tap(mainNav(page).getByRole('button', { name: /^train$/i }));
+    // F4-7: returning user — Suggested starts the session directly.
     await run.tap(page.getByRole('button', { name: /^suggested workout$/i }).first());
-    await expect(page.getByRole('button', { name: /^start workout$/i }).last()).toBeVisible();
-    await run.tap(page.getByRole('button', { name: /^start workout$/i }).last());
     // Advanced view signature: per-row completion toggles, no single
     // big Complete Set bar.
     await expect(page.getByRole('button', { name: /mark set complete/i }).first()).toBeVisible({ timeout: 20_000 });

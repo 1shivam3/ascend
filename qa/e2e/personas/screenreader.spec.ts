@@ -117,7 +117,9 @@ test('Screen-reader — accessibility tree across surfaces', async ({ page }, te
   });
 
   await run.step('Plan-generator dialog: present in the tree, named, focus inside', async () => {
-    await run.tap(page.getByRole('button', { name: /^suggested workout$/i }).first());
+    // F4-7: Suggested now starts directly for returning users; the
+    // generator dialog opens via Customize.
+    await run.tap(page.getByRole('button', { name: /^customize$/i }).first());
     await page.waitForTimeout(1_200);
     const lines = await ariaLines(page);
     const dlgIdx = lines.findIndex((l) => l.role === 'dialog' || l.role === 'alertdialog');
@@ -141,9 +143,8 @@ test('Screen-reader — accessibility tree across surfaces', async ({ page }, te
   await page.waitForTimeout(600);
 
   await run.step('Live workout session: every interactive element is named', async () => {
+    // F4-7: returning user — Suggested starts the session directly.
     await run.tap(page.getByRole('button', { name: /^suggested workout$/i }).first());
-    await expect(page.getByRole('button', { name: /^start workout$/i }).last()).toBeVisible();
-    await run.tap(page.getByRole('button', { name: /^start workout$/i }).last());
     await expect(page.getByRole('button', { name: /complete set/i })).toBeVisible({ timeout: 20_000 });
     const snap = await ariaLines(page);
     const { total, unnamed } = analyze(snap);
