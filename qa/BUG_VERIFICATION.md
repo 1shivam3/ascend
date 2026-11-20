@@ -565,6 +565,27 @@ Dev 9/0, Vikram 7/0 (+1 not-testable), Screen-reader 9/0.
   Remaining NOT TESTED: real cloud sync / two-device round trip, real auth,
   voice capture, Form Coach on real footage, real TalkBack, production SW.
 
+## Persona-followups batch (2026-11-20, post-program)
+
+Owner said "Merge and proceed" after Phase 7; the brief has no Phase 8, so
+the batch is the Phase 7 report's recommended next fixes, in its order.
+Evidence spec: qa/e2e/persona-followups.spec.ts (both tests failed before,
+pass after).
+
+- P7-1 (Medium) — FIXED: the Change Today's Workout sheet's empty-plans
+  branch now carries a primary "Start a suggested workout" action
+  (home.startSuggested, en+hi) that closes the sheet and navigates to
+  Train, where Suggested Workout generates a session immediately.
+- F4-5 (Low) — FIXED: the details step's validation banner already
+  existed but rendered at the top of the screen, off-screen from the
+  bottom Continue button. It now scrolls into view (instant) whenever
+  an error is set. Arjun's ledger: the details step records "yes" again.
+- F4-6 (Low) — FIXED: "You need to be 13 or older to use Ascend."
+  (onboarding.dobAgeNote, en+hi) now sits under the DOB picker.
+  Aman's under-13 step records "yes" (block + explanation both asserted).
+- F4-7 (Low) — NOT in this batch: removing the plan-editor gate is a
+  start-flow design change; left for the owner's call.
+
 ## F4-7 fast start (2026-11-20, owner's design call)
 
 The owner chose "skip the editor for returning users" over leaving

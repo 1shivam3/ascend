@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { Gender, Unit, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
 import StepProgressBar from './StepProgressBar';
@@ -92,6 +92,17 @@ export default function PersonalDetailsScreen({
   const [statsSkipped, setStatsSkipped] = useState(initialBodyStatsSkipped);
 
   const [error, setError] = useState<string | null>(null);
+
+  // F4-5: the banner renders at the top of the screen while Continue
+  // sits at the bottom — on a phone the failure feedback appeared
+  // off-screen and the tap read as "nothing happens". Bring the
+  // banner into view whenever an error is set.
+  const errorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // Instant, not smooth: a smooth scroll can be interrupted by the
+    // shake animation / layout and leave the banner off-screen.
+    if (error) errorRef.current?.scrollIntoView({ block: 'center' });
+  }, [error]);
 
   const addLimitation = (opt: string) =>
     setLimitations((prev) => (opt && !prev.includes(opt) ? [...prev, opt] : prev));
@@ -204,7 +215,7 @@ export default function PersonalDetailsScreen({
         </div>
 
         {error && (
-          <div className="p-3.5 rounded-xl bg-danger/10 border border-danger/30 text-danger text-xs flex items-start gap-2.5 animate-shake">
+          <div ref={errorRef} className="p-3.5 rounded-xl bg-danger/10 border border-danger/30 text-danger text-xs flex items-start gap-2.5 animate-shake">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span className="leading-snug">{error}</span>
           </div>
@@ -275,6 +286,11 @@ export default function PersonalDetailsScreen({
               {t('onboarding.dateOfBirthHint')}
             </span>
             <DobPicker id="details-dob" value={dob} onChange={setDob} min={bounds.min} max={bounds.max} />
+            {/* F4-6: the picker bounds silently stop 13 years back —
+                state the rule where the missing years confuse. */}
+            <span className="block text-2xs text-text-muted">
+              {t('onboarding.dobAgeNote')}
+            </span>
           </div>
 
           {/* Weight & height (Task 1.1) — asked here because the food
