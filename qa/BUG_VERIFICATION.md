@@ -536,3 +536,31 @@ Phase 0 baseline, branch `bug-program/phase-0` off master `adcb6c1`.
 - Keyboard behaviour in every modal on a real device (B2).
 - (Carried) Form Coach on real footage; rest-timer audibility;
   Health Connect partial grants; notification outcomes.
+
+## Phase 7 resolutions (2026-11-20)
+
+Persona pass complete — full report in qa/PERSONA_REPORT.md (supersedes the
+QA-hardening Phase 4 edition). 11 Playwright persona tests, all passing as
+tests; step ledgers: Rohan 4 yes/1 difficulty, Priya 6/0 (+1 not-testable),
+Arjun 4/2, Meera 5/0, Aman 3/0 (+1 difficulty), Sana 9/0 (+1 not-tested),
+Dev 9/0, Vikram 7/0 (+1 not-testable), Screen-reader 9/0.
+
+- F4-1 (cold offline tab crash, High) — FIXED, re-proven: Sana cold Train
+  opens pass in light and dark.
+- F4-2 (offline relaunch, High) — FIXED, re-proven: Sana relaunch step.
+- F4-3 (generator ignored declared injuries, High) — FIXED, re-proven:
+  Vikram legs generation respects Knee + Low back in both themes; the
+  generator routes through prepareGeneratedPlans with limitations.
+- F4-4 (Hurts swap dead end, Medium) — FIXED, re-proven: Vikram swap step.
+- F4-5 / F4-6 / F4-7 (all Low) — still open, unchanged (Arjun/Aman/Rohan
+  difficulty steps).
+- NEW P7-1 (Medium): Today's rest-day "Train anyway" sheet offers a
+  plan-less user no way to start training (only "Set today as Rest Day" /
+  Manage Plans); workaround is the Train tab. Documented, not fixed —
+  Phase 7 is a measurement phase.
+- Harness repairs (test infrastructure only, no app code): setTheme now
+  writes themeMode (post-§35 persistence); persona drives enter Train via
+  the tab on rest days (see P7-1).
+- Weighted overall 7.7/10 (brief rubric), no caps triggered. Verdict: Ship.
+  Remaining NOT TESTED: real cloud sync / two-device round trip, real auth,
+  voice capture, Form Coach on real footage, real TalkBack, production SW.
